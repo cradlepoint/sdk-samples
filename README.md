@@ -1,5 +1,10 @@
 # Router App/SDK sample application design tools.
 
+Note that the most complete documentation is at present in this wiki:
+<http://wikis.iatips.com/index.php?title=CP_MainPage>
+
+Eventually, the info will move to a formal Developer Portal. 
+ 
 ## Running Make.py
 
 - Check **status** of SDK on local router, queries Router API "/status/system/sdk"
