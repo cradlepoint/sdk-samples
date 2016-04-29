@@ -1,0 +1,397 @@
+
+App was installed okay, and started:
+{
+	'6903f7bb-cee2-41eb-af-9b71ab8d3ad5': {
+		'type': 'development',
+		'app': {
+			'date': '2016-03-03T17: 04: 06.838652',
+			'uuid': '6903f7bb-cee2-41eb-afba-9b71ab8d3ad5',
+			'version_major': 1,
+			'name': 'hello_world',
+			'restart': True,
+			'version_minor': 10,
+			'vendor': 'customer'
+		},
+		'summary': 'Startedapplication',
+		'state': 'started'
+	}
+}
+
+{
+	'114c8c0f-9887-4e68-a4e7-de8d73fba69f': {
+		'state': 'started',
+		'summary': 'Startedapplication',
+		'app': {
+			'version_major': 1,
+			'uuid': '114c8c0f-9887-4e68-a4e7-de8d73fba69f',
+			'restart': True,
+			'date': '2016-03-04T15: 30: 01.455373',
+			'vendor': 'customer',
+			'version_minor': 8,
+			'name': 'hello_world'
+		},
+		'type': 'development'
+	}
+}
+
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:GOOD file:/usr/lib
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcares.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcares.so.2.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcompat.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcrypto.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcrypto.so.1.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcsclient.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcsclient.so.1.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip4tc.so.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip4tc.so.0.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip6tc.so.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip6tc.so.0.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libipsec.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libipsec.so.0.8.1
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libiptc.so.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libiptc.so.0.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libjansson.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libjansson.so.2.6
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libm.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libm.so.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libmnl.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libmnl.so.1.0.3
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_acct.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_acct.so.1.0.2
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_conntrack.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_conntrack.so.1.0.4
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnfnetlink.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnfnetlink.so.1.0.1
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-genl.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-genl.so.3.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-nf.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-nf.so.3.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-route.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-route.so.3.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl.so.3.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam.so.1.1.6
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam_misc.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam_misc.so.1.1.6
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpamc.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpamc.so.1.1.6
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpcap.so.1
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpcap.so.1.6.2
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libquagga.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssh.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssh.so.0.7.1
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssl.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssl.so.1.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libusb.so
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libusb.so.1.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libxtables.so.7
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libxtables.so.7.0.0
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libz.so.1
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libz.so.1.2.8
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pppd
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:python3.3
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:rp-pppoe
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:security
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ulogd
+92.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:xtables
+
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>httpserver: Accepted API login from local address 192.168.1.6, user: admin
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:Hello SDK World!
+192.168.1.1 :  <14>httpserver: Accepted API login from local address 192.168.1.6, user: admin
+192.168.1.1 :  <14>httpserver: Accepted API login from local address 192.168.1.6, user: admin
+192.168.1.1 :  <15>routersdk: _onControlAction ['control', 'system', 'sdk', 'action'] uninstall 114c8c0f-9887-4e68-a4e7-de8d73fba69f
+192.168.1.1 :  <15>psmon:sh: Stopping process 4028: /bin/sh
+192.168.1.1 :  <15>psmon:sh: Process (/bin/sh[4028]) exited with code: -15
+192.168.1.1 :  <15>psmon:sh: Stopped process 4028: /bin/sh
+192.168.1.1 :  <15>routersdk: Application successfully stopped
+192.168.1.1 :  <14>filemgr: Rebuilding flash sector: id: 1, allocated: 234, remaining: 2847, total: 62689, erase_count: 107, inodes: 6, files: 1
+192.168.1.1 :  <15>svcmgr: Erasing sector: 1
+192.168.1.1 :  <15>routersdk: Application successfully uninstalled
+192.168.1.1 :  <14>httpserver: Accepted API login from local address 192.168.1.6, user: admin
+192.168.1.1 :  <15>ecm: Remote code exec triggered
+192.168.1.1 :  <14>ssh: Client SSH session started from 192.168.1.6, user: admin
+192.168.1.1 :  <15>routersdk: Developer application upload successful
+192.168.1.1 :  <14>ssh: Client session ended from 192.168.1.6, user: admin
+192.168.1.1 :  <15>routersdk: Successfully created paths /var/mnt/sdk/apps/114c8c0f-9887-4e68-a4e7-de8d73fba69f & /var/mnt/sdk/apps/114c8c0f-9887-4e68
+-a4e7-de8d73fba69f/dist
+192.168.1.1 :  <15>routersdk: Successfully downloaded package dist/tmpd0eek0
+192.168.1.1 :  <15>routersdk: Successfully extracted application directory (hello_world)
+192.168.1.1 :  <15>routersdk: Successfully extracted application
+192.168.1.1 :  <15>routersdk: Application Manifest validation successful
+192.168.1.1 :  <14>filemgr: Rebuilding flash sector: id: 0, allocated: 887, remaining: 1659, total: 63877, erase_count: 106, inodes: 8, files: 3
+192.168.1.1 :  <15>svcmgr: Erasing sector: 0
+192.168.1.1 :  <15>routersdk: Application successfully installed
+192.168.1.1 :  <15>psmon:sh: Started process 4118: ['/bin/sh', 'start.sh']
+192.168.1.1 :  <15>routersdk: Application successfully started
+192.168.1.1 :  <14>UNKNOWN: INFO:routerSDK:CWD:/var/mnt/sdk/apps/114c8c0f-9887-4e68-a4e7-de8d73fba69f/hello_world
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:GOOD file:/usr/lib
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcares.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcares.so.2.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcompat.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcrypto.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcrypto.so.1.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcsclient.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libcsclient.so.1.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip4tc.so.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip4tc.so.0.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip6tc.so.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libip6tc.so.0.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libipsec.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libipsec.so.0.8.1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libiptc.so.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libiptc.so.0.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libjansson.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libjansson.so.2.6
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libm.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libm.so.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libmnl.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libmnl.so.1.0.3
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_acct.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_acct.so.1.0.2
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_conntrack.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnetfilter_conntrack.so.1.0.4
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnfnetlink.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnfnetlink.so.1.0.1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-genl.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-genl.so.3.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-nf.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-nf.so.3.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-route.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl-route.so.3.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libnl.so.3.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam.so.1.1.6
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam_misc.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpam_misc.so.1.1.6
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpamc.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpamc.so.1.1.6
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpcap.so.1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libpcap.so.1.6.2
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libquagga.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssh.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssh.so.0.7.1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssl.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libssl.so.1.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libusb.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libusb.so.1.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libxtables.so.7
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libxtables.so.7.0.0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libz.so.1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:libz.so.1.2.8
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pppd
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:python3.3
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:rp-pppoe
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:security
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ulogd
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:xtables
+
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:GOOD file:/usr/lib/python3.3
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:OpenSSL
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:__future__.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:_compat_pickle.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:_pyio.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:_ssh.cpython-33m.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:_strptime.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:_weakrefset.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:abc.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:argparse.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:base64.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:bdb.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:bisect.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cProfile.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:calendar.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cgi.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:chunk.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cmd.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:code.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:codecs.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:codeop.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:collections
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:compileall.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:configparser.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:contextlib.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:copy.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:copyreg.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cp
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cpsite.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cradlepoint.cpython-33m.so
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ctypes
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:datetime.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:dateutil
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:difflib.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:dis.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:dnslib
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:dnsproxy.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:dummy_threading.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:email
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:encodings
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:fnmatch.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:functools.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:genericpath.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:getopt.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:gettext.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:glob.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:gzip.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:hashlib.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:heapq.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:hmac.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:html
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:http
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:imp.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:importlib
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:inspect.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:io.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ipaddress.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:json
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:keyword.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:lib-dynload
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:linecache.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:locale.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:logging
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:lzma.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mailbox.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mimetypes.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:numbers.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:opcode.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:os.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pdb.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pickle.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pkgutil.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:platform.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:posixpath.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pprint.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:py_compile.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pyrad
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:queue.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:quopri.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:random.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:re.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:reprlib.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:runpy.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:serial
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:shlex.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:shutil.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:smtplib.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:socket.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:socketserver.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:sre_compile.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:sre_constants.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:sre_parse.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ssh.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ssl.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:stat.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:string.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:stringprep.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:struct.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:subprocess.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:tarfile.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:telnetlib.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:tempfile.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:textwrap.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:threading.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:token.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:tokenize.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:tornado
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:traceback.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:tty.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:types.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:urllib
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:uu.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:uuid.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:warnings.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:weakref.pyo
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:xml
+
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:GOOD file:/dev
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:log
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cp_lkm_pm
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cp_lkm_usb
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:switch0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ubi1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ubi1_0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:watchdog0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:watchdog
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:pts
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:bus
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock8
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock7
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock6
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock5
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:root
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock4
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock3
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock2
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtdblock0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:network_throughput
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ralink_gpio
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ubi_ctrl
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:network_latency
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:cpu_dma_latency
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:net
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ttyS1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ttyS0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:console
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ptmx
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:tty
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:ppp
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd8ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd7ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd6ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd5ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd4ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd3ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd2ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd1ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd0ro
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd8
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd7
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd6
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd5
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd4
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd3
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd2
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd1
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mtd0
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:urandom
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:random
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:zero
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:port
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:null
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:kmsg
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:full
+192.168.1.1 :  <15>UNKNOWN: DEBUG:routerSDK:  file:mem

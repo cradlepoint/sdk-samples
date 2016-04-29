@@ -1,0 +1,28 @@
+config/system/gpio_actions/
+			"serial_gpio_enable": true,
+
+   	"system": {
+		"connector_gpio": {
+			"output": 0,
+			"timeout": 300,
+			"input": 1
+		},
+
+
+# this only works when {"Content-Type": "application/x-www-form-urlencoded"}
+result = client.put("control/gpio/CGPIO_CONNECTOR_OUTPUT", "data=%d" % result)
+# PUT http://192.168.1.1/api/control/gpio/CGPIO_CONNECTOR_OUTPUT data=0
+# GET RSP 0
+
+# result = client.put("control/gpio", {"data": "CGPIO_CONNECTOR_OUTPUT %d" % result})
+# PUT http://192.168.1.1/api/control/gpio {"data": "CGPIO_CONNECTOR_OUTPUT 0"}
+# RSP {'exception': 'key', 'key': 'data'}
+
+# result = client.put("control/gpio", {"CGPIO_CONNECTOR_OUTPUT": result})
+# PUT http://192.168.1.1/api/control/gpio {"CGPIO_CONNECTOR_OUTPUT": 0}
+# RSP {'key': 'data', 'exception': 'key'}
+
+# result = client.put("control/gpio/CGPIO_CONNECTOR_OUTPUT", {"data": result})
+# PUT http://192.168.1.1/api/control/gpio/CGPIO_CONNECTOR_OUTPUT {"data": 0}
+# RSP {'key': 'data', 'exception': 'key'}
+

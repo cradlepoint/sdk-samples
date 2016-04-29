@@ -1,0 +1,1 @@
+pscp.exe -pw 441b1702 -v RouterSDKDemo.tar.gz admin@192.168.1.1:/app_upload
