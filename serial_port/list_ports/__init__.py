@@ -1,5 +1,5 @@
 from cp_lib.app_base import CradlepointAppBase
-from serial_port.list_ports.list_ports import do_list_ports
+from serial_port.list_ports.list_ports import run_router_app
 
 
 class RouterApp(CradlepointAppBase):
@@ -13,4 +13,4 @@ class RouterApp(CradlepointAppBase):
         return
 
     def run(self):
-        return do_list_ports(self.logger, self.settings)
+        return run_router_app(self.logger, self.settings)

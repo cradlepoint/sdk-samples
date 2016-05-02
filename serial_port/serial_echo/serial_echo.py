@@ -9,8 +9,11 @@ from cp_lib.app_base import CradlepointAppBase
 DEF_BAUD_RATE = 9600
 DEF_PORT_NAME = "/dev/ttyS1"
 
+# set to None to disable, or set to bytes to send
+ASK_ARE_YOU_THERE = b"u there?"
 
-def run_main(app_base):
+
+def run_router_app(app_base):
     """
 
     :param CradlepointAppBase app_base: prepared resources: logger, cs_client
@@ -33,12 +36,22 @@ def run_main(app_base):
         if "baud_rate" in app_base.settings["serial_echo"]:
             baud_rate = int(app_base.settings["serial_echo"]["baud_rate"])
 
+    # see if port is a digit?
+    if port_name[0].isdecimal():
+        port_name = int(port_name)
+
     message = "Starting serial echo on {0}, baud={1}".format(port_name,
                                                              baud_rate)
     app_base.logger.info(message)
 
-    ser = serial.Serial(port_name, baudrate=baud_rate, bytesize=8, parity='N',
-                        stopbits=1, timeout=1, xonxoff=0, rtscts=0)
+    try:
+        ser = serial.Serial(port_name, baudrate=baud_rate, bytesize=8,
+                            parity='N', stopbits=1, timeout=1,
+                            xonxoff=0, rtscts=0)
+
+    except serial.SerialException:
+        app_base.logger.error("Open failed!")
+        raise
 
     # start as None to force at least 1 change
     dsr_was = None
@@ -46,10 +59,18 @@ def run_main(app_base):
 
     try:
         while True:
-            data = ser.read(size=1)
+            try:
+                data = ser.read(size=1)
+            except KeyboardInterrupt:
+                app_base.logger.warning(
+                    "Keyboard Interrupt - asked to quit")
+                break
+
             if len(data):
                 app_base.logger.debug(str(data))
                 ser.write(data)
+            elif ASK_ARE_YOU_THERE is not None:
+                ser.write(ASK_ARE_YOU_THERE)
             # else:
             #     app_base.logger.debug(b".")
 
@@ -73,9 +94,6 @@ def run_main(app_base):
 
 if __name__ == "__main__":
     my_app = CradlepointAppBase("serial/serial_echo")
-
-    _result = run_main(my_app)
-
+    _result = run_router_app(my_app)
     my_app.logger.info("Exiting, status code is {}".format(_result))
-
     sys.exit(_result)

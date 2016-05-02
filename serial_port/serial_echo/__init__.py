@@ -1,5 +1,5 @@
 from cp_lib.app_base import CradlepointAppBase
-from serial_port.serial_echo.serial_echo import run_main
+from serial_port.serial_echo.serial_echo import run_router_app
 
 
 class RouterApp(CradlepointAppBase):
@@ -17,7 +17,7 @@ class RouterApp(CradlepointAppBase):
 
         # we do this wrap to dump any Python exception traceback out to Syslog
         try:
-            result = run_main(self)
+            result = run_router_app(self)
         except:
             self.logger.exception("CradlepointAppBase failed")
             raise

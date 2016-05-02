@@ -3,15 +3,15 @@ import serial
 import sys
 
 import cp_lib.hw_status
+from cp_lib.app_base import CradlepointAppBase
 
 
-def do_list_ports(my_logger, my_settings):
+def run_router_app(app_base):
     """
-    Say hello every 10 seconds
+    Do the probe/check of
 
-    :param my_logger: a logger
-    :type my_logger: logging.Logger
-    :param dist my_settings: from the INI file
+    :param CradlepointAppBase app_base: the prepared resources: logger,
+                                        cs_client, settings, etc
     :return:
     """
 
@@ -52,27 +52,12 @@ def do_list_ports(my_logger, my_settings):
         raise NotImplementedError(
             "This sample only runs on CP Router or Windows")
 
-    return
+    return 0
 
 if __name__ == "__main__":
 
-    import logging
-    import logging.handlers
+    my_app = CradlepointAppBase("serial_port/list_ports")
 
-    logger = logging.getLogger("routerSDK")
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
-
-    # handler = logging.handlers.SysLogHandler(address="/dev/log",
-    handler = logging.handlers.SysLogHandler(
-        address=("192.168.1.6", 514),
-        facility=logging.handlers.SysLogHandler.LOG_LOCAL6)
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-    logger.info("Starting ...")
-    # logger.debug("settings:{}".format(obj.settings))
-
-    do_list_ports(logger, {})
+    _result = run_router_app(my_app)
+    my_app.logger.info("Exiting, status code is {}".format(_result))
+    sys.exit(_result)
