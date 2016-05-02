@@ -4,6 +4,7 @@ A basic but complete echo server
 
 import socketserver
 import threading
+import time
 
 import cp_lib.data.json_get_put as json_get_put
 from cp_lib.app_base import CradlepointAppBase
@@ -28,6 +29,19 @@ def run_router_app(app_base):
 
     my_server = JsonServerThread('Json', app_base)
     my_server.start()
+
+    # we need to block the main thread here, because this sample is running
+    # a SECOND thread for the actual server. This makes no sense in a pure
+    # sample-code scenario, but doing it this way does allow you to
+    # import & run the class JsonServerThread() from another demo app
+    # which requires multiple threads - such as my Counter demo which
+    # requires both a web server AND a JSON RPC server as 2 threads.
+    try:
+        while True:
+            time.sleep(15.0)
+
+    except KeyboardInterrupt:
+        app_base.logger.info("Stopping Server, Key Board interrupt")
 
     return 0
 

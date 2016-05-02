@@ -2,6 +2,7 @@
 A basic but complete echo server
 """
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from cp_lib.app_base import CradlepointAppBase
@@ -20,6 +21,20 @@ def run_router_app(app_base):
     """
     my_server = WebServerThread('Digit_Web', app_base)
     my_server.start()
+
+    # we need to block the main thread here, because this sample is running
+    # a SECOND thread for the actual server. This makes no sense in a pure
+    # sample-code scenario, but doing it this way does allow you to
+    # import & run the class WebServerThread() from another demo app
+    # which requires multiple threads - such as my Counter demo which
+    # requires both a web server AND a JSON RPC server as 2 threads.
+    try:
+        while True:
+            time.sleep(15.0)
+
+    except KeyboardInterrupt:
+        app_base.logger.info("Stopping Server, Key Board interrupt")
+
     return 0
 
 
@@ -78,11 +93,7 @@ class WebServerThread(threading.Thread):
         # set by singleton - pushes in any/all instances
         WebServerRequestHandler.APP_BASE = self.app_base
 
-        try:
-            httpd.serve_forever()
-
-        except KeyboardInterrupt:
-            self.app_base.logger.info("Stopping Server, Key Board interrupt")
+        httpd.serve_forever()
 
     def please_stop(self):
         """
