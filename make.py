@@ -8,9 +8,9 @@ import sys
 import time
 
 # these must be added, pulled in by pip
-import requests
-import requests.exceptions
-from requests.auth import HTTPDigestAuth
+# import requests
+# import requests.exceptions
+# from requests.auth import HTTPDigestAuth
 
 from tools.copy_file_nl import copy_file_nl
 import cp_lib.app_name_parse as app_name_parse
@@ -30,7 +30,14 @@ FILE_NAME_MAIN = "main.py"
 FILE_NAME_UUID = "_last_uuid.txt"
 
 SCP_USER_DEFAULT = "admin"
-SCP_EXE_NAME = "./tools/pscp.exe"
+WIN_SCP_NAME = "./tools/pscp.exe"
+
+# def is for Linux
+DEF_SCP_NAME = "scp"
+
+# set False means SCP will ask for apssword always; True means SSHPASS is used
+# to feed password from ./config/settings.ini
+USE_SSH_PASS = True
 
 # codes returned by Router API access which fails
 EXIT_CODE_NO_DATA = -20099
@@ -794,28 +801,40 @@ class TheMaker(CradlepointAppBase):
             self.logger.info(
                 "Upload & Install SDK on router({}) (win32)".format(
                     self.get_router_ip()))
-            # if self.logger.debug:
+
+            # Windows is happy with a single string ... but
             cmd = "{0} -pw {1} -v {2} {3}@{4}:/app_upload".format(
-                SCP_EXE_NAME, self.get_router_password(), file_name,
+                WIN_SCP_NAME, self.get_router_password(), file_name,
                 self.get_router_user_name(),
                 self.get_router_ip())
-            self.logger.debug("cmd:({})".format(cmd))
-            try:
-                result = subprocess.check_output(cmd)
-
-            except subprocess.CalledProcessError as err:
-                # return subprocess.CalledProcessError.returncode
-                # <131>ERROR:make:res:(['probe_gps', 'probe_gps.tar',
-                #                      'probe_gps.tar.gz'])
-                self.logger.error("err:({})".format(err))
-                return -1
-
-            self.logger.debug("res:({})".format(result))
 
         else:
             self.logger.info(
                 "Upload & Install SDK on router({}) (else)".format(
-                    self.attrib["local_ip"]))
+                    self.get_router_ip()))
+
+            # ... but Linux requires the list
+            if USE_SSH_PASS:
+                # we allow user to select to use or not
+                cmd = ["sshpass", "-p", self.get_router_password(),
+                       DEF_SCP_NAME, file_name, "{0}@{1}:/app_upload".format(
+                        self.get_router_user_name(), self.get_router_ip())]
+            else:
+                cmd = [DEF_SCP_NAME, file_name, "{0}@{1}:/app_upload".format(
+                    self.get_router_user_name(), self.get_router_ip())]
+
+        try:
+            self.logger.debug("cmd:({})".format(cmd))
+            result = subprocess.check_output(cmd)
+
+        except subprocess.CalledProcessError as err:
+            # return subprocess.CalledProcessError.returncode
+            # <131>ERROR:make:res:(['probe_gps', 'probe_gps.tar',
+            #                      'probe_gps.tar.gz'])
+            self.logger.error("err:({})".format(err))
+            return -1
+
+        self.logger.debug("res:({})".format(result))
 
         # save _last_uuid, so for start/stop/uninstall don't have to re-enter
         if "application" in self.settings:
