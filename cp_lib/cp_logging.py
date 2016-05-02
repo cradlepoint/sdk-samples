@@ -32,8 +32,9 @@ def get_recommended_logger(sets=None, level=None, name=None):
     When level >= INFO, it blends with router's native Syslog
 
     :param dict sets: settings
-    :param level: allow direct 'over-ride' of the level in the settings file (used by MAKE.PY)
-    :param str name: optional NAME for the logger, to over-ride any settings data
+    :param level: allow direct 'over-ride' of the level in the settings file
+                  (used by MAKE.PY)
+    :param str name: optional NAME for logger, to over-ride any settings data
     :return:
     """
 
@@ -61,7 +62,8 @@ def get_recommended_logger(sets=None, level=None, name=None):
             # for the Linux system log, we've no port number etc
             syslog_address = settings[SETS_SYSLOG_IP]
         else:
-            syslog_address = (settings[SETS_SYSLOG_IP], settings[SETS_SYSLOG_PORT])
+            syslog_address = (settings[SETS_SYSLOG_IP],
+                              settings[SETS_SYSLOG_PORT])
     else:
         syslog_address = None
 
@@ -71,16 +73,18 @@ def get_recommended_logger(sets=None, level=None, name=None):
     # LOG FILE on DISK - when NOT on router
     if settings[SETS_FILE] is not None:
         # then add the file logger, but never on the router!
-        handler = logging.handlers.RotatingFileHandler(filename=settings[SETS_FILE])
+        handler = logging.handlers.RotatingFileHandler(
+            filename=settings[SETS_FILE])
         handler.setLevel(settings[SETS_LEVEL])
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        logger.info("Logging - enabled log file={}".format(settings[SETS_FILE]))
+        logger.info(
+            "Logging - enabled log file={}".format(settings[SETS_FILE]))
 
     # SYSLOG server - when NOT on router
     if syslog_address is not None:
-        handler = logging.handlers.SysLogHandler(address=syslog_address,
-                                                 facility=settings[SETS_SYSLOG_PRI])
+        handler = logging.handlers.SysLogHandler(
+            address=syslog_address, facility=settings[SETS_SYSLOG_PRI])
         handler.setLevel(settings[SETS_LEVEL])
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -93,23 +97,25 @@ def get_recommended_logger(sets=None, level=None, name=None):
     #             # we are in deploy mode, or running on a Cradlepoint router
     #             syslog_address = '/dev/log'
     #
-    #         handler = logging.handlers.SysLogHandler(address=syslog_address,
-    #                                                  facility=settings[SETS_SYSLOG_PRI])
+    #         handler = logging.handlers.SysLogHandler(
+    #             address=syslog_address, facility=settings[SETS_SYSLOG_PRI])
     #         handler.setLevel(settings[SETS_LEVEL])
     #         handler.setFormatter(formatter)
     #         logger.addHandler(handler)
-    #         logger.debug("Logging - enabled ROUTER syslog={}".format(syslog_address))
+    #         logger.debug(
+    #             "Logging - enabled ROUTER syslog={}".format(syslog_address))
 
     return logger
 
 
 def _process_settings(sets=None, name=None):
     """
-    Parse out and validate the settings. Since they may be imported from INI and/or JSON,
-    we may need to convert some values from text to "as expected"
+    Parse out and validate the settings. Since they may be imported from
+    INI and/or JSON, we may need to convert some values from text to
+    "as expected"
 
     :param dict sets: settings
-    :param str name: optional NAME for the logger, to over-ride any settings data
+    :param str name: optional NAME for logger, to over-ride any settings data
     :return dict:
     """
 
@@ -159,10 +165,11 @@ def _process_settings(sets=None, name=None):
             settings[SETS_FILE] = value
 
         # special - disable syslog when run on PC
-        if sys.platform == 'win32' and 'pc_syslog' in local_sets:
-			# this setting should be missing, or forced to boolean
+        if sys.platform in ('win32', 'linux') and 'pc_syslog' in local_sets:
+            # this setting should be missing, or forced to boolean before
+            # we reach here
             if not local_sets['pc_syslog']:
-                # then disable Syslog
+                # then False, so disable Syslog
                 settings[SETS_SYSLOG_IP] = None
 
         elif "syslog_ip" in local_sets:
