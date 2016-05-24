@@ -193,9 +193,9 @@ def string_list_status_apps(index, one_app, all_data=False):
 
     app_tag = "SDK APP[%d]" % index
 
-    if 'name' in one_app["app"]:
+    if '_id_' in one_app:
         result.append(
-            "{0}    Name:{1}".format(app_tag, one_app['app']['name']))
+            "{0}    UUID:{1}".format(app_tag, one_app['_id_']))
 
     if 'state' in one_app:
         result.append(
@@ -205,31 +205,40 @@ def string_list_status_apps(index, one_app, all_data=False):
         result.append(
             "{0} Summary:{1}".format(app_tag, one_app['summary']))
 
-    if 'date' in one_app["app"]:
-        result.append(
-            "{0}    Date:{1}".format(app_tag, one_app['app']['date']))
-
-    if 'version_major' in one_app["app"]:
-        result.append("{0} Version:{1}.{2}".format(
-            app_tag, one_app['app']['version_major'],
-            one_app['app']['version_minor']))
-
-    if '_id_' in one_app:
-        result.append(
-            "{0}    UUID:{1}".format(app_tag, one_app['_id_']))
-
-    if all_data:
-        # then include all data
-        if 'type' in one_app:
+    if 'app' in one_app:
+        # only if the app is named - note that as of FW 6.1.2, we might have
+        # 'extra' entries for failed actions. So we need to support un-named
+        # apps. Example: trying to install 'too many' apps leaves the failure
+        # as 2nd entry, without name, date, etc.
+        if 'name' in one_app["app"]:
+            # only if the app is named
             result.append(
-                "{0}    type:{1}".format(app_tag, one_app['type']))
+                "{0}    Name:{1}".format(app_tag, one_app['app']['name']))
 
-        if 'restart' in one_app["app"]:
+        if 'date' in one_app["app"]:
             result.append(
-                "{0} Restart:{1}".format(app_tag, one_app['app']['restart']))
+                "{0}    Date:{1}".format(app_tag, one_app['app']['date']))
 
-        if 'vendor' in one_app["app"]:
-            result.append(
-                "{0}  Vendor:{1}".format(app_tag, one_app['app']['vendor']))
+        if 'version_major' in one_app["app"]:
+            result.append("{0} Version:{1}.{2}".format(
+                app_tag, one_app['app']['version_major'],
+                one_app['app']['version_minor']))
+
+        if all_data:
+            # then include all data
+            if 'type' in one_app:
+                result.append(
+                    "{0}    type:{1}".format(app_tag,
+                                             one_app['type']))
+
+            if 'restart' in one_app["app"]:
+                result.append(
+                    "{0} Restart:{1}".format(app_tag,
+                                             one_app['app']['restart']))
+
+            if 'vendor' in one_app["app"]:
+                result.append(
+                    "{0}  Vendor:{1}".format(app_tag,
+                                             one_app['app']['vendor']))
 
     return result
