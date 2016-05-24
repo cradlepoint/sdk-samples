@@ -18,6 +18,9 @@ PORT = 514
 logging.basicConfig(level=logging.DEBUG, format='%(message)s', datefmt='',
                     filename=LOG_FILE, filemode='w')
 
+# set True to show GPS messages, else discard
+SHOW_GSP = False
+
 
 class SyslogUDPHandler(socketserver.BaseRequestHandler):
 
@@ -27,7 +30,7 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
 
         if data[4] > 0x80:
             # handle CP's weird Syslog payload
-            # [39]3C31353EEFBBBF65636D3A2052656D6F746520636F6465206578656400
+            # [39]3C31353EE65636D3A2052656D6F746520636F6465206578656400
             # 192.168.1.1 :  b'<15>\xef\xbb\xbfecm: Remote code exec tri\x00'
             data = data[:4] + b" ? " + data[7:]
         # msg = ""
@@ -41,37 +44,49 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
             # <15>WAN:1f3c6020: status exception: 4
             "status exception:",
 
-            # <15>WAN:1f0e98e7: Modem:gps: {'fix': {'latitude': {'second': ...
-            "Modem:gps",
-
             # <14>cp_stack_mgr: INFO  lte_sierra.c(6107) int1: lte_sierra_...
             "cp_stack_mgr",
 
             # <12>dnsmasq-dhcp[410]: no address range available for DHCPv6 an1
             "address range available for DHCPv6 request",
 
-            # <15>gps.ploop: is the GPS keep-alive - the "Poll Loop"
-            "gps.ploop",
-
             # <15>smsserver: SMS STATE: sms_idle -> sms_start
             "sms_idle -> sms_start",
 
-            # 192.168.30.1 :  <15>wlan: Starting wireless survey on radio 0
-            # 192.168.30.1 :  <15>wlan: Wireless survey completed (radio 0)
+            # wlan: Starting wireless survey on radio 0
+            # wlan: Wireless survey completed (radio 0)
             "ireless survey",
 
-            # 192.168.30.1 :  <15>wwan2: WifiWanService.wwan, all requested
+            # wwan2: WifiWanService.wwan, all requested
             #                     scans have been done: nets : []
             "WifiWanService.wwan",
 
-            # 192.168.30.1 :  <15>wwan2: we're calling plug_profiles for radio
+            # wwan2: we're calling plug_profiles for radio
             "calling plug_profiles",
 
-            # 192.168.35.1 :  <15>WAN:43988388.PassiveDns: ipv6_out bytes :
+            # WAN:43988388.PassiveDns: ipv6_out bytes :
             #                     152 pkts : 2 iface out : 25853
             "PassiveDns",
 
+            # dnsmasq-dhcp[473]: DHCPINFORM(primarylan1) 192.168.35.6 ...
+            "dnsmasq-dhcp",
+
         ]
+
+        if not SHOW_GSP:
+            skip_phrases.extend([
+                # WAN:1f0e98e7: Modem:gps: {'fix': {'latitude': {'second': ...
+                "Modem:gps",
+
+                # gps.ploop: is the GPS keep-alive - the "Poll Loop"
+                "gps.ploop",
+
+                # gps.tx.inet: <tx_tcp host=192.168.1.6 port=9999
+                "gps.tx.inet",
+
+                # <services.gps.efsm_dti.DefaultTimeIntervalEFSM object
+                "gps.efsm",
+            ])
 
         skip_this = False
         for phrase in skip_phrases:
