@@ -94,9 +94,10 @@ class TheMaker(CradlepointAppBase):
         """Basic Init"""
         from cp_lib.load_settings_ini import copy_config_ini_to_json
 
-        if not os.path.isfile("./config/settings.json"):
-            # make sure we have at least a basic ./config/settings.json
-            copy_config_ini_to_json()
+        # make sure we have at least a basic ./config/settings.json
+        # ALWAYS copy existing ./config/settings.ini over, which makes
+        # CradlepointAppBase.__init__() happy
+        copy_config_ini_to_json()
 
         # we don't contact router for model/fw - will do in sanity_check, IF
         # the command means contact router
