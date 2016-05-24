@@ -6,6 +6,13 @@ from cp_lib.data.data_tree import get_item_value, data_tree_clean, \
     get_item_time_duration_to_seconds, put_item
 
 
+class CradlepointRouterOffline(ConnectionError):
+    """
+    A general failure to use when the AppBase fails to find the router
+    """
+    pass
+
+
 class CradlepointAppBase(object):
     """
     This object holds the data and status during the hand-off from the
