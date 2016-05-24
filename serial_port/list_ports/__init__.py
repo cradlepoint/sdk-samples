@@ -13,4 +13,10 @@ class RouterApp(CradlepointAppBase):
         return
 
     def run(self):
-        return run_router_app(self.logger, self.settings)
+        try:
+            result = run_router_app(self)
+        except:
+            self.logger.exception("CradlepointAppBase failed")
+            raise
+
+        return result
