@@ -337,7 +337,18 @@ def clean_string(value: str):
     """
     trim a string, and remove any leading/trailing quotes. String is
     stripped of white space again, after removing quotes.
+
+    If we passed in bytes, convert to str with UTF-8, for other unexpected
+    types, force TypeError, else it might be AttributeError
     """
+    if isinstance(value, bytes):
+        # convert bytes to UTF-8
+        value = value.decode()
+
+    elif not isinstance(value, str):
+        raise TypeError(
+            "clean_string() requires str type, not {}".format(type(value)))
+
     value = unquote_string(value)
     value = value.strip()
     return value
