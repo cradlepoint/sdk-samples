@@ -38,7 +38,8 @@ class BuildDependencyList(object):
 
         # exist, but not in /usr/lib/python3.3? builtin?
         # maybe inside cradlepoint.cpython-33m?
-        "errno", "fcntl", "ioctrl", "gc", "pydoc", "select", "sys", "time"
+        "errno", "fcntl", "ioctl", "gc", "math",
+        "pydoc", "select", "sys", "time"
     ]
 
     # others? _ssh.cpython-33m.so, cradlepoint.cpython-33m.so
