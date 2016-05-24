@@ -21,7 +21,7 @@ def run_router_app(app_base):
     """
     # confirm we are running on an 1100/1150, result should be "IBR1100LPE"
     result = app_base.get_product_name()
-    if result in ("IBR1100", "IBR1150"):
+    if result in ("IBR1100", "IBR1150", "IBR600B", "IBR650B"):
         app_base.logger.info("Product Model is good:{}".format(result))
     else:
         app_base.logger.error(
@@ -39,6 +39,8 @@ def run_router_app(app_base):
     # see if port is a digit?
     if port_name[0].isdecimal():
         port_name = int(port_name)
+
+    old_pyserial = serial.VERSION.startswith("2.6")
 
     message = "Starting serial echo on {0}, baud={1}".format(port_name,
                                                              baud_rate)
@@ -74,17 +76,36 @@ def run_router_app(app_base):
             # else:
             #     app_base.logger.debug(b".")
 
-            if dsr_was != ser.dsr:
-                dsr_was = ser.dsr
-                app_base.logger.info(
-                    "DSR changed to {}, setting DTR".format(dsr_was))
-                ser.dtr = dsr_was
+            if old_pyserial:
+                # as of May-2016/FW 6.1, this is PySerial v2.6, so it uses
+                # the older style control signal access
+                if dsr_was != ser.getDSR():
+                    # do this 'get' twice to handle first pass as None
+                    dsr_was = ser.getDSR()
+                    app_base.logger.info(
+                        "DSR changed to {}, setting DTR".format(dsr_was))
+                    ser.setDTR(dsr_was)
 
-            if cts_was != ser.cts:
-                cts_was = ser.cts
-                app_base.logger.info(
-                    "CTS changed to {}, setting RTS".format(cts_was))
-                ser.rts = cts_was
+                if cts_was != ser.getCTS():
+                    cts_was = ser.getCTS()
+                    app_base.logger.info(
+                        "CTS changed to {}, setting RTS".format(cts_was))
+                    ser.setRTS(cts_was)
+            else:
+                if dsr_was != ser.dsr:
+                    dsr_was = ser.dsr
+                    app_base.logger.info(
+                        "DSR changed to {}, setting DTR".format(dsr_was))
+                    ser.dtr = dsr_was
+
+                if cts_was != ser.cts:
+                    cts_was = ser.cts
+                    app_base.logger.info(
+                        "CTS changed to {}, setting RTS".format(cts_was))
+                    ser.rts = cts_was
+
+            # if you lose the serial port - like disconnected, then
+            # ser.getDSR() will throw OSError #5 Input/Output error
 
     finally:
         ser.close()
