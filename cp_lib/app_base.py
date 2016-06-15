@@ -13,6 +13,13 @@ class CradlepointRouterOffline(ConnectionError):
     pass
 
 
+class CradlepointSdkDisabled(ConnectionError):
+    """
+    A general failure to use when the SDK data isn't in status tree
+    """
+    pass
+
+
 class CradlepointAppBase(object):
     """
     This object holds the data and status during the hand-off from the
