@@ -18,14 +18,15 @@ import logging
 BUFFER_DUMP_WIDTH = 16
 
 
-def buffer_dump(message, data, show_ascii=False):
+def buffer_dump(message, data, show_ascii=False, slash=False):
     """
     create a list of strings, dumping bytes in an insightful way
 
     :param str message: a display message
     :param data:
     :type data: str or bytes
-    :param bool show_ascii:
+    :param bool show_ascii: if True, append an ASCII approximation to line
+    :param bool slash: if True, format as "\x00" instead of "00 "
     :return list:
     """
     if data is None:
@@ -55,7 +56,10 @@ def buffer_dump(message, data, show_ascii=False):
         if is_string:
             # handle if string
             for x in chunk:
-                message.append("%02X" % ord(x))
+                if slash:
+                    message.append("\\x%02X" % ord(x))
+                else:
+                    message.append(" %02X" % ord(x))
 
             if show_ascii:
                 # only attach if we think is nearly ascii, else skip
@@ -66,18 +70,21 @@ def buffer_dump(message, data, show_ascii=False):
         else:
             # handle if bytes
             for x in chunk:
-                message.append("%02X" % int(x))
+                if slash:
+                    message.append("\\x%02X" % int(x))
+                else:
+                    message.append(" %02X" % int(x))
 
             if show_ascii:
                 message.append("b%s" % repr(chunk.decode('utf8')))
 
-        lines.append(" ".join(message))
+        lines.append("".join(message))
         data_offset += BUFFER_DUMP_WIDTH
 
     return lines
 
 
-def logger_buffer_dump(logger, message, data, show_ascii=False):
+def logger_buffer_dump(logger, message, data, show_ascii=False, slash=False):
     """
     carefully display a bytes string
 
@@ -86,11 +93,12 @@ def logger_buffer_dump(logger, message, data, show_ascii=False):
     :param data:
     :type data: str or bytes
     :param bool show_ascii:
+    :param bool slash: if True, format as "\x00" instead of "00 "
     :return:
     """
     # import time
 
-    results = buffer_dump(message, data, show_ascii)
+    results = buffer_dump(message, data, show_ascii, slash)
     for data in results:
         # the CP doesn't like no format?
         logger.debug("%s", data)
