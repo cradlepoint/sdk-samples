@@ -183,7 +183,7 @@ class NmeaStatus(object):
             self.__hold[self.SPEED_KNOTS] = float(tokens[7])
             if len(tokens[8]):
                 self.__hold[self.COURSE_TRUE] = float(tokens[8])
-            else:
+            else:  # else sometimes is null/empty!
                 self.__hold[self.COURSE_TRUE] = 0.0
 
         return True
@@ -205,7 +205,10 @@ class NmeaStatus(object):
         assert tokens[0] == "GPVTG"
 
         if self.COURSE_TRUE not in self.__hold:
-            self.__hold[self.COURSE_TRUE] = float(tokens[1])
+            if len(tokens[1]):
+                self.__hold[self.COURSE_TRUE] = float(tokens[1])
+            else:  # else sometimes is null/empty!
+                self.__hold[self.COURSE_TRUE] = 0.0
 
         if self.SPEED_KNOTS not in self.__hold:
             self.__hold[self.SPEED_KNOTS] = float(tokens[5])
