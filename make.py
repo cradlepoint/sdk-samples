@@ -14,7 +14,7 @@ import time
 
 from tools.copy_file_nl import copy_file_nl
 import cp_lib.app_name_parse as app_name_parse
-from cp_lib.app_base import CradlepointAppBase
+from cp_lib.app_base import CradlepointAppBase, CradlepointSdkDisabled
 from cp_lib.cs_ping import cs_ping
 
 SDIR_CONFIG = "config"
@@ -35,7 +35,7 @@ WIN_SCP_NAME = "./tools/pscp.exe"
 # def is for Linux
 DEF_SCP_NAME = "scp"
 
-# set False means SCP will ask for apssword always; True means SSHPASS is used
+# set False means SCP will ask for password always; True means SSHPASS is used
 # to feed password from ./config/settings.ini
 USE_SSH_PASS = True
 
@@ -60,7 +60,7 @@ class TheMaker(CradlepointAppBase):
 
     SDIR_SAVE_EXT = ".save"
 
-    ACTION_DEFAULT = "package"
+    ACTION_DEFAULT = "status"
     ACTION_NAMES = ("build", "package", "status", "install", "start",
                     "stop", "uninstall",
                     "purge", "uuid", "reboot", "clean", "ping")
@@ -185,7 +185,12 @@ class TheMaker(CradlepointAppBase):
 
         elif self.action == "status":
             # go to our router & check status
-            return self.action_status(verbose=True)
+            try:
+                return self.action_status(verbose=True)
+
+            except CradlepointSdkDisabled:
+                self.logger.error("Router Lacks SDK function")
+                return -1
 
         elif self.action == "install":
             # try to send our TAR.GZIP to our router
@@ -448,7 +453,7 @@ class TheMaker(CradlepointAppBase):
         if os.path.exists(app_file_name):
             # if app developer supplies one, use it (TDB - do pre-processing)
             # for example, copy "network/tcp_echo/main.py" to "build/main.py"
-            self.logger.info("Copy existing APP MAIN from [{}]".format(
+            self.logger.info("Cpy existing APP MAIN from [{}]".format(
                 app_file_name))
             copy_file_nl(app_file_name, dst_file_name)
             # sh util.copyfile(app_file_name, dst_file_name)
@@ -463,7 +468,7 @@ class TheMaker(CradlepointAppBase):
 
         elif os.path.exists(glob_file_name):
             # if root supplies one, use it (TDB - do pre-processing)
-            self.logger.info("Copy existing ROOT MAIN from [{}]".format(
+            self.logger.info("Cpy existing ROOT MAIN from [{}]".format(
                 glob_file_name))
             copy_file_nl(glob_file_name, dst_file_name)
             # sh util.copyfile(glob_file_name, dst_file_name)
@@ -527,7 +532,7 @@ class TheMaker(CradlepointAppBase):
                     # self.logger.debug("Make Dir [{0}]".format(dst_path_name))
                     self._confirm_dir_exists(dst_path_name, "File to Build")
 
-                    self.logger.debug("Copy file [{0}] to {1}".format(
+                    self.logger.debug("Cpy file [{0}] to {1}".format(
                         path_name, dst_file_name))
                     # note: copyfile requires 2 file names - 2nd cannot
                     # be a directory destination, we'll skip EMPTY files
@@ -590,9 +595,9 @@ class TheMaker(CradlepointAppBase):
         path_name = os.path.split(build_file_name)
         self._confirm_dir_exists(path_name[0], "Dep 2 Build")
 
-        self.logger.debug("Copy file [{0}] to {1}".format(source_file_name,
-                                                          build_file_name))
-        # copyfile requires 2 file names - 2nd cannot be a directory dest
+        self.logger.debug("Cpy file [{0}] to {1}".format(source_file_name,
+                                                         build_file_name))
+        # copyfile requires 2 file names - 2nd cannot be a directory dst
         copy_file_nl(source_file_name, build_file_name, discard_empty=True)
         # sh util.copyfile(source_file_name, build_file_name)
 
@@ -668,6 +673,9 @@ class TheMaker(CradlepointAppBase):
 
         # we save as 'last_status', as a few clients use as as proxy
         self.last_status = self.cs_client.get("status/system/sdk")
+        if self.last_status is None:
+            raise CradlepointSdkDisabled("Router lacks SDK Function")
+
         self.logger.info("SDK status check successful")
         # self.logger.debug("RSP:{}".format(reply['data']))
         # {'service': 'started', 'apps': [], 'mode': 'devmode',
@@ -1086,7 +1094,7 @@ class TheMaker(CradlepointAppBase):
 
         if os.path.exists(app_file_name):
             # if app developer supplies one, use it (TDB - do pre-processing)
-            self.logger.debug("Copy existing app script from [{}]".format(
+            self.logger.debug("Cpy existing app script from [{}]".format(
                 app_file_name))
             copy_file_nl(app_file_name, dst_file_name)
             # sh util.copyfile(app_file_name, dst_file_name)
@@ -1096,7 +1104,7 @@ class TheMaker(CradlepointAppBase):
 
         elif os.path.exists(cfg_file_name):
             # if root supplies one, use it (TDB - do pre-processing)
-            self.logger.debug("Copy existing root script from [{}]".format(
+            self.logger.debug("Cpy existing root script from [{}]".format(
                 cfg_file_name))
             copy_file_nl(cfg_file_name, dst_file_name)
             # sh util.copyfile(cfg_file_name, dst_file_name)
