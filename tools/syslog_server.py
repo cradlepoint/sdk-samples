@@ -86,6 +86,9 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
 
                 # <services.gps.efsm_dti.DefaultTimeIntervalEFSM object
                 "gps.efsm",
+
+                # gps.src.cs: No gps sample
+                "No gps sample",
             ])
 
         skip_this = False
