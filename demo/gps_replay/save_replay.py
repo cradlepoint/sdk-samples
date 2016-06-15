@@ -21,13 +21,9 @@ import time
 import gc
 
 from cp_lib.app_base import CradlepointAppBase
-from cp_lib.parse_data import clean_string
-# from cp_lib.gps_nmea import NmeaStatus
+from cp_lib.load_gps_config import GpsConfig
+from cp_lib.parse_data import clean_string, parse_integer
 
-# set your interface port below; due to Windows FW, you may not be able
-# to use 'localhost' if you have multiple interfaces
-DEF_HOST_IP = '192.168.35.6'
-DEF_HOST_PORT = 9999
 DEF_BUFFER_SIZE = 1024
 DEF_REPLAY_FILE = 'gps_log.json'
 
@@ -38,36 +34,51 @@ def run_router_app(app_base):
     :param CradlepointAppBase app_base: prepared resources: logger, cs_client
     :return:
     """
-    # logger.debug("Settings({})".format(sets))
-
-    host_ip = DEF_HOST_IP
-    host_port = DEF_HOST_PORT
     buffer_size = DEF_BUFFER_SIZE
     replay_file_name = DEF_REPLAY_FILE
 
-    # we are reading the settings from sample gps_localhost
+    # use Router API to fetch any configured data
+    config = GpsConfig(app_base)
+    host_ip, host_port = config.get_client_info()
+    del config
+
     section = "gps"
     if section in app_base.settings:
         # then load dynamic values
-        host_ip = clean_string(
-            app_base.settings[section].get("host_ip", DEF_HOST_IP))
-        host_port = int(
-            app_base.settings[section].get("host_port", DEF_HOST_PORT))
-        buffer_size = int(
-            app_base.settings[section].get("buffer_size", DEF_BUFFER_SIZE))
-        replay_file_name = clean_string(
-            app_base.settings[section].get("replay_file", DEF_REPLAY_FILE))
+        temp = app_base.settings[section]
 
-    # replay_file = gps_replay.json
+        # check on our localhost port (not used, but to test)
+        if "host_ip" in temp:
+            # then OVER-RIDE what the router told us
+            app_base.logger.warning("Settings OVER-RIDE router host_ip")
+            value = clean_string(temp["host_ip"])
+            app_base.logger.warning("was:{} now:{}".format(host_ip, value))
+            host_ip = value
+
+        if "host_port" in temp:
+            # then OVER-RIDE what the router told us
+            app_base.logger.warning("Settings OVER-RIDE router host_port")
+            value = parse_integer(temp["host_port"])
+            app_base.logger.warning("was:{} now:{}".format(host_port, value))
+            host_port = value
+
+        if "buffer_size" in temp:
+            buffer_size = parse_integer(temp["buffer_size"])
+
+        if "replay_file" in temp:
+            replay_file_name = clean_string(temp["replay_file"])
+
+    app_base.logger.debug("GPS source:({}:{})".format(host_ip, host_port))
 
     # make sure our log file exists & is empty
     file_han = open(replay_file_name, "w")
     file_han.write("[\n")
     file_han.close()
 
+    address = (host_ip, host_port)
+
     while True:
         # define the socket resource, including the type (stream == "TCP")
-        address = (host_ip, host_port)
         app_base.logger.info("Preparing GPS Listening on {}".format(address))
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -123,7 +134,8 @@ def run_router_app(app_base):
                     offset = int(time.time() - start_time)
 
                     for line in data:
-                        result = '{"offset":%d, "data":"%s"},\n' % (offset, line)
+                        result = '{"offset":%d, "data":"%s"},\n' % (offset,
+                                                                    line)
                         file_han.write(result)
 
                     app_base.logger.debug("Wrote at offset:{}".format(offset))
@@ -146,8 +158,16 @@ def run_router_app(app_base):
 
 if __name__ == "__main__":
     import sys
+    from cp_lib.load_settings_ini import copy_config_ini_to_json, \
+        load_sdk_ini_as_dict
 
-    my_app = CradlepointAppBase("gps/gps_localhost")
+    copy_config_ini_to_json()
+
+    app_path = "demo/gps_replay"
+    my_app = CradlepointAppBase(app_path)
+    # force a heavy reload of INI (app base normally only finds JSON)
+    my_app.settings = load_sdk_ini_as_dict(app_path)
+
     _result = run_router_app(my_app)
     my_app.logger.info("Exiting, status code is {}".format(_result))
     sys.exit(_result)
