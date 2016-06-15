@@ -4,10 +4,10 @@ Load Router API "status/product_info" into settings.
 import json
 import logging
 import os.path
-import sys
 
 from cp_lib.load_settings_json import DEF_GLOBAL_DIRECTORY
 from cp_lib.cs_client import CradlepointClient
+from cp_lib.app_base import CradlepointRouterOffline
 
 SECTION_PRODUCT_INFO = "product_info"
 
@@ -77,9 +77,8 @@ def load_product_info(sets, client, file_name=None):
     client.show_rsp = save_state
 
     if result is None:
-        logging.error("Aborting - Router({}) is not accessible".format(
-            client.router_ip))
-        sys.exit(-1)
+        raise CradlepointRouterOffline(
+            "Aborting; Router({}) is not accessible".format(client.router_ip))
 
     if isinstance(result, str):
         result = json.loads(result)
