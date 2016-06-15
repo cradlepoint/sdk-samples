@@ -10,7 +10,8 @@ import logging
 import os
 import sys
 
-from cp_lib.load_settings_json import DEF_GLOBAL_DIRECTORY, DEF_SETTINGS_FILE_NAME, DEF_JSON_EXT, SECTION_NAME_LIST, \
+from cp_lib.load_settings_json import DEF_GLOBAL_DIRECTORY, \
+    DEF_SETTINGS_FILE_NAME, DEF_JSON_EXT, SECTION_NAME_LIST, \
     SECTION_APPLICATION, SECTION_LOGGING, SECTION_ROUTER_API
 from make import EXIT_CODE_BAD_FORM
 
@@ -25,7 +26,8 @@ def load_sdk_ini_as_dict(app_dir_path=None, file_name=None):
     """
     Follow Router SDK Design:
      1) first load ./config/settings.ini - if it exists
-     2) second load /{project}/settings.ini - if it exists, and smartly merge into .config values
+     2) second load /{project}/settings.ini - if it exists, and smartly
+     merge into .config values
 
     :param str app_dir_path: the base directory of our project, like network/tcp_echo/
     :param str file_name: pass in alternative name - mainly for testing, else use DEF_FILE_NAME
@@ -64,13 +66,15 @@ def load_ini_as_dict(ini_name, pre_dict=None):
     import configparser
 
     if not os.path.isfile(ini_name):
-        # if this INI file DOES NOT exist, return - existence is not this module's responsibility!
+        # if this INI file DOES NOT exist, return - existence is not this
+        # module's responsibility!
         # logging.debug("INI file {} does NOT exist".format(ini_path))
         return pre_dict
 
     # LOAD IN THE INI FILE, using the Python library
     config = configparser.ConfigParser()
-    # READ indirectly, as config.read() tries to open cp_lib/config/file.ini, not config/file.ini
+    # READ indirectly, as config.read() tries to open cp_lib/config/file.ini,
+    # not config/file.ini
     file_han = open(ini_name, "r")
     try:
         config.read_file(file_han)
@@ -90,16 +94,18 @@ def load_ini_as_dict(ini_name, pre_dict=None):
 
         section_tag = section.lower()
         if section_tag not in SECTION_NAME_LIST:
-            # we make sure 'expected' sections are lower case, otherwise allow any case-mix
+            # we make sure 'expected' sections are lower case, otherwise
+            # allow any case-mix
             # example: [application] must be lower-case, but [TcpStuff] is fine
             section_tag = section
 
         settings[section_tag] = {}
-        # note: 'section' is the old possibly mixed case name; section_tag might be lower case
+        # note: 'section' is the old possibly mixed case name; section_tag
+        # might be lower case
         for key, val in config.items(section):
             settings[section_tag][key] = val
 
-    # add OPTIONAL comments to the file - set ADD_JSON_COMMENT_KEY = None to disable
+    # add OPTIONAL comments to file; set ADD_JSON_COMMENT_KEY=None to disable
     if ADD_JSON_COMMENT_KEY is not None:
         comments = {
             SECTION_APPLICATION: "Settings for the application being built.",
