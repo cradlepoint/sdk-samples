@@ -206,7 +206,21 @@ class TheMaker(CradlepointAppBase):
 
         elif self.action == "uninstall":
             # go to our router & do an install
-            return self.action_uninstall()
+            # TODO - fix the uninstall after FW: 6.2.2
+            # now, router leaves misc old app info around, so we'll
+            # need to do a better scan, finding apps to install
+            # INFO:make:SDK APP[0]    UUID:db946fe9-fb7e-42b1-8589-123ff698b67e
+            # INFO:make:SDK APP[0]   State:uninstalled
+            # INFO:make:SDK APP[0] Summary:Uninstalled Application
+            # INFO:make:SDK APP[1]    UUID:114c8c0f-9887-4e68-a4e7-de8d73fba69f
+            # INFO:make:SDK APP[1]   State:started
+            # INFO:make:SDK APP[1] Summary:Started Application
+            # INFO:make:SDK APP[1]    Name:hello_world
+            # INFO:make:SDK APP[1]    Date:2016-10-20T13:12:51Z
+            # INFO:make:SDK APP[1] Version:1.12
+            # return self.action_uninstall()
+            self.logger.info("Doing PURGE instead of UNINSTALL")
+            return self.action_purge()
 
         elif self.action == "purge":
             # go to our router & force a purge
@@ -453,7 +467,7 @@ class TheMaker(CradlepointAppBase):
         if os.path.exists(app_file_name):
             # if app developer supplies one, use it (TDB - do pre-processing)
             # for example, copy "network/tcp_echo/main.py" to "build/main.py"
-            self.logger.info("Cpy existing APP MAIN from [{}]".format(
+            self.logger.info("Copy existing APP MAIN from [{}]".format(
                 app_file_name))
             copy_file_nl(app_file_name, dst_file_name)
             # sh util.copyfile(app_file_name, dst_file_name)
@@ -468,7 +482,7 @@ class TheMaker(CradlepointAppBase):
 
         elif os.path.exists(glob_file_name):
             # if root supplies one, use it (TDB - do pre-processing)
-            self.logger.info("Cpy existing ROOT MAIN from [{}]".format(
+            self.logger.info("Copy existing ROOT MAIN from [{}]".format(
                 glob_file_name))
             copy_file_nl(glob_file_name, dst_file_name)
             # sh util.copyfile(glob_file_name, dst_file_name)
@@ -532,7 +546,7 @@ class TheMaker(CradlepointAppBase):
                     # self.logger.debug("Make Dir [{0}]".format(dst_path_name))
                     self._confirm_dir_exists(dst_path_name, "File to Build")
 
-                    self.logger.debug("Cpy file [{0}] to {1}".format(
+                    self.logger.debug("Copy file [{0}] to {1}".format(
                         path_name, dst_file_name))
                     # note: copyfile requires 2 file names - 2nd cannot
                     # be a directory destination, we'll skip EMPTY files
@@ -595,9 +609,9 @@ class TheMaker(CradlepointAppBase):
         path_name = os.path.split(build_file_name)
         self._confirm_dir_exists(path_name[0], "Dep 2 Build")
 
-        self.logger.debug("Cpy file [{0}] to {1}".format(source_file_name,
-                                                         build_file_name))
-        # copyfile requires 2 file names - 2nd cannot be a directory dst
+        self.logger.debug("Copy file [{0}] to {1}".format(source_file_name,
+                                                          build_file_name))
+        # copyfile requires 2 file names - 2nd cannot be a directory dest
         copy_file_nl(source_file_name, build_file_name, discard_empty=True)
         # sh util.copyfile(source_file_name, build_file_name)
 
@@ -681,20 +695,28 @@ class TheMaker(CradlepointAppBase):
         # {'service': 'started', 'apps': [], 'mode': 'devmode',
         #  'summary': 'Service started'}
 
-        if verbose:
-            # then put out all of the logging info, else don't
-            result = self._string_list_status_basic(self.last_status)
-            for line in result:
-                self.logger.info(line)
+        if self.last_status is None:
+            self.logger.info("SDK is not enabled in the Router.")
 
-            if len(self.last_status['apps']) > 0:
-                _index = 0
-                for one_app in self.last_status['apps']:
-                    result = string_list_status_apps(_index, one_app)
-                    for line in result:
-                        self.logger.info(line)
-                    _index += 1
+        else:
+            self.logger.info("SDK status check successful")
 
+            if verbose:
+                # then put out all of the logging info, else don't
+                result = self._string_list_status_basic(self.last_status)
+                for line in result:
+                    self.logger.info(line)
+
+                if 'apps' in self.last_status and \
+                        (len(self.last_status['apps']) > 0):
+                    _index = 0
+                    for one_app in self.last_status['apps']:
+                        result = string_list_status_apps(_index, one_app)
+                        for line in result:
+                            self.logger.info(line)
+                        _index += 1
+                else:
+                    self.logger.info("SDK App Count:0")
         return 0
 
     @staticmethod
@@ -711,27 +733,30 @@ class TheMaker(CradlepointAppBase):
         """
         result = []
 
-        if 'service' in status:
-            result.append("SDK Service Status:{}".format(status['service']))
+        if status is not None:
+            if 'service' in status:
+                result.append("SDK Service Status:{}".format(
+                    status['service']))
 
-        if 'summary' in status:
-            result.append("SDK Summary:{}".format(status['summary']))
+            if 'summary' in status:
+                result.append("SDK Summary:{}".format(status['summary']))
 
-        if 'mode' in status:
-            if status['mode'].lower() == "devmode":
-                result.append("SDK Router is in DEV MODE")
-            elif status['mode'].lower() == "standard":
+            if 'mode' in status:
+                if status['mode'].lower() == "devmode":
+                    result.append("SDK Router is in DEV MODE")
+                elif status['mode'].lower() == "standard":
                     result.append(
                         "SDK Router is NOT in DEV MODE - is in STANDARD mode.")
-            else:
-                result.append("SDK Router Dev Mode Unknown:{}".format(
-                    status['mode']))
+                else:
+                    result.append("SDK Router Dev Mode Unknown:{}".format(
+                        status['mode']))
 
-        if 'apps' in status:
-            if len(status['apps']) == 0:
-                result.append("SDK - No Apps Installed")
-            else:
-                result.append("SDK App Count:{}".format(len(status['apps'])))
+            if 'apps' in status:
+                if len(status['apps']) == 0:
+                    result.append("SDK - No Apps Installed")
+                else:
+                    result.append("SDK App Count:{}".format(
+                        len(status['apps'])))
 
         return result
 
@@ -840,8 +865,10 @@ class TheMaker(CradlepointAppBase):
             # return subprocess.CalledProcessError.returncode
             # <131>ERROR:make:res:(['probe_gps', 'probe_gps.tar',
             #                      'probe_gps.tar.gz'])
-            self.logger.error("err:({})".format(err))
-            return -1
+
+            # TODO - handle the PSCP error more gracefully?
+            # self.logger.error("err:({})".format(err))
+            return 0
 
         self.logger.debug("res:({})".format(result))
 
@@ -1094,7 +1121,7 @@ class TheMaker(CradlepointAppBase):
 
         if os.path.exists(app_file_name):
             # if app developer supplies one, use it (TDB - do pre-processing)
-            self.logger.debug("Cpy existing app script from [{}]".format(
+            self.logger.debug("Copy existing app script from [{}]".format(
                 app_file_name))
             copy_file_nl(app_file_name, dst_file_name)
             # sh util.copyfile(app_file_name, dst_file_name)
@@ -1104,7 +1131,7 @@ class TheMaker(CradlepointAppBase):
 
         elif os.path.exists(cfg_file_name):
             # if root supplies one, use it (TDB - do pre-processing)
-            self.logger.debug("Cpy existing root script from [{}]".format(
+            self.logger.debug("Copy existing root script from [{}]".format(
                 cfg_file_name))
             copy_file_nl(cfg_file_name, dst_file_name)
             # sh util.copyfile(cfg_file_name, dst_file_name)
@@ -1219,6 +1246,12 @@ class TheMaker(CradlepointAppBase):
             except PermissionError:
                 time.sleep(1.0)
                 os.makedirs(dir_name)
+
+            file_name = os.path.join(dir_name, "__init__.py")
+            self.logger.info("Create __init__.py")
+            file_han = open(file_name, 'w')
+            file_han.write(" ")
+            file_han.close()
 
         # else:
             # self.logger.debug("{}({}) exists as dir".format(
