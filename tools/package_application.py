@@ -180,7 +180,9 @@ def package_application(app_root, pkey):
         app['firmware_minor'] = int(config[section]['firmware_minor'])
         app['restart'] = config[section].getboolean('restart')
         app['reboot'] = config[section].getboolean('reboot')
-        # this actually makes an INVALID format, because it uses localtime, but adds no time-zine offset!
+        app['auto_start'] = config[section].getboolean('auto_start')
+        # this actually makes an INVALID format, because it uses localtime,
+        #  but adds no time-zine offset!
         # app['date'] = datetime.datetime.now().isoformat()
         app['date'] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 

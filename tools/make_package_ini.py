@@ -42,6 +42,8 @@ def make_package_ini(sets, output_file_name):
     data_lines.append("restart=%s" % value)
     value = app_sets.get("reboot", "False").lower()
     data_lines.append("reboot=%s" % value)
+    value = app_sets.get("auto_start", "True").lower()
+    data_lines.append("auto_start=%s" % value)
 
     value = app_sets.get("firmware", "6.1")
     major, minor = split_version_string(value)

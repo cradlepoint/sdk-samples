@@ -88,7 +88,7 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
                 "gps.efsm",
 
                 # gps.src.cs: No gps sample
-                "No gps sample",
+                "gps.src",
             ])
 
         skip_this = False
