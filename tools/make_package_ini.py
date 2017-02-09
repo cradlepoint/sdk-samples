@@ -46,14 +46,17 @@ def make_package_ini(sets, output_file_name):
     data_lines.append("auto_start=%s" % value)
 
     value = app_sets.get("firmware", "6.1")
-    major, minor = split_version_string(value)
+    major, minor, patch = split_version_string(value)
     data_lines.append("firmware_major=%s" % major)
     data_lines.append("firmware_minor=%s" % minor)
+    data_lines.append("firmware_patch=%s" % patch)
 
     value = app_sets.get("version", "0.1")
-    major, minor = split_version_string(value)
+    major, minor, patch = split_version_string(value)
     data_lines.append("version_major=%s" % major)
     data_lines.append("version_minor=%s" % minor)
+    data_lines.append("version_patch=%s" % patch)
+
 
     _han = open(output_file_name, 'w')
     for line in data_lines:

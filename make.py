@@ -1296,6 +1296,10 @@ if __name__ == "__main__":
 
     maker = TheMaker()
 
+    # Use below for debug testing
+    # sys.argv = ['-v', '-m', 'build', 'simple.hello_world']
+    # sys.argv = ['-v', '-m', 'status']
+
     if len(sys.argv) < 2:
         maker.dump_help(sys.argv)
         sys.exit(-1)
