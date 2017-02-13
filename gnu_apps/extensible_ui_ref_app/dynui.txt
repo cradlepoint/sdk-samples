@@ -1,0 +1,38 @@
+Dynamic UI overview/usage:
+
+Every SDK application needs a main calling point, the SDK dynamic UI has a file called installer.py.
+This file creates what is called a route map.  The route map creates a list of endpoints that are
+called when a visitor connects to a website.  The example below demonstrates a client connecting to
+a local router and pointing to the "hello" endpoint.  The router's http server reads this and sends
+the word "Hello" back to the client's computer:
+
+[ client computer ]                      [ router http server ]
+https://192.168.0.1/hello       ->       <serve up page for hello endpoint>
+                                <-       Hello
+Hello
+
+In the example SDK application, we setup two route maps, one route map is for '/(.*)' which is 
+terminology for 'match anything sent after the IP/DNS address'.  It doesn't point at a directory
+because it is only supposed to read from the SDK root directory.  This rule would catch any of these
+requests and redirect the requests to the main index.tpl.html file:
+
+https://192.168.0.1/
+https://192.168.0.1/hello
+https://192.168.0.1/anything
+
+The SDK application also has a route map for '/resources/(.*)' which points to the 'resources/'
+directory.  This is so our HTML code can load CSS and image resources out of the SDK to display to
+clients.  The SDK application builds a route map list which contains tuples:
+
+[('/(.*)', ''), ('/resources/(.*)', 'resources/')]
+
+these are only two, but more can be added.  The route map is added to a message which tells the 
+router's http server to start the application as a hotspotServer, which the installer.py file
+sends to the router via our config store's client put command.
+
+When the application is run, in hotspotServer mode, a unauthenticated client will connect to the
+router and try to load a web page.  The router intercepts the request, and makes a call to the
+new SDK's route map.  This will push the SDK's index.tpl.html file (as index.html) to the client,
+if resources need to be loaded, resources are pulled in from the SDK's resources directory and
+everything is displayed to the user.  The user must click the ACCEPT button in order for their IP
+to be added to the list of accepted clients.
