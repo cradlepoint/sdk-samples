@@ -1,7 +1,30 @@
-##Router SDK Dynamic UI reference application and development tools. ##
-#### NOTE: This folder contains an SDK app that uses GNU make to build and install. The SDK python tools cannot be used this application. ####
+#Router SDK Dynamic UI reference application and development tools.#
 
-Available GNU make targets:
+----------
+
+### IMPORTANT: ###
+This folder contains an SDK app that uses GNU make to build and install. The SDK python tools cannot be used this application.
+
+Prior to using 'make' execute the following based on you OS:
+
+- Linux
+	- sudo apt-get install libffi-dev
+	- sudo apt-get install libssl-dev
+	- sudo apt-get install curl
+	- sudo apt-get install python3-pip
+	- sudo python3 -m pip install -U cryptography
+- OS X
+	- install python 3.5.1 from python.org
+	- pip3 install pyopenssl
+	- ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+	- brew install curl
+	- brew install openssl
+	- export COPYFILE_DISABLE=1
+		- excludes that "*._" files from the tar.gz. package in OS X.
+
+----------
+
+###Available GNU make targets###
 
 **default:**
     Build and test the router SDK reference app and create the archive
@@ -39,6 +62,8 @@ Available GNU make targets:
  **purge:**
     Purge all applications from the locally connected router.
 
+
+----------
 
 # HOW-TO Steps for running the reference application on your router. #
 
