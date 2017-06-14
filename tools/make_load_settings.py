@@ -248,7 +248,7 @@ def increment_app_version(ini_name, incr_version=False, backup=False):
             offset = old_line.find("=")
             assert offset >= 0
             value = old_line[offset + 1:].strip()
-            major, minor = split_version_string(value)
+            major, minor, patch = split_version_string(value)
             minor += 1
             version = "%d.%d" % (major, minor)
             logging.debug(
