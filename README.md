@@ -1,4 +1,4 @@
-# Router SDK/App sample Design Tools.
+# Router SDK Design Tools and sample applications.
 ----------
 This directory contains the Router SDK tools and sample applications. Below is a desciption of each. The Router Applications Development Guide is the best document to read first.
 
