@@ -109,7 +109,7 @@ class CSClient(object):
                 print("Timeout: router at {} did not respond.".format(router_ip))
                 return None
 
-            return json.loads(response.text)['data']
+            return json.loads(response.text)
 
     def put(self, base, value='', query='', tree=0):
         """Send a put request."""

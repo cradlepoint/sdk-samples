@@ -109,7 +109,7 @@ class CSClient(object):
                 print("Timeout: router at {} did not respond.".format(router_ip))
                 return None
 
-            return json.loads(response.text)['data']
+            return json.loads(response.text)
 
     def put(self, base, value='', query='', tree=0):
         """Send a put request."""
@@ -137,13 +137,27 @@ class CSClient(object):
 
     def append(self, base, value='', query=''):
         """Send an append request."""
+        value = json.dumps(value).replace(' ', '')
         if sys.platform == 'linux2':
-            value = json.dumps(value).replace(' ', '')
             cmd = "post\n{}\n{}\n{}\n".format(base, query, value)
             return self._dispatch(cmd)
         else:
-            print('Append is only available when running the app in the router.')
-            raise NotImplementedError
+            # Running in a computer so use http to send the post to the router.
+            import requests
+            router_ip, router_username, router_password = self._get_router_access_info()
+            router_api = 'http://{}/api/{}/{}'.format(router_ip, base, query)
+
+            try:
+                response = requests.post(router_api,
+                                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                        auth=requests.auth.HTTPDigestAuth(router_username, router_password),
+                                        data={"data": '{}'.format(value)})
+            except (requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError):
+                print("Timeout: router at {} did not respond.".format(router_ip))
+                return None
+
+            return response.text
 
     def delete(self, base, query=''):
         """Send a delete request."""
