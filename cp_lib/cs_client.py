@@ -147,9 +147,7 @@ class CradlepointClient(object):
         :param str query: ???
         :param int tree: ???
         """
-        if isinstance(value, dict):
-            # convert dictionary to JSON without white-space
-            value = json.dumps(value).replace(' ', '')
+        value = json.dumps(value).replace(' ', '')
 
         self._logger.debug("CSClient() PUT={} data={}".format(base, value))
         self.last_url = "put\n{}\n{}\n{}\n{}\n".format(base, query,
