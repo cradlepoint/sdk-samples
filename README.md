@@ -1,88 +1,84 @@
-# Router App/SDK sample application design tools.
+# Router SDK Design Tools and sample applications.
+----------
+This directory contains the Router SDK tools and sample applications. Below is a desciption of each. The Router Applications Development Guide is the best document to read first.
 
-## File Make.py
+## *** IMPORTANT - PLEASE READ ***
 
-This is the main build tool - see <http://wikis.iatips.com/> for how-to-use
-documentation.
+This is version 2.0 of the Router SDK and applications. The SDK has been simplified from the previous SDK to decrease the learning curve to allow more focus on application development. The router application infrastructure and packaging is unchanged. That is, an 'tar.gz' application package built with the previous SDK can still be installed into the router using SDK version 2.0. However, the coding of an application version 1.0 may need to be re-factored in order for continued development with SDK version 2.0. Please see document SDK\_version\_1.0\_app_refactor.html in this directory for details.
 
-## Directory config
+## Documents 
 
-Hold various shared configuration files, plus the default main.py
+- **README.html**
+    - This README file.
+- **Router\_Application\_Development_Guide.html**
+    - The main document that describes application development.
+- **Router\_APIs\_for_Applications.html**
+    - The router config store API in the router.
+- **GNU\_Make_README.html**
+    - The Linux GNU make instructions for the SDK.
 
-## Directory cp_lib
+## Sample Application Directories 
 
-Common library modules. Most are designed to work on the Cradlepoint router,
-although most can run on either a router or (for testing) on a PC
+- **app_template**
+    - A skeleton template for the creation of a new application.
+- **Boot1**
+    - On bootup, this application will select test the connection of each sim in a dual sim modem and enable the best.
+- **email**
+    - Sends an email.
+- **ftp_client**
+    - Creates a file and uploads it to an FTP server.
+- **ftp_server**
+    - Creates an FTP server in the router. A USB memory device is used as the FTP directory.
+- **gps_localhost**
+    - Assuming the Cradlepoint router is configured to forward NMEA sentences to a localhost port, open the port as a server and receive the streaming GSP data.
+- **gps_probe**
+    - Probe the GPS hardware and log the results.
+- **hello_world**
+    - Outputs a 'Hello World!' log every 10 seconds. 
+- **hspt**
+    - Sets up a custom Hot Spot landing page.
+- **list\_serial_ports**
+    - Lists out the serial ports in the logs.
+- **loglevel**
+    - Changes the router log level.
+- **modbus_poll**
+    - Poll a single range of Modbus registers from an attached serial Modbus/RTU PLC or slave device.
+- **modbus\_simple_bridge**
+    - A basic Modbus/TCP to RTU bridge.
+- **ping**
+    - Ping an address and log the results.
+- **power_gpio**
+    - Query the 2x2 power connector GPIO.
+- **send_alert**
+    - Sends an alert to the ECM when the application is started and stopped.
+- **send\_to_server**
+    - Gets the '/status' from the reouter config store and send it to a test server.
+- **serial_echo**
+    - Waits for data to enter the serial port, then echo back out.
+- **simple\_web_server**
+    - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 
-## Directory data - SAMPLES
 
-Code Sample related to 'data' usage and movement.
-* json_settings - simple JSON server on TCP port 9901, which allows
-a JSON RPC client to query the CradlepointAppBase 'settings' data
 
-## Directory demo - SAMPLES
 
-Larger code applications related to customer demos.
-* gpio_power_loss - monitor the IBR11X0 2x2 power connector input to detect
-power loss. Email an alert when power is lost or restored.
-* hoops_counter - run both a JSON RPC server and web server.
-They share a counter value (app_base.data["counter"]).
-JSON RPC server assumes a remote client puts (writes) new counter values.
-The web server shows as 5 large graphic digits on a page.
+## SDK Directories 
 
-## Directory gpio - SAMPLES
+- **common**
+    - Contains the cs.py file which should be copied into an  application folder. It is a wrapper for the TCP interface to the router config store.
+- **config**
+    - Contains the settings.mk file for Linux users that want to use GNU make for application development instead of python make.py.
+- **tools**
+    - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
 
-Code Samples related to router input/output pins:
-* power - read the 2x2 power connector gpio on the IBR11X0
-* serial_gpio - read 3 inputs on the IBR11X0's RS-232 port
+## Files 
 
-## Directory gps - SAMPLES
+- **make.py**
+    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected router that is in DEV mode.
+- **Makefile**
+    - The Makefile for Linux users that want to use GNU make for application development instead of python make.py.
+- **sdk_settings.ini**
+    - This is the ini file that contains the settings used by python make.py.
 
-Code Samples related to router GPS:
-* probe_gps - query the router STATUS tree, showing if the router supports
-GPS, and if any active modems show GPS data
 
-## Directory network - SAMPLES
 
-Code Samples related to common TCP/IP network tasks:
-* **warning: any 'server function' requires the router firewall to be
-correctly changed to allow client access to the router.**
-* digit_web - display a web page of a 5-digit number, as JPG images per digit.
-This demonstrates support for a simple web page with embedded objects, \
-which means the remote browser makes multiple requests.
-* send_email - send a single email to GMAIL with SSL/TLS
-* send_ping - use Router API control tree to send a ping.
-Sadly, is fixed to 40 pings, so takes about 40 seconds!
-* simple_web - display a web page with a short text message.
-* tcp_echo - accept a raw client, echoing back (repeating) any text received.
 
-## Directory serial_port - SAMPLES
-
-Code Samples related to common TCP/IP network tasks:
-* list_port - tests ports on IBR11X0 - firmware does NOT yet support
-* serial_echo - open IBR11X0 RS-232 port, echo by bytes received
-- firmware does NOT yet support properly
-
-## Directory simple - SAMPLES
-
-Code Samples related to common tasks:
-* hello_world - single python file running, sending text message to Syslog.
-Naming the code file 'main.py'
-prevents make.py from including the default main.py and many cplib files.
-* hello_world_1task - send text message to Syslog, but creates 1 sub-task
-to do the sending. On a PC, a KeyboardInterrupt shows how to gracefully
-stop children tasks.
-* hello_world_2task - send 3 text messages to Syslog, by creating 3 sub-tasks
-to do the sending. 2 sub-tasks run forever, while the third exists frequently
-and is restarted.
-* hello_world-app - send a text message to Syslog. uses the CradlepointAppBase.
-* send_alert - send an ECM alert.
-
-## Directory test
-
-Unittest scripts
-
-## Directory tools
-
-Shared modules NEVER designed to run on the router.
-Most of the tools here are used by MAKE.PY

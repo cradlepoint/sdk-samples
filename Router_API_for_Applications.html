@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Router_API_for_Applications</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<style type="text/css">
+/* GitHub stylesheet for MarkdownPad (http://markdownpad.com) */
+/* Author: Nicolas Hery - http://nicolashery.com */
+/* Version: b13fe65ca28d2e568c6ed5d7f06581183df8f2ff */
+/* Source: https://github.com/nicolahery/markdownpad-github */
+
+/* RESET
+=============================================================================*/
+
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* BODY
+=============================================================================*/
+
+body {
+  font-family: Helvetica, arial, freesans, clean, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  background-color: #fff;
+  padding: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+body>*:first-child {
+  margin-top: 0 !important;
+}
+
+body>*:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* BLOCKS
+=============================================================================*/
+
+p, blockquote, ul, ol, dl, table, pre {
+  margin: 15px 0;
+}
+
+/* HEADERS
+=============================================================================*/
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 20px 0 10px;
+  padding: 0;
+  font-weight: bold;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 tt, h1 code, h2 tt, h2 code, h3 tt, h3 code, h4 tt, h4 code, h5 tt, h5 code, h6 tt, h6 code {
+  font-size: inherit;
+}
+
+h1 {
+  font-size: 28px;
+  color: #000;
+}
+
+h2 {
+  font-size: 24px;
+  border-bottom: 1px solid #ccc;
+  color: #000;
+}
+
+h3 {
+  font-size: 18px;
+}
+
+h4 {
+  font-size: 16px;
+}
+
+h5 {
+  font-size: 14px;
+}
+
+h6 {
+  color: #777;
+  font-size: 14px;
+}
+
+body>h2:first-child, body>h1:first-child, body>h1:first-child+h2, body>h3:first-child, body>h4:first-child, body>h5:first-child, body>h6:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+a:first-child h1, a:first-child h2, a:first-child h3, a:first-child h4, a:first-child h5, a:first-child h6 {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+h1+p, h2+p, h3+p, h4+p, h5+p, h6+p {
+  margin-top: 10px;
+}
+
+/* LINKS
+=============================================================================*/
+
+a {
+  color: #4183C4;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* LISTS
+=============================================================================*/
+
+ul, ol {
+  padding-left: 30px;
+}
+
+ul li > :first-child, 
+ol li > :first-child, 
+ul li ul:first-of-type, 
+ol li ol:first-of-type, 
+ul li ol:first-of-type, 
+ol li ul:first-of-type {
+  margin-top: 0px;
+}
+
+ul ul, ul ol, ol ol, ol ul {
+  margin-bottom: 0;
+}
+
+dl {
+  padding: 0;
+}
+
+dl dt {
+  font-size: 14px;
+  font-weight: bold;
+  font-style: italic;
+  padding: 0;
+  margin: 15px 0 5px;
+}
+
+dl dt:first-child {
+  padding: 0;
+}
+
+dl dt>:first-child {
+  margin-top: 0px;
+}
+
+dl dt>:last-child {
+  margin-bottom: 0px;
+}
+
+dl dd {
+  margin: 0 0 15px;
+  padding: 0 15px;
+}
+
+dl dd>:first-child {
+  margin-top: 0px;
+}
+
+dl dd>:last-child {
+  margin-bottom: 0px;
+}
+
+/* CODE
+=============================================================================*/
+
+pre, code, tt {
+  font-size: 12px;
+  font-family: Consolas, "Liberation Mono", Courier, monospace;
+}
+
+code, tt {
+  margin: 0 0px;
+  padding: 0px 0px;
+  white-space: nowrap;
+  border: 1px solid #eaeaea;
+  background-color: #f8f8f8;
+  border-radius: 3px;
+}
+
+pre>code {
+  margin: 0;
+  padding: 0;
+  white-space: pre;
+  border: none;
+  background: transparent;
+}
+
+pre {
+  background-color: #f8f8f8;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  line-height: 19px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+pre code, pre tt {
+  background-color: transparent;
+  border: none;
+}
+
+kbd {
+    -moz-border-bottom-colors: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background-color: #DDDDDD;
+    background-image: linear-gradient(#F1F1F1, #DDDDDD);
+    background-repeat: repeat-x;
+    border-color: #DDDDDD #CCCCCC #CCCCCC #DDDDDD;
+    border-image: none;
+    border-radius: 2px 2px 2px 2px;
+    border-style: solid;
+    border-width: 1px;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    line-height: 10px;
+    padding: 1px 4px;
+}
+
+/* QUOTES
+=============================================================================*/
+
+blockquote {
+  border-left: 4px solid #DDD;
+  padding: 0 15px;
+  color: #777;
+}
+
+blockquote>:first-child {
+  margin-top: 0px;
+}
+
+blockquote>:last-child {
+  margin-bottom: 0px;
+}
+
+/* HORIZONTAL RULES
+=============================================================================*/
+
+hr {
+  clear: both;
+  margin: 15px 0;
+  height: 0px;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  border-bottom: 4px solid #ddd;
+  padding: 0;
+}
+
+/* TABLES
+=============================================================================*/
+
+table th {
+  font-weight: bold;
+}
+
+table th, table td {
+  border: 1px solid #ccc;
+  padding: 6px 13px;
+}
+
+table tr {
+  border-top: 1px solid #ccc;
+  background-color: #fff;
+}
+
+table tr:nth-child(2n) {
+  background-color: #f8f8f8;
+}
+
+/* IMAGES
+=============================================================================*/
+
+img {
+  max-width: 100%
+}
+</style>
+</head>
+<body>
+<h1>Router API for Applications</h1>
+<hr />
+<h2>Quick Links</h2>
+<h4><a href="#overview">Overview</a></h4>
+<h4><a href="#router_info">Router Info</a></h4>
+<h4><a href="#sdk_app_info">Router SDK and Application Info</a></h4>
+<h4><a href="#logging">Logging</a></h4>
+<h4><a href="#ping">Ping</a></h4>
+<h4><a href="#gpio">GPIO</a></h4>
+<h4><a href="#gps">GPS</a></h4>
+<h4><a href="#modem">Modem</a></h4>
+<p><a name="overview"></a></p>
+<h2>Overview</h2>
+<p>The router trees, also referred to as the router config store, are essentially the APIs to router query and control. One can read items to determine status or results and write to control and configure. All data is exchanged in the JSON format.  The JSON format is described at <a href="http://www.json.org/">http://www.json.org/</a>. The data can be accessed via the router CLI, a python application, or using curl. </p>
+<p>The router config store consist of the following trees:</p>
+<ul>
+<li>
+<strong>control</strong>
+<ul>
+<li>Elements used for controlling functions of the router.</li>
+</ul>
+</li>
+<li>
+<strong>config</strong>
+<ul>
+<li>Elements used for router configuration.</li>
+</ul>
+</li>
+<li>
+<strong>status</strong>
+<ul>
+<li>Elements to get the status of the router.</li>
+</ul>
+</li>
+<li>
+<strong>state</strong>
+<ul>
+<li>Should not to be used by applications.</li>
+</ul>
+</li>
+</ul>
+<p>This document does not describe every item in the router config store. There are sections that cover functionality and how the config store can be used for that function (i.e. Ping, GPIO, GPS, Modem, etc.). Many functional areas will span multiple tree types depending on the use case. Anything which is done via the router UI, utilizes the router trees.</p>
+<h2>CLI Example</h2>
+<p>Below is an example of how to query the router system logging information using the <strong>cat</strong> or <strong>get</strong> command and then changing the logging level to <strong>info</strong> with the <strong>set</strong> command. Note the JSON format in the output. These trees can also be traversed using linux change directory command (i.e. cd /config/system/logging). This can be very useful to see what is contained in each branch of the tree.</p>
+<pre><code>    [admin@IBR900-267: /$ cat /config/system/logging
+    {
+        &quot;console&quot;: false,
+        &quot;enabled&quot;: true,
+        &quot;firewall&quot;: false,
+        &quot;level&quot;: &quot;debug&quot;,
+        &quot;max_logs&quot;: 1000,
+        &quot;modem_debug&quot;: {
+            &quot;lvl_error&quot;: false,
+            &quot;lvl_info&quot;: false,
+            &quot;lvl_trace&quot;: false,
+            &quot;lvl_warn&quot;: false
+        },
+        &quot;remoteLogging&quot;: {
+            &quot;enabled&quot;: false,
+            &quot;serverAddr&quot;: &quot;192.168.20.171&quot;,
+            &quot;server_port&quot;: 514,
+            &quot;system_id&quot;: false,
+            &quot;utf8_bom&quot;: false
+        },
+        &quot;services&quot;: []
+    }
+    [admin@IBR900-267: /$ set /config/system/logging/level &quot;info&quot;
+
+    [admin@IBR900-267: /$ cat /config/system/logging
+    {
+        &quot;console&quot;: false,
+        &quot;enabled&quot;: true,
+        &quot;firewall&quot;: false,
+        &quot;level&quot;: &quot;info&quot;,
+        &quot;max_logs&quot;: 1000,
+        &quot;modem_debug&quot;: {
+            &quot;lvl_error&quot;: false,
+            &quot;lvl_info&quot;: false,
+            &quot;lvl_trace&quot;: false,
+            &quot;lvl_warn&quot;: false
+        },
+        &quot;remoteLogging&quot;: {
+            &quot;enabled&quot;: false,
+            &quot;serverAddr&quot;: &quot;192.168.20.171&quot;,
+            &quot;server_port&quot;: 514,
+            &quot;system_id&quot;: false,
+            &quot;utf8_bom&quot;: false
+        },
+        &quot;services&quot;: []
+    }
+</code></pre>
+
+<h2>Python Example</h2>
+<p>All sample apps include a cs.py file which contains the CSClient class. This class is a wrapper for the TCP interface to the router trees. Below is an example of how to query the router system logging information and then change the logging level to <strong>debug</strong> using the CSClient class.</p>
+<pre><code>    # Import the CSClient file which contains the necessary functions
+    # for router config store access
+    import cs
+
+    appName = 'ref_app'
+
+    cs.CSClient().log(appName, 'action({})'.format(command))
+
+    # Read the logging level
+    ret_value = cs.CSClient().get('/config/system/logging/level')
+
+    # Output a syslog for the current logging level
+    cs.CSClient().log(appName, 'Current Logging level = {}'.format(ret_value))
+    ret_value = ''
+
+    # Set the logging level to debug when the app is stopped.
+    ret_value = cs.CSClient().put('/config/system/logging', {'level': 'debug'})
+
+    # Output a syslog for the new current logging level
+    cs.CSClient().log(appName, 'New Logging level = {}'.format(ret_value))
+</code></pre>
+
+<h2>Curl Example</h2>
+<p>On Linux, the curl command can also be used to access items in the router trees. Use curl 'GET' to read and 'PUT' to write. Below is an example of getting the SDK status.</p>
+<p>The user specific information in the curl command is:</p>
+<ul>
+<li>router user name: admin</li>
+<li>router password: 44224267</li>
+<li>
+<p>router IP address: 192.168.0.1</p>
+<pre><code>    $ curl -s --digest --insecure -u admin:44224267 -H &quot;Accept: application/json&quot; -X GET http://192.168.0.1/api/status/system/sdk | /usr/bin/env python3 -m json.tool
+    {
+        &quot;success&quot;: true,
+        &quot;data&quot;: {
+            &quot;service&quot;: &quot;started&quot;,
+            &quot;mode&quot;: &quot;devmode&quot;,
+            &quot;summary&quot;: &quot;Service started&quot;
+        }
+    }
+
+
+    curl -s --digest --insecure -u admin:44224267 -H &quot;Accept: application/json&quot; -X GET http://192.168.0.1/api/config/system/logging/level | /usr/bin/env python3 -m json.tool
+    {
+        &quot;success&quot;: true,
+        &quot;data&quot;: &quot;debug&quot;
+    }
+
+
+    curl -s --digest --insecure -u admin:44224267 -H &quot;Accept: application/json&quot; -X PUT http://192.168.0.1/api/config/system/logging/level -d data='&quot;info&quot;' | /usr/bin/env python3 -m json.tool
+    {
+        &quot;success&quot;: true,
+        &quot;data&quot;: &quot;info&quot;
+    }        
+</code></pre>
+
+</li>
+</ul>
+<p><a name="router_info"></a></p>
+<h2>Router Info</h2>
+<p>There are three different trees that provide router information. Most are self explanatory.</p>
+<h3>Product Info /status/product_info/:</h3>
+<pre><code>    cat /status/product_info/
+    {
+        &quot;company_name&quot;: &quot;Cradlepoint, Inc.&quot;,
+        &quot;company_url&quot;: &quot;http://cradlepoint.com&quot;,
+        &quot;copyright&quot;: &quot;Cradlepoint, Inc. 2017&quot;,
+        &quot;mac0&quot;: &quot;00:30:44:22:42:67&quot;,
+        &quot;manufacturing&quot;: {
+            &quot;board_ID&quot;: &quot;909507&quot;,
+            &quot;mftr_date&quot;: &quot;1643&quot;,
+            &quot;serial_num&quot;: &quot;WA164300000518&quot;
+        },
+        &quot;product_name&quot;: &quot;IBR900LP6&quot;
+    }
+</code></pre>
+
+<h3>Firmware Info /status/fw_info/:</h3>
+<pre><code>    cat /status/fw_info/
+    {
+        &quot;build_date&quot;: &quot;Wed Mar  8 18:57:21 MST 2017&quot;,
+        &quot;build_type&quot;: &quot;RELEASE&quot;,
+        &quot;build_version&quot;: &quot;cc2619b&quot;,
+        &quot;custom_defaults&quot;: false,
+        &quot;fw_update_available&quot;: false,
+        &quot;major_version&quot;: 6,
+        &quot;manufacturing_upgrade&quot;: false,
+        &quot;minor_version&quot;: 3,
+        &quot;patch_version&quot;: 1,
+        &quot;upgrade_major_version&quot;: 0,
+        &quot;upgrade_minor_version&quot;: 0,
+        &quot;upgrade_patch_version&quot;: 0
+    }  
+</code></pre>
+
+<h3>Feature Info /status/feature:</h3>
+<p>The feature information provides a list of feature license. The two SDK license will only exist if the features have been enabled via the ECM. The 'Router SDK' means that router apps have been enabled while the 'Router SDK - Dev Mode' means the the development mode is enabled.</p>
+<pre><code>    cat /status/feature
+    {
+        &quot;db&quot;: [
+            [
+                &quot;46a03bd2-91ae-11e2-a305-002564cb1fdc&quot;,
+                &quot;Extended Enterprise License&quot;,
+                1123,
+                1064
+            ],
+            [
+                &quot;b7b3eb09-53c5-4a5c-88d8-f9456870087c&quot;,
+                &quot;Router SDK - Dev Mode&quot;,
+                7606,
+                7597
+            ],
+            [
+                &quot;9568fa81-d8e0-4223-a18c-0b1784f21f2a&quot;,
+                &quot;Router SDK&quot;,
+                7607,
+                7597
+            ]
+        ],
+        &quot;expiring_alert&quot;: false
+    }
+</code></pre>
+
+<h3>System ID /config/system/system_id:</h3>
+<p>This is a customizable identity that will be used in router reporting and alerting. The default value is the product name and the last three characters in the MAC address of the router. It is used as a hostname to DHCP, so it must conform to standard hostname conventions.</p>
+<pre><code>    cat /config/system/system_id
+    &quot;IBR900-267&quot;
+</code></pre>
+
+<h3>Ethernet /status/ethernet:</h3>
+<p>Shows current state of the Ethernet ports and their speed.</p>
+<pre><code>    cat /status/ethernet
+    [
+        {
+            &quot;link&quot;: &quot;up&quot;,
+            &quot;link_speed&quot;: &quot;1000FD&quot;,
+            &quot;port&quot;: 0
+        },
+        {
+            &quot;link&quot;: &quot;up&quot;,
+            &quot;link_speed&quot;: &quot;1000FD&quot;,
+            &quot;port&quot;: 1
+        },
+        {
+            &quot;link&quot;: &quot;down&quot;,
+            &quot;link_speed&quot;: &quot;Unknown&quot;,
+            &quot;port&quot;: 2
+        }
+    ]
+</code></pre>
+
+<p><a name="sdk_app_info"></a></p>
+<h2>SDK and Application Info</h2>
+<p>SDK and application information can be found in <strong>/status/system/sdk</strong>. It contains the state of the Router SDK service and any application. If there are any error with installing or starting an application, it will be contained in this tree.</p>
+<h3>/status/system/sdk:</h3>
+<p>The main items in SDK status tree are:</p>
+<ul>
+<li>
+<strong>mode</strong>
+<ul>
+<li>
+This indicates the route SDK mode which affects how apps can be installed.
+<ul>
+<li>standard - Normal router mode when apps can be installed via ECM.</li>
+<li>devmode - Development mode which allows apps to be installed directly from a computer. This is set from the Tools menu of ECM.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<strong>service</strong>
+<ul>
+<li>The state of the Router SDK service in the router. </li>
+</ul>
+</li>
+<li>
+<strong>summary</strong>
+<ul>
+<li>A more detailed version of the Router SDK service state.</li>
+</ul>
+</li>
+<li>
+<strong>apps</strong>
+<ul>
+<li>A list of any apps that are installed with details about each app. Most are items self explanatory. However, note the 'state' which indicated the current state of the app. This can be installing, started, error, etc.</li>
+</ul>
+</li>
+</ul>
+<h4>No App installed:</h4>
+<pre><code>    cat /status/system/sdk
+    {
+        &quot;mode&quot;: &quot;devmode&quot;,
+        &quot;service&quot;: &quot;started&quot;,
+        &quot;summary&quot;: &quot;Service started&quot;
+    }
+</code></pre>
+
+<h4>After App installed:</h4>
+<pre><code>    cat /status/system/sdk
+    {
+        &quot;apps&quot;: [
+            {
+                &quot;_id_&quot;: &quot;616acd0c-0475-479e-a33b-f7054843c971&quot;,
+                &quot;app&quot;: {
+                    &quot;auto_start&quot;: true,
+                    &quot;date&quot;: &quot;2017-03-31T15:49:17.537335&quot;,
+                    &quot;name&quot;: &quot;hello_world&quot;,
+                    &quot;reboot&quot;: true,
+                    &quot;restart&quot;: false,
+                    &quot;uuid&quot;: &quot;616acd0c-0475-479e-a33b-f7054843c971&quot;,
+                    &quot;vendor&quot;: &quot;Cradlebpoint&quot;,
+                    &quot;version_major&quot;: 1,
+                    &quot;version_minor&quot;: 0
+                },
+                &quot;state&quot;: &quot;started&quot;,
+                &quot;summary&quot;: &quot;Started Application&quot;,
+                &quot;type&quot;: &quot;developer&quot;
+            }
+        ],
+        &quot;mode&quot;: &quot;devmode&quot;,
+        &quot;service&quot;: &quot;started&quot;,
+        &quot;summary&quot;: &quot;Service started&quot;
+    }
+</code></pre>
+
+<p><a name="logging"></a></p>
+<h2>Logging</h2>
+<p>Router logging can be queried or configured via <strong>/config/system/logging</strong>. This includes setting the log level along with sending logs to a syslog server. </p>
+<pre><code>    cat /config/system/logging/
+    {
+        &quot;console&quot;: false,
+        &quot;enabled&quot;: true,
+        &quot;firewall&quot;: false,
+        &quot;level&quot;: &quot;debug&quot;,
+        &quot;max_logs&quot;: 1000,
+        &quot;modem_debug&quot;: {
+            &quot;lvl_error&quot;: false,
+            &quot;lvl_info&quot;: false,
+            &quot;lvl_trace&quot;: false,
+            &quot;lvl_warn&quot;: false
+        },
+        &quot;remoteLogging&quot;: {
+            &quot;enabled&quot;: false,
+            &quot;serverAddr&quot;: &quot;192.168.0.171&quot;,
+            &quot;server_port&quot;: 514,
+            &quot;system_id&quot;: false,
+            &quot;utf8_bom&quot;: true
+        },
+        &quot;services&quot;: []
+    }
+</code></pre>
+
+<ul>
+<li>
+<strong>console</strong>
+<ul>
+<li>Not Used.</li>
+</ul>
+</li>
+<li>
+<strong>enabled</strong>
+<ul>
+<li>Not Used.</li>
+</ul>
+</li>
+<li>
+<strong>firewall</strong>
+<ul>
+<li>Not Used.</li>
+</ul>
+</li>
+<li>
+<strong>level</strong>
+<ul>
+<li>Setting the log level controls which messages are stored or filtered out. A log level of Debug will record the most information while a log level of Critical will only record the most urgent messages.</li>
+</ul>
+</li>
+<li>
+<strong>max_logs</strong>
+<ul>
+<li>This is the maximum number of log messages the service will store.  After this limit is reached, the oldest are lost as new messages come in.  However, based on the platform, the limit may be smaller.</li>
+</ul>
+</li>
+<li>
+<strong>modem_debug</strong>
+<ul>
+<li>Used to set the modem logging level. Not recommended for application use.</li>
+</ul>
+</li>
+<li>
+<strong>remoteLogging</strong>
+<ul>
+<li>
+enabled
+<ul>
+<li>Set true to send log messages to the specified Syslog Server.</li>
+</ul>
+</li>
+<li>
+serverAddr
+<ul>
+<li>The Hostname or IP address of the Syslog Server.</li>
+</ul>
+</li>
+<li>
+server_port
+<ul>
+<li>The Port Number of the Syslog Server.</li>
+</ul>
+</li>
+<li>
+system_id
+<ul>
+<li>Set true to include the routers &quot;System ID&quot; at the beginning of every log message. This is often useful when a single remote syslog server is handling logs for several routers.</li>
+</ul>
+</li>
+<li>
+utf8_bom
+<ul>
+<li>The log message is sent using a UTF-8 encoding. By default the router will preprend the Unicode Byte Order Mark (BOM) to the syslog message in compliance with the Syslog protocol, RFC5424. Some syslog servers may not support, fully, RFC5424 and will treat the BOM as ASCII text which will appear as garbled characters in the log. If this occurs, set this option to false.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<strong>services</strong>
+<ul>
+<li>Not recommended for application use.</li>
+</ul>
+</li>
+</ul>
+<p><a name="ping"></a></p>
+<h2>Ping</h2>
+<p>Ping can be used to test communication to another host on the network. All ping operations and results are found in the /control/ping tree.</p>
+<pre><code>    cat /control/ping
+    {
+        &quot;result&quot;: &quot;&quot;,
+        &quot;start&quot;: {
+            &quot;bind_ip&quot;: false,
+            &quot;deadline&quot;: &quot;Same as timeout&quot;,
+            &quot;df&quot;: &quot;do&quot;,
+            &quot;family&quot;: &quot;inet&quot;,
+            &quot;fwmark&quot;: null,
+            &quot;host&quot;: null,
+            &quot;iface&quot;: null,
+            &quot;interval&quot;: 1,
+            &quot;num&quot;: 4,
+            &quot;size&quot;: 56,
+            &quot;srcaddr&quot;: null,
+            &quot;timeout&quot;: 11
+        },
+        &quot;status&quot;: &quot;&quot;,
+        &quot;stop&quot;: &quot;&quot;
+    }
+</code></pre>
+
+<h3>Starting a Ping:</h3>
+<p>Write operations to <strong>control/ping/start</strong> will initiate a ping. The following will start a basic ping when written: {&quot;host&quot;: &quot;www.google.com&quot;, &quot;size&quot;: 64}. An IP address can also be used.</p>
+<p><strong><em>NOTE:</em></strong> Concurrent ping operations are not supported.  </p>
+<p>Ping Options for <strong>control/ping/start</strong>:</p>
+<ul>
+<li>
+<strong>iface</strong>: device UID, interface name, or Network name
+<ul>
+<li>Allows ping to be sourced from an interface</li>
+</ul>
+</li>
+<li>
+<strong>bind_ip</strong>: boolean
+<ul>
+<li>Causes ping to bind to an IP on the interface specified by &quot;iface&quot;.  
+</li>
+</ul>
+</li>
+<li>
+<strong>srcaddr</strong>: IP Address
+<ul>
+<li>Causes ping to be sourced from the specified IP address.</li>
+</ul>
+</li>
+<li><strong>deadline</strong>: seconds</li>
+<li>
+<strong>timeout</strong>: seconds
+<ul>
+<li>If specified, ping will continue until either &quot;num&quot; packets are sent, or &quot;timeout&quot; seconds have elapsed.  The two options are equivalent, and if both are specified, the lesser of the two is used</li>
+</ul>
+</li>
+<li>
+<strong>df</strong>: {<em>do</em>, <em>want</em>, or <em>dont</em>}
+<ul>
+<li>
+Specify the Path MTU discovery option:
+<ul>
+<li><em>do</em>:	Asserts the &quot;Don't Fragment&quot; flag in the ICMP requests, prohibiting fragmentation</li>
+<li><em>want</em>: Allows local fragmentation, and will fragment the ICMP request if the ICMP request 					exceeds the outbound interfaces' MTU</li>
+<li><em>dont</em>: Do not assert the &quot;Don't Fragment&quot; flag, allowing fragmentation, and will fragment the ICMP Requests in response to ICMP fragmentation responses</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<strong>fwmark</strong>: null/non-null
+<ul>
+<li>If non-null, then the SO_MARK socket option is set, causing the packetssent through the socket to be marked.</li>
+</ul>
+</li>
+<li>
+<strong>family</strong>: {<em>inet</em> or <em>inet6</em>}
+<ul>
+<li>If <em>inet</em>, then ping for IPv4 is used; if <em>inet6</em>, then the equivalent of ping6 is used.</li>
+</ul>
+</li>
+<li>
+<strong>host</strong>: Hostname, or IP address
+<ul>
+<li>Specifies the destination for the ICMP requests</li>
+</ul>
+</li>
+<li>
+<strong>interval</strong>: seconds
+<ul>
+<li>The number of seconds to wait between each ICMP request</li>
+</ul>
+</li>
+<li>
+<strong>num</strong>: integer
+<ul>
+<li>The number of ICMP requests to send before exiting.  If &quot;deadline&quot; or &quot;timeout&quot; is also specified, then ping will exit after &quot;num&quot; packets have been sent, or min(deadline, timeout&quot;) seconds have elapsed.</li>
+</ul>
+</li>
+<li>
+<strong>size</strong>: bytes
+<ul>
+<li>Size of the ICMP request</li>
+</ul>
+</li>
+</ul>
+<h3>Stopping a Ping:</h3>
+<p>Write operations to control/ping/stop will halt the ping in progress, if any. If a ping is not in progress, this is ignored.</p>
+<h3>Retrieving Results and Status:</h3>
+<p>Reading from <strong>control/ping/results</strong> will return the additional results since the last read, or the start of the ping, whichever is most recent. Reading the results will clear out the results immediately after they are read; the reader will need to concatenate the results if desired.</p>
+<p><strong><em>NOTE:</em></strong> If more than 10 results accumulate between reads, the oldest results will be truncated such that the maximum number of result lines will never exceed 10.</p>
+<p>Reading from <strong>control/ping/status</strong> will return the current state of the ping in progress. Unlike the results, this will persist through multiple reads.  The status can be one of 'running', 'done', 'stopped', or 'error'. If any packets were transmitted during the Ping, then when the ping stops, the result summary will be posted to <strong>control/ping/results</strong> (and cleared when read)</p>
+<p><a name="gpio"></a></p>
+<h2>GPIO</h2>
+<p>Some of the Cradlepoint routers have GPIO connectors as well as GPIO pins built into the power connectors Below is information related to GPIO router config store tree items.</p>
+<h3>/config/system/gpio_actions</h3>
+<p>Includes configuration data for all user configurable pins - if the pin is enabled, it's direction, and what action it is currently assigned to. The available actions are:</p>
+<p>if value of direction is <em>in</em>, available values for &quot;current_action&quot; are:</p>
+<ul>
+<li>
+<em>in_action_sensing</em> Input Sensing: 
+<ul>
+<li>In this mode the logic state (high or low) is automatically sensed by the router and is readable as the Current Value.</li>
+</ul>
+</li>
+<li>
+<em>in_action_ignition</em> Ignition Sensing: 
+<ul>
+<li>(available on power connector only) In this mode the router will turn off after the input has been held low for the timeout period in seconds. The router will then reboot when the input is returned to high. If the input is held low for less than the timeout period before returning to high, no action is taken.</li>
+</ul>
+</li>
+<li>
+<em>in_action_reset</em> Router Reset: 
+<ul>
+<li>(available on power connector only) In this mode an external device can reset the router by holding the input low for 10-seconds.</li>
+</ul>
+</li>
+</ul>
+<p>if value of direction is <em>out</em>, available values for &quot;current_action&quot; are:</p>
+<ul>
+<li>
+<em>out_action_low</em> Default/Open: 
+<ul>
+<li>In this mode the output pin is not used and is at 0V (ground potential).</li>
+</ul>
+</li>
+<li>
+<em>out_action_high</em> or <em>out_action_router_running</em> Set Closed/Router Running: 
+<ul>
+<li>In these modes the output pin is logic low while the router is booting and transitions to logic high when the router is fully running. If the router is reset, the output returns to low until the router has fully rebooted.</li>
+</ul>
+</li>
+<li>
+<em>out_action_modem_connected</em> Modem Connected: 
+<ul>
+<li>In this mode the output pin is logic low until the modem has connected to the tower. If the connection drops, this output is set low until the connection is restored.</li>
+</ul>
+</li>
+</ul>
+<p>The &quot;pin&quot; value is for internal purposes only. Please see <a href="#gpio_acions"><strong>/status/gpio_action</strong></a> for more information.</p>
+<p><a name="gpio_acions"></a></p>
+<h3>/status/gpio_actions</h3>
+<p>Used to view capabilities of the GPIOs. Here you can see what actions a pin supports, and what direction it can be set to (some pins are fixed direction and some are bidirectional). You can also get the &quot;pretty_value&quot; string, which outputs the current state of the GPIO in human readable form. It is updated every time this field is accessed.</p>
+<h3>/control/gpio</h3>
+<p>Used to bypass the GPIO service and set values to gpio pins manually. Not recommended</p>
+<h3>/status/gpio</h3>
+<p>Used to read the GPIO values directly from the pins.</p>
+<h3>/config/system/connector_gpio</h3>
+<p>Deprecated - DO NOT USE.</p>
+<p><a name="gps"></a></p>
+<h2>GPS</h2>
+<h3>GNSS vs GPS</h3>
+<p>GNSS stands for Global Navigation Satellite Systems and GPS stand for Global Positioning System. GNSS is an umbrella term for all the satellite-based positioning systems, including GPS. GPS itself is the US satellite system and, however, GPS is used interchangeably for all satellite positioning systems. See <a href="https://en.wikipedia.org/wiki/Satellite_navigation">https://en.wikipedia.org/wiki/Satellite_navigation</a> for more details about satellite navigation.</p>
+<p>The most common assumption is that all modems are capable of GPS. In order for a cellular modem to support GPS, GPS must be a function of both the modem and carrier. GPS requires the following four elements:</p>
+<ul>
+<li>A cellular modem that supports GPS.</li>
+<li>A cellular carrier that allows the GPS functionality on that modem.</li>
+<li>Sufficient GPS signal level at the modem deployment location.</li>
+<li>GPS antenna (depending on the model of modem or Cradlepoint).</li>
+</ul>
+<p>From an app access perspective, most use cases only needs to verify that GPS is enabled and get the GPS location data. This is described below.</p>
+<h4>config/system/gps/enabled</h4>
+<p>This is either true or false and indicates gps enablement.</p>
+<h4>config/system/gps/enable_gps_keepalive</h4>
+<p>When &quot;GPS Keepalive&quot; is enabled, the GPS service will poll the GPS hardware every 10 seconds. The GPS hardware goes into a low power state after a certain interval of inactivity. Setting this flag will prevent the GPS from going into that low power state. Coming out of a low power state takes extra time to regain the GPS lock so set this flag to keep the hardware from falling asleep. Note this flag has no effect if the GPS service itself is not enabled.</p>
+<h4>Get GPS location data</h4>
+<p>The current GPS data can be found in <strong>/status/gps/</strong>.  </p>
+<p>This contains two fields: fix and nmea. </p>
+<ul>
+<li>
+<strong>fix</strong>:
+<ul>
+<li>a struct containing parsed information about the current GPS fix. </li>
+</ul>
+</li>
+<li>
+<strong>nmea</strong> 
+<ul>
+<li>an array of National Marine Electronics Association (NMEA) strings. </li>
+</ul>
+</li>
+</ul>
+<p>An example output is:</p>
+<pre><code>    cat /status/gps
+    {
+    'fix': {'age': 1.2596200000261888,
+             'altitude_meters': 850.8,
+             'ground_speed_knots': 0.0,
+             'heading': 323.4,
+             'latitude': {'degree': 43.0,
+                          'minute': 37.0,
+                          'second': 10.84808349609375},
+             'lock': True,
+             'longitude': {'degree': -116.0,
+                           'minute': 12.0,
+                           'second': 20.53081512451172},
+             'satellites': 9,
+             'time': 204921},
+    'nmea': ['$GPGSV,4,1,16,05,14,275,24,07,61,082,30,08,40,063,28,09,29,167,26*71\r\n',
+              '$GPGSV,4,2,16,11,18,116,27,13,17,316,27,17,02,189,23,27,12,036,24*77\r\n',
+              '$GPGSV,4,3,16,28,53,243,25,30,67,317,32,33,,,35,38,,,34*7B\r\n',
+              '$GPGSV,4,4,16,39,,,34,40,,,34,41,,,34,42,,,34*73\r\n',
+              '$GPGGA,204920.0,4337.180827,N,11612.342184,W,1,09,0.9,850.8,M,-11.0,M,,*61\r\n',
+              '$GPVTG,323.4,T,308.9,M,0.0,N,0.0,K,A*27\r\n',
+              '$GPRMC,204920.0,A,4337.180827,N,11612.342184,W,0.0,323.4,110417,14.6,E,A*27\r\n',
+              '$GPGSA,A,2,05,07,08,09,11,13,27,28,30,,,,1.2,0.9,0.8*3C\r\n']
+    }
+</code></pre>
+
+<p><a name="modem"></a></p>
+<h2>Modem</h2>
+<p>The modem status and control information is part of the wan tree. This is a very critical and complicated aspect of the router functionality. Please note that there is no direct access to the modem AT commands. For now, this section will only describe how to enable and disable a modem, along with some status information, as this has been requested by several application developers. More information will be added as needed.</p>
+<p>The list of modems in the system can be found here: get /status/wan/devices. While this will list all the wan devices, not all modems may be configured with a SIM card. </p>
+<pre><code>    get status/wan/devices
+    {
+        &quot;ethernet-wan&quot;: {
+            ...
+        },
+        &quot;mdm-feb80139&quot;: {
+            ...
+        },
+        &quot;mdm-fee5c7f2&quot;: {
+            ...
+        }
+    }
+</code></pre>
+
+<p>To determine if a modem does not have SIM card inserted, see here: get status/wan/devices/mdm-<uid>/status/error_text. Where <uid> is the modem's unique identifier. The response will be 'null' if the card exist.</p>
+<pre><code>    get status/wan/devices/mdm-fee5c7f2/status/error_text
+    &quot;SIM error: NOSIM&quot;
+</code></pre>
+
+<p>Here is an example of the diagnostic information for a modem with a SIM. This contains much data about the modem including its signal quality. Note that the &quot;DBM&quot; field is the modems RSSI.</p>
+<pre><code>    get status/wan/devices/mdm-fee5c7f2/diagnostics/
+    {
+        &quot;BANDDLFRQ&quot;: &quot;2110-2155&quot;,
+        &quot;BANDULFRQ&quot;: &quot;1710-1755&quot;,
+        &quot;CARRID&quot;: &quot;Verizon Wireless&quot;,
+        &quot;CARRIER_SWITCH_DEFAULTS&quot;: &quot;VERIZON,ATT,SPRINT,GENERIC&quot;,
+        &quot;CELL_ID&quot;: &quot;2934137 (0x2cc579)&quot;,
+        &quot;CFGAPNMASK&quot;: &quot;8&quot;,
+        &quot;CGSN&quot;: &quot;356526070342666&quot;,
+        &quot;CHIPSET&quot;: &quot;9X30C&quot;,
+        &quot;CUR_PLMN&quot;: &quot;311480&quot;,
+        &quot;DBM&quot;: &quot;-60&quot;,
+        &quot;DEFAPN&quot;: &quot;3&quot;,
+        &quot;DEFAPNTYPE&quot;: &quot;IP&quot;,
+        &quot;DISP_IMEI&quot;: &quot;356526070342666&quot;,
+        &quot;DISP_MEID&quot;: &quot;35652607034266&quot;,
+        &quot;EMMCOMMSTATE&quot;: &quot;RRC Idle&quot;,
+        &quot;EMMSTATE&quot;: &quot;Registered&quot;,
+        &quot;EMMSUBSTATE&quot;: &quot;Normal Service&quot;,
+        &quot;FW_CARRIER_LOAD&quot;: &quot;VERIZON&quot;,
+        &quot;GSN&quot;: &quot;356526070342666&quot;,
+        &quot;HM_PLMN&quot;: &quot;311480&quot;,
+        &quot;HOMECARRID&quot;: &quot;Verizon&quot;,
+        &quot;HW_VER&quot;: &quot;1.0&quot;,
+        &quot;ICCID&quot;: &quot;89148000003136071391&quot;,
+        &quot;IMSI&quot;: &quot;311480313413488&quot;,
+        &quot;LAST_PIN&quot;: &quot;&quot;,
+        &quot;LAST_PIN_VALID&quot;: &quot;False&quot;,
+        &quot;LTEBANDWIDTH&quot;: &quot;10 MHz&quot;,
+        &quot;MDL&quot;: &quot;Internal LP6 (SIM1)&quot;,
+        &quot;MDM_CONTROL_TYPE&quot;: &quot;NORMAL&quot;,
+        &quot;MDM_DRIVER_CAPABILITIES&quot;: &quot;1547313&quot;,
+        &quot;MDM_MODE_CAPABILITIES&quot;: &quot;21&quot;,
+        &quot;MDN&quot;: &quot;+12086310191&quot;,
+        &quot;MFG&quot;: &quot;CradlePoint Inc.&quot;,
+        &quot;MFG_MDL&quot;: &quot;MC7455-CP&quot;,
+        &quot;MODEMIMSSTATE&quot;: &quot;Full Service&quot;,
+        &quot;MODEMOPMODE&quot;: &quot;Online&quot;,
+        &quot;MODEMPSSTATE&quot;: &quot;Attached&quot;,
+        &quot;MODEMSYSMODE&quot;: &quot;LTE&quot;,
+        &quot;MODEMTEMP&quot;: &quot;33&quot;,
+        &quot;MSID&quot;: &quot;2086310191&quot;,
+        &quot;PIN_RETRIES&quot;: &quot;3&quot;,
+        &quot;PIN_STATUS&quot;: &quot;READY&quot;,
+        &quot;PRD&quot;: &quot;Internal LP6 (SIM1)&quot;,
+        &quot;PRI_ID&quot;: &quot;9905117&quot;,
+        &quot;PRI_VER&quot;: &quot;000.005&quot;,
+        &quot;PRLV&quot;: &quot;15504&quot;,
+        &quot;PUK_RETRIES&quot;: &quot;10&quot;,
+        &quot;RFBAND&quot;: &quot;Band 4&quot;,
+        &quot;ROAM&quot;: &quot;1&quot;,
+        &quot;RSRP&quot;: &quot;-84&quot;,
+        &quot;RSRQ&quot;: &quot;-7&quot;,
+        &quot;RXCHANNEL&quot;: &quot;2000&quot;,
+        &quot;SCELLACTIVE&quot;: &quot;Not Registered&quot;,
+        &quot;SELAPN&quot;: &quot;3&quot;,
+        &quot;SIM_LOCK&quot;: &quot;FALSE&quot;,
+        &quot;SINR&quot;: &quot;9.2&quot;,
+        &quot;SS&quot;: &quot;100&quot;,
+        &quot;SUPPORTED_TECH&quot;: &quot;lte/3g&quot;,
+        &quot;TXCHANNEL&quot;: &quot;20000&quot;,
+        &quot;VER&quot;: &quot;SWI9X30C_02.05.07.00 r5154 CARMD-EV-FRMWR2 2015/12/04 22:23:15&quot;,
+        &quot;VER_PKG&quot;: &quot;02.05.07.00_VERIZON,002.008_002&quot;,
+        &quot;VER_PREF_PKG&quot;: &quot;02.05.07.00_VERIZON,002.008_002&quot;,
+        &quot;VER_PRETTY&quot;: &quot;2.5.7.0&quot;
+    }
+</code></pre>
+
+<p>The modem can be enabled and disabled by changing the testmode/ready flag in the control tree (true to enable and false to diasable). Setting the reset flag to true will reset the modem.</p>
+<pre><code>    get control/wan/devices/mdm-fee5c7f2/testmode
+    {
+        &quot;ready&quot;: true,
+        &quot;reset&quot;: false
+    }
+</code></pre>
+
+<hr />
+<p>Published Date: 5-30-2017</p>
+<p>This article not have what you need? Not find what you were looking for? Think this article can be improved? Please let us know at <a href="&#109;&#97;&#x69;&#108;&#x74;&#x6f;&#58;&#x73;&#117;&#103;&#x67;&#101;&#115;&#116;&#x69;&#x6f;&#110;&#x73;&#64;&#x63;&#x72;&#97;&#100;&#x6c;&#101;&#x70;&#111;&#x69;&#x6e;&#116;&#x2e;&#x63;&#111;&#x6d;">&#x73;&#x75;&#x67;&#103;e&#115;&#x74;i&#x6f;&#110;&#115;&#x40;&#x63;r&#x61;&#x64;&#108;&#101;&#x70;&#x6f;&#x69;&#x6e;&#116;&#x2e;&#99;&#x6f;&#x6d;</a>.</p>
+
+</body>
+</html>
+<!-- This document was created with MarkdownPad, the Markdown editor for Windows (http://markdownpad.com) -->
