@@ -59,7 +59,7 @@ def run_router_app():
     port_list = []
 
     # confirm we are running on an 1100/1150 or 900/950, result should be "IBR1100LPE"
-    result = json.loads(cs.CSClient().get("status/product_info/product_name"))
+    result = cs.CSClient().get("status/product_info/product_name").get('data')
     if "IBR1100" in result or "IBR1150" in result or "IBR900" in result or "IBR950" in result:
         name = "/dev/ttyS1"
         cs.CSClient().log(APP_NAME, "Product Model {} has 1 builtin port:{}".format(result, name))
@@ -162,8 +162,8 @@ def action(command):
         elif command == 'stop':
             pass
 
-    except:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}!'.format(APP_NAME, command))
+    except Exception as ex:
+        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
         raise
 
 
