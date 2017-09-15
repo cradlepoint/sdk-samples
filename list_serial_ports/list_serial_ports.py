@@ -67,9 +67,6 @@ def run_router_app():
 
     elif "IBR300" in result or "IBR350" in result:
         cs.CSClient().log(APP_NAME, "Product Model {} has no serial support".format(result))
-
-    else:
-        cs.CSClient().log(APP_NAME, "Inappropriate Product:{} - aborting.".format(result))
         return -1
 
     if probe_physical:
