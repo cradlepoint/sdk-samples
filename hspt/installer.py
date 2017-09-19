@@ -49,8 +49,9 @@ if __name__ == '__main__':
     mkroutes('/(.*)', '')
     mkroutes('/resources/(.*)', 'resources/')
 
-    if args.opt not in ['start', 'stop']:
+    opt = args.opt.strip()
+    if opt not in ['start', 'stop']:
         log('failed to run command')
         exit()
 
-    action(args.opt)
+    action(opt)

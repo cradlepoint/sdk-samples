@@ -27,14 +27,14 @@ def probe_gps():
 
     # check the type of Router we are running on
     try:
-        result = json.loads(cs.CSClient().get("status/product_info/product_name"))
+        result = cs.CSClient().get("status/product_info/product_name")['data']
         message = "Router Model:{}".format(result)
         report_lines.append(message)
         cs.CSClient().log(APP_NAME, message)
     except KeyError:
         cs.CSClient().log(APP_NAME, "App Base is missing 'product_info'")
 
-    result = json.loads(cs.CSClient().get("config/system/gps"))
+    result = cs.CSClient().get("config/system/gps")['data']
     if not isinstance(result, dict):
         # some error?
         gps_enabled = False
@@ -62,7 +62,7 @@ def probe_gps():
 
     if gps_enabled:
         # only do this if enabled!
-        result = json.loads(cs.CSClient().get("status/wan/devices"))
+        result = cs.CSClient().get("status/wan/devices")['data']
 
         gps_sources = []
         for key in result:
@@ -144,8 +144,8 @@ def action(command):
             # Nothing on stop
             pass
 
-    except:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}!'.format(APP_NAME, command))
+    except Exception as ex:
+        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
         raise
 
 
@@ -154,8 +154,10 @@ if __name__ == "__main__":
     parser.add_argument('opt')
     args = parser.parse_args()
 
-    if args.opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(args.opt))
+    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
+    opt = args.opt.strip()
+    if opt not in ['start', 'stop']:
+        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
         exit()
 
-    action(args.opt)
+    action(opt)

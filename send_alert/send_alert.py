@@ -29,18 +29,21 @@ def action(command):
         elif command == 'stop':
             cs.CSClient().log(APP_NAME, 'Sent ECM alert that app was stopped.')
             cs.CSClient().alert(APP_NAME, 'Application has been stopped')
-    except:
-        e = sys.exc_info()[0]
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! exception: {}'.format(APP_NAME, command, e))
+
+    except Exception as ex:
+        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
         raise
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('opt')
     args = parser.parse_args()
 
-    if args.opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(args.opt))
+    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
+    opt = args.opt.strip()
+    if opt not in ['start', 'stop']:
+        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
         exit()
 
-    action(args.opt)
+    action(opt)

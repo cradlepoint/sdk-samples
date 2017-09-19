@@ -3,9 +3,10 @@ A Simple Web server
 """
 
 import cs
+import cgi
 import argparse
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler, CGIHTTPRequestHandler
 
 APP_NAME = 'simple_web_server'
 WEB_MESSAGE = "Hello World from Cradlepoint router!"
@@ -19,8 +20,11 @@ def start_server():
 
     cs.CSClient().log(APP_NAME, "Starting Server: {}".format(server_address))
     cs.CSClient().log(APP_NAME, "Web Message is: {}".format(WEB_MESSAGE))
-
     httpd = HTTPServer(server_address, WebServerRequestHandler)
+
+    # Use the line below to serve the index.html page that is in the
+    # app directory.
+    # httpd = HTTPServer(server_address, SimpleHTTPRequestHandler)
 
     try:
         httpd.serve_forever()
@@ -61,8 +65,8 @@ def action(command):
         elif command == 'stop':
             pass
 
-    except:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}!'.format(APP_NAME, command))
+    except Exception as ex:
+        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
         raise
 
 
@@ -71,8 +75,10 @@ if __name__ == "__main__":
     parser.add_argument('opt')
     args = parser.parse_args()
 
-    if args.opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(args.opt))
+    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
+    opt = args.opt.strip()
+    if opt not in ['start', 'stop']:
+        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
         exit()
 
-    action(args.opt)
+    action(opt)

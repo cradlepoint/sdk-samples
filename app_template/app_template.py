@@ -1,17 +1,17 @@
 """
 A Blank app template as an example
 """
+APP_NAME = "app_template"
+
 try:
     import sys
     import traceback
     import argparse
     import cs
 except Exception as ex:
-    cs.CSClient().log("app_template.py", 'Import failure: {}'.format(ex))
-    cs.CSClient().log("app_template.py", 'Traceback: {}'.format(traceback.format_exc()))
+    cs.CSClient().log(APP_NAME, 'Import failure: {}'.format(ex))
+    cs.CSClient().log(APP_NAME, 'Traceback: {}'.format(traceback.format_exc()))
     sys.exit(-1)
-
-APP_NAME = "app_template"
 
 
 def start_router_app():
@@ -49,8 +49,8 @@ def action(command):
             # Call the function to start the app.
             stop_router_app()
 
-    except Exception as e:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! exception: {}'.format(APP_NAME, command, e))
+    except Exception as ex:
+        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! exception: {}'.format(APP_NAME, command, ex))
         raise
 
 
@@ -59,9 +59,10 @@ if __name__ == "__main__":
     parser.add_argument('opt')
     args = parser.parse_args()
 
-    # The start.sh and stop.sh should call this script with a start or stop argument
-    if args.opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(args.opt))
+    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
+    opt = args.opt.strip()
+    if opt not in ['start', 'stop']:
+        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
         exit()
 
-    action(args.opt)
+    action(opt)

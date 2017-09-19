@@ -43,8 +43,8 @@ def get(config_tree):
         response = requests.get(router_api, auth=get_digest())
 
     except (requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError):
-        print("Timeout: router at {} did not respond.".format(g_dev_client_ip))
+            requests.exceptions.ConnectionError) as ex:
+        print("Error with get for router at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
 
     return json.dumps(json.loads(response.text), indent=4)
@@ -61,8 +61,8 @@ def put(value):
         print('status_code: {}'.format(response.status_code))
 
     except (requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError):
-        print("Timeout: router at {} did not respond.".format(g_dev_client_ip))
+            requests.exceptions.ConnectionError) as ex:
+        print("Error with put for router at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
 
     return json.dumps(json.loads(response.text), indent=4)
@@ -73,8 +73,11 @@ def clean():
     print("Cleaning {}".format(g_app_name))
     try:
         app_pack_name = get_app_pack()
-        if os.path.isfile(app_pack_name):
-            os.remove(app_pack_name)
+        files_to_clean = [g_app_name + ".tar.gz", g_app_name + ".tar"]
+        for file_name in files_to_clean:
+            if os.path.isfile(file_name):
+                os.remove(file_name)
+                print('Deleted file: {}'.format(file_name))
     except OSError:
         print('Clean Error 1 for file {}: {}'.format(app_pack_name, OSError.strerror()))
 
