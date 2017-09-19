@@ -20,7 +20,7 @@ ASK_ARE_YOU_THERE = b"u there?"
 
 def run_router_app():
     # confirm we are running on an 1100/1150, 900/950, or 600/650. result should be like "IBR1100LPE"
-    result = json.loads(cs.CSClient().get("status/product_info/product_name"))
+    result = cs.CSClient().get("status/product_info/product_name").get('data')
     if "IBR1100" in result or "IBR1150" in result or \
        "IBR900" in result or "IBR950" in result or \
        "IBR600" in result or "IBR650" in result:
@@ -30,12 +30,8 @@ def run_router_app():
                           "Inappropriate Product:{} - aborting.".format(result))
         return -1
 
-    port_name = 9600
-    baud_rate = '/dev/ttyS1'
-
-    # see if port is a digit?
-    if port_name[0].isdecimal():
-        port_name = int(port_name)
+    port_name = '/dev/ttyS1'
+    baud_rate = 9600
 
     old_pyserial = serial.VERSION.startswith("2.6")
 
@@ -70,8 +66,6 @@ def run_router_app():
                 ser.write(data)
             elif ASK_ARE_YOU_THERE is not None:
                 ser.write(ASK_ARE_YOU_THERE)
-            # else:
-            #     app_base.logger.debug(b".")
 
             if old_pyserial:
                 # as of May-2016/FW 6.1, this is PySerial v2.6, so it uses
@@ -124,6 +118,7 @@ def action(command):
     except Exception as ex:
         cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
         raise
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

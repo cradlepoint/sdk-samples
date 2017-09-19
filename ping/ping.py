@@ -28,15 +28,15 @@ def action(command):
             ping_results = []
             while not done:
                 time.sleep(1)
-                ping_data = json.loads(cs.CSClient().get('/control/ping'))
+                ping_data = cs.CSClient().get('/control/ping').get('data')
                 # Need to collect the results as it is cleared when read.
-                result = ping_data['result']
+                result = ping_data.get('result')
 
                 if result != '':
                     lines = result.split('\n')
                     ping_results.extend(lines)
 
-                status = ping_data['status']
+                status = ping_data.get('status')
 
                 if status == 'done' or status == 'error':
                     done = True

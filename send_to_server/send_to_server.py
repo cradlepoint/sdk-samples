@@ -1,5 +1,5 @@
 '''
-Gets the '/status' from the reouter config store and send it
+Gets the '/status' from the router config store and send it
 to a test server.
 '''
 
@@ -18,8 +18,7 @@ APP_NAME = 'send_to_server'
 def post_to_server():
     try:
         # The tree item to get from the router config store
-        tree_item = '/status'
-        cs.CSClient().log(APP_NAME, "get {}".format(tree_item))
+        tree_item = '/status/system/sdk'
         start_time = datetime.datetime.now()
 
         # Get the item from the router config store
@@ -28,9 +27,6 @@ def post_to_server():
 
         time_to_get = datetime.datetime.now() - start_time
         encode_start_time = datetime.datetime.now()
-
-        # Convert the tree_data string to a json object (i.e. dictionary)
-        tree_data = json.loads(tree_data)
 
         # URL encode the tree_data
         params = urllib.parse.urlencode(tree_data)
@@ -53,9 +49,8 @@ def post_to_server():
         cs.CSClient().log(APP_NAME, 'Time to get reply from server: {}'.format(end_time - send_to_server_start_time))
         cs.CSClient().log(APP_NAME, 'Time to get and send data in post request: {}'.format(end_time - start_time))
 
-    except:
-        e = sys.exc_info()[0]
-        cs.CSClient().log(APP_NAME, 'Something went wrong! exceptions: {}'.format(e))
+    except Exception as ex:
+        cs.CSClient().log(APP_NAME, 'Something went wrong! ex: {}'.format(ex))
         raise
 
     return

@@ -14,7 +14,7 @@ def run_router_app():
     """
 
     # confirm we are running on 900/950 or 1100/1150
-    result = json.loads(cs.CSClient().get("status/product_info/product_name"))
+    result = cs.CSClient().get("status/product_info/product_name").get('data')
     if "IBR900" in result or "IBR950" in result:
         input_name = "status/gpio/CONNECTOR_INPUT"
         output_name = "status/gpio/CONNECTOR_OUTPUT"
@@ -27,8 +27,8 @@ def run_router_app():
         cs.CSClient().log(APP_NAME, "Inappropriate Product:{} - aborting.".format(result))
         return
 
-    result_in = json.loads(cs.CSClient().get(input_name))
-    result_out = json.loads(cs.CSClient().get(output_name))
+    result_in = cs.CSClient().get(input_name).get('data')
+    result_out = cs.CSClient().get(output_name).get('data')
 
     cs.CSClient().log(APP_NAME, "Product Model is: {}".format(result))
     cs.CSClient().log(APP_NAME, "GPIO 2x2: {} = {}".format(input_name, result_in))
