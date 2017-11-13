@@ -1,56 +1,63 @@
 """
-A Blank app template as an example
+An app template as an example
 """
-APP_NAME = "app_template"
 
+# A try/except is wrapped around the imports to catch an
+# attempt to import a file or library that does not exist
+# in NCOS. Very useful during app development if one is
+# adding python libraries.
 try:
+    import cs
     import sys
     import traceback
     import argparse
-    import cs
+
+    from app_logging import AppLogger
+
 except Exception as ex:
-    cs.CSClient().log(APP_NAME, 'Import failure: {}'.format(ex))
-    cs.CSClient().log(APP_NAME, 'Traceback: {}'.format(traceback.format_exc()))
+    # Output logs indicating what import failed.
+    cs.CSClient().log('app_template.py', 'Import failure: {}'.format(ex))
+    cs.CSClient().log('app_template.py', 'Traceback: {}'.format(traceback.format_exc()))
     sys.exit(-1)
+
+
+# Create an AppLogger for logging to syslog in NCOS.
+log = AppLogger()
 
 
 def start_router_app():
     try:
-        cs.CSClient().log(APP_NAME, 'start_router_app()')
+        log.debug('start_router_app()')
 
     except Exception as e:
-        cs.CSClient().log(APP_NAME, 'Something went wrong in start_router_app()! exception: {}'.format(e))
+        log.error('Exception during start_router_app()! exception: {}'.format(e))
         raise
-
-    return
 
 
 def stop_router_app():
     try:
-        cs.CSClient().log(APP_NAME, 'stop_router_app()')
+        log.debug('stop_router_app()')
 
     except Exception as e:
-        cs.CSClient().log(APP_NAME, 'Something went wrong in stop_router_app()! exception: {}'.format(e))
+        log.error('Exception during stop_router_app()! exception: {}'.format(e))
         raise
-
-    return
 
 
 def action(command):
     try:
         # Log the action for the app.
-        cs.CSClient().log(APP_NAME, 'action({})'.format(command))
+        log.debug('action({})'.format(command))
 
         if command == 'start':
-            # Call the function to start the app.
+            # Call the function when the app is started.
             start_router_app()
 
         elif command == 'stop':
-            # Call the function to start the app.
+            # Call the function when the app is stopped.
             stop_router_app()
 
-    except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! exception: {}'.format(APP_NAME, command, ex))
+    except Exception as e:
+        log.error('Exception during {}! exception: {}'.format(command, e))
         raise
 
 
@@ -59,10 +66,11 @@ if __name__ == "__main__":
     parser.add_argument('opt')
     args = parser.parse_args()
 
-    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
     opt = args.opt.strip()
     if opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
+        log.debug('Failed to run command: {}'.format(opt))
         exit()
 
     action(opt)
+
+    log.debug('App is exiting')
