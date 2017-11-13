@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Router_API_for_Applications</title>
+<title>NCOS_API_for_Applications</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <style type="text/css">
 /* GitHub stylesheet for MarkdownPad (http://markdownpad.com) */
@@ -291,12 +291,12 @@ img {
 </style>
 </head>
 <body>
-<h1>Router API for Applications</h1>
+<h1>NCOS API for Applications</h1>
 <hr />
 <h2>Quick Links</h2>
 <h4><a href="#overview">Overview</a></h4>
-<h4><a href="#router_info">Router Info</a></h4>
-<h4><a href="#sdk_app_info">Router SDK and Application Info</a></h4>
+<h4><a href="#ncos">NCOS Info</a></h4>
+<h4><a href="#sdk_app_info">NCOS SDK and Application Info</a></h4>
 <h4><a href="#logging">Logging</a></h4>
 <h4><a href="#ping">Ping</a></h4>
 <h4><a href="#gpio">GPIO</a></h4>
@@ -304,25 +304,25 @@ img {
 <h4><a href="#modem">Modem</a></h4>
 <p><a name="overview"></a></p>
 <h2>Overview</h2>
-<p>The router trees, also referred to as the router config store, are essentially the APIs to router query and control. One can read items to determine status or results and write to control and configure. All data is exchanged in the JSON format.  The JSON format is described at <a href="http://www.json.org/">http://www.json.org/</a>. The data can be accessed via the router CLI, a python application, or using curl. </p>
-<p>The router config store consist of the following trees:</p>
+<p>The NCOS trees, also referred to as the NCOS config store, are essentially the APIs to NCOS query and control. One can read items to determine status or results and write to control and configure. All data is exchanged in the JSON format.  The JSON format is described at <a href="http://www.json.org/">http://www.json.org/</a>. The data can be accessed via the device CLI, a python application, or using curl. </p>
+<p>The NCOS config store consist of the following trees:</p>
 <ul>
 <li>
 <strong>control</strong>
 <ul>
-<li>Elements used for controlling functions of the router.</li>
+<li>Elements used for controlling functions of NCOS.</li>
 </ul>
 </li>
 <li>
 <strong>config</strong>
 <ul>
-<li>Elements used for router configuration.</li>
+<li>Elements used for NCOS configuration.</li>
 </ul>
 </li>
 <li>
 <strong>status</strong>
 <ul>
-<li>Elements to get the status of the router.</li>
+<li>Elements to get the status of the NCOS.</li>
 </ul>
 </li>
 <li>
@@ -332,9 +332,9 @@ img {
 </ul>
 </li>
 </ul>
-<p>This document does not describe every item in the router config store. There are sections that cover functionality and how the config store can be used for that function (i.e. Ping, GPIO, GPS, Modem, etc.). Many functional areas will span multiple tree types depending on the use case. Anything which is done via the router UI, utilizes the router trees.</p>
+<p>This document does not describe every item in the NCOS config store. There are sections that cover functionality and how the config store can be used for that function (i.e. Ping, GPIO, GPS, Modem, etc.). Many functional areas will span multiple tree types depending on the use case. Anything which is done via the router UI, utilizes the router trees.</p>
 <h2>CLI Example</h2>
-<p>Below is an example of how to query the router system logging information using the <strong>cat</strong> or <strong>get</strong> command and then changing the logging level to <strong>info</strong> with the <strong>set</strong> command. Note the JSON format in the output. These trees can also be traversed using linux change directory command (i.e. cd /config/system/logging). This can be very useful to see what is contained in each branch of the tree.</p>
+<p>Below is an example of how to query NCOS system logging information using the <strong>cat</strong> or <strong>get</strong> command and then changing the logging level to <strong>info</strong> with the <strong>set</strong> command. Note the JSON format in the output. These trees can also be traversed using linux change directory command (i.e. cd /config/system/logging). This can be very useful to see what is contained in each branch of the tree.</p>
 <pre><code>    [admin@IBR900-267: /$ cat /config/system/logging
     {
         &quot;console&quot;: false,
@@ -384,9 +384,9 @@ img {
 </code></pre>
 
 <h2>Python Example</h2>
-<p>All sample apps include a cs.py file which contains the CSClient class. This class is a wrapper for the TCP interface to the router trees. Below is an example of how to query the router system logging information and then change the logging level to <strong>debug</strong> using the CSClient class.</p>
+<p>All sample apps include a cs.py file which contains the CSClient class. This class is a wrapper for the TCP interface to the NCOS trees. Below is an example of how to query NCOS system logging information and then change the logging level to <strong>debug</strong> using the CSClient class.</p>
 <pre><code>    # Import the CSClient file which contains the necessary functions
-    # for router config store access
+    # for NCOS config store access
     import cs
 
     appName = 'ref_app'
@@ -408,13 +408,13 @@ img {
 </code></pre>
 
 <h2>Curl Example</h2>
-<p>On Linux, the curl command can also be used to access items in the router trees. Use curl 'GET' to read and 'PUT' to write. Below is an example of getting the SDK status.</p>
+<p>On Linux, the curl command can also be used to access items in the NCOS trees. Use curl 'GET' to read and 'PUT' to write. Below is an example of getting the SDK status.</p>
 <p>The user specific information in the curl command is:</p>
 <ul>
-<li>router user name: admin</li>
-<li>router password: 44224267</li>
+<li>NCOS device user name: admin</li>
+<li>NCOS device password: 44224267</li>
 <li>
-<p>router IP address: 192.168.0.1</p>
+<p>NCOS device IP address: 192.168.0.1</p>
 <pre><code>    $ curl -s --digest --insecure -u admin:44224267 -H &quot;Accept: application/json&quot; -X GET http://192.168.0.1/api/status/system/sdk | /usr/bin/env python3 -m json.tool
     {
         &quot;success&quot;: true,
@@ -442,9 +442,9 @@ img {
 
 </li>
 </ul>
-<p><a name="router_info"></a></p>
-<h2>Router Info</h2>
-<p>There are three different trees that provide router information. Most are self explanatory.</p>
+<p><a name="ncos_info"></a></p>
+<h2>NCOS Info</h2>
+<p>There are three different trees that provide NCOS product type information. Most are self explanatory.</p>
 <h3>Product Info /status/product_info/:</h3>
 <pre><code>    cat /status/product_info/
     {
@@ -480,7 +480,7 @@ img {
 </code></pre>
 
 <h3>Feature Info /status/feature:</h3>
-<p>The feature information provides a list of feature license. The two SDK license will only exist if the features have been enabled via the ECM. The 'Router SDK' means that router apps have been enabled while the 'Router SDK - Dev Mode' means the the development mode is enabled.</p>
+<p>The feature information provides a list of feature license. The two SDK license will only exist if the features have been enabled via the ECM. The 'Router SDK' means that device apps have been enabled while the 'Router SDK - Dev Mode' means the the development mode is enabled.</p>
 <pre><code>    cat /status/feature
     {
         &quot;db&quot;: [
@@ -508,7 +508,7 @@ img {
 </code></pre>
 
 <h3>System ID /config/system/system_id:</h3>
-<p>This is a customizable identity that will be used in router reporting and alerting. The default value is the product name and the last three characters in the MAC address of the router. It is used as a hostname to DHCP, so it must conform to standard hostname conventions.</p>
+<p>This is a customizable identity that will be used in device reporting and alerting. The default value is the product name and the last three characters in the MAC address of the device. It is used as a hostname to DHCP, so it must conform to standard hostname conventions.</p>
 <pre><code>    cat /config/system/system_id
     &quot;IBR900-267&quot;
 </code></pre>
@@ -537,7 +537,7 @@ img {
 
 <p><a name="sdk_app_info"></a></p>
 <h2>SDK and Application Info</h2>
-<p>SDK and application information can be found in <strong>/status/system/sdk</strong>. It contains the state of the Router SDK service and any application. If there are any error with installing or starting an application, it will be contained in this tree.</p>
+<p>SDK and application information can be found in <strong>/status/system/sdk</strong>. It contains the state of the NCOS SDK service and any application. If there are any errors with installing or starting an application, it will be contained in this tree.</p>
 <h3>/status/system/sdk:</h3>
 <p>The main items in SDK status tree are:</p>
 <ul>
@@ -547,8 +547,8 @@ img {
 <li>
 This indicates the route SDK mode which affects how apps can be installed.
 <ul>
-<li>standard - Normal router mode when apps can be installed via ECM.</li>
-<li>devmode - Development mode which allows apps to be installed directly from a computer. This is set from the Tools menu of ECM.</li>
+<li>standard - Normal NCOS mode when apps can be installed via NCM.</li>
+<li>devmode - Development mode which allows apps to be installed directly from a computer. This is set from the Tools menu of NCM.</li>
 </ul>
 </li>
 </ul>
@@ -556,13 +556,13 @@ This indicates the route SDK mode which affects how apps can be installed.
 <li>
 <strong>service</strong>
 <ul>
-<li>The state of the Router SDK service in the router. </li>
+<li>The state of the NCOS SDK service in the router. </li>
 </ul>
 </li>
 <li>
 <strong>summary</strong>
 <ul>
-<li>A more detailed version of the Router SDK service state.</li>
+<li>A more detailed version of the NCOS SDK service state.</li>
 </ul>
 </li>
 <li>
@@ -581,7 +581,7 @@ This indicates the route SDK mode which affects how apps can be installed.
     }
 </code></pre>
 
-<h4>After App installed:</h4>
+<h4>App installed:</h4>
 <pre><code>    cat /status/system/sdk
     {
         &quot;apps&quot;: [
@@ -611,7 +611,7 @@ This indicates the route SDK mode which affects how apps can be installed.
 
 <p><a name="logging"></a></p>
 <h2>Logging</h2>
-<p>Router logging can be queried or configured via <strong>/config/system/logging</strong>. This includes setting the log level along with sending logs to a syslog server. </p>
+<p>NCOS device logging can be queried or configured via <strong>/config/system/logging</strong>. This includes setting the log level along with sending logs to a syslog server. </p>
 <pre><code>    cat /config/system/logging/
     {
         &quot;console&quot;: false,
@@ -697,13 +697,13 @@ server_port
 <li>
 system_id
 <ul>
-<li>Set true to include the routers &quot;System ID&quot; at the beginning of every log message. This is often useful when a single remote syslog server is handling logs for several routers.</li>
+<li>Set true to include the devices &quot;System ID&quot; at the beginning of every log message. This is often useful when a single remote syslog server is handling logs for several devices.</li>
 </ul>
 </li>
 <li>
 utf8_bom
 <ul>
-<li>The log message is sent using a UTF-8 encoding. By default the router will preprend the Unicode Byte Order Mark (BOM) to the syslog message in compliance with the Syslog protocol, RFC5424. Some syslog servers may not support, fully, RFC5424 and will treat the BOM as ASCII text which will appear as garbled characters in the log. If this occurs, set this option to false.</li>
+<li>The log message is sent using a UTF-8 encoding. By default the device will preprend the Unicode Byte Order Mark (BOM) to the syslog message in compliance with the Syslog protocol, RFC5424. Some syslog servers may not support, fully, RFC5424 and will treat the BOM as ASCII text which will appear as garbled characters in the log. If this occurs, set this option to false.</li>
 </ul>
 </li>
 </ul>
@@ -829,7 +829,7 @@ Specify the Path MTU discovery option:
 <p>Reading from <strong>control/ping/status</strong> will return the current state of the ping in progress. Unlike the results, this will persist through multiple reads.  The status can be one of 'running', 'done', 'stopped', or 'error'. If any packets were transmitted during the Ping, then when the ping stops, the result summary will be posted to <strong>control/ping/results</strong> (and cleared when read)</p>
 <p><a name="gpio"></a></p>
 <h2>GPIO</h2>
-<p>Some of the Cradlepoint routers have GPIO connectors as well as GPIO pins built into the power connectors Below is information related to GPIO router config store tree items.</p>
+<p>Some of the Cradlepoint devices have GPIO connectors as well as GPIO pins built into the power connectors Below is information related to GPIO router config store tree items.</p>
 <h3>/config/system/gpio_actions</h3>
 <p>Includes configuration data for all user configurable pins - if the pin is enabled, it's direction, and what action it is currently assigned to. The available actions are:</p>
 <p>if value of direction is <em>in</em>, available values for &quot;current_action&quot; are:</p>
@@ -837,19 +837,19 @@ Specify the Path MTU discovery option:
 <li>
 <em>in_action_sensing</em> Input Sensing: 
 <ul>
-<li>In this mode the logic state (high or low) is automatically sensed by the router and is readable as the Current Value.</li>
+<li>In this mode the logic state (high or low) is automatically sensed by the device and is readable as the Current Value.</li>
 </ul>
 </li>
 <li>
 <em>in_action_ignition</em> Ignition Sensing: 
 <ul>
-<li>(available on power connector only) In this mode the router will turn off after the input has been held low for the timeout period in seconds. The router will then reboot when the input is returned to high. If the input is held low for less than the timeout period before returning to high, no action is taken.</li>
+<li>(available on power connector only) In this mode the device will turn off after the input has been held low for the timeout period in seconds. The device will then reboot when the input is returned to high. If the input is held low for less than the timeout period before returning to high, no action is taken.</li>
 </ul>
 </li>
 <li>
-<em>in_action_reset</em> Router Reset: 
+<em>in_action_reset</em> Device Reset: 
 <ul>
-<li>(available on power connector only) In this mode an external device can reset the router by holding the input low for 10-seconds.</li>
+<li>(available on power connector only) In this mode an external device can reset the device by holding the input low for 10-seconds.</li>
 </ul>
 </li>
 </ul>
@@ -946,7 +946,7 @@ Specify the Path MTU discovery option:
 
 <p><a name="modem"></a></p>
 <h2>Modem</h2>
-<p>The modem status and control information is part of the wan tree. This is a very critical and complicated aspect of the router functionality. Please note that there is no direct access to the modem AT commands. For now, this section will only describe how to enable and disable a modem, along with some status information, as this has been requested by several application developers. More information will be added as needed.</p>
+<p>The modem status and control information is part of the WAN tree. This is a very critical and complicated aspect of the device functionality. Please note that there is no direct access to the modem AT commands. For now, this section will only describe how to enable and disable a modem, along with some status information, as this has been requested by several application developers. </p>
 <p>The list of modems in the system can be found here: get /status/wan/devices. While this will list all the wan devices, not all modems may be configured with a SIM card. </p>
 <pre><code>    get status/wan/devices
     {
@@ -973,18 +973,21 @@ Specify the Path MTU discovery option:
         &quot;BANDDLFRQ&quot;: &quot;2110-2155&quot;,
         &quot;BANDULFRQ&quot;: &quot;1710-1755&quot;,
         &quot;CARRID&quot;: &quot;Verizon Wireless&quot;,
-        &quot;CARRIER_SWITCH_DEFAULTS&quot;: &quot;VERIZON,ATT,SPRINT,GENERIC&quot;,
+        &quot;CARRIER_SWITCH_DEFAULTS&quot;: &quot;&quot;,
         &quot;CELL_ID&quot;: &quot;2934137 (0x2cc579)&quot;,
-        &quot;CFGAPNMASK&quot;: &quot;8&quot;,
+        &quot;CFGAPNMASK&quot;: &quot;72&quot;,
         &quot;CGSN&quot;: &quot;356526070342666&quot;,
         &quot;CHIPSET&quot;: &quot;9X30C&quot;,
+        &quot;CLONE_INSTANCE&quot;: &quot;0&quot;,
+        &quot;CS&quot;: &quot;UP&quot;,
         &quot;CUR_PLMN&quot;: &quot;311480&quot;,
-        &quot;DBM&quot;: &quot;-60&quot;,
+        &quot;DBM&quot;: &quot;-61&quot;,
         &quot;DEFAPN&quot;: &quot;3&quot;,
         &quot;DEFAPNTYPE&quot;: &quot;IP&quot;,
         &quot;DISP_IMEI&quot;: &quot;356526070342666&quot;,
         &quot;DISP_MEID&quot;: &quot;35652607034266&quot;,
-        &quot;EMMCOMMSTATE&quot;: &quot;RRC Idle&quot;,
+        &quot;DORMANT&quot;: &quot;Active&quot;,
+        &quot;EMMCOMMSTATE&quot;: &quot;RRC Connected&quot;,
         &quot;EMMSTATE&quot;: &quot;Registered&quot;,
         &quot;EMMSUBSTATE&quot;: &quot;Normal Service&quot;,
         &quot;FW_CARRIER_LOAD&quot;: &quot;VERIZON&quot;,
@@ -992,16 +995,16 @@ Specify the Path MTU discovery option:
         &quot;HM_PLMN&quot;: &quot;311480&quot;,
         &quot;HOMECARRID&quot;: &quot;Verizon&quot;,
         &quot;HW_VER&quot;: &quot;1.0&quot;,
-        &quot;ICCID&quot;: &quot;89148000003136071391&quot;,
-        &quot;IMSI&quot;: &quot;311480313413488&quot;,
+        &quot;ICCID&quot;: &quot;89148000003135588379&quot;,
+        &quot;IMSI&quot;: &quot;311480313296736&quot;,
         &quot;LAST_PIN&quot;: &quot;&quot;,
         &quot;LAST_PIN_VALID&quot;: &quot;False&quot;,
         &quot;LTEBANDWIDTH&quot;: &quot;10 MHz&quot;,
         &quot;MDL&quot;: &quot;Internal LP6 (SIM1)&quot;,
         &quot;MDM_CONTROL_TYPE&quot;: &quot;NORMAL&quot;,
-        &quot;MDM_DRIVER_CAPABILITIES&quot;: &quot;1547313&quot;,
+        &quot;MDM_DRIVER_CAPABILITIES&quot;: &quot;41393201&quot;,
         &quot;MDM_MODE_CAPABILITIES&quot;: &quot;21&quot;,
-        &quot;MDN&quot;: &quot;+12086310191&quot;,
+        &quot;MDN&quot;: &quot;+12085761045&quot;,
         &quot;MFG&quot;: &quot;CradlePoint Inc.&quot;,
         &quot;MFG_MDL&quot;: &quot;MC7455-CP&quot;,
         &quot;MODEMIMSSTATE&quot;: &quot;Full Service&quot;,
@@ -1009,25 +1012,27 @@ Specify the Path MTU discovery option:
         &quot;MODEMPSSTATE&quot;: &quot;Attached&quot;,
         &quot;MODEMSYSMODE&quot;: &quot;LTE&quot;,
         &quot;MODEMTEMP&quot;: &quot;33&quot;,
-        &quot;MSID&quot;: &quot;2086310191&quot;,
+        &quot;MSID&quot;: &quot;2084827826&quot;,
         &quot;PIN_RETRIES&quot;: &quot;3&quot;,
         &quot;PIN_STATUS&quot;: &quot;READY&quot;,
         &quot;PRD&quot;: &quot;Internal LP6 (SIM1)&quot;,
         &quot;PRI_ID&quot;: &quot;9905117&quot;,
         &quot;PRI_VER&quot;: &quot;000.005&quot;,
-        &quot;PRLV&quot;: &quot;15504&quot;,
+        &quot;PRLV&quot;: &quot;15535&quot;,
         &quot;PUK_RETRIES&quot;: &quot;10&quot;,
         &quot;RFBAND&quot;: &quot;Band 4&quot;,
         &quot;ROAM&quot;: &quot;1&quot;,
-        &quot;RSRP&quot;: &quot;-84&quot;,
-        &quot;RSRQ&quot;: &quot;-7&quot;,
+        &quot;RSRP&quot;: &quot;-87&quot;,
+        &quot;RSRQ&quot;: &quot;-9&quot;,
         &quot;RXCHANNEL&quot;: &quot;2000&quot;,
         &quot;SCELLACTIVE&quot;: &quot;Not Registered&quot;,
         &quot;SELAPN&quot;: &quot;3&quot;,
+        &quot;SERDIS&quot;: &quot;LTE&quot;,
         &quot;SIM_LOCK&quot;: &quot;FALSE&quot;,
-        &quot;SINR&quot;: &quot;9.2&quot;,
+        &quot;SINR&quot;: &quot;9.4&quot;,
         &quot;SS&quot;: &quot;100&quot;,
         &quot;SUPPORTED_TECH&quot;: &quot;lte/3g&quot;,
+        &quot;TAC&quot;: &quot;2817&quot;,
         &quot;TXCHANNEL&quot;: &quot;20000&quot;,
         &quot;VER&quot;: &quot;SWI9X30C_02.05.07.00 r5154 CARMD-EV-FRMWR2 2015/12/04 22:23:15&quot;,
         &quot;VER_PKG&quot;: &quot;02.05.07.00_VERIZON,002.008_002&quot;,
@@ -1036,7 +1041,7 @@ Specify the Path MTU discovery option:
     }
 </code></pre>
 
-<p>The modem can be enabled and disabled by changing the testmode/ready flag in the control tree (true to enable and false to diasable). Setting the reset flag to true will reset the modem.</p>
+<p>The modem can be enabled and disabled by changing the testmode/ready flag in the control tree (true to enable and false to disable). Setting the reset flag to true will reset the modem.</p>
 <pre><code>    get control/wan/devices/mdm-fee5c7f2/testmode
     {
         &quot;ready&quot;: true,
@@ -1045,7 +1050,7 @@ Specify the Path MTU discovery option:
 </code></pre>
 
 <hr />
-<p>Published Date: 5-30-2017</p>
+<p>Published Date: 11-13-2017</p>
 <p>This article not have what you need? Not find what you were looking for? Think this article can be improved? Please let us know at <a href="&#109;&#97;&#x69;&#108;&#x74;&#x6f;&#58;&#x73;&#117;&#103;&#x67;&#101;&#115;&#116;&#x69;&#x6f;&#110;&#x73;&#64;&#x63;&#x72;&#97;&#100;&#x6c;&#101;&#x70;&#111;&#x69;&#x6e;&#116;&#x2e;&#x63;&#111;&#x6d;">&#x73;&#x75;&#x67;&#103;e&#115;&#x74;i&#x6f;&#110;&#115;&#x40;&#x63;r&#x61;&#x64;&#108;&#101;&#x70;&#x6f;&#x69;&#x6e;&#116;&#x2e;&#99;&#x6f;&#x6d;</a>.</p>
 
 </body>
