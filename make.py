@@ -1,7 +1,7 @@
 '''
-This is the Router SDK tool used to created applications
-for Cradlepoint routers. It will work on Linux, OS X, and 
-Windows once the computer environment is setup. 
+This is the NCOS SDK tool used to created applications
+for Cradlepoint NCOS devices. It will work on Linux,
+OS X, and Windows once the computer environment is setup.
 '''
 
 import os
@@ -13,9 +13,10 @@ import requests
 import subprocess
 import configparser
 
+from requests.auth import HTTPDigestAuth
 
 # These will be set in init() by using the sdk_settings.ini file.
-# They are used be various functions in the file.
+# They are used by various functions in the file.
 g_app_name = ''
 g_app_uuid = ''
 g_dev_client_ip = ''
@@ -26,7 +27,17 @@ g_python_cmd = 'python3'  # Default for Linux and OS X
 
 # Returns an HTTPDigestAuth for the global username and password.
 def get_digest():
-    return requests.auth.HTTPDigestAuth(g_dev_client_username, g_dev_client_password)
+    return HTTPDigestAuth(g_dev_client_username, g_dev_client_password)
+
+
+# Returns boolean to indicate if the NCOS device is
+# in DEV mode
+def is_NCOS_device_in_DEV_mode():
+    sdk_status = json.loads(get('/status/system/sdk')).get('data')
+    if sdk_status.get('mode') == 'devmode':
+        return True
+    else:
+        return False
 
 
 # Returns the app package name based on the global app name.
@@ -35,22 +46,22 @@ def get_app_pack():
     return package_name
 
 
-# Gets data from the router config store
+# Gets data from the NCOS config store
 def get(config_tree):
-    router_api = 'http://{}/api/{}'.format(g_dev_client_ip, config_tree)
+    ncos_api = 'http://{}/api/{}'.format(g_dev_client_ip, config_tree)
 
     try:
-        response = requests.get(router_api, auth=get_digest())
+        response = requests.get(ncos_api, auth=get_digest())
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
-        print("Error with get for router at {}. Exception: {}".format(g_dev_client_ip, ex))
+        print("Error with get for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
 
     return json.dumps(json.loads(response.text), indent=4)
 
 
-# Puts an SDK action in the router config store
+# Puts an SDK action in the NCOS device config store
 def put(value):
     try:
         response = requests.put("http://{}/api/control/system/sdk/action".format(g_dev_client_ip),
@@ -62,7 +73,7 @@ def put(value):
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
-        print("Error with put for router at {}. Exception: {}".format(g_dev_client_ip, ex))
+        print("Error with put for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
 
     return json.dumps(json.loads(response.text), indent=4)
@@ -71,29 +82,29 @@ def put(value):
 # Cleans the SDK directory for a given app by removing files created during packaging.
 def clean():
     print("Cleaning {}".format(g_app_name))
+    app_pack_name = get_app_pack()
     try:
-        app_pack_name = get_app_pack()
         files_to_clean = [g_app_name + ".tar.gz", g_app_name + ".tar"]
         for file_name in files_to_clean:
             if os.path.isfile(file_name):
                 os.remove(file_name)
                 print('Deleted file: {}'.format(file_name))
-    except OSError:
-        print('Clean Error 1 for file {}: {}'.format(app_pack_name, OSError.strerror()))
+    except OSError as e:
+        print('Clean Error 1 for file {}: {}'.format(app_pack_name, e))
 
+    meta_dir = '{}/{}/METADATA'.format(os.getcwd(), g_app_name)
     try:
-        meta_dir = '{}/{}/METADATA'.format(os.getcwd(), g_app_name)
         if os.path.isdir(meta_dir):
             shutil.rmtree(meta_dir)
-    except OSError:
-        print('Clean Error 2 for directory {}: {}'.format(meta_dir, OSError.strerror()))
+    except OSError as e:
+        print('Clean Error 2 for directory {}: {}'.format(meta_dir, e))
 
+    build_file = os.path.join(os.getcwd(), '.build')
     try:
-        build_file = os.path.join(os.getcwd(), '.build')
         if os.path.isfile(build_file):
             os.remove(build_file)
-    except OSError:
-        print('Clean Error 3 for file {}: {}'.format(build_file, OSError.strerror()))
+    except OSError as e:
+        print('Clean Error 3 for file {}: {}'.format(build_file, e))
 
 
 # Build, just validates, the application code and package.
@@ -132,69 +143,84 @@ def package():
         return success
 
 
-# Get the SDK status from the router
+# Get the SDK status from the NCOS device
 def status():
     status_tree = '/status/system/sdk'
-    print('Get {} status for router at {}'.format(status_tree, g_dev_client_ip))
+    print('Get {} status for NCOS device at {}'.format(status_tree, g_dev_client_ip))
     response = get(status_tree)
     print(response)
 
 
-# Transfer the app app tar.gz package to the router
+# Transfer the app app tar.gz package to the NCOS device
 def install():
-    app_archive = get_app_pack()
+    if is_NCOS_device_in_DEV_mode():
+        app_archive = get_app_pack()
 
-    # Use scp for Linux or OS X
-    cmd = 'scp {0} {1}@{2}:/app_upload'.format(app_archive, g_dev_client_username, g_dev_client_ip)
+        # Use scp for Linux or OS X
+        cmd = 'scp {0} {1}@{2}:/app_upload'.format(app_archive, g_dev_client_username, g_dev_client_ip)
 
-    # For Windows, use pscp.exe in the tools directory
-    if sys.platform == 'win32':
-        cmd = "./tools/bin/pscp.exe -pw {0} -v {1} {2}@{3}:/app_upload".format(
-               g_dev_client_password, app_archive,
-               g_dev_client_username, g_dev_client_ip)
-
-    print('Installing {} in router {}.'.format(app_archive, g_dev_client_ip))
-    try:
+        # For Windows, use pscp.exe in the tools directory
         if sys.platform == 'win32':
-            subprocess.check_output(cmd)
-        else:
-            subprocess.check_output(cmd, shell=True)
-    except subprocess.CalledProcessError as err:
-        # There is always an error because the router will drop the connection.
-        # print('Error installing: {}'.format(err))
-        return 0
+            cmd = "./tools/bin/pscp.exe -pw {0} -v {1} {2}@{3}:/app_upload".format(
+                   g_dev_client_password, app_archive,
+                   g_dev_client_username, g_dev_client_ip)
+
+        print('Installing {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
+        try:
+            if sys.platform == 'win32':
+                subprocess.check_output(cmd)
+            else:
+                subprocess.check_output(cmd, shell=True)
+        except subprocess.CalledProcessError as err:
+            # There is always an error because the NCOS device will drop the connection.
+            # print('Error installing: {}'.format(err))
+            return 0
+    else:
+        print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
 
 
-# Start the app from the router
+# Start the app in the NCOS device
 def start():
-    print('Start application {} for router at {}'.format(g_app_name, g_dev_client_ip))
-    print('Application UUID is {}.'.format(g_app_uuid))
-    response = put('start')
-    print(response)
+    if is_NCOS_device_in_DEV_mode():
+        print('Start application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+        print('Application UUID is {}.'.format(g_app_uuid))
+        response = put('start')
+        print(response)
+    else:
+        print('ERROR: NCOS device is not in DEV Mode! Unable to start the app from {}.'.format(g_dev_client_ip))
 
 
-# Stop the app from the router
+# Stop the app in the NCOS device
 def stop():
-    print('Stop application {} for router at {}'.format(g_app_name, g_dev_client_ip))
-    print('Application UUID is {}.'.format(g_app_uuid))
-    response = put('stop')
-    print(response)
+    if is_NCOS_device_in_DEV_mode():
+        print('Stop application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+        print('Application UUID is {}.'.format(g_app_uuid))
+        response = put('stop')
+        print(response)
+    else:
+        print('ERROR: NCOS device is not in DEV Mode! Unable to stop the app from {}.'.format(g_dev_client_ip))
 
 
-# Uninstall the app from the router
+# Uninstall the app from the NCOS device
 def uninstall():
-    print('Uninstall application {} for router at {}'.format(g_app_name, g_dev_client_ip))
-    print('Application UUID is {}.'.format(g_app_uuid))
-    response = put('uninstall')
-    print(response)
+    if is_NCOS_device_in_DEV_mode():
+        print('Uninstall application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+        print('Application UUID is {}.'.format(g_app_uuid))
+        response = put('uninstall')
+        print(response)
+    else:
+        print('ERROR: NCOS device is not in DEV Mode! Unable to uninstall the app from {}.'.format(g_dev_client_ip))
 
 
-# Purge the app from the router
+# Purge the app from the NCOS device
 def purge():
-    print('Purge application {} for router at {}'.format(g_app_name, g_dev_client_ip))
-    print('Application UUID is {}.'.format(g_app_uuid))
-    response = put('purge')
-    print(response)
+    if is_NCOS_device_in_DEV_mode():
+        print('Purged application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+        print('Application UUID is {}.'.format(g_app_uuid))
+        response = put('purge')
+        print(response)
+    else:
+        print('ERROR: NCOS device is not in DEV Mode! Unable to purge the app from {}.'.format(g_dev_client_ip))
 
 
 # Prints the help information
@@ -202,16 +228,40 @@ def output_help():
     print('Command format is: {} make.py <action>'.format(g_python_cmd))
     print('clean: Clean all project artifacts.\n')
     print('build or package: Create the app archive tar.gz file.\n')
-    print('status: Fetch and print current app status from the locally connected router.\n')
-    print('install: Secure copy the app archive to a locally connected router.')
-    print('         The router must already be in SDK DEV mode via registration ')
-    print('         and licensing in ECM.\n')
-    print('start: Start the app on the locally connected router.\n')
-    print('stop: Stop the app on the locally connected router.\n')
-    print('uninstall: Uninstall the app from the locally connected router.\n')
-    print('purge: Purge all apps from the locally connected router.\n')
+    print('status: Fetch and print current app status from the locally connected NCOS device.\n')
+    print('install: Secure copy the app archive to a locally connected NCOS device.')
+    print('         The NCOS device must already be in SDK DEV mode via registration ')
+    print('         and licensing in NCM.\n')
+    print('start: Start the app on the locally connected NCOS device.\n')
+    print('stop: Stop the app on the locally connected NCOS device.\n')
+    print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
+    print('purge: Purge all apps from the locally connected NCOS device.\n')
+    print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
     print('help: Print this help information.\n')
-    pass
+
+
+# Create a UUID for the application. If one exist, a new one
+# is created.
+def create_uuid():
+    global g_app_uuid
+
+    uuid_key = 'uuid'
+    app_config_file = os.path.join(g_app_name, 'package.ini')
+    config = configparser.ConfigParser()
+    config.read(app_config_file)
+    if g_app_name in config:
+        if uuid_key in config[g_app_name]:
+            g_app_uuid = config[g_app_name][uuid_key]
+
+            _uuid = str(uuid.uuid4())
+            config.set(g_app_name, uuid_key, _uuid)
+            with open(app_config_file, 'w') as configfile:
+                config.write(configfile)
+            print('INFO: Created and saved uuid {} in {}'.format(_uuid, app_config_file))
+        else:
+            print('ERROR: The uuid key does not exist in {}'.format(app_config_file))
+    else:
+        print('ERROR: The APP_NAME section does not exist in {}'.format(app_config_file))
 
 
 # Get the uuid from application package.ini if not already set
@@ -308,7 +358,6 @@ def init():
 
 
 if __name__ == "__main__":
-
     # Default is no arguments given.
     if len(sys.argv) < 2:
         output_help()
@@ -346,6 +395,9 @@ if __name__ == "__main__":
 
     elif utility_name == 'purge':
         purge()
+
+    elif utility_name == 'uuid':
+        create_uuid()
 
     else:
         output_help()
