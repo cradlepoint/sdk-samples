@@ -1,19 +1,19 @@
-# Router SDK Design Tools and sample applications.
+# NCOS SDK Design Tools and sample applications.
 ----------
-This directory contains the Router SDK tools and sample applications. Below is a desciption of each. The Router Applications Development Guide is the best document to read first.
+This directory contains the NCOS SDK tools and sample applications. Below is a description of each. The NCOS Applications Development Guide is the best document to read first.
 
 ## *** IMPORTANT - PLEASE READ ***
 
-This is version 2.0 of the Router SDK and applications. The SDK has been simplified from the previous SDK to decrease the learning curve to allow more focus on application development. The router application infrastructure and packaging is unchanged. That is, an 'tar.gz' application package built with the previous SDK can still be installed into the router using SDK version 2.0. However, the coding of an application version 1.0 may need to be re-factored in order for continued development with SDK version 2.0. Please see document SDK\_version\_1.0\_app_refactor.html in this directory for details.
+This is version 2.0 of the NCOS SDK and applications. The SDK has been simplified from the previous SDK to decrease the learning curve to allow more focus on application development. The NCOS application infrastructure and packaging is unchanged. That is, an 'tar.gz' application package built with the previous SDK can still be installed into an NCOS device using SDK version 2.0. However, the coding of an application version 1.0 may need to be re-factored in order for continued development with SDK version 2.0. Please see document SDK\_version\_1.0\_app_refactor.html in this directory for details.
 
 ## Documents 
 
 - **README.html**
     - This README file.
-- **Router\_Application\_Development_Guide.html**
+- **NCOS\_Application\_Development_Guide.html**
     - The main document that describes application development.
-- **Router\_APIs\_for_Applications.html**
-    - The router config store API in the router.
+- **NCOS\_API\_for_Applications.html**
+    - The NCOS config store API in the device.
 - **GNU\_Make_README.html**
     - The Linux GNU make instructions for the SDK.
 
@@ -22,15 +22,15 @@ This is version 2.0 of the Router SDK and applications. The SDK has been simplif
 - **app_template**
     - A skeleton template for the creation of a new application.
 - **Boot1**
-    - On bootup, this application will select test the connection of each sim in a dual sim modem and enable the best.
+    - On bootup, this application will select test the connection of each SIM in a dual SIM modem and enable the best.
 - **email**
     - Sends an email.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
-    - Creates an FTP server in the router. A USB memory device is used as the FTP directory.
+    - Creates an FTP server in the device. A USB memory device is used as the FTP directory.
 - **gps_localhost**
-    - Assuming the Cradlepoint router is configured to forward NMEA sentences to a localhost port, open the port as a server and receive the streaming GSP data.
+    - Assuming the Cradlepoint device is configured to forward NMEA sentences to a localhost port, open the port as a server and receive the streaming GSP data.
 - **gps_probe**
     - Probe the GPS hardware and log the results.
 - **hello_world**
@@ -40,7 +40,7 @@ This is version 2.0 of the Router SDK and applications. The SDK has been simplif
 - **list\_serial_ports**
     - Lists out the serial ports in the logs.
 - **loglevel**
-    - Changes the router log level.
+    - Changes the device log level.
 - **modbus_poll**
     - Poll a single range of Modbus registers from an attached serial Modbus/RTU PLC or slave device.
 - **modbus\_simple_bridge**
@@ -52,11 +52,11 @@ This is version 2.0 of the Router SDK and applications. The SDK has been simplif
 - **send_alert**
     - Sends an alert to the ECM when the application is started and stopped.
 - **send\_to_server**
-    - Gets the '/status' from the reouter config store and send it to a test server.
+    - Gets the '/status' from the NCOS config store and send it to a test server.
 - **serial_echo**
     - Waits for data to enter the serial port, then echo back out.
 - **simple\_web_server**
-    - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
+    - A simple web server to receive messages. Note that any 'server function' requires the device firewall to be correctly changed to allow client access to the router.
 
 
 
@@ -64,7 +64,7 @@ This is version 2.0 of the Router SDK and applications. The SDK has been simplif
 ## SDK Directories 
 
 - **common**
-    - Contains the cs.py file which should be copied into an  application folder. It is a wrapper for the TCP interface to the router config store.
+    - Contains the cs.py file which should be copied into an application folder. It is a wrapper for the TCP interface to the NCOS config store.
 - **config**
     - Contains the settings.mk file for Linux users that want to use GNU make for application development instead of python make.py.
 - **tools**
@@ -73,7 +73,7 @@ This is version 2.0 of the Router SDK and applications. The SDK has been simplif
 ## Files 
 
 - **make.py**
-    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected router that is in DEV mode.
+    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
 - **Makefile**
     - The Makefile for Linux users that want to use GNU make for application development instead of python make.py.
 - **sdk_settings.ini**
