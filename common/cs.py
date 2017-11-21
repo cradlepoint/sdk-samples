@@ -187,8 +187,8 @@ class CSClient(object):
             cmd = "alert\n{}\n{}\n".format(app_name, value)
             return self._dispatch(cmd)
         else:
-            print('Alert is only available when running the app in the router.')
-            raise NotImplementedError
+            print('Alert is only available when running the app in NCOS.')
+            print('Alert Text: {}'.format(value))
 
     def log(self, name='', value='', level='DEBUG'):
         """Send a request to create a log entry."""
