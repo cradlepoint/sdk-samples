@@ -37,7 +37,7 @@ def hash_dir(target, hash_func=hashlib.sha256):
     hashed_files = {}
     for path, d, f in os.walk(target):
         for fl in f:
-            if not fl.startswith('.'):
+            if not fl.startswith('.') and not os.path.basename(path).startswith('.'):
                 # we need this be LINUX fashion!
                 if sys.platform == "win32":
                     # swap the network\\tcp_echo to be network/tcp_echo
