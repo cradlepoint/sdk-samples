@@ -47,8 +47,9 @@ def start_ftp_server():
         # start ftp server
         cs.CSClient().log(APP_NAME, 'Starting FTP server...')
         server.serve_forever()
-        t = Thread(target=server.serve_forever())
-        t.start()
+        # This will run the server in another thread
+        # t = Thread(target=server.serve_forever())
+        # t.start()
 
     except Exception as e:
         cs.CSClient().log(APP_NAME, 'Something went wrong in start_ftp_server()! exception: {}'.format(e))
