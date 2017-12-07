@@ -3,7 +3,7 @@ Helper function to parse a time durations; use '3 hr' or '15 min' instead
 of mind-bending settings such as 10800 and 900 seconds
 """
 
-from cp_lib.parse_data import parse_float, parse_integer
+from parse_data import parse_float, parse_integer
 
 __version__ = "1.0.0"
 
