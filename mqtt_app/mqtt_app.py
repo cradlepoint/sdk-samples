@@ -49,7 +49,7 @@ def on_connect(client, userdata, flags, rc):
 # message_callback_add() to define a callback that will be called for specific
 # topic filters. on_message will serve as fallback when none matched.
 def on_message(client, userdata, msg):
-    log.debug('Published msg received. Topic:{}, msg:{}'.format(msg.topic, msg.payload))
+    log.debug('Published msg received. topic: {}, msg: {}'.format(msg.topic, msg.payload))
 
 
 # Called when a message that was to be sent using the publish() call has
