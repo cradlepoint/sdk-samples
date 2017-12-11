@@ -1,5 +1,12 @@
 """
 An MQTT App example
+
+This app does the following:
+- The main code is in mqtt_app.py
+- Connects to MQTT test server ‘test.mosquitto.org’
+- Subscribes to topic ‘paho/test/single/gps’
+- Runs a background thread which publishes router gps info to topic ‘paho/test/single/gps’ every 10 secs.
+- Generates a log when the MQTT server sends the published information for topic ‘paho/test/single/gps’ which was subscribed too.
 """
 
 # A try/except is wrapped around the imports to catch an
