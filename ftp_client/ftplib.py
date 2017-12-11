@@ -36,6 +36,7 @@ python ftplib.py -d localhost -l -p -l
 # Modified by Giampaolo Rodola' to add TLS support.
 #
 
+import cs
 import os
 import sys
 import socket
@@ -161,6 +162,7 @@ class FTP:
         (this is read and squirreled away by connect())'''
         if self.debugging:
             print('*welcome*', self.sanitize(self.welcome))
+            cs.CSClient().log('FTP', '{} {}'.format('*welcome*', self.sanitize(self.welcome)))
         return self.welcome
 
     def set_debuglevel(self, level):
@@ -190,11 +192,14 @@ class FTP:
         line = line + CRLF
         if self.debugging > 1:
             print('*put*', self.sanitize(line))
+            cs.CSClient().log('FTP', '{} {}'.format('*put*', self.sanitize(line)))
         self.sock.sendall(line.encode(self.encoding))
 
     # Internal: send one command to the server (through putline())
     def putcmd(self, line):
-        if self.debugging: print('*cmd*', self.sanitize(line))
+        if self.debugging:
+            print('*cmd*', self.sanitize(line))
+            cs.CSClient().log('FTP', '{} {}'.format('*cmd*', self.sanitize(line)))
         self.putline(line)
 
     # Internal: return one line from the server, stripping CRLF.
@@ -205,6 +210,7 @@ class FTP:
             raise Error("got more than %d bytes" % self.maxline)
         if self.debugging > 1:
             print('*get*', self.sanitize(line))
+            cs.CSClient().log('FTP', '{} {}'.format('*get*', self.sanitize(line)))
         if not line:
             raise EOFError
         if line[-2:] == CRLF:
@@ -235,6 +241,7 @@ class FTP:
         resp = self.getmultiline()
         if self.debugging:
             print('*resp*', self.sanitize(resp))
+            cs.CSClient().log('FTP', '{} {}'.format('*resp*', self.sanitize(resp)))
         self.lastresp = resp[:3]
         c = resp[:1]
         if c in {'1', '2', '3'}:
@@ -260,6 +267,7 @@ class FTP:
         line = b'ABOR' + B_CRLF
         if self.debugging > 1:
             print('*put urgent*', self.sanitize(line))
+            cs.CSClient().log('FTP', '{} {}'.format('*put urgent*', self.sanitize(line)))
         self.sock.sendall(line, MSG_OOB)
         resp = self.getmultiline()
         if resp[:3] not in {'426', '225', '226'}:
@@ -472,6 +480,7 @@ class FTP:
                     raise Error("got more than %d bytes" % self.maxline)
                 if self.debugging > 2:
                     print('*retr*', repr(line))
+                    cs.CSClient().log('FTP', '{} {}'.format('*retr*', self.sanitize(line)))
                 if not line:
                     break
                 if line[-2:] == CRLF:

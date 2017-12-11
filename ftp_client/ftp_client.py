@@ -33,6 +33,13 @@ def start_router_app():
         # Connect to an FTP test server
         ftp = FTP('speedtest.tele2.net')
 
+        # This can be used for ftp debug logs.
+        # The required argument level means:
+        # 0: no debugging output (default)
+        # 1: print commands and responses but not body text etc.
+        # 2: also print raw lines read and sent before stripping CR/LF'''
+        # ftp.set_debuglevel(0)
+
         # Login to the server
         reply = ftp.login('anonymous', 'anonymous')
         cs.CSClient().log(APP_NAME, 'FTP login reply: {}'.format(reply))
@@ -50,6 +57,9 @@ def start_router_app():
         raise
 
     finally:
+        if ftp:
+            ftp.quit()
+
         if fh:
             fh.close()
     return
