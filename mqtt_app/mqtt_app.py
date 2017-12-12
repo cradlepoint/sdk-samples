@@ -4,10 +4,9 @@ Reference: https://www.eclipse.org/paho/clients/python/docs/
 
 This app does the following:
 - Connects to MQTT test server ‘test.mosquitto.org’
-- Subscribes to topic ‘paho/test/single/gps’
-- Runs a background thread which publishes router gps info to topic ‘paho/test/single/gps’ every 10 secs.
-- Generates a log when the MQTT server sends the published information for topic ‘paho/test/single/gps’
-  which was subscribed to.
+- Subscribes to topics as defined in settings.py.
+- Runs a background thread which publishes data to the topics defined in settings.py every 10 secs.
+- Generates a log when the MQTT server sends the published information for topics subscribed.
 """
 
 # A try/except is wrapped around the imports to catch an
@@ -48,9 +47,9 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    topics = [(settings.GPS_TOPIC, settings.MQTT_QOS),
-              (settings.MODEM_TEMP_TOPIC, settings.MQTT_QOS),
-              (settings.WAN_CONNECTION_STATE_TOPIC, settings.MQTT_QOS)]
+    topics = [(settings.GPS_TOPIC, settings.MQTT_QOS_0),
+              (settings.MODEM_TEMP_TOPIC, settings.MQTT_QOS_0),
+              (settings.WAN_CONNECTION_STATE_TOPIC, settings.MQTT_QOS_0)]
     try:
         client.subscribe(topics)
     except Exception as ex:
@@ -96,15 +95,15 @@ def publish_thread():
                        'latitude': gps_lastpos.get('latitude')}
 
             # Single Topic Publish example
-            publish.single(settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=settings.MQTT_QOS,
+            publish.single(settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=settings.MQTT_QOS_0,
                            hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
 
             # Multiple Topics Publish example
             modem_temp = cs.CSClient().get(settings.MODEM_TEMP_TOPIC).get('data', '')
             wan_connection_state = cs.CSClient().get(settings.WAN_CONNECTION_STATE_TOPIC).get('data')
 
-            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, settings.MQTT_QOS, False),
-                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, settings.MQTT_QOS, False)]
+            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, settings.MQTT_QOS_0, False),
+                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, settings.MQTT_QOS_0, False)]
 
             publish.multiple(msgs=msgs, hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
 
