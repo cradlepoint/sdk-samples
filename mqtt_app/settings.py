@@ -10,7 +10,7 @@ MQTT_USER_NAME = 'anonymous'
 MQTT_PASSWORD = 'anonymous'
 
 # MQTT Topics
-# Topics are names the same as the path to get the data from the
+# Topics are named the same as the path to get the data from the
 # NCOS device. This was done for simplicity.
 GPS_TOPIC = '/status/gps/lastpos'
 MODEM_TEMP_TOPIC = '/status/system/modem_temperature'
