@@ -21,6 +21,7 @@ try:
     import settings
     import json
     import time
+    import ssl
     import paho.mqtt.client as mqtt
     import paho.mqtt.publish as publish
 
@@ -47,9 +48,9 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    topics = [(settings.GPS_TOPIC, settings.MQTT_QOS_0),
-              (settings.MODEM_TEMP_TOPIC, settings.MQTT_QOS_0),
-              (settings.WAN_CONNECTION_STATE_TOPIC, settings.MQTT_QOS_0)]
+    topics = [(settings.GPS_TOPIC, 0),
+              (settings.MODEM_TEMP_TOPIC, 0),
+              (settings.WAN_CONNECTION_STATE_TOPIC, 0)]
     try:
         client.subscribe(topics)
     except Exception as ex:
@@ -91,19 +92,19 @@ def publish_thread():
     while True:
         try:
             gps_lastpos = cs.CSClient().get(settings.GPS_TOPIC).get('data')
-            gps_pos = {'logitude': gps_lastpos.get('longitude'),
+            gps_pos = {'longitude': gps_lastpos.get('longitude'),
                        'latitude': gps_lastpos.get('latitude')}
 
             # Single Topic Publish example
-            publish.single(settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=settings.MQTT_QOS_0,
+            publish.single(settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=0,
                            hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
 
             # Multiple Topics Publish example
             modem_temp = cs.CSClient().get(settings.MODEM_TEMP_TOPIC).get('data', '')
             wan_connection_state = cs.CSClient().get(settings.WAN_CONNECTION_STATE_TOPIC).get('data')
 
-            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, settings.MQTT_QOS_0, False),
-                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, settings.MQTT_QOS_0, False)]
+            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, 0, False),
+                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, 0, False)]
 
             publish.multiple(msgs=msgs, hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
 
@@ -118,6 +119,14 @@ def start_mqtt():
         log.debug('Start MQTT Client')
 
         mqtt_client = mqtt.Client(client_id=settings.MQTT_CLIENT_ID)
+
+        if settings.MQTT_LOGGING:
+            # Add MQTT logging to the app logs
+            mqtt_client.enable_logger(AppLogger.logger)
+        else:
+            mqtt_client.disable_logger()
+
+        # Assign callback functions
         mqtt_client.on_connect = on_connect
         mqtt_client.on_message = on_message
         mqtt_client.on_publish = on_publish
