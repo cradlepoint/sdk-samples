@@ -154,8 +154,6 @@ def start_router_app():
 
         publish_thread()
 
-        time.sleep(36000)
-
     except Exception as ex:
         log.error('Exception during start_router_app()! exception: {}'.format(ex))
         raise
