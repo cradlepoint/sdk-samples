@@ -162,8 +162,9 @@ def start_mqtt():
         mqtt_client.on_publish = on_publish
         mqtt_client.on_subscribe = on_subscribe
 
-        log.debug('MQTT connect to {}, {}'.format(settings.MQTT_SERVER, settings.MQTT_PORT))
-        mqtt_client.connect(settings.MQTT_SERVER, settings.MQTT_PORT)
+        connack_code = mqtt_client.connect(settings.MQTT_SERVER, settings.MQTT_PORT)
+        log.info('MQTT connect reply to {}, {}: {}'.format(settings.MQTT_SERVER, settings.MQTT_PORT,
+                                                           mqtt.connack_string(connack_code)))
 
         # Blocking call that processes network traffic, dispatches callbacks and
         # handles reconnecting.
