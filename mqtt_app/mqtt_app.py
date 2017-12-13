@@ -170,10 +170,13 @@ def start_mqtt():
         mqtt_client.on_publish = on_publish
         mqtt_client.on_subscribe = on_subscribe
 
+        # Set a Will to be sent by the broker in case the client disconnects unexpectedly.
+        # QOS 2: The broker will deliver the message exactly once by using a four step handshake.
+        mqtt_client.will_set('/will/oops', payload='{} has vanished!'.format(settings.MQTT_CLIENT_ID), qos=2)
+
         connack_code = mqtt_client.connect(settings.MQTT_SERVER, settings.MQTT_PORT)
         log.info('MQTT connect reply to {}, {}: {}'.format(settings.MQTT_SERVER, settings.MQTT_PORT,
                                                            mqtt.connack_string(connack_code)))
-
         # Blocking call that processes network traffic, dispatches callbacks and
         # handles reconnecting.
         mqtt_client.loop_forever()
