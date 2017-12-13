@@ -49,8 +49,13 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    topics = [(settings.GPS_TOPIC, 0),
-              (settings.MODEM_TEMP_TOPIC, 0),
+    # QOS 0: The broker will deliver the message once, with no confirmation.
+    # QOS 1: The broker will deliver the message at least once, with confirmation required.
+    # QOS 2: The broker will deliver the message exactly once by using a four step handshake.
+    #
+    # A list of tuples (i.e. topic, qos). Both topic and qos must be present in the tuple.
+    topics = [(settings.GPS_TOPIC, 2),
+              (settings.MODEM_TEMP_TOPIC, 1),
               (settings.WAN_CONNECTION_STATE_TOPIC, 0)]
     try:
         client.subscribe(topics)
@@ -116,6 +121,7 @@ def publish_thread():
                        'latitude': gps_lastpos.get('latitude')}
 
             # Single Topic Publish example
+            # QOS 0: The client will deliver the message once, with no confirmation.
             publish.single(topic=settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=0,
                            hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
 
@@ -127,8 +133,10 @@ def publish_thread():
 
             # Using tuples to define multiple messages,
             # the form must be: ("<topic>", "<payload>", qos, retain)
-            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, 0, False),
-                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, 0, False)]
+            # QOS 1: The client will deliver the message at least once, with confirmation required.
+            # QOS 2: The client will deliver the message exactly once by using a four step handshake.
+            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, 1, False),
+                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, 2, False)]
 
             publish.multiple(msgs=msgs, hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
 
