@@ -15,6 +15,7 @@ This app does the following:
 # adding python libraries.
 try:
     import cs
+    import os
     import sys
     import traceback
     import argparse
@@ -86,6 +87,25 @@ def on_subscribe(client, userdata, mid, granted_qos):
     log.debug('Subscribe response: Message ID={}, granted_qos={}'.format(mid, granted_qos))
 
 
+# This function will publish a file to the MQTT broker
+def publish_file(file_name, file_path):
+    global mqtt_client
+    log.debug('publish_file({})'.format(file_path))
+    try:
+        with open(file_path) as fh:
+            file_contents = fh.read()
+        ret_obj = mqtt_client.publish(topic=file_name, payload=file_contents, qos=0)
+
+        if ret_obj.rc == mqtt.MQTT_ERR_SUCCESS:
+            log.debug('MQTT published file: {}'.format(file_path))
+        else:
+            log.warning('MQTT failed to publish file: {}'.format(file_path))
+            log.warning('MQTT failed to publish file. error: {}'.format(mqtt.error_string(ret_obj.rc)))
+
+    except Exception as ex:
+        log.error('Exception in publish_file(). ex: {}'.format(ex))
+
+
 # This function will periodically publish device data to the MQTT Broker
 def publish_thread():
     log.debug('Start publish_thread()')
@@ -96,17 +116,27 @@ def publish_thread():
                        'latitude': gps_lastpos.get('latitude')}
 
             # Single Topic Publish example
-            publish.single(settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=0,
+            publish.single(topic=settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=0,
                            hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
+
+            time.sleep(1)
 
             # Multiple Topics Publish example
             modem_temp = cs.CSClient().get(settings.MODEM_TEMP_TOPIC).get('data', '')
             wan_connection_state = cs.CSClient().get(settings.WAN_CONNECTION_STATE_TOPIC).get('data')
 
+            # Using tuples to define multiple messages,
+            # the form must be: ("<topic>", "<payload>", qos, retain)
             msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, 0, False),
                     (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, 0, False)]
 
             publish.multiple(msgs=msgs, hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
+
+            time.sleep(1)
+
+            # Publish the package.ini file as an example
+            file_name = 'package.ini'
+            publish_file(file_name, os.path.join(os.getcwd(), file_name))
 
             time.sleep(10)
         except Exception as ex:
