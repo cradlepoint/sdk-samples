@@ -45,6 +45,8 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
     - Poll a single range of Modbus registers from an attached serial Modbus/RTU PLC or slave device.
 - **modbus\_simple_bridge**
     - A basic Modbus/TCP to RTU bridge.
+- **mqtt_app**
+    - Demonstrates an MQTT Client using the paho-mqtt library.
 - **ping**
     - Ping an address and log the results.
 - **power_gpio**
