@@ -241,7 +241,7 @@ def output_help():
 
 
 # Get the uuid from application package.ini if not already set
-def get_app_uuid(ceate_new_uuid):
+def get_app_uuid(ceate_new_uuid=False):
     global g_app_uuid
 
     if g_app_uuid == '':
