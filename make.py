@@ -240,32 +240,8 @@ def output_help():
     print('help: Print this help information.\n')
 
 
-# Create a UUID for the application. If one exist, a new one
-# is created.
-def create_uuid():
-    global g_app_uuid
-
-    uuid_key = 'uuid'
-    app_config_file = os.path.join(g_app_name, 'package.ini')
-    config = configparser.ConfigParser()
-    config.read(app_config_file)
-    if g_app_name in config:
-        if uuid_key in config[g_app_name]:
-            g_app_uuid = config[g_app_name][uuid_key]
-
-            _uuid = str(uuid.uuid4())
-            config.set(g_app_name, uuid_key, _uuid)
-            with open(app_config_file, 'w') as configfile:
-                config.write(configfile)
-            print('INFO: Created and saved uuid {} in {}'.format(_uuid, app_config_file))
-        else:
-            print('ERROR: The uuid key does not exist in {}'.format(app_config_file))
-    else:
-        print('ERROR: The APP_NAME section does not exist in {}'.format(app_config_file))
-
-
 # Get the uuid from application package.ini if not already set
-def get_app_uuid():
+def get_app_uuid(ceate_new_uuid):
     global g_app_uuid
 
     if g_app_uuid == '':
@@ -277,13 +253,12 @@ def get_app_uuid():
             if uuid_key in config[g_app_name]:
                 g_app_uuid = config[g_app_name][uuid_key]
 
-                if g_app_uuid == '':
+                if ceate_new_uuid or g_app_uuid == '':
                     # Create a UUID if it does not exist
                     _uuid = str(uuid.uuid4())
                     config.set(g_app_name, uuid_key, _uuid)
                     with open(app_config_file, 'w') as configfile:
                         config.write(configfile)
-                    print('INFO: The uuid did not exist in {}'.format(app_config_file))
                     print('INFO: Created and saved uuid {} in {}'.format(_uuid, app_config_file))
             else:
                 print('ERROR: The uuid key does not exist in {}'.format(app_config_file))
@@ -294,7 +269,7 @@ def get_app_uuid():
 
 
 # Setup all the globals based on the OS and the sdk_settings.ini file.
-def init():
+def init(ceate_new_uuid):
     global g_python_cmd
     global g_app_name
     global g_dev_client_ip
@@ -352,7 +327,7 @@ def init():
         print('ERROR 5: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
     # This will also create a UUID if needed.
-    get_app_uuid()
+    get_app_uuid(ceate_new_uuid)
 
     return success
 
@@ -365,7 +340,7 @@ if __name__ == "__main__":
 
     utility_name = str(sys.argv[1]).lower()
 
-    if not init():
+    if not init(ceate_new_uuid=utility_name == 'uuid'):
         sys.exit(0)
 
     if utility_name == 'clean':
@@ -397,7 +372,8 @@ if __name__ == "__main__":
         purge()
 
     elif utility_name == 'uuid':
-        create_uuid()
+        # This is handled in init()
+        pass
 
     else:
         output_help()
