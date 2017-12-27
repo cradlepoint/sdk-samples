@@ -57,6 +57,8 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
     - Gets the '/status' from the device config store and send it to a test server.
 - **serial_echo**
     - Waits for data to enter the serial port, then echo back out.
+- **simple\_custom_dashboard**
+    - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **simple\_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 
