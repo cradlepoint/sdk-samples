@@ -291,35 +291,35 @@ img {
 </style>
 </head>
 <body>
-<h1><strong>NCOS SDK v2.0 Router Application Development</strong></h1>
+<h1><strong>NCOS SDK v2.0 Application Development Guide</strong></h1>
 <hr />
 <h2>Quick Links</h2>
 <h4><a href="#overview">Overview</a></h4>
 <h4><a href="#community">Developer Community</a></h4>
 <h4><a href="#knowledge">Cradlepoint Knowledge Base</a></h4>
-<h4><a href="#environment">Router Python Environment</a></h4>
+<h4><a href="#environment">NCOS Python Environment</a></h4>
 <h4><a href="#setup">Computer Setup Instructions</a></h4>
-<h4><a href="#devmode">Router Development Mode</a></h4>
+<h4><a href="#devmode">NCOS Development Mode</a></h4>
 <h4><a href="#structure">Application Directory Structure</a></h4>
 <h4><a href="#anatomy">Application Package Anatomy</a></h4>
 <h4><a href="#sdk">SDK Instructions Overview</a></h4>
-<h4><a href="#syslog">Router Syslog for Debugging</a></h4>
+<h4><a href="#syslog">NCOS Syslog for Debugging</a></h4>
 <h4><a href="#ncm">NCM Application Deployment</a></h4>
 <h4><a href="#sample">Sample Application Walk Through</a></h4>
 <p><a name="overview"></a></p>
 <h2>Overview</h2>
-<p>Cradlepoint’s Router Application Framework provides the ability to add intelligence in the router. Applications written in Python can be securely downloaded to the router via <a href="https://cradlepoint.com/ecm">Network Cloud Manager</a> (NCM). This allows for extended router features, FOG Computing, and IoT management.</p>
-<p>At a high level, the Cradlepoint Router Apps/SDK is a mechanism to package a collection of files – including executable files – in an archive, which can be transferred securely via NCM, hidden within a Cradlepoint router, and executed as an extension to normal firmware.</p>
+<p>Cradlepoint’s NCOS device Application Framework provides the ability to add intelligence in the device. Applications written in Python can be securely downloaded to the device via <a href="https://cradlepoint.com/ecm">Network Cloud Manager</a> (NCM). This allows for extended device features, FOG Computing, and IoT management.</p>
+<p>At a high level, the Cradlepoint NCOS Deive Apps/SDK is a mechanism to package a collection of files – including executable files – in an archive, which can be transferred securely via NCM, hidden within a Cradlepoint device, and executed as an extension to normal firmware.</p>
 <h3>What is Supported?</h3>
-<p>For the scope of this document, Router Apps are limited to the non-privileged Python scripts. Supported functionality:</p>
+<p>For the scope of this document, NCOS Apps are limited to the non-privileged Python scripts. Supported functionality:</p>
 <ul>
 <li>Standard TCP/UDP/SSL socket servers function on ports higher than 1024.</li>
-<li>Standard TCP/UDP/SSL socket client to other devices (or the router as 127.0.0.1/localhost).</li>
+<li>Standard TCP/UDP/SSL socket client to other devices (or the device as 127.0.0.1/localhost).</li>
 <li>Access to serial ports via PySerial module, including native and USB-serial ports.</li>
 <li>Ability to PING external devices.</li>
 <li>UI Extensibility (i.e. Hot Spot splash page or other UI WEB pages)</li>
-<li>Access to the Router API (aka: status and control tree data).</li>
-<li>USB Memory device file access (USB Memory device support varies based on router).</li>
+<li>Access to the NCOS API (aka: status and control tree data).</li>
+<li>USB Memory device file access.</li>
 </ul>
 <h3>What is not Supported?</h3>
 <ul>
@@ -328,29 +328,33 @@ img {
 <li>Access to shared resources (for example: no ability to issue custom AT commands to cell modems).</li>
 <li>Modifications of routing or security behavior.</li>
 </ul>
-<h3>Supported Routers</h3>
-<p>The supported set of routers is:</p>
+<h3>Supported NCOS Devices</h3>
+<p>The supported set of devices is:</p>
 <ul>
 <li>AER – 1600/1650, 2100, 3100/3150</li>
 <li>COR – IBR1100/1150, IBR900/IBR950, IBR600B/IBR650B, IBR350</li>
 <li>ARC - CBA850</li>
 </ul>
-<p>New routers products will support Python applications unless they are a special low-function, low-cost model.</p>
+<p>New NCOS products will support Python applications unless they are a special low-function, low-cost model.</p>
 <h3>Application Development</h3>
-<p>During development, an application can be directly installed into a 'DEV Mode' router. This makes it easier to debug and work through the development process. Once the application has been fully debugged and is ready for deployment, it can be installed via NCM at the group level.</p>
+<p>During development, an application can be directly installed into a 'DEV Mode' device. This makes it easier to debug and work through the development process. Once the application has been fully debugged and is ready for deployment, it can be installed via NCM at the group level.</p>
 <h3>SDK Toolset</h3>
 <p>Cradlepoint has a simplified SDK, written in python, which builds and creates an app package. The SDK, along with sample applications is located <a href="https://github.com/cradlepoint/sdk-samples/releases">here</a>. </p>
-<p>For app development, the SDK is used to install, start, stop, uninstall, and check status of the application in a locally connected development router. The application package is the same for local debugging or for uploading to the NCM for production deployment. Application development can be done on Linux, OS X, and Windows operating systems with the same SDK.</p>
+<p>For app development, the SDK is used to install, start, stop, uninstall, and check status of the application in a locally connected development device. The application package is the same for local debugging or for uploading to the NCM for production deployment. Application development can be done on Linux, OS X, and Windows operating systems with the same SDK.</p>
 <p>This document is specifically written for SDK version 2.0 and above.</p>
 <p><a name="community"></a>	</p>
 <h2>Developer Community</h2>
 <p>Cradlepoint has a <a href="https://dev.cradlepoint.com">Developer Community Portal</a> to leverage knowledge, share, and collaborate with other developers. This forum is also actively monitored by Cradlepoint to answer questions.</p>
 <p><a name="knowledge"></a></p>
 <h2>Cradlepoint Knowledge Base</h2>
-<p>The existing <a href="http://knowledgebase.cradlepoint.com">Cradlepoint Knowledge Base</a> also has many articles related to router applications and the SDK.</p>
+<p>The existing <a href="http://knowledgebase.cradlepoint.com">Cradlepoint Knowledge Base</a> also has many articles related to NCOS applications and the SDK.</p>
 <p><a name="environment"></a>	</p>
-<h2>Router Python Environment</h2>
-<p>Application are written in python. However, the router only contains a subset of a typical python installation on a computer. The list of python modules in the router are listed here: <a href="https://dev.cradlepoint.com/s/article/ka1380000000EXWAA2/sdk-fw-6-1-0-modules">Router FW 6.1.0 Modules.</a> New python files can be added to you application but they must also adhere to this list.</p>
+<h2>NCOS Python Environment</h2>
+<p>Application are written in python. However, NCOS only contains a subset of a typical python installation on a computer. The list of python modules in the NCOS device can be obtained by installing sample app python_module_list which is included with the SDK. This application will list all of the python modules in the logs.</p>
+<p>New python files can be added to your application but their dependencies must also adhere to the NCOS python environment. These new python files/modules can be copied to the main application directory or can be installed using pip. If pip is used, any 'egg' or 'dist' directories can be deleted as they are not required for functionality and will just use up memory unnecessarily when installed into the NCOS device. </p>
+<p>Example pip command:
+pip(3) install --ignore-install --target=&lt;path to application directory&gt; &lt;python module name&gt;</p>
+<p><strong>note:</strong> Use pip on Windows and pip3 on Linux or OS X.</p>
 <p><a name="setup"></a></p>
 <h2>Computer Setup Instructions</h2>
 <p>The SDK and sample apps can be downloaded from <a href="https://github.com/cradlepoint/sdk-samples">https://github.com/cradlepoint/sdk-samples</a>. Below are the setup instruction for:</p>
@@ -455,14 +459,15 @@ Useful tools
 <p>Below is the directory structure for for the SDK and sample applications. The <strong>BOLD</strong> items are modified or created by the developer. The other files are used by the SDK or are referenced by the other files.</p>
 <ul>
 <li>
-Router_Apps (directory)
+NCOS_Apps (directory)
 <ul>
 <li>
-app_name (directory)
+app_template (directory for the application)
 <ul>
 <li><strong>package.ini</strong> - App initialization items.</li>
 <li><strong>app_name.py</strong> - The app python code. There can be multiple py files based on the app design.</li>
-<li>cs.py - This is included with every sample app and should be in your app. It contains a CSClient class which is a wrapper for the TCP interface to the router config store (i.e. the router trees). </li>
+<li>cs.py - This is included with every sample app and should be in your app. It contains a CSClient class which is a wrapper for the TCP interface to the device config store (i.e. the NCOS JSON API trees).</li>
+<li>app_logging.py - If included, this contains a class which can be used to generate NCOS syslogs at different levels (i.e. info, debug, error, etc.). Can be found in the common directory of the SDK.</li>
 <li><strong>install.sh</strong> - Runs on app installation. (update with app name) </li>
 <li><strong>start.sh</strong> - Script that starts an app (i.e. cppython app_name.py start).</li>
 <li><strong>stop.sh</strong> - Script that stops an app (i.e. cppython app_name.py stop).</li>
@@ -471,7 +476,7 @@ app_name (directory)
 <li>
 config (directory)
 <ul>
-<li><strong>settings.mk</strong> - Build system config settings (i.e. Router MAC, IP, Username, Password, etc.).</li>
+<li><strong>settings.mk</strong> - Build system config settings (i.e. NCOS Device MAC, IP, Username, Password, etc.).</li>
 </ul>
 </li>
 <li>
@@ -493,17 +498,17 @@ bin (directory)
 </li>
 </ul>
 </li>
-<li><strong>sdk_setting.ini</strong> - Used by the SDK and contains the settings for building the app and connecting to the local router.</li>
-<li>Router_Application_Development_Guide.md </li>
-<li>Router_APIs_for_Applications.md </li>
-<li>Makefile_README.md </li>
+<li><strong>sdk_setting.ini</strong> - Used by the SDK and contains the settings for building the app and connecting to the local NCOS device.</li>
+<li>NCOS_SDK_V2.0_Application_Development_Guide.html </li>
+<li>NCOS_APIs_for_Applications.html </li>
+<li>GNU_Make_README.html </li>
 </ul>
 </li>
 </ul>
-<p>Based on the sdk_setting.ini file, the SDK will build all files located in the <em>app_name</em> directory into a <em>tar.gz</em> package that can then been installed into the router. This installation is either directly into the router (if in DEV mode) or via NCM for grouped routers.</p>
+<p>Based on the sdk_setting.ini file, the SDK will build all files located in the <em>app_name</em> directory into a <em>tar.gz</em> package that can then been installed into the device. This installation is either directly into the device (if in DEV mode) or via NCM for grouped devices.</p>
 <p><a name="anatomy"></a></p>
 <h2>Application Package Anatomy</h2>
-<p>A router application package, which is a <em>tar.gz</em> archive, consists of a set of files that includes the python executable, start/stop scripts, initialization files, along with manifest and signature files. This package of files is built by the SDK base on the sdk_settings.ini. Some of these files, like the manifest and signature files, are created by the Make tool. Others are created by the application developer. Below are the example contents for a tar.gz archive created for a router application.</p>
+<p>A NCOS application package, which is a <em>tar.gz</em> archive, consists of a set of files that includes the python executable, start/stop scripts, initialization files, along with manifest and signature files. This package of files is built by the SDK base on the sdk_settings.ini. Some of these files, like the manifest and signature files, are created by the Make tool. Others are created by the application developer. Below are the example contents for a tar.gz archive created for a NCOS application.</p>
 <ul>
 <li>
 app_name (directory)
@@ -525,7 +530,7 @@ METADATA (directory)
 </li>
 </ul>
 <h3>package.ini</h3>
-<p>This initialization file contains information and about the application and items that affect installation and execution. This information will stored in /status/system/sdk within the router config store for installed apps.</p>
+<p>This initialization file contains information and about the application and items that affect installation and execution. This information will stored in /status/system/sdk within the NCOS config store for installed apps.</p>
 <p>For example:</p>
 <pre><code>[hello_world]
 uuid=7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c
@@ -559,20 +564,21 @@ auto_start=true
 <p>Add notes to describe the app or anything else.</p>
 </li>
 <li>
-<p>**firmware_major and firmware_minor **</p>
-<p>This is the required router firmware version for the app. <strong><em>Not  implemented at this time.</em></strong></p>
+<p><strong>firmware_major and firmware_minor</strong></p>
+<p>This is the required device firmware version for the app. <strong><em>Not  implemented at this time.</em></strong></p>
 </li>
 <li>
 <p><strong>restart</strong>
-If set to 'true', then the application will be restarted if it dies or is not running. If false, the router will not attempt to restart the application.</p>
+If set to 'true', the application will be restarted if it dies or is not running. If false, the device will not attempt to restart the application.
+d</p>
 </li>
 <li>
 <p><strong>reboot</strong>
-If set to 'true', the router will restart the application following a router reboot. Otherwise, it will not be restarted.</p>
+If set to 'true', the application will be started following a device reboot. Otherwise, it will not be restarted.</p>
 </li>
 <li>
 <p><strong>version_major and version_minor</strong></p>
-<p>This contains the app version. This must be incremented for any new production app used installed via NCM. It will not re-install the same version that already exist in the router.</p>
+<p>This contains the app version. This must be incremented for any new production app used installed via NCM. It will not re-install the same version that already exist in the device.</p>
 </li>
 <li>
 <p><strong>auto_start</strong></p>
@@ -580,7 +586,7 @@ If set to 'true', the router will restart the application following a router reb
 </li>
 </ul>
 <h3>install.sh</h3>
-<p>This script is executed when the application is installed in the router. Typically it will just add logs for the installation.</p>
+<p>This script is executed when the application is installed in the device. Typically it will just add logs for the installation.</p>
 <p>For example:</p>
 <pre><code>#!/bin/bash
 echo &quot;INSTALLATION hello_world on:&quot; &gt;&gt; install.log
@@ -588,14 +594,14 @@ date &gt;&gt; install.log
 </code></pre>
 
 <h3>start.sh</h3>
-<p>This script is executed when the application is started in the router. It contains the command to start the python script and pass any arguments. </p>
+<p>This script is executed to start the application in the device. It contains the command to start the python script and pass any arguments. </p>
 <p>For example:</p>
 <pre><code>#!/bin/bash
 cppython hello_world.py start
 </code></pre>
 
 <h3>stop.sh</h3>
-<p>This script is executed when the application is stopped in the router. It contains the command to stop the python script. </p>
+<p>This script is executed when the application is stopped in the device. It contains the command to stop the python script. </p>
 <p>For example:</p>
 <pre><code>#!/bin/bash
 cppython hello_world.py stop
@@ -606,27 +612,29 @@ cppython hello_world.py stop
 <p>The SDK includes a python make.py file which is compatible for all supported platforms. There is also a GNU Makefile which can only be used with Linux or OS X. Both perform the same actions which are noted below. However, there are minor setup differences between the two. Developers can choose the one they prefer. For usage instructions, see:</p>
 <ul>
 <li><a href="#python_usage">Python SDK Usage</a></li>
-<li><a href="gnu_make_usage">GNU Make SDK Usage</a></li>
+<li><a href="#gnu_make_usage">GNU Make SDK Usage</a></li>
 </ul>
 <h3>SDK actions are:</h3>
 <p><strong>default (i.e. no action given):</strong>
-    Build and test the router reference app and create the archive file suitable for deployment to a router DEV mode or for uploading to NCM.</p>
+    Print a help file</p>
 <p><strong>clean:</strong>
     Clean all project artifacts. Entails execution of all &quot;-clean&quot; make targets.</p>
-<p><strong>package:</strong>
+<p><strong>build or package:</strong>
     Create the app archive tar.gz file.</p>
 <p><strong>status:</strong>
-    Fetch and print current app status from the locally connected router.</p>
+    Fetch and print current app status from the locally connected device.</p>
 <p><strong>install:</strong>
-    Secure copy the app archive to a locally connected router. The router must already be in SDK DEV mode via registration and licensing in NCM.</p>
+    Secure copy the app archive to a locally connected device. The device must already be in SDK DEV mode via registration and licensing in NCM. <strong>Note:</strong> A 'Connection reset by peer' error will be displayed even when the application is successfully copied to the device. This occurs when the device drops the connections after the file copy is complete.</p>
 <p><strong>start:</strong>
-    Start the app on the locally connected router.</p>
+    Start the app on the locally connected device.</p>
 <p><strong>stop:</strong>
-    Stop the app on the locally connected router.</p>
+    Stop the app on the locally connected device.</p>
 <p><strong>uninstall:</strong>
-    Uninstall the app from the locally connected router.</p>
+    Uninstall the app from the locally connected device.</p>
 <p><strong>purge:</strong>
-    Purge all apps from the locally connected router.</p>
+    Purge all apps from the locally connected device.</p>
+<p><strong>uuid:</strong>
+    This will create a new UUID for the app and write it to the package.ini file.</p>
 <p><a name="python_usage"></a></p>
 <h3>Python SDK Usage</h3>
 <p>All SDK functions are contained in the make.py python file. While this executable is the same regardless of the workstation platform, the python command is not. Use the following python command based on your platform:</p>
@@ -671,12 +679,12 @@ uuid=dd91c8ea-cd95-4d9d-b08b-cf62de19684f
 </li>
 <li>
 <p>Build the application package.</p>
-<pre><code>python(3) make.py
+<pre><code>python(3) make.py build
 </code></pre>
 
 </li>
 <li>
-<p>Test connectivity with your router via the status target.</p>
+<p>Test connectivity with your device via the status target.</p>
 <pre><code>python(3) make.py status
 {
     &quot;data&quot;: {},
@@ -686,7 +694,7 @@ uuid=dd91c8ea-cd95-4d9d-b08b-cf62de19684f
 
 </li>
 <li>
-<p>Install the application on your router.</p>
+<p>Install the application on your device.</p>
 <pre><code>python(3) make.py install
 admin@192.168.0.1's password: 
 hspt.tar.gz                          100% 1439     1.4KB/s   00:00    
@@ -696,7 +704,7 @@ lost connection
 
 </li>
 <li>
-<p>Get the application execution status from your router.</p>
+<p>Get the application execution status from your device.</p>
 <pre><code>python(3) make.py status
 {
     &quot;data&quot;: {
@@ -726,7 +734,7 @@ lost connection
 
 </li>
 <li>
-<p>Uninstall the application from your router.</p>
+<p>Uninstall the application from your device.</p>
 <pre><code>python(3) make.py uninstall
 {
     &quot;data&quot;: &quot;uninstall 7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;,
@@ -738,15 +746,15 @@ lost connection
 </ol>
 <p><a name="gnu_make_usage"></a></p>
 <h3>GNU Make SDK Usage</h3>
-<p>A GNU Makefile, for Linux or OS X, is also included with the SDK which can perform the same functions as the make.py file. The make targets are identical to the make.py actions. However, environment variable will need to be set in lieu of the sdk_setting.ini file. </p>
+<p>A GNU Makefile, for Linux or OS X, is also included with the SDK which can perform the same functions as the make.py file. The make targets are identical to the make.py actions. However, environment variable will need to be set in lieu of the sdk_setting.ini file.</p>
 <p>The GNU make usage is as follows:</p>
 <ol>
 <li>
 <p>Export the following variables in your environment.</p>
 <pre><code>APP_NAME - The name of your application.
 APP_UUID - Each application must have its own UUID.
-DEV_CLIENT_MAC - The mac address of your router.
-DEV_CLIENT_IP  - The lan ip address of your router.
+DEV_CLIENT_MAC - The mac address of your device.
+DEV_CLIENT_IP  - The lan ip address of your device.
 </code></pre>
 
 <p>Example:</p>
@@ -764,7 +772,7 @@ $ export DEV_CLIENT_IP=192.168.20.1
 
 </li>
 <li>
-<p>Test connectivity with your router via the status target.</p>
+<p>Test connectivity with your device via the status target.</p>
 <pre><code>$ make status
 curl -s --digest --insecure -u admin:441dbbec \
                 -H &quot;Accept: application/json&quot; \
@@ -778,7 +786,7 @@ curl -s --digest --insecure -u admin:441dbbec \
 
 </li>
 <li>
-<p>Build, test, and install the application on your router.</p>
+<p>Build, test, and install the application on your device.</p>
 <pre><code>$ make install
 scp /home/sfisher/dev/sdk/hspt.tar.gz admin@192.168.0.1:/app_upload
 admin@192.168.0.1's password: 
@@ -789,7 +797,7 @@ lost connection
 
 </li>
 <li>
-<p>Get application execution status from your router.</p>
+<p>Get application execution status from your device.</p>
 <pre><code>$ make status
 curl -s --digest --insecure -u admin:441dbbec \
                 -H &quot;Accept: application/json&quot; \
@@ -823,7 +831,7 @@ curl -s --digest --insecure -u admin:441dbbec \
 
 </li>
 <li>
-<p>Uninstall the application from your router.</p>
+<p>Uninstall the application from your device.</p>
 <pre><code>$ make uninstall
 curl -s --digest --insecure -u admin:441dbbec \
                 -H &quot;Accept: application/json&quot; \
@@ -839,9 +847,9 @@ curl -s --digest --insecure -u admin:441dbbec \
 </li>
 </ol>
 <p><a name="syslog"></a></p>
-<h2>Router Syslog for Debugging</h2>
-<p>Application debugging is accomplished with the use of debug syslogs. However, the default logging level in the router is set to <strong>info</strong> so this will need to be changed to <strong>debug</strong>. It is also possible to send the router logs to a syslog server running on another device. For more information, see the Knowledge Base article <a href="http://knowledgebase.cradlepoint.com/articles/Support/fw6-Understanding-Router-Log-Files-and-Features?retURL=%2Fapex%2FknowledgeSearch%3Fc%3DAll_Products%26p%3D2%26k%3Dsyslog%26t%3D%26l%3D%26lang%3Den_US&amp;popup=false&amp;c=All_Products&amp;lang=en_US">'Understanding Router Log Files'</a>.</p>
-<p>You can also view logs via CLI commands when logged into the router console. This console is available by logging into the router with Secure Shell (i.e. ssh) or by slecting the 'Device Console' from  'System &gt; System Control &gt; Device Options' in the router UI. The logs can be viewed or cleared with the following CLI commands:</p>
+<h2>NCOS Syslog for Debugging</h2>
+<p>Application debugging is accomplished with the use of debug syslogs. However, the default logging level in the NCOS device is set to <strong>info</strong> so this will need to be changed to <strong>debug</strong>. It is also possible to send the device logs to a syslog server running on another device. For more information, see the Knowledge Base article <a href="http://knowledgebase.cradlepoint.com/articles/Support/fw6-Understanding-Router-Log-Files-and-Features?retURL=%2Fapex%2FknowledgeSearch%3Fc%3DAll_Products%26p%3D2%26k%3Dsyslog%26t%3D%26l%3D%26lang%3Den_US&amp;popup=false&amp;c=All_Products&amp;lang=en_US">'Understanding Router Log Files'</a>.</p>
+<p>You can also view logs via CLI commands when logged into the NCOS device console. This console is available by logging into the device with Secure Shell (i.e. ssh) or by selecting the 'Device Console' from  'System &gt; System Control &gt; Device Options' in the device UI. The logs can be viewed or cleared with the following CLI commands:</p>
 <pre><code>log (displays logs in the terminal window)
 log -s &lt;text&gt; (search for logs that contain &lt;text&gt; and displays them)
 log -s -i &lt;text&gt; (search for logs that contain &lt;text&gt; but case insensitive)
@@ -850,14 +858,14 @@ help log (display the log command options)
 </code></pre>
 
 <p><a name="devmode"></a></p>
-<h2>Router Development Mode</h2>
-<p>In order to install an application directly to the router without using NCM, the router must be placed in <strong>DEV</strong> mode. One would typically debug and test an application using <strong>DEV</strong> mode prior to using NCM for installation. <strong>DEV</strong> mode allows for quicker and easier testing and debugging. Instructions for setting up a router for <strong>DEV</strong> mode is in Knowledge Base article <a href="https://dev.cradlepoint.com/s/article/ka1380000000EXqAAM/sdk-enable-development-mode">'SDK Enable Developer Mode'</a>. </p>
+<h2>NCOS Development Mode</h2>
+<p>In order to install an application directly to the device without using NCM, the NCOS device must be placed in <strong>DEV</strong> mode. One would typically debug and test an application using <strong>DEV</strong> mode prior to using NCM for installation. <strong>DEV</strong> mode allows for quicker and easier testing and debugging. Instructions for setting up an NCOS device for <strong>DEV</strong> mode is in Knowledge Base article <a href="https://dev.cradlepoint.com/s/article/ka1380000000EXqAAM/sdk-enable-development-mode">'SDK Enable Developer Mode'</a>. </p>
 <p><a name="ncm"></a></p>
 <h2>NCM Application Deployment</h2>
-<p>NCM is used to securely deploy applications to routers at the group level. If an application <em>tar.gz</em> package is uploaded to NCM and then assigned to a router group, NCM will then securely download and install the application to the routers within the group. For security, the application files are not user accessible within NCM or routers. That is, one is not able to download the application from the router or NCM.</p>
+<p>NCM is used to securely deploy applications to devices at the group level. If an application <em>tar.gz</em> package is uploaded to NCM and then assigned to a NCOS device group, NCM will then securely download and install the application to the devices within the group. For security, the application files are not user accessible within NCM or devices. That is, one is not able to download the application from the device or NCM.</p>
 <p><a name="sample"></a></p>
 <h2>Sample Application Walk Through</h2>
-<p>Cradlepoint has provided several sample applications with the SDK which is located <a href="https://github.com/cradlepoint/sdk-samples">here</a>. Any of these apps can be used as a starting point for your application. The application data structure is described  <a href="#overview">here</a>. </p>
+<p>Cradlepoint has provided several sample applications with the SDK which is located <a href="https://github.com/cradlepoint/sdk-samples/releases">here</a>. Any of these apps can be used as a starting point for your application. The application data structure is described  <a href="#overview">here</a>. </p>
 <p>When using the SDK make.py file, be sure to invoke the proper python command based on your computer OS.</p>
 <ul>
 <li>
@@ -875,11 +883,11 @@ help log (display the log command options)
 </ul>
 <h3>How to Run the Hello World Sample App</h3>
 <ol>
-<li>Download the SDK and sample apps from <a href="https://github.com/cradlepoint/sdk-samples">here</a>.</li>
+<li>Download the SDK and sample apps from <a href="https://github.com/cradlepoint/sdk-samples/releases">here</a>.</li>
 <li>Ensure your computer has been setup. See <a href="#setup">Computer Setup Instructions</a>.</li>
-<li>Connect the router to your computer. This can be done by connecting the LAN port of the router to the USB port of your computer via a USB to Ethernet adapter.</li>
-<li>Ensure the router is in DEV Mode. See <a href="#devmode">here</a>.</li>
-<li>Enable Debug logs in the router which is very helpful. See <a href="http://knowledgebase.cradlepoint.com/articles/Support/fw6-Understanding-Router-Log-Files-and-Features?retURL=%2Fapex%2FknowledgeSearch%3Fc%3DAll_Products%26p%3D3%26k%3Ddebug%2Blogs%26t%3D%26l%3D%26lang%3Den_US&amp;popup=false&amp;c=All_Products&amp;lang=en_US">here</a></li>
+<li>Connect the NCOS device device to your computer. This can be done by connecting the LAN port of the device to the USB port of your computer via a USB to Ethernet adapter.</li>
+<li>Ensure the device is in DEV Mode. See <a href="#devmode">here</a>.</li>
+<li>Enable Debug logs in the device which is very helpful. See <a href="http://knowledgebase.cradlepoint.com/articles/Support/fw6-Understanding-Router-Log-Files-and-Features?retURL=%2Fapex%2FknowledgeSearch%3Fc%3DAll_Products%26p%3D3%26k%3Ddebug%2Blogs%26t%3D%26l%3D%26lang%3Den_US&amp;popup=false&amp;c=All_Products&amp;lang=en_US">here</a></li>
 <li>Open a terminal window.</li>
 <li>Change directory to 'sample_apps'.</li>
 <li>
@@ -894,19 +902,19 @@ dev_client_password=44224267
 
 </li>
 <li>
-<p>Verify router connectivity via:</p>
+<p>Verify device connectivity via:</p>
 <pre><code>$ python(3) make.py status
 </code></pre>
 
 </li>
 <li>
 <p>Create the application package</p>
-<pre><code>$ python(3) make.py 
+<pre><code>$ python(3) make.py build
 </code></pre>
 
 </li>
 <li>
-<p>Install the application package</p>
+<p>Install the application package. <strong>Note:</strong> A 'Connection reset by peer' error will be displayed even when the application is successfully copied to the device. This occurs when the device drops the connections after the file copy is complete.</p>
 <pre><code>$ python(3) make.py install
 </code></pre>
 
@@ -918,11 +926,11 @@ dev_client_password=44224267
 
 </li>
 <li>
-<p>Also check the logs in the router to ensure the application is creating 'Hello World' logs. In the router console use the 'log' command.</p>
+<p>Also check the logs in the device to ensure the application is creating 'Hello World' logs. In the device console use the 'log' command.</p>
 </li>
 </ol>
 <hr />
-<p>Published Date: 7-10-2017</p>
+<p>Published Date: 12-27-2017</p>
 <p>This article not have what you need? Not find what you were looking for? Think this article can be improved? Please let us know at <a href="&#109;&#97;&#x69;&#108;&#x74;&#x6f;&#58;&#x73;&#117;&#103;&#x67;&#101;&#115;&#116;&#x69;&#x6f;&#110;&#x73;&#64;&#x63;&#x72;&#97;&#100;&#x6c;&#101;&#x70;&#111;&#x69;&#x6e;&#116;&#x2e;&#x63;&#111;&#x6d;">&#x73;&#x75;&#x67;&#103;e&#115;&#x74;i&#x6f;&#110;&#115;&#x40;&#x63;r&#x61;&#x64;&#108;&#101;&#x70;&#x6f;&#x69;&#x6e;&#116;&#x2e;&#99;&#x6f;&#x6d;</a>.</p>
 
 </body>
