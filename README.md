@@ -68,7 +68,7 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
 ## SDK Directories 
 
 - **common**
-    - Contains the cs.py file which should be copied into an  application folder. It is a wrapper for the TCP interface to the router config store.
+    - Contains files that are useful to include with an app. 
 - **config**
     - Contains the settings.mk file for Linux users that want to use GNU make for application development instead of python make.py.
 - **tools**
