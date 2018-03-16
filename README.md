@@ -14,8 +14,6 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
     - The main document that describes application development.
 - **Router\_APIs\_for_Applications.html**
     - The router config store API in the router.
-- **GNU\_Make_README.html**
-    - The Linux GNU make instructions for the SDK.
 
 ## Sample Application Directories 
 
