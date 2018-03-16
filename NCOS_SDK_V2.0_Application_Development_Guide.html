@@ -609,11 +609,7 @@ cppython hello_world.py stop
 
 <p><a name="sdk"></a></p>
 <h2>SDK Instructions Overview</h2>
-<p>The SDK includes a python make.py file which is compatible for all supported platforms. There is also a GNU Makefile which can only be used with Linux or OS X. Both perform the same actions which are noted below. However, there are minor setup differences between the two. Developers can choose the one they prefer. For usage instructions, see:</p>
-<ul>
-<li><a href="#python_usage">Python SDK Usage</a></li>
-<li><a href="#gnu_make_usage">GNU Make SDK Usage</a></li>
-</ul>
+<p>The SDK includes a python make.py file which is compatible for Windows, Linux and OS X platforms. </p>
 <h3>SDK actions are:</h3>
 <p><strong>default (i.e. no action given):</strong>
     Print a help file</p>
@@ -635,8 +631,7 @@ cppython hello_world.py stop
     Purge all apps from the locally connected device.</p>
 <p><strong>uuid:</strong>
     This will create a new UUID for the app and write it to the package.ini file.</p>
-<p><a name="python_usage"></a></p>
-<h3>Python SDK Usage</h3>
+<h3>SDK Usage</h3>
 <p>All SDK functions are contained in the make.py python file. While this executable is the same regardless of the workstation platform, the python command is not. Use the following python command based on your platform:</p>
 <ul>
 <li>
@@ -736,108 +731,6 @@ lost connection
 <li>
 <p>Uninstall the application from your device.</p>
 <pre><code>python(3) make.py uninstall
-{
-    &quot;data&quot;: &quot;uninstall 7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;,
-    &quot;success&quot;: true
-}
-</code></pre>
-
-</li>
-</ol>
-<p><a name="gnu_make_usage"></a></p>
-<h3>GNU Make SDK Usage</h3>
-<p>A GNU Makefile, for Linux or OS X, is also included with the SDK which can perform the same functions as the make.py file. The make targets are identical to the make.py actions. However, environment variable will need to be set in lieu of the sdk_setting.ini file.</p>
-<p>The GNU make usage is as follows:</p>
-<ol>
-<li>
-<p>Export the following variables in your environment.</p>
-<pre><code>APP_NAME - The name of your application.
-APP_UUID - Each application must have its own UUID.
-DEV_CLIENT_MAC - The mac address of your device.
-DEV_CLIENT_IP  - The lan ip address of your device.
-</code></pre>
-
-<p>Example:</p>
-<pre><code>$ export APP_NAME=hello_world
-$ export APP_UUID=616acd0c-0475-479e-a33b-f7054843c973
-$ export DEV_CLIENT_MAC=44224267
-$ export DEV_CLIENT_IP=192.168.20.1
-</code></pre>
-
-</li>
-<li>
-<p>Build the application package.</p>
-<pre><code>$ make
-</code></pre>
-
-</li>
-<li>
-<p>Test connectivity with your device via the status target.</p>
-<pre><code>$ make status
-curl -s --digest --insecure -u admin:441dbbec \
-                -H &quot;Accept: application/json&quot; \
-                -X GET http://192.168.0.1/api/status/system/sdk | \
-                /usr/bin/env python3 -m json.tool
-{
-    &quot;data&quot;: {},
-    &quot;success&quot;: true
-}
-</code></pre>
-
-</li>
-<li>
-<p>Build, test, and install the application on your device.</p>
-<pre><code>$ make install
-scp /home/sfisher/dev/sdk/hspt.tar.gz admin@192.168.0.1:/app_upload
-admin@192.168.0.1's password: 
-hspt.tar.gz                          100% 1439     1.4KB/s   00:00    
-Received disconnect from 192.168.0.1: 11: Bye Bye
-lost connection
-</code></pre>
-
-</li>
-<li>
-<p>Get application execution status from your device.</p>
-<pre><code>$ make status
-curl -s --digest --insecure -u admin:441dbbec \
-                -H &quot;Accept: application/json&quot; \
-                -X GET http://192.168.0.1/api/status/system/sdk | \
-                /usr/bin/env python3 -m json.tool
-{
-    &quot;data&quot;: {
-        &quot;7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;: {
-            &quot;app&quot;: {
-                &quot;date&quot;: &quot;2015-12-04T09:30:39.656151&quot;,
-                &quot;name&quot;: &quot;hspt&quot;,
-                &quot;restart&quot;: true,
-                &quot;uuid&quot;: &quot;7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;,
-                &quot;vendor&quot;: &quot;Cradlebox&quot;,
-                &quot;version_major&quot;: 1,
-                &quot;version_minor&quot;: 1
-            },
-            &quot;base_directory&quot;: &quot;/var/mnt/sdk/apps/7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;,
-            &quot;directory&quot;: hspt&quot;,
-            &quot;filename&quot;: &quot;dist/tmp_znv2t&quot;,
-            &quot;state&quot;: &quot;started&quot;,
-            &quot;summary&quot;: &quot;Package started successfully&quot;,
-            &quot;type&quot;: &quot;development&quot;,
-            &quot;url&quot;: &quot;file:///var/tmp/tmpg1385l&quot;,
-            &quot;uuid&quot;: &quot;7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;
-        }
-    },
-    &quot;success&quot;: true
-}
-</code></pre>
-
-</li>
-<li>
-<p>Uninstall the application from your device.</p>
-<pre><code>$ make uninstall
-curl -s --digest --insecure -u admin:441dbbec \
-                -H &quot;Accept: application/json&quot; \
-                -X PUT http://192.168.0.1/api/control/system/sdk/action \
-                -d data='&quot;uninstall 7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;' | \
-                /usr/bin/env python3 -m json.tool
 {
     &quot;data&quot;: &quot;uninstall 7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c&quot;,
     &quot;success&quot;: true
