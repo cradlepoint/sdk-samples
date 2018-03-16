@@ -4,7 +4,7 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
 
 ## *** IMPORTANT - PLEASE READ ***
 
-This is version 2.0 of the NCOS SDK and applications. The SDK has been simplified from the previous SDK to decrease the learning curve to allow more focus on application development. The NCOS application infrastructure and packaging is unchanged. That is, an 'tar.gz' application package built with the previous SDK can still be installed into the router using SDK version 2.0. However, the coding of an application version 1.0 may need to be re-factored in order for continued development with SDK version 2.0. Please see document SDK\_version\_1.0\_app_refactor.html in this directory for details.
+This is version 2.0 of the NCOS SDK and applications. The SDK has been simplified from the previous SDK to decrease the learning curve to allow more focus on application development. The NCOS application infrastructure and packaging is unchanged. That is, an 'tar.gz' application package built with the previous SDK can still be installed into the router using SDK version 2.0.
 
 ## Documents 
 
@@ -76,8 +76,6 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
 
 - **make.py**
     - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
-- **Makefile**
-    - The Makefile for Linux users that want to use GNU make for application development instead of python make.py.
 - **sdk_settings.ini**
     - This is the ini file that contains the settings used by python make.py.
 
