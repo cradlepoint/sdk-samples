@@ -67,8 +67,6 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
 
 - **common**
     - Contains files that are useful to include with an app. 
-- **config**
-    - Contains the settings.mk file for Linux users that want to use GNU make for application development instead of python make.py.
 - **tools**
     - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
 
