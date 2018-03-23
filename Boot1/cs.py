@@ -15,7 +15,6 @@ import re
 import socket
 import sys
 
-
 class SdkCSException(Exception):
     pass
 
@@ -46,14 +45,38 @@ class CSClient(object):
         if not init:
             return
 
+    def _get_auth(self, device_ip, username, password):
+        # This is only needed when the app is running in a computer.
+        # Returns the proper HTTP Auth for the global username and password.
+        # Digest Auth is used for NCOS 6.4 and below while Basic Auth is
+        # used for NCOS 6.5 and up.
+        import requests
+        from http import HTTPStatus
+
+        use_basic = False
+        device_api = 'http://{}/api/status/product_info'.format(device_ip)
+
+        try:
+            response = requests.get(device_api, auth=requests.auth.HTTPBasicAuth(username, password))
+            if response.status_code == HTTPStatus.OK:
+                use_basic = True
+
+        except:
+            use_basic = False
+
+        if use_basic:
+            return requests.auth.HTTPBasicAuth(username, password)
+        else:
+            return requests.auth.HTTPDigestAuth(username, password)
+
     @staticmethod
-    def _get_router_access_info():
-        """Should only be called when running in a computer. It will return the
-           dev_client_ip, dev_client_username, and dev_client_password as defined in
-           the sdk section of the sdk_settings.ini file."""
-        router_ip = ''
-        router_username = ''
-        router_password = ''
+    def _get_device_access_info():
+        # Should only be called when running in a computer. It will return the
+        # dev_client_ip, dev_client_username, and dev_client_password as defined in
+        # the sdk section of the sdk_settings.ini file.
+        device_ip = ''
+        device_username = ''
+        device_password = ''
 
         if sys.platform != 'linux2':
             import os
@@ -71,23 +94,23 @@ class CSClient(object):
 
             if sdk_key in config:
                 if ip_key in config[sdk_key]:
-                    router_ip = config[sdk_key][ip_key]
+                    device_ip = config[sdk_key][ip_key]
                 else:
                     print('ERROR 1: The {} key does not exist in {}'.format(ip_key, settings_file))
 
                 if username_key in config[sdk_key]:
-                    router_username = config[sdk_key][username_key]
+                    device_username = config[sdk_key][username_key]
                 else:
                     print('ERROR 2: The {} key does not exist in {}'.format(username_key, settings_file))
 
                 if password_key in config[sdk_key]:
-                    router_password = config[sdk_key][password_key]
+                    device_password = config[sdk_key][password_key]
                 else:
                     print('ERROR 3: The {} key does not exist in {}'.format(password_key, settings_file))
             else:
                 print('ERROR 4: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
-        return router_ip, router_username, router_password
+        return device_ip, device_username, device_password
 
     def get(self, base, query='', tree=0):
         """Send a get request."""
@@ -95,18 +118,17 @@ class CSClient(object):
             cmd = "get\n{}\n{}\n{}\n".format(base, query, tree)
             return self._dispatch(cmd)
         else:
-            # Running in a computer so use http to send the get to the router.
+            # Running in a computer so use http to send the get to the device.
             import requests
-            router_ip, router_username, router_password = self._get_router_access_info()
-            router_api = 'http://{}/api/{}/{}'.format(router_ip, base, query)
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
-                response = requests.get(router_api,
-                                        auth=requests.auth.HTTPDigestAuth(router_username, router_password))
+                response = requests.get(device_api, auth=self._get_auth(device_ip, username, password))
 
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
-                print("Timeout: router at {} did not respond.".format(router_ip))
+                print("Timeout: device at {} did not respond.".format(device_ip))
                 return None
 
             return json.loads(response.text)
@@ -118,19 +140,19 @@ class CSClient(object):
             cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
         else:
-            # Running in a computer so use http to send the put to the router.
+            # Running in a computer so use http to send the put to the device.
             import requests
-            router_ip, router_username, router_password = self._get_router_access_info()
-            router_api = 'http://{}/api/{}/{}'.format(router_ip, base, query)
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
-                response = requests.put(router_api,
+                response = requests.put(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=requests.auth.HTTPDigestAuth(router_username, router_password),
+                                        auth=self._get_auth(device_ip, username, password),
                                         data={"data": '{}'.format(value)})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
-                print("Timeout: router at {} did not respond.".format(router_ip))
+                print("Timeout: device at {} did not respond.".format(device_ip))
                 return None
 
             return response.text
@@ -142,19 +164,19 @@ class CSClient(object):
             cmd = "post\n{}\n{}\n{}\n".format(base, query, value)
             return self._dispatch(cmd)
         else:
-            # Running in a computer so use http to send the post to the router.
+            # Running in a computer so use http to send the post to the device.
             import requests
-            router_ip, router_username, router_password = self._get_router_access_info()
-            router_api = 'http://{}/api/{}/{}'.format(router_ip, base, query)
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
-                response = requests.post(router_api,
-                                        headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=requests.auth.HTTPDigestAuth(router_username, router_password),
-                                        data={"data": '{}'.format(value)})
+                response = requests.post(device_api,
+                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                         auth=self._get_auth(device_ip, username, password),
+                                         data={"data": '{}'.format(value)})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
-                print("Timeout: router at {} did not respond.".format(router_ip))
+                print("Timeout: device at {} did not respond.".format(device_ip))
                 return None
 
             return response.text
@@ -165,18 +187,18 @@ class CSClient(object):
             cmd = "delete\n{}\n{}\n".format(base, query)
             return self._dispatch(cmd)
         else:
-            # Running in a computer so use http to send the delete to the router.
+            # Running in a computer so use http to send the delete to the device.
             import requests
-            router_ip, router_username, router_password = self._get_router_access_info()
-            router_api = 'http://{}/api/{}/{}'.format(router_ip, base, query)
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
-                response = requests.delete(router_api,
+                response = requests.delete(device_api,
                                            headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                           auth=requests.auth.HTTPDigestAuth(router_username, router_password))
+                                           auth=self._get_auth(device_ip, username, password))
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
-                print("Timeout: router at {} did not respond.".format(router_ip))
+                print("Timeout: device at {} did not respond.".format(device_ip))
                 return None
 
             return response.text

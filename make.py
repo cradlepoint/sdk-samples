@@ -25,9 +25,27 @@ g_dev_client_password = ''
 g_python_cmd = 'python3'  # Default for Linux and OS X
 
 
-# Returns an HTTPDigestAuth for the global username and password.
-def get_digest():
-    return HTTPDigestAuth(g_dev_client_username, g_dev_client_password)
+# Returns the proper HTTP Auth for the global username and password.
+# Digest Auth is used for NCOS 6.4 and below while Basic Auth is
+# used for NCOS 6.5 and up.
+def get_auth():
+    from http import HTTPStatus
+
+    use_basic = False
+    device_api = 'http://{}/api/status/product_info'.format(g_dev_client_ip)
+
+    try:
+        response = requests.get(device_api, auth=requests.auth.HTTPBasicAuth(g_dev_client_username, g_dev_client_password))
+        if response.status_code == HTTPStatus.OK:
+            use_basic = True
+
+    except:
+        use_basic = False
+
+    if use_basic:
+        return requests.auth.HTTPBasicAuth(g_dev_client_username, g_dev_client_password)
+    else:
+        return requests.auth.HTTPDigestAuth(g_dev_client_username, g_dev_client_password)
 
 
 # Returns boolean to indicate if the NCOS device is
@@ -51,7 +69,7 @@ def get(config_tree):
     ncos_api = 'http://{}/api/{}'.format(g_dev_client_ip, config_tree)
 
     try:
-        response = requests.get(ncos_api, auth=get_digest())
+        response = requests.get(ncos_api, auth=get_auth())
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
@@ -66,7 +84,7 @@ def put(value):
     try:
         response = requests.put("http://{}/api/control/system/sdk/action".format(g_dev_client_ip),
                                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                auth=get_digest(),
+                                auth=get_auth(),
                                 data={"data": '"{} {}"'.format(value, get_app_uuid())})
 
         print('status_code: {}'.format(response.status_code))
