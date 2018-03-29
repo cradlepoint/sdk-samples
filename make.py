@@ -174,16 +174,13 @@ def install():
     if is_NCOS_device_in_DEV_mode():
         app_archive = get_app_pack()
 
-        # Use scp for OS X
-        cmd = 'scp {0} {1}@{2}:/app_upload'.format(app_archive, g_dev_client_username, g_dev_client_ip)
-
-        if sys.platform == 'linux':
-            cmd = 'sshpass -p {0} scp {1} {2}@{3}:/app_upload'.format(
-                   g_dev_client_password, app_archive,
-                   g_dev_client_username, g_dev_client_ip)
+        # Use sshpass for Linux or OS X
+        cmd = 'sshpass -p {0} scp {1} {2}@{3}:/app_upload'.format(
+               g_dev_client_password, app_archive,
+               g_dev_client_username, g_dev_client_ip)
 
         # For Windows, use pscp.exe in the tools directory
-        elif sys.platform == 'win32':
+        if sys.platform == 'win32':
             cmd = "./tools/bin/pscp.exe -pw {0} -v {1} {2}@{3}:/app_upload".format(
                    g_dev_client_password, app_archive,
                    g_dev_client_username, g_dev_client_ip)
