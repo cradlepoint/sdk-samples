@@ -175,7 +175,9 @@ def install():
         app_archive = get_app_pack()
 
         # Use scp for Linux or OS X
-        cmd = 'scp {0} {1}@{2}:/app_upload'.format(app_archive, g_dev_client_username, g_dev_client_ip)
+        cmd = 'sshpass -p {0} scp {1} {2}@{3}:/app_upload'.format(
+               g_dev_client_password, app_archive,
+               g_dev_client_username, g_dev_client_ip)
 
         # For Windows, use pscp.exe in the tools directory
         if sys.platform == 'win32':
