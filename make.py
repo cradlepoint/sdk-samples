@@ -59,8 +59,10 @@ def is_NCOS_device_in_DEV_mode():
 
 
 # Returns the app package name based on the global app name.
-def get_app_pack():
+def get_app_pack(app_name=None):
     package_name = g_app_name + ".tar.gz"
+    if app_name is not None:
+        package_name = app_name + ".tar.gz"
     return package_name
 
 
@@ -77,6 +79,23 @@ def get(config_tree):
         return None
 
     return json.dumps(json.loads(response.text), indent=4)
+
+
+# Get a list of all the apps in the directory
+def get_app_list():
+    app_dirs = []
+    cwd = os.getcwd()
+    print("Scanning {} for app directories.".format(cwd))
+    dirs_in_cwd = os.listdir(cwd)
+
+    # Assume dir is an app_dir if it contains 'package.ini'
+    for item in dirs_in_cwd:
+        if os.path.isdir(item):
+            contents = os.listdir(item)
+            if 'package.ini' in contents:
+                app_dirs.append(item)
+
+    return app_dirs
 
 
 # Puts an SDK action in the NCOS device config store
@@ -98,11 +117,14 @@ def put(value):
 
 
 # Cleans the SDK directory for a given app by removing files created during packaging.
-def clean():
-    print("Cleaning {}".format(g_app_name))
-    app_pack_name = get_app_pack()
+def clean(app=None):
+    app_name = g_app_name
+    if app is not None:
+        app_name = app
+    print("Cleaning {}".format(app_name))
+    app_pack_name = get_app_pack(app_name)
     try:
-        files_to_clean = [g_app_name + ".tar.gz", g_app_name + ".tar"]
+        files_to_clean = [app_name + ".tar.gz", app_name + ".tar"]
         for file_name in files_to_clean:
             if os.path.isfile(file_name):
                 os.remove(file_name)
@@ -110,7 +132,7 @@ def clean():
     except OSError as e:
         print('Clean Error 1 for file {}: {}'.format(app_pack_name, e))
 
-    meta_dir = '{}/{}/METADATA'.format(os.getcwd(), g_app_name)
+    meta_dir = '{}/{}/METADATA'.format(os.getcwd(), app_name)
     try:
         if os.path.isdir(meta_dir):
             shutil.rmtree(meta_dir)
@@ -123,6 +145,16 @@ def clean():
             os.remove(build_file)
     except OSError as e:
         print('Clean Error 3 for file {}: {}'.format(build_file, e))
+
+
+# Cleans the SDK directory for all apps by removing files created during packaging.
+def clean_all():
+    cwd = os.getcwd()
+    print("Scanning {} for app directories.".format(cwd))
+    app_dirs = get_app_list()
+
+    for app in app_dirs:
+        clean(app)
 
 
 # Build, just validates, the application code and package.
@@ -159,6 +191,26 @@ def package():
         success = False
     finally:
         return success
+
+
+# Package all the app files in the directory into a tar.gz archives.
+def package_all():
+    success = True
+    cwd = os.getcwd()
+    print("Scanning {} for app directories.".format(cwd))
+    app_dirs = get_app_list()
+
+    package_script_path = os.path.join('tools', 'bin', 'package_application.py')
+    for app in app_dirs:
+        app_path = os.path.join(app)
+        try:
+            print('Build app: {}'.format(app_path))
+            subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
+        except subprocess.CalledProcessError as err:
+            print('Error packaging {}: {}'.format(app_path, err))
+            success = False
+
+    return success
 
 
 # Get the SDK status from the NCOS device
@@ -247,11 +299,14 @@ def purge():
 def output_help():
     print('Command format is: {} make.py <action>'.format(g_python_cmd))
     print('clean: Clean all project artifacts.\n')
-    print('build or package: Create the app archive tar.gz file.\n')
+    print('                  To clean all the apps, add the option "all" (i.e. clean all).')
+    print('build or package: Create the app archive tar.gz file.')
+    print('                  To build all the apps, add the option "all" (i.e. build all).')
+    print('                  Any directory containing a package.ini file is considered and app.\n')
     print('status: Fetch and print current app status from the locally connected NCOS device.\n')
     print('install: Secure copy the app archive to a locally connected NCOS device.')
     print('         The NCOS device must already be in SDK DEV mode via registration ')
-    print('         and licensing in NCM.\n')
+    print('         and licensing using NCM.\n')
     print('start: Start the app on the locally connected NCOS device.\n')
     print('stop: Stop the app on the locally connected NCOS device.\n')
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
@@ -359,19 +414,31 @@ if __name__ == "__main__":
         sys.exit(0)
 
     utility_name = str(sys.argv[1]).lower()
+    option = None
+    if len(sys.argv) > 2:
+        option = str(sys.argv[2]).lower()
 
     if not init(ceate_new_uuid=utility_name == 'uuid'):
         sys.exit(0)
 
     if utility_name == 'clean':
-        clean()
+        if option == 'all':
+            clean_all()
+        else:
+            clean()
 
     elif utility_name == 'build':
         # build()
-        package()
+        if option == 'all':
+            package_all()
+        else:
+            package()
 
     elif utility_name == 'package':
-        package()
+        if option == 'all':
+            package_all()
+        else:
+            package()
 
     elif utility_name == 'status':
         status()
