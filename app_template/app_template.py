@@ -15,7 +15,8 @@ try:
     from app_logging import AppLogger
 
 except Exception as ex:
-    # Output logs indicating what import failed.
+    # Output DEBUG logs indicating what import failed. Use the logging in the
+    # CSClient since app_logging may not be loaded.
     cs.CSClient().log('app_template.py', 'Import failure: {}'.format(ex))
     cs.CSClient().log('app_template.py', 'Traceback: {}'.format(traceback.format_exc()))
     sys.exit(-1)
@@ -25,6 +26,7 @@ except Exception as ex:
 log = AppLogger()
 
 
+# Add functionality to execute when the app is started
 def start_router_app():
     try:
         log.debug('start_router_app()')
@@ -34,6 +36,7 @@ def start_router_app():
         raise
 
 
+# Add functionality to execute when the app is stopped
 def stop_router_app():
     try:
         log.debug('stop_router_app()')
@@ -43,17 +46,18 @@ def stop_router_app():
         raise
 
 
+# This function will take action based on the command parameter.
 def action(command):
     try:
         # Log the action for the app.
         log.debug('action({})'.format(command))
 
         if command == 'start':
-            # Call the function when the app is started.
+            # Call the start function when the app is started.
             start_router_app()
 
         elif command == 'stop':
-            # Call the function when the app is stopped.
+            # Call the stop function when the app is stopped.
             stop_router_app()
 
     except Exception as e:
@@ -61,6 +65,9 @@ def action(command):
         raise
 
 
+# The main entry point for hello_world.py This will be executed when the
+# application is started or stopped as defined in the start.sh and stop.sh
+# scripts. It expects either a 'start' or 'stop' argument.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('opt')
