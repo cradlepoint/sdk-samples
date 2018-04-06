@@ -33,7 +33,7 @@ creating a new application are:
    built, a new UUID will be created.
 6. Update the readme.txt file in the new_app_name application if required.
 
-Your 'new_app_name' is now ready to be updated, built, and installed.
+Your 'new_app_name' is now ready for your new code.
 
 
 Expected Output
