@@ -22,7 +22,7 @@ Application Purpose
 This application can be used as a template to create a new application. Instructions for
 creating a new application are:
 
-1. Copy the app_template and past in the same directory.
+1. Copy the app_template and paste in the same directory.
 2. Rename the directory to your application name. I'll use
    'new_app_name' as an example in these instructions.
 3. Rename the app_template.py file to new_app_name.py.
