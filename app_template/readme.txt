@@ -1,6 +1,6 @@
 Application Name
 ================
-The name of the application directory
+The name of the application
 
 
 Application Version
