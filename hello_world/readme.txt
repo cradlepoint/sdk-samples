@@ -2,15 +2,28 @@ Application Name
 ================
 hello_world
 
+
 Application Version
 ===================
  1.0
+
+
+NCOS Devices Supported
+======================
+All
+
+
+External Requirements
+=====================
+None
+
 
 Application Purpose
 ===================
 This is a simple 'Hello World' application that can be used for testing ones NCOS SDK setup.
 Once the application built (i.e. hello_world.tar.gz file), it can be installed into an NCOS
 device using NCM or into an NCOS device setup in DEV mode using the SDK install command.
+
 
 Expected Output
 ===============
