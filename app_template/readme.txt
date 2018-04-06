@@ -1,46 +1,42 @@
 Application Name
 ================
-The name of the application
+app_template
 
 
 Application Version
 ===================
-The version located in the package.ini file
-
+1.0
 
 NCOS Devices Supported
 ======================
-List the NCOS devices that this application supports. This
-could be 'ALL'.
+ALL
 
 
 External Requirements
 =====================
-Note any external hardware, devices, servers, etc. that are
-required for application functionality.
-
-    Examples:
-    - Multiple SIMS
-    - Specific device configuration
-	- Server IP addresses
-	- Etc.
+None
 
 
 Application Purpose
 ===================
-Describe the purpose of the application
+This application can be used as a template to create a new application. Instructions for
+creating a new application are:
+
+1. Copy the app_template and past in the same directory.
+2. Rename the directory to your application name. I'll use
+   'new_app_name' as an example in these instructions.
+3. Rename the app_template.py file to new_app_name.py.
+4. Edit install.py, start.sh, and stop.sh and replace all
+   'app_template' occurrences with 'new_app_name'.
+5. Edit package.ini and replace 'app_template' with 'new_app_name'. Also,
+   delete the UUID so that the entry is 'uuid ='. When the application is
+   built, a new UUID will be created.
+6. Update the readme.txt file in the new_app_name application if required.
+
+Your 'new_app_name' is now ready to be updated, built, and installed.
 
 
 Expected Output
 ===============
-List any expected output. This does not need to be all
-inclusive. Just note anything that may not be obvious
-based on the purpose noted above.
-
-	Examples:
-	- Logs
-	- Messages sent to any servers
-	- GPIO settings
-	- Multiple SIMs.
-	- Etc.
+None
 

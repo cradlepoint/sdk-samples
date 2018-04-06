@@ -1,5 +1,5 @@
 """
-An app template as an example
+An app template that can be used to create a new application
 """
 
 # A try/except is wrapped around the imports to catch an
