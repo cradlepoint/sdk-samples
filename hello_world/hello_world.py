@@ -10,6 +10,7 @@ import subprocess
 APP_NAME = 'hello_world'
 
 
+# This function will take action based on the command parameter.
 def action(command):
     cs.CSClient().log(APP_NAME, 'action({})'.format(command))
 
@@ -22,6 +23,9 @@ def action(command):
         pass
 
 
+# The main entry point for hello_world.py This will be executed when the
+# application is started or stopped as defined in the start.sh and stop.sh
+# scripts. It expects either a 'start' or 'stop' argument.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('opt')
