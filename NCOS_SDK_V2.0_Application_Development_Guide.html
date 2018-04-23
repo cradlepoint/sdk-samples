@@ -309,13 +309,13 @@ img {
 <p><a name="overview"></a></p>
 <h2>Overview</h2>
 <p>Cradlepoint’s NCOS device Application Framework provides the ability to add intelligence in the device. Applications written in Python can be securely downloaded to the device via <a href="https://cradlepoint.com/ecm">Network Cloud Manager</a> (NCM). This allows for extended device features, FOG Computing, and IoT management.</p>
-<p>At a high level, the Cradlepoint NCOS Deive Apps/SDK is a mechanism to package a collection of files – including executable files – in an archive, which can be transferred securely via NCM, hidden within a Cradlepoint device, and executed as an extension to normal firmware.</p>
+<p>At a high level, the Cradlepoint NCOS Device Apps/SDK is a mechanism to package a collection of files – including executable files – in an archive, which can be transferred securely via NCM, hidden within a Cradlepoint device, and executed as an extension to normal firmware.</p>
 <h3>What is Supported?</h3>
 <p>For the scope of this document, NCOS Apps are limited to the non-privileged Python scripts. Supported functionality:</p>
 <ul>
 <li>Standard TCP/UDP/SSL socket servers function on ports higher than 1024.</li>
 <li>Standard TCP/UDP/SSL socket client to other devices (or the device as 127.0.0.1/localhost).</li>
-<li>Access to serial ports via PySerial module, including native and USB-serial ports.</li>
+<li>Access to serial ports via the PySerial module, including native and USB-serial ports.</li>
 <li>Ability to PING external devices.</li>
 <li>UI Extensibility (i.e. Hot Spot splash page or other UI WEB pages)</li>
 <li>Access to the NCOS API (aka: status and control tree data).</li>
