@@ -37,8 +37,6 @@ This is version 2.0 of the NCOS SDK and applications. The SDK has been simplifie
     - Ping an address and log the results.
 - **python\_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
-- **send_alert**
-    - Sends an alert to the ECM when the application is started and stopped.
 - **send\_to_server**
     - Gets the '/status' from the device config store and send it to a test server.
 - **simple\_custom_dashboard**
