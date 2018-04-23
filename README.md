@@ -2,10 +2,6 @@
 ----------
 This directory contains the NCOS SDK tools and sample applications. Below is a description of each. The Router Applications Development Guide is the best document to read first.
 
-## *** IMPORTANT - PLEASE READ ***
-
-This is version 2.0 of the NCOS SDK and applications. The SDK has been simplified from the previous SDK to decrease the learning curve to allow more focus on application development. The NCOS application infrastructure and packaging is unchanged. That is, an 'tar.gz' application package built with the previous SDK can still be installed into the router using SDK version 2.0.
-
 ## Documents 
 
 - **README.html**
