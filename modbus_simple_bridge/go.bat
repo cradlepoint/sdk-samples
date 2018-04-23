@@ -1,1 +1,0 @@
-python main.py serial_port.modbus_simple_bridge
