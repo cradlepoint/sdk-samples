@@ -82,6 +82,7 @@ def action(command):
         cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
         raise
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('opt')

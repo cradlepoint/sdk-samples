@@ -3,13 +3,11 @@ Gets the '/status' from the router config store and send it
 to a test server.
 '''
 
-import sys
+
 import argparse
 import datetime
 import urllib.request
 import urllib.parse
-import json
-import time
 import cs
 
 APP_NAME = 'send_to_server'

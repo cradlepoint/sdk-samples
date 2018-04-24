@@ -13,12 +13,6 @@ import cs
 APP_NAME = "ftp_client"
 TEMP_FILE = '/var/tmp/my_file.txt'
 
-# A USB Storage device will be mounted at /var/media
-# if it is plugged into the USB port of the router.
-# Note: Not all USB devices are compatible.
-TEMP_FILE_USB = '/var/media/my_file.txt'
-
-
 def start_router_app():
     # Create a temporary file to upload to an FTP server
     try:

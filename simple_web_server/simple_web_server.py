@@ -3,7 +3,6 @@ A Simple Web server
 """
 
 import cs
-import cgi
 import argparse
 
 from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler, CGIHTTPRequestHandler
