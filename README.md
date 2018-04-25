@@ -27,6 +27,8 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
     - Outputs a 'Hello World!' log every 10 seconds. 
 - **hspt**
     - Sets up a custom Hot Spot landing page.
+- **ibr1700_obdII**
+    - Demonstrates how to access OBD-II PIDs on the IBR1700
 - **mqtt_app**
     - Demonstrated MQTT using the paho library
 - **ping**
