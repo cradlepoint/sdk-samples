@@ -48,7 +48,7 @@ class AppLogger(object):
 
             syslog.ident = '%s: ' % AppLogger.__app_name
             syslog.setFormatter(logging.Formatter(
-                '%(asctime)s %(name)s %(message)s'
+                '%(message)s'
             ))
             AppLogger.logger.addHandler(syslog)
 
