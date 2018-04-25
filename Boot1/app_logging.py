@@ -19,7 +19,6 @@ import logging.handlers
 # To log from another file:
 # from app_logging import AppLogger
 #
-# log = AppLogger()
 # log.info('This is an INFO log.')
 # log.debug('This is a DEBUG log')
 # etc.
@@ -49,7 +48,7 @@ class AppLogger(object):
 
             syslog.ident = '%s: ' % AppLogger.__app_name
             syslog.setFormatter(logging.Formatter(
-                '%(asctime)s %(name)s %(message)s'
+                '%(message)s'
             ))
             AppLogger.logger.addHandler(syslog)
 

@@ -2,18 +2,10 @@
 Logger for the app
 '''
 
-try:
-    import cs
-    import settings
-    import sys
-    import traceback
-    import logging
-    import logging.handlers
-
-except Exception as e:
-    cs.CSClient().log('app_logging.py', 'Import failure: {}'.format(e))
-    cs.CSClient().log('app_logging.py', 'Traceback: {}'.format(traceback.format_exc()))
-    sys.exit(-1)
+import settings
+import sys
+import logging
+import logging.handlers
 
 
 ###########################################################
@@ -56,7 +48,7 @@ class AppLogger(object):
 
             syslog.ident = '%s: ' % AppLogger.__app_name
             syslog.setFormatter(logging.Formatter(
-                '%(asctime)s %(name)s %(message)s'
+                '%(message)s'
             ))
             AppLogger.logger.addHandler(syslog)
 
