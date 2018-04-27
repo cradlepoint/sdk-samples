@@ -30,7 +30,6 @@ try:
     import platform
     import collections
     import traceback
-    import argparse
 
     from app_logging import AppLogger
     from importlib import util
@@ -101,50 +100,8 @@ def log_module_list():
                 log.info('|{0:>3}| {1:20}| {2}'.format(count, mod[0], mod[1]))
 
 
-def start_router_app():
-    try:
-        log.debug('start_router_app()')
-        log_module_list()
-
-    except Exception as e:
-        log.error('Exception during start_router_app()! exception: {}'.format(e))
-        raise
-
-
-def stop_router_app():
-    try:
-        log.debug('stop_router_app()')
-
-    except Exception as e:
-        log.error('Exception during stop_router_app()! exception: {}'.format(e))
-        raise
-
-
-def action(command):
-    try:
-        log.debug('action({})'.format(command))
-
-        if command == 'start':
-            start_router_app()
-
-        elif command == 'stop':
-            stop_router_app()
-
-    except Exception as e:
-        log.error('Exception during {}! exception: {}'.format(command, e))
-        raise
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    opt = args.opt.strip()
-    if opt not in ['start', 'stop']:
-        log.debug('Failed to run command: {}'.format(opt))
-        exit()
-
-    action(opt)
-
-    log.debug('App is exiting')
+    try:
+        log_module_list()
+    except Exception as e:
+        log.error('Exception occurred! exception: {}'.format(e))
