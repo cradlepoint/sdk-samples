@@ -4,13 +4,12 @@ pyftplib and also asynchat.py and asyncore.py. For detail
 information about pyftplib, see https://pythonhosted.org/pyftpdlib/.
 """
 
-import sys
-import argparse
+
 import cs
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
-from threading import Thread
+
 
 APP_NAME = "ftp_server"
 
@@ -20,6 +19,7 @@ FTP_DIR = '/var/media'
 
 
 def start_ftp_server():
+    cs.CSClient().log(APP_NAME, 'start_ftp_server()...')
     try:
         authorizer = DummyAuthorizer()
         # Define a new user having full r/w permissions and a read-only
@@ -53,45 +53,8 @@ def start_ftp_server():
 
     except Exception as e:
         cs.CSClient().log(APP_NAME, 'Something went wrong in start_ftp_server()! exception: {}'.format(e))
-        raise
-
-    return
-
-
-def stop_router_app():
-    """
-        Perform any cleanup or other actions.
-    """
-    return
-
-
-def action(command):
-    try:
-        # Log the action for the app.
-        cs.CSClient().log(APP_NAME, 'action({})'.format(command))
-
-        if command == 'start':
-            # Call the function to start the app.
-            start_ftp_server()
-
-        elif command == 'stop':
-            # Call the function to start the app.
-            stop_router_app()
-
-    except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
-        raise
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
-    opt = args.opt.strip()
-    if opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
-        exit()
-
-    action(opt)
+    cs.CSClient().log(APP_NAME, 'ftp_server main...')
+    start_ftp_server()
