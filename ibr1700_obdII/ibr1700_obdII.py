@@ -18,7 +18,6 @@ try:
     import os
     import sys
     import traceback
-    import argparse
     import settings
     import json
     import time
@@ -146,53 +145,8 @@ def start_mqtt():
         raise
 
 
-def start_app():
-    try:
-        log.info('start_app()')
-
-        # Start the MQTT client
-        start_mqtt()
-
-    except Exception as ex:
-        log.error('Exception during start_app()! exception: {}'.format(ex))
-        raise
-
-
-def stop_app():
-    try:
-        log.info('stop_app()')
-
-    except Exception as ex:
-        log.error('Exception during stop_app()! exception: {}'.format(ex))
-        raise
-
-
-def action(command):
-    try:
-        log.info('action({})'.format(command))
-
-        if command == 'start':
-            start_app()
-
-        elif command == 'stop':
-            stop_app()
-
-    except Exception as ex:
-        log.error('Exception during {}! exception: {}'.format(command, ex))
-        raise
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    # Strip the args in case extra spaces were added.
-    opt = args.opt.strip()
-    if opt not in ['start', 'stop']:
-        log.error('Failed to run command: {}'.format(opt))
-        exit()
-
-    action(opt)
-
-    log.info('App is exiting')
+    try:
+        start_mqtt()
+    except Exception as ex:
+        log.error('Exception occurred!: {}'.format(ex))
