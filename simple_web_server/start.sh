@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython simple_web_server.py start
+cppython simple_web_server.py
