@@ -4,11 +4,11 @@ to a test server.
 '''
 
 
-import argparse
+import cs
 import datetime
 import urllib.request
 import urllib.parse
-import cs
+
 
 APP_NAME = 'send_to_server'
 
@@ -49,36 +49,7 @@ def post_to_server():
 
     except Exception as ex:
         cs.CSClient().log(APP_NAME, 'Something went wrong! ex: {}'.format(ex))
-        raise
-
-    return
-
-
-def action(command):
-    try:
-        # Log the action for the app.
-        cs.CSClient().log(APP_NAME, 'action({})'.format(command))
-
-        if command == 'start':
-            post_to_server()
-
-        elif command == 'stop':
-            # Do nothing
-            pass
-    except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
-        raise
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
-    opt = args.opt.strip()
-    if opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
-        exit()
-
-    action(opt)
+    post_to_server()
