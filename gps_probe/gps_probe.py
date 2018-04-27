@@ -6,11 +6,10 @@ a list of text strings showing if any GPS source exists, if there is
 existing last-seen data, and so on.
 
 """
-import argparse
-import json
-import sys
-import time
 import cs
+import json
+import time
+
 
 APP_NAME = 'gps_probe'
 
@@ -129,35 +128,6 @@ def probe_gps():
                 # be saved to a file if needed.
                 report_lines.append(line)
 
-    return 0
-
-
-def action(command):
-    try:
-        # Log the action for the app.
-        cs.CSClient().log(APP_NAME, 'action({})'.format(command))
-
-        if command == 'start':
-            probe_gps()
-
-        elif command == 'stop':
-            # Nothing on stop
-            pass
-
-    except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
-        raise
-
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
-    opt = args.opt.strip()
-    if opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
-        exit()
-
-    action(opt)
+    probe_gps()

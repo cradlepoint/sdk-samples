@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython gps_probe.py start
+cppython gps_probe.py
