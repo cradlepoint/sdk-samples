@@ -3,7 +3,6 @@ A Simple HTTP Server for a custom dashboard.
 '''
 
 import cs
-import argparse
 import cgi
 import json
 import sys
@@ -133,29 +132,8 @@ class WebServerRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(bytes('<html><body><h1>Server Received: {}</h1></body></html>'.format(value), 'utf-8'))
 
 
-def action(command):
-    try:
-        # Log the action for the app.
-        log.debug('action({})'.format(command))
-
-        if command == 'start':
-            start_server()
-
-        elif command == 'stop':
-            pass
-
-    except Exception as e:
-        log.error('Exception during {}! exception: {}'.format(command, e))
-        raise
-
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    if args.opt not in ['start', 'stop']:
-        log.debug('Failed to run command: {}'.format(args.opt))
-        exit()
-
-    action(args.opt)
+    try:
+        start_server()
+    except Exception as e:
+        log.error('Exception occurred! exception: {}'.format(e))
