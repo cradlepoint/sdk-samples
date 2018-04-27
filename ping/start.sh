@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython ping.py start
+cppython ping.py
