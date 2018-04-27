@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython hello_world.py start
+cppython hello_world.py
