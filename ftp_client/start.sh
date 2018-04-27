@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython ftp_client.py start
+cppython ftp_client.py

@@ -3,23 +3,16 @@ This app will create a file and then upload it to an FTP server.
 The file will be deleted when the app is stopped.
 """
 
-import sys
-import argparse
-from ftplib import FTP
-import os
 import cs
+from ftplib import FTP
 
 
 APP_NAME = "ftp_client"
-TEMP_FILE = '/var/tmp/my_file.txt'
-
-# A USB Storage device will be mounted at /var/media
-# if it is plugged into the USB port of the router.
-# Note: Not all USB devices are compatible.
-TEMP_FILE_USB = '/var/media/my_file.txt'
+TEMP_FILE = 'my_file.txt'
 
 
-def start_router_app():
+def send_ftp_file():
+    cs.CSClient().log(APP_NAME, 'ftp_client send_ftp_file()...')
     # Create a temporary file to upload to an FTP server
     try:
         f = open(TEMP_FILE, 'w')
@@ -52,44 +45,8 @@ def start_router_app():
     finally:
         if fh:
             fh.close()
-    return
-
-
-def stop_router_app():
-    # delete the temporary file if it exists
-    if os.path.exists(TEMP_FILE):
-        os.remove(TEMP_FILE)
-    return
-
-
-def action(command):
-    try:
-        # Log the action for the app.
-        cs.CSClient().log(APP_NAME, 'action({})'.format(command))
-
-        if command == 'start':
-            # Call the function to start the app.
-            start_router_app()
-
-        elif command == 'stop':
-            # Call the function to start the app.
-            stop_router_app()
-
-    except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Problem with {} on {}! ex: {}'.format(APP_NAME, command, ex))
-        raise
 
 
 if __name__ == "__main__":
     cs.CSClient().log(APP_NAME, 'ftp_client main...')
-    parser = argparse.ArgumentParser()
-    parser.add_argument('opt')
-    args = parser.parse_args()
-
-    cs.CSClient().log(APP_NAME, 'args: {})'.format(args))
-    opt = args.opt.strip()
-    if opt not in ['start', 'stop']:
-        cs.CSClient().log(APP_NAME, 'Failed to run command: {}'.format(opt))
-        exit()
-
-    action(opt)
+    send_ftp_file()
