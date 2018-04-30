@@ -19,10 +19,6 @@ CONFIG_FILE = 'package.ini'
 SIGNATURE_FILE = 'SIGNATURE.DS'
 MANIFEST_FILE = 'MANIFEST.json'
 
-BYTE_CODE_FILES = re.compile('^.*\.(pyc|pyo|pyd)$')
-BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
-
-
 def file_checksum(hash_func=hashlib.sha256, file=None):
     h = hash_func()
     buffer_size = h.block_size * 64
@@ -58,7 +54,10 @@ def pack_package(app_root, app_name):
     print("pack TAR:%s.tar" % app_name)
     tar_name = "{}.tar".format(app_name)
     tar = tarfile.open(tar_name, 'w')
-    tar.add(app_root, arcname=os.path.basename(app_root))
+    EXCLUDES = re.compile('.*__pycache__.*|^.*\.(pyc|pyo|pyd)$|.*\/test.*')
+    def excludes(f):
+        return EXCLUDES.match(f) is not None
+    tar.add(app_root, arcname=os.path.basename(app_root), exclude=excludes)
     tar.close()
 
     print("gzip archive:%s.tar.gz" % app_name)
@@ -92,15 +91,6 @@ def clean_manifest_folder(app_metadata_folder):
         shutil.rmtree(os.path.join(path, d))
 
 
-def clean_bytecode_files(app_root):
-    for path, dirs, files in os.walk(app_root):
-        for file in filter(lambda x: BYTE_CODE_FILES.match(x), files):
-            os.remove(os.path.join(path, file))
-        for d in filter(lambda x: BYTE_CODE_FOLDERS.match(x), dirs):
-            shutil.rmtree(os.path.join(path, d))
-    pass
-
-
 def package_application(app_root, pkey):
     app_root = os.path.realpath(app_root)
     app_config_file = os.path.join(app_root, CONFIG_FILE)
@@ -116,8 +106,6 @@ def package_application(app_root, pkey):
         assert os.path.basename(app_root) == app_name
 
         clean_manifest_folder(app_metadata_folder)
-
-        clean_bytecode_files(app_root)
 
         pmf = {}
         pmf['version_major'] = int(1)
