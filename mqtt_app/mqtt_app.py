@@ -147,7 +147,7 @@ def publish_thread():
 
             time.sleep(10)
         except Exception as ex:
-            log.error('Exception in send_gps(). ex: {}'.format(ex))
+            log.error('Exception in publish_thread(). ex: {}'.format(ex))
 
 
 def start_mqtt():
