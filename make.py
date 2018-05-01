@@ -12,6 +12,7 @@ import shutil
 import requests
 import subprocess
 import configparser
+import unittest
 
 from requests.auth import HTTPDigestAuth
 
@@ -312,6 +313,8 @@ def output_help():
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
     print('purge: Purge all apps from the locally connected NCOS device.\n')
     print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
+    print('unit: Run any unit tests associated with selected app.\n')
+    print('system: Run any system tests associated with selected app.\n')
     print('help: Print this help information.\n')
 
 
@@ -461,6 +464,49 @@ if __name__ == "__main__":
     elif utility_name == 'uuid':
         # This is handled in init()
         pass
+
+    elif utility_name == 'unit':
+        # load any tests in app/test/unit
+        app_test_path = os.path.join(g_app_name, 'test', 'unit')
+        suite = unittest.defaultTestLoader.discover(app_test_path)
+        # change to the app dir so app files can be properly imported
+        os.chdir(g_app_name)
+        # add the current path to sys path so we can directly import
+        sys.path.append(os.getcwd())
+        # run suite
+        unittest.TextTestRunner().run(suite)
+
+    elif utility_name == 'system':
+        # load any tests in app/test/unit
+        app_test_path = os.path.join(g_app_name, 'test', 'system')
+        suite = unittest.defaultTestLoader.discover(app_test_path)
+
+        # try to add IP and auth info to system test classes
+        def iterate_tests(test_suite_or_case):
+            try:
+                suite = iter(test_suite_or_case)
+            except TypeError:
+                yield test_suite_or_case
+            else:
+                for test in suite:
+                    for subtest in iterate_tests(test):
+                        yield subtest
+
+        for test in iterate_tests(suite):
+            try:
+                test.DEV_CLIENT_IP = g_dev_client_ip
+                test.DEV_CLIENT_USER = g_dev_client_username
+                test.DEV_CLIENT_PASS = g_dev_client_password
+            except Exception as e:
+                # if classes don't accept it ignore
+                pass
+
+        # change to the app dir so app files can be properly imported
+        os.chdir(g_app_name)
+        # add the current path to sys path so we can directly import
+        sys.path.append(os.getcwd())
+        # run suite
+        unittest.TextTestRunner().run(suite)
 
     else:
         output_help()

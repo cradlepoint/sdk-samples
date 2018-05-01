@@ -2,15 +2,22 @@
 Outputs a 'Hello World!' log every 10 seconds.
 '''
 
-import cs
+import sys
 import time
+import logging
+import logging.handlers
 
-APP_NAME = 'hello_world'
+handlers = [logging.StreamHandler()]
+if sys.platform == 'linux2':
+    # on router also use the syslog
+    handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
 
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)s: %(message)s',
+                    datefmt='%b %d %H:%M:%S',
+                    handlers=handlers)
+log = logging.getLogger('hello_world')
 
-# The main entry point for hello_world.py
-if __name__ == "__main__":
-    while True:
-        cs.CSClient().log(APP_NAME, 'Hello World!')
-        time.sleep(10)
-
+while True:
+    log.info("Hello World!")
+    time.sleep(10)
