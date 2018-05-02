@@ -298,16 +298,16 @@ def purge():
 
 # Prints the help information
 def output_help():
-    print('Command format is: {} make.py <action>'.format(g_python_cmd))
-    print('clean: Clean all project artifacts.\n')
-    print('                  To clean all the apps, add the option "all" (i.e. clean all).')
+    print('Command format is: {} make.py <action>\n'.format(g_python_cmd))
+    print('clean: Clean all project artifacts.')
+    print('\tTo clean all the apps, add the option "all" (i.e. clean all).\n')
     print('build or package: Create the app archive tar.gz file.')
-    print('                  To build all the apps, add the option "all" (i.e. build all).')
-    print('                  Any directory containing a package.ini file is considered and app.\n')
+    print('\tTo build all the apps, add the option "all" (i.e. build all).')
+    print('\tAny directory containing a package.ini file is considered an app.\n')
     print('status: Fetch and print current app status from the locally connected NCOS device.\n')
     print('install: Secure copy the app archive to a locally connected NCOS device.')
-    print('         The NCOS device must already be in SDK DEV mode via registration ')
-    print('         and licensing using NCM.\n')
+    print('\tThe NCOS device must already be in SDK DEV mode via registration ')
+    print('\tand licensing using NCM.\n')
     print('start: Start the app on the locally connected NCOS device.\n')
     print('stop: Stop the app on the locally connected NCOS device.\n')
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
