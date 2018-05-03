@@ -3,49 +3,43 @@ This application will ping an address and log the results
 '''
 
 import cs
+import sys
 import time
+import logging
+import logging.handlers
 
+handlers = [logging.StreamHandler()]
 
-APP_NAME = 'ping'
+if sys.platform == 'linux2':
+    # on router also use the syslog
+    handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
 
+logging.basicConfig(level=logging.DEBUG,
+        format='%(asctime)s %(name)s: %(message)s',
+        datefmt='%b %d %H:%M:%S',
+        handlers=handlers)
 
-def run_ping():
-    try:
-        # Log the action for the app.
-        cs.CSClient().log(APP_NAME, 'run_ping()...')
+log = logging.getLogger('ping-sdk')
 
-        ping_data = {
-            'host': 'www.google.com',  # Can also be an IP address
-            'size': 64
-        }
+host = 'www.google.com' # IP address can also be used
 
-        result = cs.CSClient().put('/control/ping/start', ping_data)
-        cs.CSClient().log(APP_NAME, 'Start ping: {}'.format(result))
+cstore = cs.CSClient()
+cstore.put('control/ping/start/host', host)
+cstore.put('control/ping/start/size', 64)
 
-        done = False
-        ping_results = []
-        while not done:
-            time.sleep(1)
-            ping_data = cs.CSClient().get('/control/ping').get('data')
-            # Need to collect the results as it is cleared when read.
-            result = ping_data.get('result')
+log.info('ping host: %s', host)
+result = {}
+try_count = 0;
 
-            if result != '':
-                lines = result.split('\n')
-                ping_results.extend(lines)
+while try_count < 10:
+    result = cstore.get('control/ping')
+    if result.get('data') and result.get('data').get('status') in ["error", "done"]:
+        break
+    time.sleep(1)
+    try_count += 1
 
-            status = ping_data.get('status')
+error_str = ""
+if try_count == 10 or not result.get('data') or result.get('data').get('status') != "done":
+    error_str = "An error occurred"
 
-            if status == 'done' or status == 'error':
-                done = True
-
-            # Now that the ping is done, log the results
-            for line in ping_results:
-                cs.CSClient().log(APP_NAME, 'Ping Results: {}'.format(line))
-
-    except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Exception occurred! ex: {}'.format(ex))
-
-
-if __name__ == "__main__":
-    run_ping()
+log.info("ping result: %s\n%s", error_str, result['data']['result'])
