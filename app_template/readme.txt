@@ -39,5 +39,6 @@ Your 'new_app_name' is now ready for your new code.
 
 Expected Output
 ===============
-None
+Logs will be output indicating that the application has been started
+or stopped.
 
