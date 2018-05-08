@@ -65,7 +65,7 @@ def action(command):
         raise
 
 
-# The main entry point for hello_world.py This will be executed when the
+# The main entry point for app_template.py This will be executed when the
 # application is started or stopped as defined in the start.sh and stop.sh
 # scripts. It expects either a 'start' or 'stop' argument.
 if __name__ == "__main__":
