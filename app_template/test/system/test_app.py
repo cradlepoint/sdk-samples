@@ -1,6 +1,7 @@
 import requests
 import unittest
 
+
 # This test expects the app to have been installed and uninstalled.
 class TestApp(unittest.TestCase):
     # added by the make.py system test runner if set in sdk_settings.ini
