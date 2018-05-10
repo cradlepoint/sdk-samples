@@ -44,7 +44,7 @@ mqtt_client = None
 
 # Called when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):
-    log.debug("MQTT Client connection results: {}".format(mqtt.connack_string(rc)))
+    log.debug('MQTT Client connection results: {}'.format(mqtt.connack_string(rc)))
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.

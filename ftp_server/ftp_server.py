@@ -6,6 +6,9 @@ information about pyftplib, see https://pythonhosted.org/pyftpdlib/.
 
 
 import cs
+import os
+import sys
+
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
@@ -15,7 +18,10 @@ APP_NAME = "ftp_server"
 
 # This requires a USB compatible storage device plugged into
 # the router. It will mount to /var/media.
-FTP_DIR = '/var/media'
+if sys.platform == 'linux2':
+    FTP_DIR = '/var/media'
+else:
+    FTP_DIR = os.getcwd()
 
 
 def start_ftp_server():
@@ -52,7 +58,7 @@ def start_ftp_server():
         # t.start()
 
     except Exception as e:
-        cs.CSClient().log(APP_NAME, 'Something went wrong in start_ftp_server()! exception: {}'.format(e))
+        cs.CSClient().log(APP_NAME, 'Exception occurred! exception: {}'.format(e))
 
 
 if __name__ == "__main__":
