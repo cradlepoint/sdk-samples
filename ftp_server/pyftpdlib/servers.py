@@ -266,14 +266,6 @@ class FTPServer(Acceptor):
                 if ip is not None and ip in self.ip_map:
                     self.ip_map.remove(ip)
 
-    def handle_error(self):
-        """Called to handle any uncaught exceptions."""
-        try:
-            raise
-        except Exception:
-            logger.error(traceback.format_exc())
-        self.close()
-
     def close_all(self):
         """Stop serving and also disconnects all currently connected
         clients.

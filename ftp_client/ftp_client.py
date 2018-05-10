@@ -39,7 +39,7 @@ def send_ftp_file():
         cs.CSClient().log(APP_NAME, 'FTP STOR reply: {}'.format(reply))
 
     except Exception as e:
-        cs.CSClient().log(APP_NAME, 'Something went wrong in start_router_app()! exception: {}'.format(e))
+        cs.CSClient().log(APP_NAME, 'Exception occurred! exception: {}'.format(e))
         raise
 
     finally:
