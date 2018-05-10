@@ -27,11 +27,6 @@ class TestApp(unittest.TestCase):
         # capture output to test on
         with self._capture_output() as (out, err):
 
-            # augment time.sleep so when it is called it will throw an exception
-            # immediately instead of looping forever so we can exit the test
-            # mock = unittest.mock.Mock(side_effect=Exception('quick exit'))
-            # time.sleep = mock
-
             importlib.reload(ftp_server)
             # Make the thread a daemon so it will be killed when the test ends
             server_thread = Thread(target=ftp_server.start_ftp_server, args=(), daemon=True)

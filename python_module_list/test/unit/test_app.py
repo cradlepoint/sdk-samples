@@ -23,8 +23,6 @@ class TestApp(unittest.TestCase):
     def test_app(self):
         # capture output to test on
         with self._capture_output() as (out, err):
-            # augment time.sleep so we don't spend time in it
-            time.sleep = unittest.mock.Mock(return_value=None)
 
             importlib.reload(python_module_list)
             python_module_list.log_module_list()
