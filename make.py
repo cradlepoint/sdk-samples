@@ -299,6 +299,8 @@ def purge():
 # Prints the help information
 def output_help():
     print('Command format is: {} make.py <action>\n'.format(g_python_cmd))
+    print('Actions include:')
+    print('================')
     print('clean: Clean all project artifacts.')
     print('\tTo clean all the apps, add the option "all" (i.e. clean all).\n')
     print('build or package: Create the app archive tar.gz file.')
