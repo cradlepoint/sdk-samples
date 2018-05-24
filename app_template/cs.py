@@ -1,19 +1,19 @@
 """
-sdk_config_store.py - Communication module for sdk apps
+NCOS communication module for SDK applications.
 
-Copyright (c) 2017 Cradlepoint, Inc. <www.cradlepoint.com>.  All rights reserved.
+Copyright (c) 2018 Cradlepoint, Inc. <www.cradlepoint.com>.  All rights reserved.
 
 This file contains confidential information of CradlePoint, Inc. and your use of
 this file is subject to the CradlePoint Software License Agreement distributed with
 this file. Unauthorized reproduction or distribution of this file is subject to civil and
 criminal penalties.
-
 """
 
 import json
 import re
 import socket
 import sys
+
 
 class SdkCSException(Exception):
     pass
@@ -23,6 +23,17 @@ CSCLIENT_NAME = 'SDK CSClient'
 
 
 class CSClient(object):
+    """
+    The CSClient class is the NCOS SDK mechanism for communication between apps and the router tree/config store.
+    Instances of this class communicate with the router using either an explicit socket or with http method calls.
+
+    Apps running locally on the router use a socket on the router to send commands from the app to the router tree
+    and to receive data (JSON) from the router tree.
+
+    Apps running remotely use the requests library to send HTTP method calls to the router and to receive data from
+    the router tree. This allows one to use an IDE to run and debug the application on a the computer. Although,
+    there are limitations with respect to the device hardware access (i.e. serial, USB, etc.).
+    """
     END_OF_HEADER = b"\r\n\r\n"
     STATUS_HEADER_RE = re.compile(b"status: \w*")
     CONTENT_LENGTH_HEADER_RE = re.compile(b"content-length: \w*")
@@ -33,7 +44,7 @@ class CSClient(object):
 
     @classmethod
     def is_initialized(cls):
-        return (cls in cls._instances)
+        return cls in cls._instances
 
     def __new__(cls, *na, **kwna):
         """ Singleton factory (with subclassing support) """
@@ -44,6 +55,127 @@ class CSClient(object):
     def __init__(self, init=False):
         if not init:
             return
+
+    def get(self, base, query='', tree=0):
+        """
+        Constructs and sends a get request to retrieve specified data from a device.
+
+        The behavior of this method is contextual:
+            - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
+              specified data.
+            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
+
+        Args:
+            base: String representing a path to a resource on a router tree,
+                  (i.e. '/config/system/logging/level').
+            query: Not required.
+            tree: Not required.
+
+        Returns:
+            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+
+        """
+        if sys.platform == 'linux2':
+            cmd = "get\n{}\n{}\n{}\n".format(base, query, tree)
+            return self._dispatch(cmd)
+        else:
+            # Running in a computer so use http to send the get to the device.
+            import requests
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
+
+            try:
+                response = requests.get(device_api, auth=self._get_auth(device_ip, username, password))
+
+            except (requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError):
+                print("Timeout: device at {} did not respond.".format(device_ip))
+                return None
+
+            return json.loads(response.text)
+
+    def put(self, base, value='', query='', tree=0):
+        """
+        Constructs and sends a put request to update or add specified data to the device router tree.
+
+        The behavior of this method is contextual:
+            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
+              the router tree.
+            - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
+              data.
+
+        Args:
+            base: String representing a path to a resource on a router tree,
+                  (i.e. '/config/system/logging/level').
+            value: Not required.
+            query: Not required.
+            tree: Not required.
+
+        Returns:
+            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+        """
+        value = json.dumps(value).replace(' ', '')
+        if sys.platform == 'linux2':
+            cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
+            return self._dispatch(cmd)
+        else:
+            # Running in a computer so use http to send the put to the device.
+            import requests
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
+
+            try:
+                response = requests.put(device_api,
+                                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                        auth=self._get_auth(device_ip, username, password),
+                                        data={"data": '{}'.format(value)})
+            except (requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError):
+                print("Timeout: device at {} did not respond.".format(device_ip))
+                return None
+
+            return json.loads(response.text)
+
+    def alert(self, app_name='', value=''):
+        """
+        Constructs and sends a custom alert to NCM for the device. Apps calling this method must be running
+        on the target device to send the alert. If invoked while running on a computer, then only a log is output.
+
+        Args:
+        app_name: String name of your application.
+        value: String to displayed for the alert.
+
+        Returns:
+            Success: None
+            Failure: An error
+        """
+        if sys.platform == 'linux2':
+            cmd = "alert\n{}\n{}\n".format(app_name, value)
+            return self._dispatch(cmd)
+        else:
+            # Running in a computer and can't actually send the alert.
+            print('Alert is only available when running the app in NCOS.')
+            print('Alert Text: {}'.format(value))
+
+    def log(self, name='', value=''):
+        """
+        Adds a DEBUG log to the device SYSLOG.
+        Note: It is recommend that app_logging.py be used for logging which
+              supports all logging levels.
+
+        Args:
+        name: String of the name of your application.
+        value: String text for the log.
+
+        Returns:
+        None
+        """
+        if sys.platform == 'linux2':
+            cmd = "log\n{}\n{}\n".format(name, value)
+            return self._dispatch(cmd)
+        else:
+            # Running in a computer so just use print for the log.
+            print('[{}]: {}'.format(name, value))
 
     def _get_auth(self, device_ip, username, password):
         # This is only needed when the app is running in a computer.
@@ -111,115 +243,6 @@ class CSClient(object):
                 print('ERROR 4: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
         return device_ip, device_username, device_password
-
-    def get(self, base, query='', tree=0):
-        """Send a get request."""
-        if sys.platform == 'linux2':
-            cmd = "get\n{}\n{}\n{}\n".format(base, query, tree)
-            return self._dispatch(cmd)
-        else:
-            # Running in a computer so use http to send the get to the device.
-            import requests
-            device_ip, username, password = self._get_device_access_info()
-            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
-
-            try:
-                response = requests.get(device_api, auth=self._get_auth(device_ip, username, password))
-
-            except (requests.exceptions.Timeout,
-                    requests.exceptions.ConnectionError):
-                print("Timeout: device at {} did not respond.".format(device_ip))
-                return None
-
-            return json.loads(response.text)
-
-    def put(self, base, value='', query='', tree=0):
-        """Send a put request."""
-        value = json.dumps(value).replace(' ', '')
-        if sys.platform == 'linux2':
-            cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
-            return self._dispatch(cmd)
-        else:
-            # Running in a computer so use http to send the put to the device.
-            import requests
-            device_ip, username, password = self._get_device_access_info()
-            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
-
-            try:
-                response = requests.put(device_api,
-                                        headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=self._get_auth(device_ip, username, password),
-                                        data={"data": '{}'.format(value)})
-            except (requests.exceptions.Timeout,
-                    requests.exceptions.ConnectionError):
-                print("Timeout: device at {} did not respond.".format(device_ip))
-                return None
-
-            return response.text
-
-    def append(self, base, value='', query=''):
-        """Send an append request."""
-        value = json.dumps(value).replace(' ', '')
-        if sys.platform == 'linux2':
-            cmd = "post\n{}\n{}\n{}\n".format(base, query, value)
-            return self._dispatch(cmd)
-        else:
-            # Running in a computer so use http to send the post to the device.
-            import requests
-            device_ip, username, password = self._get_device_access_info()
-            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
-
-            try:
-                response = requests.post(device_api,
-                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                         auth=self._get_auth(device_ip, username, password),
-                                         data={"data": '{}'.format(value)})
-            except (requests.exceptions.Timeout,
-                    requests.exceptions.ConnectionError):
-                print("Timeout: device at {} did not respond.".format(device_ip))
-                return None
-
-            return response.text
-
-    def delete(self, base, query=''):
-        """Send a delete request."""
-        if sys.platform == 'linux2':
-            cmd = "delete\n{}\n{}\n".format(base, query)
-            return self._dispatch(cmd)
-        else:
-            # Running in a computer so use http to send the delete to the device.
-            import requests
-            device_ip, username, password = self._get_device_access_info()
-            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
-
-            try:
-                response = requests.delete(device_api,
-                                           headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                           auth=self._get_auth(device_ip, username, password))
-            except (requests.exceptions.Timeout,
-                    requests.exceptions.ConnectionError):
-                print("Timeout: device at {} did not respond.".format(device_ip))
-                return None
-
-            return response.text
-
-    def alert(self, app_name='', value=''):
-        """Send a request to create an alert."""
-        if sys.platform == 'linux2':
-            cmd = "alert\n{}\n{}\n".format(app_name, value)
-            return self._dispatch(cmd)
-        else:
-            print('Alert is only available when running the app in NCOS.')
-            print('Alert Text: {}'.format(value))
-
-    def log(self, name='', value='', level='DEBUG'):
-        """Send a request to create a log entry."""
-        if sys.platform == 'linux2':
-            cmd = "log\n{}\n{}\n".format(name, value)
-            return self._dispatch(cmd)
-        else:
-            # Running in a computer so just use print for the log.
-            print('[{}]: {}'.format(name, value))
 
     def _safe_dispatch(self, cmd):
         """Send the command and return the response."""
