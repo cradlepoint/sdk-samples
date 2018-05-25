@@ -302,9 +302,13 @@ img {
 <h4><a href="#gpio">GPIO</a></h4>
 <h4><a href="#gps">GPS</a></h4>
 <h4><a href="#modem">Modem</a></h4>
+<h4><a href="#cpu">CPU and Memory Utilization</a></h4>
+<h4><a href="#usb">USB Mass Storage</a></h4>
+<h4><a href="#ncm">NetCloud Manager (NCM)</a></h4>
+<h4><a href="#serial">Serial Port Access</a></h4>
 <p><a name="overview"></a></p>
 <h2>Overview</h2>
-<p>The NCOS trees, also referred to as the NCOS config store, are essentially the APIs to NCOS query and control. One can read items to determine status or results and write to control and configure. All data is exchanged in the JSON format.  The JSON format is described at <a href="http://www.json.org/">http://www.json.org/</a>. The data can be accessed via the device CLI, a python application, or using curl. </p>
+<p>The NCOS trees, also referred to as the NCOS config store, are essentially the APIs to NCOS query and control. Router tree item values can be read to determine their status or to verify the results of POST and PUT operations performed on them. Router tree items can be written to control and configure their values. All data is exchanged in the JSON format.  The JSON format is described at <a href="http://www.json.org/">http://www.json.org/</a>. The data can be accessed via the device CLI, a python application, or using curl. </p>
 <p>The NCOS config store consist of the following trees:</p>
 <ul>
 <li>
@@ -334,7 +338,7 @@ img {
 </ul>
 <p>This document does not describe every item in the NCOS config store. There are sections that cover functionality and how the config store can be used for that function (i.e. Ping, GPIO, GPS, Modem, etc.). Many functional areas will span multiple tree types depending on the use case. Anything which is done via the router UI, utilizes the router trees.</p>
 <h2>CLI Example</h2>
-<p>Below is an example of how to query NCOS system logging information using the <strong>cat</strong> or <strong>get</strong> command and then changing the logging level to <strong>info</strong> with the <strong>set</strong> command. Note the JSON format in the output. These trees can also be traversed using linux change directory command (i.e. cd /config/system/logging). This can be very useful to see what is contained in each branch of the tree.</p>
+<p>The following example of how to query NCOS system logging information using the <strong>cat</strong> or <strong>get</strong> command and then changing the logging level to <strong>info</strong> with the <strong>set</strong> command. Note the JSON format in the output. These trees can also be traversed using lthe Linux change directory command (i.e. cd /config/system/logging). This can be very useful to see what is contained in each branch of the tree.</p>
 <pre><code>    [admin@IBR900-267: /$ cat /config/system/logging
     {
         &quot;console&quot;: false,
@@ -480,7 +484,7 @@ img {
 </code></pre>
 
 <h3>Feature Info /status/feature:</h3>
-<p>The feature information provides a list of feature license. The two SDK license will only exist if the features have been enabled via the ECM. The 'Router SDK' means that device apps have been enabled while the 'Router SDK - Dev Mode' means the the development mode is enabled.</p>
+<p>The feature information provides a list of feature licenses. The two SDK licenses will only exist if the features have been enabled via the ECM. The value 'Router SDK' means that device apps have been enabled while the value 'Router SDK - Dev Mode' means that the development mode is enabled.</p>
 <pre><code>    cat /status/feature
     {
         &quot;db&quot;: [
@@ -537,7 +541,7 @@ img {
 
 <p><a name="sdk_app_info"></a></p>
 <h2>SDK and Application Info</h2>
-<p>SDK and application information can be found in <strong>/status/system/sdk</strong>. It contains the state of the NCOS SDK service and any application. If there are any errors with installing or starting an application, it will be contained in this tree.</p>
+<p>SDK and application information can be found in <strong>/status/system/sdk</strong>. It contains the state of the NCOS SDK service and any application. If there are any errors with installing or starting an application, they are contained in this tree.</p>
 <h3>/status/system/sdk:</h3>
 <p>The main items in SDK status tree are:</p>
 <ul>
@@ -829,9 +833,9 @@ Specify the Path MTU discovery option:
 <p>Reading from <strong>control/ping/status</strong> will return the current state of the ping in progress. Unlike the results, this will persist through multiple reads.  The status can be one of 'running', 'done', 'stopped', or 'error'. If any packets were transmitted during the Ping, then when the ping stops, the result summary will be posted to <strong>control/ping/results</strong> (and cleared when read)</p>
 <p><a name="gpio"></a></p>
 <h2>GPIO</h2>
-<p>Some of the Cradlepoint devices have GPIO connectors as well as GPIO pins built into the power connectors Below is information related to GPIO router config store tree items.</p>
+<p>Some Cradlepoint devices have GPIO connectors and pins built into their power connectors The following information is related to GPIO router config store tree items.</p>
 <h3>/config/system/gpio_actions</h3>
-<p>Includes configuration data for all user configurable pins - if the pin is enabled, it's direction, and what action it is currently assigned to. The available actions are:</p>
+<p>Includes configuration data for all user configurable pins - This configuration dat reports if the pin is enabled, it's direction, and what action it is currently assigned to the pin. The available actions are:</p>
 <p>if value of direction is <em>in</em>, available values for &quot;current_action&quot; are:</p>
 <ul>
 <li>
@@ -887,7 +891,7 @@ Specify the Path MTU discovery option:
 <p><a name="gps"></a></p>
 <h2>GPS</h2>
 <h3>GNSS vs GPS</h3>
-<p>GNSS stands for Global Navigation Satellite Systems and GPS stand for Global Positioning System. GNSS is an umbrella term for all the satellite-based positioning systems, including GPS. GPS itself is the US satellite system and, however, GPS is used interchangeably for all satellite positioning systems. See <a href="https://en.wikipedia.org/wiki/Satellite_navigation">https://en.wikipedia.org/wiki/Satellite_navigation</a> for more details about satellite navigation.</p>
+<p>GNSS stands for Global Navigation Satellite Systems and GPS stand for Global Positioning System. GNSS is an umbrella term for all the satellite-based positioning systems, including GPS. GPS itself is the US satellite system but the term &quot;GPS&quot; is used interchangeably for all satellite positioning systems. See <a href="https://en.wikipedia.org/wiki/Satellite_navigation">https://en.wikipedia.org/wiki/Satellite_navigation</a> for more details about satellite navigation.</p>
 <p>The most common assumption is that all modems are capable of GPS. In order for a cellular modem to support GPS, GPS must be a function of both the modem and carrier. GPS requires the following four elements:</p>
 <ul>
 <li>A cellular modem that supports GPS.</li>
@@ -899,7 +903,7 @@ Specify the Path MTU discovery option:
 <h4>config/system/gps/enabled</h4>
 <p>This is either true or false and indicates gps enablement.</p>
 <h4>config/system/gps/enable_gps_keepalive</h4>
-<p>When &quot;GPS Keepalive&quot; is enabled, the GPS service will poll the GPS hardware every 10 seconds. The GPS hardware goes into a low power state after a certain interval of inactivity. Setting this flag will prevent the GPS from going into that low power state. Coming out of a low power state takes extra time to regain the GPS lock so set this flag to keep the hardware from falling asleep. Note this flag has no effect if the GPS service itself is not enabled.</p>
+<p>By default, the GPS hardware goes into a low power state after a certain interval of inactivity. To prevent the GPS hardware from entering this low power state, set “enable<em>gps</em>keepalive” to true.  When “enable<em>gps</em>keepalive” is enabled, the GPS service will poll the GPS hardware every 10 seconds and prevent the GPS from entering a low power state. Coming out of a low power state takes extra time to regain the GPS lock so set this flag to keep the hardware from falling asleep. Note this flag has no effect if the GPS service itself is not enabled.</p>
 <h4>Get GPS location data</h4>
 <p>The current GPS data can be found in <strong>/status/gps/</strong>.  </p>
 <p>This contains two fields: fix and nmea. </p>
@@ -947,7 +951,7 @@ Specify the Path MTU discovery option:
 <p><a name="modem"></a></p>
 <h2>Modem</h2>
 <p>The modem status and control information is part of the WAN tree. This is a very critical and complicated aspect of the device functionality. Please note that there is no direct access to the modem AT commands. For now, this section will only describe how to enable and disable a modem, along with some status information, as this has been requested by several application developers. </p>
-<p>The list of modems in the system can be found here: get /status/wan/devices. While this will list all the wan devices, not all modems may be configured with a SIM card. </p>
+<p>The list of modems in the system can be found here: get /status/wan/devices. While this will list all the wan devices, not all modems may be configured with a SIM card. Modem devices start with 'mdm-'. </p>
 <pre><code>    get status/wan/devices
     {
         &quot;ethernet-wan&quot;: {
@@ -962,7 +966,7 @@ Specify the Path MTU discovery option:
     }
 </code></pre>
 
-<p>To determine if a modem does not have SIM card inserted, see here: get status/wan/devices/mdm-<uid>/status/error_text. Where <uid> is the modem's unique identifier. The response will be 'null' if the card exist.</p>
+<p>To determine if a modem does not have SIM card inserted, see here: get status/wan/devices/mdm-<uid>/status/error_text. Where <uid> is the modem's unique identifier. The response will be 'null' if the SIM card is present.</p>
 <pre><code>    get status/wan/devices/mdm-fee5c7f2/status/error_text
     &quot;SIM error: NOSIM&quot;
 </code></pre>
@@ -1049,8 +1053,163 @@ Specify the Path MTU discovery option:
     }
 </code></pre>
 
+<p><a name="cpu"></a></p>
+<h2>CPU and Memory Utilization</h2>
+<p>Get the CPU utilization for the system (kernel), the user space (applications), and the user space that has been 'niced'.</p>
+<pre><code>get status/system/cpu
+{
+    &quot;nice&quot;: 0.0,
+    &quot;system&quot;: 0.0082191780821917796,
+    &quot;user&quot;: 0.021369863013698632
+}
+</code></pre>
+
+<p>Get the 1, 5, and 15 minute CPU load averages.</p>
+<pre><code>get status/system/load_avg/
+{
+    &quot;15min&quot;: 0.14000000000000003,
+    &quot;1min&quot;: 0.12,
+    &quot;5min&quot;: 0.13
+}
+</code></pre>
+
+<p>Get the memory information that is equivalent to Linux /proc/memstat.</p>
+<pre><code>get status/system/memory/
+{
+    &quot;active&quot;: 56307712,
+    &quot;active(anon)&quot;: 27910144,
+    &quot;active(file)&quot;: 28397568,
+    &quot;anonpages&quot;: 27865088,
+    &quot;bounce&quot;: 0,
+    &quot;buffers&quot;: 10985472,
+    &quot;cached&quot;: 31285248,
+    &quot;commitlimit&quot;: 260014080,
+    &quot;committed_as&quot;: 119459840,
+    &quot;dirty&quot;: 0,
+    &quot;highfree&quot;: 0,
+    &quot;hightotal&quot;: 0,
+    &quot;inactive&quot;: 13873152,
+    &quot;inactive(anon)&quot;: 0,
+    &quot;inactive(file)&quot;: 13873152,
+    &quot;kernelstack&quot;: 1187840,
+    &quot;lowfree&quot;: 364212224,
+    &quot;lowtotal&quot;: 520032256,
+    &quot;mapped&quot;: 9183232,
+    &quot;memavailable&quot;: 400588800,
+    &quot;memfree&quot;: 364212224,
+    &quot;memtotal&quot;: 520032256,
+    &quot;mlocked&quot;: 0,
+    &quot;nfs_unstable&quot;: 0,
+    &quot;pagetables&quot;: 475136,
+    &quot;shmem&quot;: 0,
+    &quot;slab&quot;: 15945728,
+    &quot;sreclaimable&quot;: 3837952,
+    &quot;sunreclaim&quot;: 12107776,
+    &quot;swapcached&quot;: 0,
+    &quot;swapfree&quot;: 0,
+    &quot;swaptotal&quot;: 0,
+    &quot;unevictable&quot;: 0,
+    &quot;vmallocchunk&quot;: 0,
+    &quot;vmalloctotal&quot;: 520093696,
+    &quot;vmallocused&quot;: 0,
+    &quot;writeback&quot;: 0,
+    &quot;writebacktmp&quot;: 0
+}
+</code></pre>
+
+<p><a name="usb"></a></p>
+<h2>USB Mass Storage</h2>
+<p>Applications can create a file within it's own directory. Note that the file will be removed when the application is uninstalled. This method is not recommended if large amounts of data are required to be saved within the file. In this case, it would be more appropriate to utilize a USB storage device. When a compatible FTDI type USB storage device is plugged into the USB port, it will be mounted to '/var/media'. An application can now create and use files in the '/var/media' directory. The state of the USB device (i.e. 'plugged' or 'unplugged') is located in the following status tree location:</p>
+<pre><code>get /status/usb/mass
+{
+    &quot;partition&quot;: &quot;sda1&quot;,
+    &quot;state&quot;: &quot;plugged&quot;,
+    &quot;type&quot;: &quot;block&quot;
+}
+</code></pre>
+
+<p><a name="ncm"></a></p>
+<h2>NetCloud Manager (NCM)</h2>
+<p>Data related to NCM is located in '/status/ecm'. Note that the internal acronym is still 'ecm' and has not been changed since the re-branding to NCM. Below is a partial output of the status tree items related to NCM. The items of most interest are:</p>
+<ul>
+<li>
+client_id
+<ul>
+<li>The id assigned to the device by NCM. Displayed in the Devices menu of NCM.</li>
+</ul>
+</li>
+<li>
+info:
+<ul>
+<li>Contains the NCM account that the device is registered along with the assigned group name in NCM.</li>
+</ul>
+</li>
+<li>
+<p>state:</p>
+<ul>
+<li>
+<p>The connection state to NCM.	</p>
+<pre><code>get /status/ecm/
+{
+    &quot;client_id&quot;: 884689,
+    &quot;client_usage_monitoring&quot;: true,
+    &quot;data_usage_in&quot;: 120258,
+    &quot;data_usage_out&quot;: 125134,
+    &quot;data_usage_period&quot;: 84662.959380862999,
+    &quot;error&quot;: null,
+    &quot;event_triggers&quot;: [
+        ...
+    ],
+    &quot;info&quot;: {
+        &quot;Account&quot;: &quot;Cradlepoint-Thomas Snuggs&quot;,
+        &quot;Group&quot;: &quot;Unassigned&quot;
+    },
+    &quot;last_patch&quot;: null,
+    &quot;managed&quot;: true,
+    &quot;recent_activity&quot;: [
+        ...
+        [
+            84523.060010892999,
+            &quot;Connecting to NetCloud&quot;
+        ]
+    ],
+    &quot;retry_delay&quot;: null,
+    &quot;retry_timer&quot;: null,
+    &quot;rollback&quot;: null,
+    &quot;server_host_redirect&quot;: null,
+    &quot;server_port_redirect&quot;: null,
+    &quot;state&quot;: &quot;connected&quot;,
+    &quot;sync&quot;: &quot;ready&quot;,
+    &quot;ts&quot;: 1526488472.7670842,
+    &quot;uptime&quot;: 84522.43060708046
+}
+</code></pre>
+
+</li>
+</ul>
+</li>
+</ul>
+<p><a name="serial"></a></p>
+<h2>Serial Port Access</h2>
+<p>Depending on the device model, serial port devices can be connected via the RS-232 port or a USB to Serial adapter. In either case, python serial library can be used to read and write to the port. Note that the serial file is included in NCOS so one only need to import it into their application files. Below are the possible port names based on the connection type.</p>
+<ul>
+<li>
+RS-232
+<ul>
+<li>/dev/ttyS1</li>
+</ul>
+</li>
+<li>
+USB to Serial Adapter
+<ul>
+<li>/dev/ttyUSB0</li>
+<li>/dev/ttyUSB1</li>
+<li>etc.</li>
+</ul>
+</li>
+</ul>
 <hr />
-<p>Published Date: 11-13-2017</p>
+<p>Published Date: 5/17/2018 11:02:48 AM </p>
 <p>This article not have what you need? Not find what you were looking for? Think this article can be improved? Please let us know at <a href="&#109;&#97;&#x69;&#108;&#x74;&#x6f;&#58;&#x73;&#117;&#103;&#x67;&#101;&#115;&#116;&#x69;&#x6f;&#110;&#x73;&#64;&#x63;&#x72;&#97;&#100;&#x6c;&#101;&#x70;&#111;&#x69;&#x6e;&#116;&#x2e;&#x63;&#111;&#x6d;">&#x73;&#x75;&#x67;&#103;e&#115;&#x74;i&#x6f;&#110;&#115;&#x40;&#x63;r&#x61;&#x64;&#108;&#101;&#x70;&#x6f;&#x69;&#x6e;&#116;&#x2e;&#99;&#x6f;&#x6d;</a>.</p>
 
 </body>
