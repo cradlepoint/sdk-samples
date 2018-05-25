@@ -1,5 +1,8 @@
 """
-An app template that can be used to create a new application
+An app template that can be used to create a new application.
+This template covers several aspect of an application that
+my not be needed in every case. It is meant as a guide and not
+a must.
 """
 
 # A try/except is wrapped around the imports to catch an
@@ -11,6 +14,7 @@ try:
     import sys
     import traceback
     import argparse
+    import os.path
 
     from app_logging import AppLogger
 
