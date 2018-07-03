@@ -46,7 +46,7 @@ class AppLogger(object):
             AppLogger.logger = logging.getLogger(AppLogger.__app_name)
             AppLogger.logger.setLevel(level=logging.DEBUG)
             log_address = '/dev/log'
-            if sys.platform == 'Darwin':
+            if sys.platform == 'darwin':
                 log_address = '/var/run/syslog'
 
             if sys.platform == 'win32':
