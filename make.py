@@ -53,10 +53,9 @@ def get_auth():
 # in DEV mode
 def is_NCOS_device_in_DEV_mode():
     sdk_status = json.loads(get('/status/system/sdk')).get('data')
-    if sdk_status.get('mode') == 'devmode':
-        return True
-    else:
-        return False
+    if sdk_status.get('mode') in ['devmode', 'standard']:
+        return True if sdk_status.get('mode') == 'devmode' else False
+    raise('Unknown SDK mode (%s)' % sdk_status.get('mode'))
 
 
 # Returns the app package name based on the global app name.
