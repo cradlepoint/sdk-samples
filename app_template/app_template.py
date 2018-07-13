@@ -14,7 +14,6 @@ try:
     import sys
     import traceback
     import argparse
-    import os.path
 
     from app_logging import AppLogger
 
