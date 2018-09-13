@@ -157,32 +157,22 @@ def clean_all():
         clean(app)
 
 
-# Build, just validates, the application code and package.
-def build():
-    print("Building {}".format(g_app_name))
-    success = True
-    validate_script_path = os.path.join('tools', 'bin', 'validate_application.py')
-    app_path = os.path.join(g_app_name)
-    try:
-        if sys.platform == 'win32':
-            subprocess.check_output('{} {} {}'.format(g_python_cmd, validate_script_path, app_path))
-        else:
-            subprocess.check_output('{} {} {}'.format(g_python_cmd, validate_script_path, app_path), shell=True)
-
-    except subprocess.CalledProcessError as err:
-        print('Error building {}: {}'.format(g_app_name, err))
-        success = False
-    finally:
-        return success
-
+def scan_for_cr(path):
+    scanfiles = ('.py', '.sh')
+    for root, _, files in os.walk(path):
+        for fl in files:
+            with open(os.path.join(root, fl), 'rb') as f:
+                if b'\r' in f.read() and [x for x in scanfiles if fl.endswith(x)]:
+                    raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
 
 # Package the app files into a tar.gz archive.
 def package():
-    success = True
     print("Packaging {}".format(g_app_name))
+    success = True
     package_dir = os.path.join('tools', 'bin')
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     app_path = os.path.join(g_app_name)
+    scan_for_cr(app_path)
 
     try:
         subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
@@ -203,6 +193,7 @@ def package_all():
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     for app in app_dirs:
         app_path = os.path.join(app)
+        scan_for_cr(app_path)
         try:
             print('Build app: {}'.format(app_path))
             subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
@@ -431,14 +422,7 @@ if __name__ == "__main__":
         else:
             clean()
 
-    elif utility_name == 'build':
-        # build()
-        if option == 'all':
-            package_all()
-        else:
-            package()
-
-    elif utility_name == 'package':
+    elif utility_name in ['package', 'build']:
         if option == 'all':
             package_all()
         else:
