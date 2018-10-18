@@ -13,6 +13,8 @@ import requests
 import subprocess
 import configparser
 import unittest
+import urllib3
+urllib3.disable_warnings()
 
 from requests.auth import HTTPDigestAuth
 
@@ -33,10 +35,10 @@ def get_auth():
     from http import HTTPStatus
 
     use_basic = False
-    device_api = 'http://{}/api/status/product_info'.format(g_dev_client_ip)
+    device_api = 'https://{}/api/status/product_info'.format(g_dev_client_ip)
 
     try:
-        response = requests.get(device_api, auth=requests.auth.HTTPBasicAuth(g_dev_client_username, g_dev_client_password))
+        response = requests.get(device_api, auth=requests.auth.HTTPBasicAuth(g_dev_client_username, g_dev_client_password), verify=False)
         if response.status_code == HTTPStatus.OK:
             use_basic = True
 
@@ -68,10 +70,10 @@ def get_app_pack(app_name=None):
 
 # Gets data from the NCOS config store
 def get(config_tree):
-    ncos_api = 'http://{}/api/{}'.format(g_dev_client_ip, config_tree)
+    ncos_api = 'https://{}/api{}'.format(g_dev_client_ip, config_tree)
 
     try:
-        response = requests.get(ncos_api, auth=get_auth())
+        response = requests.get(ncos_api, auth=get_auth(), verify=False)
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
@@ -101,10 +103,11 @@ def get_app_list():
 # Puts an SDK action in the NCOS device config store
 def put(value):
     try:
-        response = requests.put("http://{}/api/control/system/sdk/action".format(g_dev_client_ip),
+        response = requests.put("https://{}/api/control/system/sdk/action".format(g_dev_client_ip),
                                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                                 auth=get_auth(),
-                                data={"data": '"{} {}"'.format(value, get_app_uuid())})
+                                data={"data": '"{} {}"'.format(value, get_app_uuid())},
+                                verify=False)
 
         print('status_code: {}'.format(response.status_code))
 
@@ -218,7 +221,7 @@ def install():
         app_archive = get_app_pack()
 
         # Use sshpass for Linux or OS X
-        cmd = 'sshpass -p {0} scp {1} {2}@{3}:/app_upload'.format(
+        cmd = 'sshpass -p {0} scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1} {2}@{3}:/app_upload'.format(
                g_dev_client_password, app_archive,
                g_dev_client_username, g_dev_client_ip)
 
