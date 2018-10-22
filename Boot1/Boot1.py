@@ -410,7 +410,7 @@ class SIMSpeedTest(object):
         fw_patch = int(self.client.get("/status/fw_info/patch_version").get('data', ''))
         log.info("Current FW Version - major: %s, minor: %s, patch: %s",
                  fw_major, fw_minor, fw_patch)
-        return fw_major >= major and fw_minor >= minor and fw_patch >= patch
+        return (fw_major, fw_minor, fw_patch) >= (major, minor, patch)
 
     def wait_to_start(self):
         while not self.NTP_time_updated():
