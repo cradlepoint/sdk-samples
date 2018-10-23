@@ -67,11 +67,12 @@ class SIMSpeedTest(object):
     CTRL_WAN_DEVS_PATH = '/control/wan/devices'
     MIN_UPLOAD_SPD = 1.0  # Mbps
     MIN_DOWNLOAD_SPD = 10.0
-    CONNECTION_STATE_TIMEOUT = 7 * 60  # 7 Min
+    CONNECTION_STATE_TIMEOUT = 10 * 60  # 10 Min
     NETPERF_TIMEOUT = 4 * 60  # 4 Min
 
     def __init__(self):
         self.client = cs.CSClient()
+        self.diag_data = {}
 
     def find_modems(self, verbose):
         dsdm = self.client.get('/config/wan/dual_sim_disable_mask').get('data', '')
@@ -141,6 +142,27 @@ class SIMSpeedTest(object):
     def enable_eth_mode(self, mode, state):
         self.enable_dev_mode('type|is|ethernet', mode, state)
 
+    def set_mdm_failure_check_mode(self, mode):
+        self.enable_dev_mode('type|is|mdm', 'failureCheck', mode)
+
+    def enable_mdm_dns_verify(self, enable):
+        if enable:
+            mode_dict = {'mode': 'active_dns'}
+            self.enable_dev_mode('type|is|mdm', 'failureCheck', mode_dict)
+        else:
+            self.enable_dev_mode('type|is|mdm', 'failureCheck', None)
+
+    def enable_modem_test_mode(self, enable):
+        setting = 1 if enable else enable
+        if self.min_fw_version_check(6, 4):
+            self.enable_eth_mode('connectionset', setting)
+            self.enable_mdm_mode('connectionset', setting)
+        else:
+            self.enable_eth_mode('loadbalance', setting)
+            self.enable_mdm_mode('loadbalance', setting)
+
+        self.enable_mdm_dns_verify(enable)
+
     def set_wan_dev_disabled(self, dev, state):
         s = self.client.put(self.CFG_RULES2_PATH + '/%d' % dev, {"disabled": state})
         log.info("set_wan_dev_disabled - put s=%s", s)
@@ -154,15 +176,16 @@ class SIMSpeedTest(object):
         while True:
             sleep_seconds += 5
             conn_state = self.client.get(conn_path).get('data', '')
-            # TODO add checking for mdm error states
-            log.info('waiting for state=%s on sim=%s curr state=%s', state, sim, conn_state)
+            # TODO add checking for error states
+            log.info('waiting for state=%s on sim=%s curr state=%s',
+                state, sim, conn_state)
             if conn_state == state:
                 break
             if timeout_counter > self.CONNECTION_STATE_TIMEOUT:
                 log.info("timeout waiting on sim=%s", sim)
                 raise Timeout(conn_path)
             time.sleep(min(sleep_seconds, 45))
-            timeout_counter += sleep_seconds
+            timeout_counter += min(sleep_seconds, 45)
         log.info("sim=%s connected", sim)
         return True
 
@@ -318,17 +341,34 @@ class SIMSpeedTest(object):
 
         log.error('ERROR: select_sim did not return any data!')
 
+    def sim_result_msg(self, msg, sim, sim_diag_data):
+        return '{} Sim: slot={} carrier={} ICCID={} down={:.4f} up={:.4f}'.format(msg,
+                                                                                  sim.get('slot_name'),
+                                                                                  sim_diag_data.get('HOMECARRID'),
+                                                                                  sim_diag_data.get('ICCID'),
+                                                                                  sim.get('down'),
+                                                                                  sim.get('up'))
+    def signal_info_msg(self, sig_diag_data):
+        return 'Signal {} {}% RSSI:{}(dBm) RSRP:{}(dB RSRQ:{}(dB RF-band:{}'.format(sig_diag_data.get('PRD'),
+                                                                                    sig_diag_data.get('SS'),
+                                                                                    sig_diag_data.get('DBM'),
+                                                                                    sig_diag_data.get('RSRP'),
+                                                                                    sig_diag_data.get('RSRQ'),
+                                                                                    sig_diag_data.get('RFBAND'))
+
     def log_results(self, product_name, system_id, selected_sim, rejected_sim):
         log.info("log_results")
         log.info('selected_sim: {}'.format(selected_sim))
         log.info('rejected_sim: {}'.format(rejected_sim))
+        signal_rdiag = False
         try:
-            log.info('{} - {}'.format(self.STATUS_DEVS_PATH, self.client.get(self.STATUS_DEVS_PATH)))
-            log.info('sdiag get path: {}'.format('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, selected_sim.get('slot'))))
-            log.info('rdiag get path: {}'.format('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, rejected_sim.get('slot'))))
 
-            sdiag = self.client.get('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, selected_sim.get('slot'))).get('data', {})
-            rdiag = self.client.get('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, rejected_sim.get('slot'))).get('data', {})
+            sdiag = self.diag_data[selected_sim.get('slot_name')]
+            if rejected_sim.get('slot_name') in self.diag_data:
+                rdiag = self.diag_data[rejected_sim.get('slot_name')]
+                signal_rdiag = True
+            else:
+                rdiag = self.client.get('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, rejected_sim.get('slot'))).get('data', {})
 
             log.info('sdiag: {}'.format(sdiag))
             log.info('rdiag: {}'.format(rdiag))
@@ -336,21 +376,21 @@ class SIMSpeedTest(object):
             msg1 = 'The results of the SIM test on product={} id={} are as follows:'.format(product_name, system_id)
             log.info(msg1)
 
-            msg2 = 'Selected Sim: slot={} carrier={} ICCID={} down={:.4f} up={:.4f}'.format(selected_sim.get('slot_name'),
-                                                                                            sdiag.get('HOMECARRID'),
-                                                                                            sdiag.get('ICCID'),
-                                                                                            selected_sim.get('down'),
-                                                                                            selected_sim.get('up'))
+            msg2 = self.sim_result_msg('Selected', selected_sim, sdiag)
             log.info(msg2)
 
-            msg3 = 'Rejected Sim: slot={} carrier={} ICCID={} down={:.4f} up={:.4f}'.format(rejected_sim.get('slot_name'),
-                                                                                            rdiag.get('HOMECARRID'),
-                                                                                            rdiag.get('ICCID'),
-                                                                                            rejected_sim.get('down'),
-                                                                                            rejected_sim.get('up'))
+            msg3 = self.signal_info_msg(sdiag)
             log.info(msg3)
 
-            self.client.alert(settings.APP_NAME, '{}, {}, {}'.format(msg1, msg2, msg3))
+            msg4 = self.sim_result_msg('Rejected', rejected_sim, rdiag)
+            log.info(msg4)
+
+            if signal_rdiag:
+                msg5 = self.signal_info_msg(rdiag)
+                log.info(msg5)
+                self.client.alert(settings.APP_NAME, '{}, {}, {}, {}, {}'.format(msg1, msg2, msg3, msg4, msg5))
+            else:
+                self.client.alert(settings.APP_NAME, '{}, {}, {}, {}'.format(msg1, msg2, msg3, msg4))
 
         except Exception as e:
             log.error('Exception in log_results. ex: {}'.format(e))
@@ -440,7 +480,10 @@ class SIMSpeedTest(object):
         product_name = self.client.get("/status/product_info/product_name").get('data', '')
         system_id = self.client.get("/config/system/system_id").get('data', '')
 
-        sim1, sim2 = self.find_sims()
+        sim1, sim2 = 0, 0
+        while not (sim1 or sim2):
+            sim1, sim2 = self.find_sims()
+            time.sleep(5)
 
         message = "Hello from BOOT1 SIM Speedtest product={} id={}".format(product_name, system_id)
         log.info('Sending alert to ECM: {}'.format(message))
@@ -448,12 +491,7 @@ class SIMSpeedTest(object):
 
         self.ECM_suspend()
 
-        if self.min_fw_version_check(6, 4):
-            self.enable_eth_mode('connectionset', 1)
-            self.enable_mdm_mode('connectionset', 1)
-        else:
-            self.enable_eth_mode('loadbalance', True)
-            self.enable_mdm_mode('loadbalance', True)
+        self.enable_modem_test_mode(True)
 
         self.connect_sim(sim1, True)
         self.connect_sim(sim2, False)
@@ -462,6 +500,9 @@ class SIMSpeedTest(object):
         if sim1:
             try:
                 if self.modem_state(sim1, 'connected'):
+                    log.info('{}'.format('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, sim1)))
+                    self.diag_data['sim1'] = self.client.get('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, sim1)).get('data', {})
+
                     sim1_upload_speed, sim1_download_speed = self.do_speedtest(sim1)
             except Timeout:
                 log.warning("Timeout on sim=%s", sim1)
@@ -474,6 +515,7 @@ class SIMSpeedTest(object):
             self.connect_sim(sim1, False)
             try:
                 if self.modem_state(sim2, 'connected'):
+                    self.diag_data['sim2'] = self.client.get('{}/{}/diagnostics'.format(self.STATUS_DEVS_PATH, sim2)).get('data', {})
                     sim2_upload_speed, sim2_download_speed = self.do_speedtest(sim2)
             except Timeout:
                 log.warning("Timeout on sim=%s", sim2)
@@ -483,12 +525,7 @@ class SIMSpeedTest(object):
         elif not sim2:
             log.error("Error with Sim2:%s", sim2)
 
-        if self.min_fw_version_check(6, 4):
-            self.enable_eth_mode('connectionset', 0)
-            self.enable_mdm_mode('connectionset', 0)
-        else:
-            self.enable_mdm_mode('loadbalance', False)
-            self.enable_eth_mode('loadbalance', False)
+        self.enable_modem_test_mode(0)
 
         log.info('Speeds - Sim1: %f down, %f up    Sim2: %f down, %f up' % \
                  (sim1_download_speed, sim1_upload_speed, \
@@ -498,8 +535,17 @@ class SIMSpeedTest(object):
         if sim1_download_speed == 0.0 and sim1_upload_speed == 0.0 and \
            sim2_download_speed == 0.0 and sim2_upload_speed == 0.0:
             fail_msg = 'Was not able to get any modem speed results.  Aborting!'
-            self.client.alert(settings.APP_NAME, fail_msg)
-            log.warning(fail_msg)
+            try:
+                s1_signal_msg = 'Sim1: {}'.format(self.signal_info_msg(self.diag_data['sim1']))
+            except KeyError:
+                s1_signal_msg = 'No results for Sim1'
+            try:
+                s2_signal_msg = 'Sim2: {}'.format(self.signal_info_msg(self.diag_data['sim2']))
+            except KeyError:
+                s2_signal_msg = 'No results for Sim2'
+            msg = '{}, {}, {}'.format(fail_msg, s1_signal_msg, s2_signal_msg)
+            self.client.alert(settings.APP_NAME, msg)
+            log.warning(msg)
             self.client.put('/status/sdk', {settings.APP_NAME: 'failed'})
             self.ECM_resume()
             return
@@ -510,12 +556,7 @@ class SIMSpeedTest(object):
 
         self.log_results(product_name, system_id, selected_sim, rejected_sim)
 
-        if self.min_fw_version_check(6, 4):
-            self.enable_mdm_mode('connectionset', None)
-            self.enable_eth_mode('connectionset', None)
-        else:
-            self.enable_mdm_mode('loadbalance', None)
-            self.enable_eth_mode('loadbalance', None)
+        self.enable_modem_test_mode(None)
 
         self.lock_sim(selected_sim)
         self.reset_sim(selected_sim['slot'], True)
