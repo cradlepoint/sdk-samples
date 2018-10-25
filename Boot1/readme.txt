@@ -5,7 +5,7 @@ Boot1
 
 Application Version
 ===================
-2.3
+2.6
 
 NCOS Devices Supported
 ======================
