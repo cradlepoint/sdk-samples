@@ -1,0 +1,30 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2019-04-05T11:53:57.359211",
+        "files": {
+            "app_logging.py": "2e69738f3933e1be1962bdfd9a45a24031bb5b510a8858709bcb44567f7dacba",
+            "cpu_usage.py": "855126d18755566ea8434dc9ea537c765f0376680f85983d01612a1002e6593b",
+            "cs.py": "458f0b45407659433ef535fa618639a3fd6af3b8e53c1ac305296fab3b5700c6",
+            "package.ini": "307bbeba84f7a9a0104636bc0bd0759234cec2c83a7c8f577179b45b663d1f76",
+            "readme.txt": "12e2696ad8970907c6d57962a5cf901b322e1ded85366f7243ae518a194d6d5a",
+            "settings.py": "92db6e2100d161e420ad96548449b0045f3a50d1317b407d3ac6af2ae5546596",
+            "start.sh": "53303f55b036e5640396ff49a7a139cc19eac20e814d24762a51201acb085164",
+            "stop.sh": "aa76372ac896120deaf72e41bb973469643ffd5e485ad14f26e85b77b7d5c885"
+        },
+        "firmware_major": 6,
+        "firmware_minor": 6,
+        "name": "cpu_usage",
+        "notes": "Backup usage stats to attached USB",
+        "reboot": true,
+        "restart": true,
+        "uuid": "fc1e3827-29e0-46fb-bf52-82bcfc8420f6",
+        "vendor": "Cradlepoint",
+        "version_major": 1,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}
