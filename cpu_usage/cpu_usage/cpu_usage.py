@@ -21,13 +21,10 @@ try:
     from app_logging import AppLogger
 
 except Exception as ex:
-    # Output DEBUG logs indicating what import failed. Use the logging in the
-    # CSClient since app_logging may not be loaded.
     cs.CSClient().log('cpu_usage.py', 'Import failure: {}'.format(ex))
     cs.CSClient().log('cpu_usage.py', 'Traceback: {}'.format(traceback.format_exc()))
     sys.exit(-1)
 
-# Create an AppLogger for logging to syslog in NCOS.
 log = AppLogger()
 
 def start_app():
@@ -39,7 +36,6 @@ def start_app():
         create_folder()
         create_csv()
         get_usage()
-        log.info('Started Monty Python and the Harvey Grail')
 
     except Exception as e:
         log.error('Exception during start_app()! exception: {}'.format(e))
@@ -86,7 +82,6 @@ def disable_logging():
     except Exception as e:
         log.error('Exception in disable_logging() function as exception: {}'.format(e))
 
-
 def create_folder():
     """ Try and create folder in /var/media/ for configs if it doesnt exist. """
     try:
@@ -102,7 +97,6 @@ def create_folder():
         log.error('Exception creating /var/media/usage_data/!' \
                   'Is a usb stick attached? exception: {}'.format(e))
 
-
 def create_csv():
     """ Write headers """
     try:
@@ -115,7 +109,6 @@ def create_csv():
     except Exception as e:
         log.error('Exception creating /var/media/usage_data/usage_info.csv, exception: {}'.format(e))
 
-
 def get_usage():
     while True:
         system_id = cs.CSClient().get('/config/system/system_id')
@@ -123,18 +116,11 @@ def get_usage():
         load_avg = cs.CSClient().get('/status/system/load_avg')
         cpu = cs.CSClient().get('/status/system/cpu')
 
-        #cpu_usage = float(cpu['data']['nice']) + float(cpu['data']['system']) +  float(cpu['data']['user']) * float(100)
-
         try:
             os.chdir('/var/media/usage_data/')
 
-            # Hostname, Time, Memory Available, Memory Free, Memory Total, Load 15 Min, Load 1 Min, Load 5 Min, CPU Usage
-
-            # memfree is empty or not used for anything.
-            # memavailable is what can be allocated if requested.
-
             with open('usage_info.csv', 'a') as f:
-                # write row to csv...
+                # write row to csv.
                 f.write(str(system_id['data']) + ',' + \
                         str(time.asctime()) + ',' + \
                         str(('{:,.0f}'.format(memory['data']['memavailable']/float(1<<20))+" MB")) + ',' + \
@@ -145,7 +131,7 @@ def get_usage():
                         str(load_avg['data']['5min']) + ',' + \
                         str(round(float(cpu['data']['nice']) + float(cpu['data']['system']) +  float(cpu['data']['user']) * float(100))) + '%\n')
 
-                # write results to info log as well...
+                # write results to info log.
                 log.info('Mem Available :' + str(('{:,.0f}'.format(memory['data']['memavailable']/float(1<<20))+" MB")) + ',' + \
                          'Mem Free :' + str(('{:,.0f}'.format(memory['data']['memfree']/float(1<<20))+" MB")) + ',' + \
                          'Mem Total :' + str(('{:,.0f}'.format(memory['data']['memtotal']/float(1<<20))+" MB")) + ',' + \
@@ -157,10 +143,6 @@ def get_usage():
         log.info('Usage info saved, sleeping for 15 seconds')
         time.sleep(15)
 
-
-# The main entry point for app_template.py This will be executed when the
-# application is started or stopped as defined in the start.sh and stop.sh
-# scripts. It expects either a 'start' or 'stop' argument.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('opt')
