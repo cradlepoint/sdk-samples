@@ -53,7 +53,7 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
 - **simple\_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **cpu_usage**
-    - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to an attached usb stick.
+    - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
 
 
 
