@@ -11,7 +11,7 @@ Copyright © 2018 Cradlepoint, Inc.  All rights reserved.
 
 This directory contains the NCOS SDK tools and sample applications. Below is a description of each. The Router Applications Development Guide is the best document to read first.
 
-## Documents 
+## Documents
 
 - **README.html**
     - This README file.
@@ -20,7 +20,7 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
 - **Router\_APIs\_for_Applications.html**
     - The router config store API in the router.
 
-## Sample Application Directories 
+## Sample Application Directories
 
 - **app_template**
     - A skeleton template for the creation of a new application.
@@ -33,7 +33,7 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
 - **gps_probe**
     - Probe the GPS hardware and log the results.
 - **hello_world**
-    - Outputs a 'Hello World!' log every 10 seconds. 
+    - Outputs a 'Hello World!' log every 10 seconds.
 - **hspt**
     - Sets up a custom Hot Spot landing page.
 - **ibr1700_gnss**
@@ -52,22 +52,21 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
     - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **simple\_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
+- **cpu_usage**
+    - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
 
 
 
 
-## SDK Directories 
+
+## SDK Directories
 
 - **tools**
     - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
 
-## Files 
+## Files
 
 - **make.py**
     - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
 - **sdk_settings.ini**
     - This is the ini file that contains the settings used by python make.py.
-
-
-
-
