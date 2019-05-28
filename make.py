@@ -165,8 +165,8 @@ def scan_for_cr(path):
     for root, _, files in os.walk(path):
         for fl in files:
             with open(os.path.join(root, fl), 'rb') as f:
-                if b'\r' in f.read() and [x for x in scanfiles if fl.endswith(x)]:
-                    raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
+                if b'\r\n' in f.read() and [x for x in scanfiles if fl.endswith(x)]:
+                    raise Exception('Carriage return - Line Feed (\\r\n) found in file %s, CR not allowed' % (os.path.join(root, fl)))
 
 # Package the app files into a tar.gz archive.
 def package():
