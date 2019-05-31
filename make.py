@@ -221,7 +221,7 @@ def install():
         app_archive = get_app_pack()
 
         # Use sshpass for Linux or OS X
-        cmd = 'sshpass -p {0} scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1} {2}@{3}:/app_upload'.format(
+        cmd = 'sshpass -p {0} scp {1} {2}@{3}:/app_upload'.format(
                g_dev_client_password, app_archive,
                g_dev_client_username, g_dev_client_ip)
 
