@@ -7,6 +7,7 @@ OS X, and Windows once the computer environment is setup.
 import os
 import sys
 import uuid
+import logging
 import json
 import shutil
 import requests
@@ -17,15 +18,18 @@ import urllib3
 urllib3.disable_warnings()
 
 from requests.auth import HTTPDigestAuth
+from tools.bin import package_application
+
+
+logger = logging.getLogger(__name__)
 
 # These will be set in init() by using the sdk_settings.ini file.
 # They are used by various functions in the file.
 g_app_name = ''
-g_app_uuid = ''
+g_app_uuid: str = ''
 g_dev_client_ip = ''
 g_dev_client_username = ''
 g_dev_client_password = ''
-g_python_cmd = 'python3'  # Default for Linux and OS X
 
 
 # Returns the proper HTTP Auth for the global username and password.
@@ -51,57 +55,49 @@ def get_auth():
         return requests.auth.HTTPDigestAuth(g_dev_client_username, g_dev_client_password)
 
 
-# Returns boolean to indicate if the NCOS device is
-# in DEV mode
-def is_NCOS_device_in_DEV_mode():
-    sdk_status = json.loads(get('/status/system/sdk')).get('data')
-    if sdk_status.get('mode') in ['devmode', 'standard']:
-        return True if sdk_status.get('mode') == 'devmode' else False
-    raise('Unknown SDK mode (%s)' % sdk_status.get('mode'))
+def is_NCOS_device_in_devmode(func):
+    """
+    Raises an exception if NCOS device is not in devmode
+    """
+    def wrapper():
+        sdk_status = json.loads(get('/status/system/sdk')).get('data')
+        if sdk_status.get('mode') != 'devmode':
+            raise RuntimeError('Router not in devmode')
+        func()
+    return wrapper
 
 
 # Returns the app package name based on the global app name.
-def get_app_pack(app_name=None):
+def get_app_pack(app_name=None, dist_path=None):
     package_name = g_app_name + ".tar.gz"
     if app_name is not None:
         package_name = app_name + ".tar.gz"
+    if dist_path:
+        package_name = os.path.join(dist_path, package_name)
     return package_name
 
 
 # Gets data from the NCOS config store
 def get(config_tree):
     ncos_api = 'https://{}/api{}'.format(g_dev_client_ip, config_tree)
-
     try:
-        response = requests.get(ncos_api, auth=get_auth(), verify=False)
+        response = requests.get(ncos_api,
+                                auth=get_auth(),
+                                verify=False)
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
         print("Error with get for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
-
     return json.dumps(json.loads(response.text), indent=4)
 
 
-# Get a list of all the apps in the directory
-def get_app_list():
-    app_dirs = []
-    cwd = os.getcwd()
-    print("Scanning {} for app directories.".format(cwd))
-    dirs_in_cwd = os.listdir(cwd)
-
-    # Assume dir is an app_dir if it contains 'package.ini'
-    for item in dirs_in_cwd:
-        if os.path.isdir(item):
-            contents = os.listdir(item)
-            if 'package.ini' in contents:
-                app_dirs.append(item)
-
-    return app_dirs
-
-
-# Puts an SDK action in the NCOS device config store
 def put(value):
+    """
+    Puts an SDK action in the NCOS device config store
+    :param value:
+    :return:
+    """
     try:
         response = requests.put("https://{}/api/control/system/sdk/action".format(g_dev_client_ip),
                                 headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -110,21 +106,23 @@ def put(value):
                                 verify=False)
 
         print('status_code: {}'.format(response.status_code))
-
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
         print("Error with put for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
-
     return json.dumps(json.loads(response.text), indent=4)
 
 
-# Cleans the SDK directory for a given app by removing files created during packaging.
-def clean(app=None):
-    app_name = g_app_name
-    if app is not None:
-        app_name = app
-    print("Cleaning {}".format(app_name))
+def clean(app_name=None):
+    """
+    Cleans the SDK directory for a given app by removing files created during packaging.
+    :param app_name:
+    :return:
+    """
+    global g_app_name
+    if not app_name:
+        app_name = g_app_name
+    print("Cleaning app: {}".format(app_name))
     app_pack_name = get_app_pack(app_name)
     try:
         files_to_clean = [app_name + ".tar.gz", app_name + ".tar"]
@@ -150,16 +148,6 @@ def clean(app=None):
         print('Clean Error 3 for file {}: {}'.format(build_file, e))
 
 
-# Cleans the SDK directory for all apps by removing files created during packaging.
-def clean_all():
-    cwd = os.getcwd()
-    print("Scanning {} for app directories.".format(cwd))
-    app_dirs = get_app_list()
-
-    for app in app_dirs:
-        clean(app)
-
-
 def scan_for_cr(path):
     scanfiles = ('.py', '.sh')
     for root, _, files in os.walk(path):
@@ -168,43 +156,19 @@ def scan_for_cr(path):
                 if b'\r' in f.read() and [x for x in scanfiles if fl.endswith(x)]:
                     raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
 
-# Package the app files into a tar.gz archive.
+
 def package():
+    """
+    Package the app files into a tar.gz archive.
+    """
     print("Packaging {}".format(g_app_name))
-    success = True
-    package_dir = os.path.join('tools', 'bin')
-    package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     app_path = os.path.join(g_app_name)
-    scan_for_cr(app_path)
-
-    try:
-        subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
-    except subprocess.CalledProcessError as err:
-        print('Error packaging {}: {}'.format(g_app_name, err))
-        success = False
-    finally:
-        return success
+    new_package(app_path, None)
 
 
-# Package all the app files in the directory into a tar.gz archives.
-def package_all():
-    success = True
-    cwd = os.getcwd()
-    print("Scanning {} for app directories.".format(cwd))
-    app_dirs = get_app_list()
-
-    package_script_path = os.path.join('tools', 'bin', 'package_application.py')
-    for app in app_dirs:
-        app_path = os.path.join(app)
-        scan_for_cr(app_path)
-        try:
-            print('Build app: {}'.format(app_path))
-            subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
-        except subprocess.CalledProcessError as err:
-            print('Error packaging {}: {}'.format(app_path, err))
-            success = False
-
-    return success
+def new_package(build_path, dist_path):
+    scan_for_cr(build_path)
+    package_application.package_application(build_path, None, dist_path=dist_path)
 
 
 # Get the SDK status from the NCOS device
@@ -215,83 +179,83 @@ def status():
     print(response)
 
 
-# Transfer the app app tar.gz package to the NCOS device
-def install():
-    if is_NCOS_device_in_DEV_mode():
-        app_archive = get_app_pack()
+@is_NCOS_device_in_devmode
+def install(dist_path=None):
+    """
+    Transfer the app app tar.gz package to the NCOS device
+    :param dist_path: path to folder where zip file lives.
+    """
+    app_archive = get_app_pack(dist_path=dist_path)
 
-        # Use sshpass for Linux or OS X
-        cmd = 'sshpass -p {0} scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1} {2}@{3}:/app_upload'.format(
+    # Use sshpass for Linux or OS X
+    cmd = 'sshpass -p {0} scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1} {2}@{3}:/app_upload'.format(
+           g_dev_client_password, app_archive,
+           g_dev_client_username, g_dev_client_ip)
+
+    # For Windows, use pscp.exe in the tools directory
+    if sys.platform == 'win32':
+        cmd = "./tools/bin/pscp.exe -pw {0} -v {1} {2}@{3}:/app_upload".format(
                g_dev_client_password, app_archive,
                g_dev_client_username, g_dev_client_ip)
 
-        # For Windows, use pscp.exe in the tools directory
+    print('Installing {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
+    try:
         if sys.platform == 'win32':
-            cmd = "./tools/bin/pscp.exe -pw {0} -v {1} {2}@{3}:/app_upload".format(
-                   g_dev_client_password, app_archive,
-                   g_dev_client_username, g_dev_client_ip)
-
-        print('Installing {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
-        try:
-            if sys.platform == 'win32':
-                subprocess.check_output(cmd)
-            else:
-                subprocess.check_output(cmd, shell=True)
-        except subprocess.CalledProcessError as err:
-            # There is always an error because the NCOS device will drop the connection.
-            # print('Error installing: {}'.format(err))
-            return 0
-    else:
-        print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
+            subprocess.check_output(cmd)
+        else:
+            subprocess.check_output(cmd, shell=True)
+    except subprocess.CalledProcessError as err:
+        # There is always an error because the NCOS device will drop the connection.
+        pass
 
 
-# Start the app in the NCOS device
+@is_NCOS_device_in_devmode
 def start():
-    if is_NCOS_device_in_DEV_mode():
-        print('Start application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
-        print('Application UUID is {}.'.format(g_app_uuid))
-        response = put('start')
-        print(response)
-    else:
-        print('ERROR: NCOS device is not in DEV Mode! Unable to start the app from {}.'.format(g_dev_client_ip))
+    """
+    Start the app in the NCOS device
+    """
+    print('Start application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+    print('Application UUID is {}.'.format(g_app_uuid))
+    response = put('start')
+    print(response)
 
 
-# Stop the app in the NCOS device
+@is_NCOS_device_in_devmode
 def stop():
-    if is_NCOS_device_in_DEV_mode():
-        print('Stop application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
-        print('Application UUID is {}.'.format(g_app_uuid))
-        response = put('stop')
-        print(response)
-    else:
-        print('ERROR: NCOS device is not in DEV Mode! Unable to stop the app from {}.'.format(g_dev_client_ip))
+    """
+    Stop the app in the NCOS device
+    """
+    print('Stop application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+    print('Application UUID is {}.'.format(g_app_uuid))
+    response = put('stop')
+    print(response)
 
 
-# Uninstall the app from the NCOS device
+@is_NCOS_device_in_devmode
 def uninstall():
-    if is_NCOS_device_in_DEV_mode():
-        print('Uninstall application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
-        print('Application UUID is {}.'.format(g_app_uuid))
-        response = put('uninstall')
-        print(response)
-    else:
-        print('ERROR: NCOS device is not in DEV Mode! Unable to uninstall the app from {}.'.format(g_dev_client_ip))
+    """
+    Uninstall the app from the NCOS device
+    """
+    print('Uninstall application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+    print('Application UUID is {}.'.format(g_app_uuid))
+    response = put('uninstall')
+    print(response)
 
 
-# Purge the app from the NCOS device
+@is_NCOS_device_in_devmode
 def purge():
-    if is_NCOS_device_in_DEV_mode():
-        print('Purged application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
-        print('Application UUID is {}.'.format(g_app_uuid))
-        response = put('purge')
-        print(response)
-    else:
-        print('ERROR: NCOS device is not in DEV Mode! Unable to purge the app from {}.'.format(g_dev_client_ip))
+    """
+    Purge the app from the NCOS device
+    """
+    print('Purged application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
+    print('Application UUID is {}.'.format(g_app_uuid))
+    response = put('purge')
+    print(response)
 
 
 # Prints the help information
 def output_help():
-    print('Command format is: {} make.py <action>\n'.format(g_python_cmd))
+    print('Command format is: python3 make.py <action>\n')
     print('Actions include:')
     print('================')
     print('clean: Clean all project artifacts.')
@@ -341,162 +305,124 @@ def get_app_uuid(ceate_new_uuid=False):
     return g_app_uuid
 
 
-# Setup all the globals based on the OS and the sdk_settings.ini file.
-def init(ceate_new_uuid):
-    global g_python_cmd
-    global g_app_name
-    global g_dev_client_ip
-    global g_dev_client_username
-    global g_dev_client_password
+class AppBuilder:
 
-    success = True
+    # Setup all the globals based on the OS and the sdk_settings.ini file.
+    def __init__(self, ceate_new_uuid):
+        global g_app_name
+        global g_dev_client_ip
+        global g_dev_client_username
+        global g_dev_client_password
 
-    # Keys in sdk_settings.ini
-    sdk_key = 'sdk'
-    app_key = 'app_name'
-    ip_key = 'dev_client_ip'
-    username_key = 'dev_client_username'
-    password_key = 'dev_client_password'
+        # Keys in sdk_settings.ini
+        sdk_key = 'sdk'
+        app_key = 'app_name'
+        ip_key = 'dev_client_ip'
+        username_key = 'dev_client_username'
+        password_key = 'dev_client_password'
 
-    if sys.platform == 'win32':
-        g_python_cmd = 'python'
+        if sys.platform == 'Darwin':
+            # This will exclude the '._' files  in the
+            # tar.gz package for OS X.
+            os.environ["COPYFILE_DISABLE"] = "1"
 
-    elif sys.platform == 'Darwin':
-        # This will exclude the '._' files  in the
-        # tar.gz package for OS X.
-        os.environ["COPYFILE_DISABLE"] = "1"
+        settings_file = os.path.join(os.path.dirname(__file__), 'sdk_settings.ini')
+        config = configparser.ConfigParser()
+        config.read(settings_file)
 
-    settings_file = os.path.join(os.getcwd(), 'sdk_settings.ini')
-    config = configparser.ConfigParser()
-    config.read(settings_file)
+        # Initialize the globals based on the sdk_settings.ini contents.
+        g_app_name = config[sdk_key][app_key]
+        g_dev_client_ip = config[sdk_key][ip_key]
+        g_dev_client_username = config[sdk_key][username_key]
+        g_dev_client_password = config[sdk_key][password_key]
 
-    # Initialize the globals based on the sdk_settings.ini contents.
-    if sdk_key in config:
-        if app_key in config[sdk_key]:
-            g_app_name = config[sdk_key][app_key]
+        # This will also create a UUID if needed.
+        get_app_uuid(ceate_new_uuid)
+
+
+def unit_tests():
+    # load any tests in app/test/unit
+    app_test_path = os.path.join(g_app_name, 'test', 'unit')
+    suite = unittest.defaultTestLoader.discover(app_test_path)
+    # change to the app dir so app files can be properly imported
+    os.chdir(g_app_name)
+    # add the current path to sys path so we can directly import
+    sys.path.append(os.getcwd())
+    # run suite
+    unittest.TextTestRunner().run(suite)
+
+
+def system_tests():
+    # load any tests in app/test/unit
+    app_test_path = os.path.join(g_app_name, 'test', 'system')
+    suite = unittest.defaultTestLoader.discover(app_test_path)
+
+    # try to add IP and auth info to system test classes
+    def iterate_tests(test_suite_or_case):
+        try:
+            suite = iter(test_suite_or_case)
+        except TypeError:
+            yield test_suite_or_case
         else:
-            success = False
-            print('ERROR 1: The {} key does not exist in {}'.format(app_key, settings_file))
+            for test in suite:
+                for subtest in iterate_tests(test):
+                    yield subtest
 
-        if ip_key in config[sdk_key]:
-            g_dev_client_ip = config[sdk_key][ip_key]
-        else:
-            success = False
-            print('ERROR 2: The {} key does not exist in {}'.format(ip_key, settings_file))
+    for test in iterate_tests(suite):
+        try:
+            test.DEV_CLIENT_IP = g_dev_client_ip
+            test.DEV_CLIENT_USER = g_dev_client_username
+            test.DEV_CLIENT_PASS = g_dev_client_password
+        except Exception as e:
+            # if classes don't accept it ignore
+            pass
 
-        if username_key in config[sdk_key]:
-            g_dev_client_username = config[sdk_key][username_key]
-        else:
-            success = False
-            print('ERROR 3: The {} key does not exist in {}'.format(username_key, settings_file))
-
-        if password_key in config[sdk_key]:
-            g_dev_client_password = config[sdk_key][password_key]
-        else:
-            success = False
-            print('ERROR 4: The {} key does not exist in {}'.format(password_key, settings_file))
-    else:
-        success = False
-        print('ERROR 5: The {} section does not exist in {}'.format(sdk_key, settings_file))
-
-    # This will also create a UUID if needed.
-    get_app_uuid(ceate_new_uuid)
-
-    return success
+    # change to the app dir so app files can be properly imported
+    os.chdir(g_app_name)
+    # add the current path to sys path so we can directly import
+    sys.path.append(os.getcwd())
+    # run suite
+    unittest.TextTestRunner().run(suite)
 
 
-if __name__ == "__main__":
+UTILITY_PROCESSES = {
+    'redeploy': [clean, uninstall, package, install],
+    'clean': [clean],
+    'package': [clean, package],
+    'build': [clean, package],
+    'status': [status],
+    'install': [uninstall, install],
+    'start': [start],
+    'stop': [stop],
+    'uninstall': [uninstall],
+    'purge': [purge],
+    'uuid': [], #handled by AppBuilder constructor
+    'unit': [unit_tests],
+    'system': [system_tests]
+
+}
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
     # Default is no arguments given.
     if len(sys.argv) < 2:
         output_help()
         sys.exit(0)
 
     utility_name = str(sys.argv[1]).lower()
-    option = None
-    if len(sys.argv) > 2:
-        option = str(sys.argv[2]).lower()
 
-    if not init(ceate_new_uuid=utility_name == 'uuid'):
-        sys.exit(0)
+    AppBuilder(ceate_new_uuid=utility_name == 'uuid')
 
-    if utility_name == 'clean':
-        if option == 'all':
-            clean_all()
-        else:
-            clean()
-
-    elif utility_name in ['package', 'build']:
-        if option == 'all':
-            package_all()
-        else:
-            package()
-
-    elif utility_name == 'status':
-        status()
-
-    elif utility_name == 'install':
-        install()
-
-    elif utility_name == 'start':
-        start()
-
-    elif utility_name == 'stop':
-        stop()
-
-    elif utility_name == 'uninstall':
-        uninstall()
-
-    elif utility_name == 'purge':
-        purge()
-
-    elif utility_name == 'uuid':
-        # This is handled in init()
-        pass
-
-    elif utility_name == 'unit':
-        # load any tests in app/test/unit
-        app_test_path = os.path.join(g_app_name, 'test', 'unit')
-        suite = unittest.defaultTestLoader.discover(app_test_path)
-        # change to the app dir so app files can be properly imported
-        os.chdir(g_app_name)
-        # add the current path to sys path so we can directly import
-        sys.path.append(os.getcwd())
-        # run suite
-        unittest.TextTestRunner().run(suite)
-
-    elif utility_name == 'system':
-        # load any tests in app/test/unit
-        app_test_path = os.path.join(g_app_name, 'test', 'system')
-        suite = unittest.defaultTestLoader.discover(app_test_path)
-
-        # try to add IP and auth info to system test classes
-        def iterate_tests(test_suite_or_case):
-            try:
-                suite = iter(test_suite_or_case)
-            except TypeError:
-                yield test_suite_or_case
-            else:
-                for test in suite:
-                    for subtest in iterate_tests(test):
-                        yield subtest
-
-        for test in iterate_tests(suite):
-            try:
-                test.DEV_CLIENT_IP = g_dev_client_ip
-                test.DEV_CLIENT_USER = g_dev_client_username
-                test.DEV_CLIENT_PASS = g_dev_client_password
-            except Exception as e:
-                # if classes don't accept it ignore
-                pass
-
-        # change to the app dir so app files can be properly imported
-        os.chdir(g_app_name)
-        # add the current path to sys path so we can directly import
-        sys.path.append(os.getcwd())
-        # run suite
-        unittest.TextTestRunner().run(suite)
-
-    else:
+    try:
+        processes = UTILITY_PROCESSES[utility_name]
+    except KeyError:
         output_help()
+        return
 
-    sys.exit(0)
+    for process in processes:
+        process()
+
+
+if __name__ == "__main__":
+    main()

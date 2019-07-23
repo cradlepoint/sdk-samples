@@ -52,17 +52,19 @@ def hash_dir(target, hash_func=hashlib.sha256):
     return hashed_files
 
 
-def pack_package(app_root, app_name):
+def pack_package(app_root, app_name, dist_path=None):
+    if not dist_path:
+        dist_path = os.getcwd()
     print('app_root: {}'.format(app_root))
     print('app_name: {}'.format(app_name))
-    print("pack TAR:%s.tar" % app_name)
-    tar_name = "{}.tar".format(app_name)
-    tar = tarfile.open(tar_name, 'w')
+    tar_name = os.path.join(dist_path, "{}.tar".format(app_name))
+    print("pack TAR:%s" % tar_name)
+    tar = tarfile.TarFile.open(tar_name, 'w', dereference=True)
     tar.add(app_root, arcname=os.path.basename(app_root))
     tar.close()
 
-    print("gzip archive:%s.tar.gz" % app_name)
-    gzip_name = "{}.tar.gz".format(app_name)
+    print("gzip archive:%s.gz" % tar_name)
+    gzip_name = "{}.gz".format(tar_name)
     with open(tar_name, 'rb') as f_in:
         with gzip.open(gzip_name, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
@@ -101,7 +103,7 @@ def clean_bytecode_files(app_root):
     pass
 
 
-def package_application(app_root, pkey):
+def package_application(app_root, pkey, dist_path=None):
     app_root = os.path.realpath(app_root)
     app_config_file = os.path.join(app_root, CONFIG_FILE)
     app_metadata_folder = os.path.join(app_root, META_DATA_FOLDER)
@@ -113,7 +115,7 @@ def package_application(app_root, pkey):
 
     for section in config.sections():
         app_name = section
-        assert os.path.basename(app_root) == app_name
+        #assert os.path.basename(app_root) == app_name
 
         clean_manifest_folder(app_metadata_folder)
 
@@ -158,7 +160,7 @@ def package_application(app_root, pkey):
 
         create_signature(app_metadata_folder, pkey)
 
-        pack_package(app_root, section)
+        pack_package(app_root, section, dist_path)
 
         print('Package {}.tar.gz created'.format(section))
 
