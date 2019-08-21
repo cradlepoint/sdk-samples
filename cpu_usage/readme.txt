@@ -5,7 +5,7 @@ cpu_usage
 
 Application Version
 ===================
-1.0
+1.10
 
 
 NCOS Devices Supported
@@ -15,17 +15,36 @@ ALL with usb support and FW 7.0.0 and higher.
 
 External Requirements
 =====================
-The USB drive must be formatted in fat32.
+1. NCOS 7.0.0 and higher.
+2. The USB drive must be formatted in fat32.
+3. The drive must be plugged in to write to a csv file.
 
 
 Application Purpose
 ===================
-Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
+Writes cpu and memory information to logs and a csv file. On the first pass
+will create the csv file and header. After that it will append the cpu and
+memory information to the csv file.
 
 
 Expected Output
 ===============
-Your USB drive should get populated with usage_info.csv that will look like the example below:
+usage_info.csv will look like the example below:
 
-Hostname	  Time	                    Memory Available	Memory Free	Memory Total	Load 15 Min	Load 1 Min	Load 5 Min	CPU Usage
-IBR900-e44	Fri Apr 12 15:58:25 2019	43 MB	            6 MB	      231 MB	      0.14	      0.08	      0.11	      6%
+Hostname: IBR900-e44
+
+Time: Fri Apr 12 15:58:25 2019
+
+Memory Available: 43 MB
+
+Memory Free: 6 MB
+
+Memory Total: 231 MB
+
+Load 15 Min: 0.14
+
+Load 1 Min: 0.08
+
+Load 5 Min: 0.11
+
+CPU Usage: 6%
