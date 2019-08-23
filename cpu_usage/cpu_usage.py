@@ -127,7 +127,7 @@ def get_usage():
 
                         log.info(log_data)
 
-                        log.info('USB Mount Status: ' + str(usb_status['data'].title()))
+                        log.info('USB Mount Status: ' + str(usb_status['data']))
 
             except Exception as e:
                 log.error('Exception during save! exception: {}'.format(e))
@@ -135,7 +135,7 @@ def get_usage():
             time.sleep(15)
 
         else:
-            log.info('USB Mount Status: ' + str(usb_status['data'].title()))
+            log.info('USB Mount Status: ' + str(usb_status['data']))
 
             log.info(log_data)
 
