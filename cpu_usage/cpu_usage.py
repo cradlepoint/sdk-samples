@@ -3,20 +3,21 @@ try:
     import sys
     import traceback
     import argparse
+
     import os
-    import subprocess
     import time
-    import json
-    import zlib
 
     from app_logging import AppLogger
 
 except Exception as ex:
-    cs.CSClient().log('cpu_usage.py', f'Import failure: {ex}')
-    cs.CSClient().log('cpu_usage.py', f'Traceback: {traceback.format_exc()}')
+    # Output DEBUG logs indicating what import failed. Use the logging in the
+    # CSClient since app_logging may not be loaded.
+    cs.CSClient().log('app_template.py', 'Import failure: {}'.format(ex))
+    cs.CSClient().log('app_template.py', 'Traceback: {}'.format(traceback.format_exc()))
     sys.exit(-1)
 
 log = AppLogger()
+
 
 def start_app():
     """ Add functionality to execute when the app is started. """
@@ -73,13 +74,13 @@ def get_usage():
         csv_data = (
             str(system_id['data']) + ',' +
             str(time.asctime()) + ',' +
-            str(('{:,.0f}'.format(
+            str(('{:.0f}'.format(
                 memory['data']['memavailable']
                 / float(1 << 20))+" MB")) + ',' +
-            str(('{:,.0f}'.format(
+            str(('{:.0f}'.format(
                 memory['data']['memfree']
                 / float(1 << 20))+" MB")) + ',' +
-            str(('{:,.0f}'.format(
+            str(('{:.0f}'.format(
                 memory['data']['memtotal']
                 / float(1 << 20))+" MB")) + ',' +
             str(load_avg['data']['15min']) + ',' +
