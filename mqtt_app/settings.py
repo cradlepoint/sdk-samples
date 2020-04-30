@@ -1,7 +1,7 @@
-import cs
+from csclient import EventingCSClient
+cp = EventingCSClient('mqtt_app')
 
-# Used for logging or anytime the app name is needed
-APP_NAME = 'mqtt_app'
+MQTT_CLIENT_ID = cp.get('config/system/system_id')
 
 # MQTT Server settings
 MQTT_SERVER = 'test.mosquitto.org'
@@ -15,7 +15,3 @@ MQTT_PASSWORD = 'anonymous'
 GPS_TOPIC = '/status/gps/lastpos'
 MODEM_TEMP_TOPIC = '/status/system/modem_temperature'
 WAN_CONNECTION_STATE_TOPIC = '/status/wan/connection_state'
-
-# MQTT Client
-MQTT_CLIENT_ID = cs.CSClient().get('/config/system/system_id').get('data', '')
-MQTT_LOGGING = False

@@ -1,0 +1,27 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T10:48:13.993727",
+        "files": {
+            "csclient.py": "ceb0eb49b5b34ba64cae9b5871b87c87af989e218aa2b6bae2de395322658048",
+            "package.ini": "a5f80ae3f03de5dff8b1261d05a2dd6680ad367d16bba670c38caabc8a1cbd99",
+            "readme.txt": "af12134e9f8dfc672157883453fb07d717992874bdd306406167b935f3b14877",
+            "serial_temp.py": "640ae1735600ea0838023bd2b28599fd4a1556ad2d1d351daec135ef0629eb7b",
+            "start.sh": "1e2eba38adde041b81085ac61d1470878c9049ee1ee97b970bf95f0d382d3773"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "serial_temp",
+        "notes": "Router SDK to read serial temp data",
+        "reboot": true,
+        "restart": true,
+        "uuid": "e9dcf6a7-f841-41dd-a2c2-7fcebdf1aff6",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

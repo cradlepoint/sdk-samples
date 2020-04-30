@@ -1,0 +1,26 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T10:49:22.892048",
+        "files": {
+            "package.ini": "e3715c4b8d2973a4779132df06b290d367e5f97730a024eed855dd0de9fe65ee",
+            "readme.txt": "5bc30d82170fb4c94571c55d8728e37435a11d5fd8e778cae2073c419c1ef409",
+            "serial_vibration_test.py": "3a0828b347444cead926628b6ece228881a9f7d715f6d3bae0893b1d36c24fd2",
+            "start.sh": "9b339ff40ecb2e65525560fcaa3d8ceb1e54486795883778074a3735093daf62"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "serial_vibration_test",
+        "notes": "Router SDK to test serial cable during vibration test",
+        "reboot": true,
+        "restart": false,
+        "uuid": "ef39197b-0289-432f-8921-0596615eef03",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

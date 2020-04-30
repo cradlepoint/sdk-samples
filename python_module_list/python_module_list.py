@@ -17,32 +17,16 @@ pip(3) install --ignore-install --target=<app directory path> <python module>
 * note: use pip on Windows and pip3 on Linux or OS X
 """
 
-# A try/except is wrapped around the imports to catch an
-# attempt to import a file or library that does not exist
-# in NCOS. Very useful during app development if one is
-# adding python modules.
-try:
-    import cs
-    import os
-    import sys
-    import shutil
-    import pkgutil
-    import platform
-    import collections
-    import traceback
+import os
+import sys
+import pkgutil
+import platform
+import collections
 
-    from app_logging import AppLogger
-    from importlib import util
+from importlib import util
+from csclient import EventingCSClient
 
-except Exception as ex:
-    # Output logs indicating what import failed.
-    cs.CSClient().log('python_module_list.py', 'Import failure: {}'.format(ex))
-    cs.CSClient().log('python_module_list.py', 'Traceback: {}'.format(traceback.format_exc()))
-    sys.exit(-1)
-
-
-# Create an AppLogger for logging to syslog in NCOS.
-log = AppLogger()
+cp = EventingCSClient('python_module_list')
 
 
 def log_module_list():
@@ -88,20 +72,20 @@ def log_module_list():
 
     line = '-' * 10
     # Log the python version running in the device
-    log.info('{0} Python Version: {1} {0}'.format(line, platform.python_version()))
+    cp.log('{0} Python Version: {1} {0}'.format(line, platform.python_version()))
 
     # Log the python module that were found in the device
     for loader, modules in loaders.items():
         if len(modules) != 0:
-            log.info('{0} Module Count={1}: {2} {0}'.format(line, len(modules), loader))
+            cp.log('{0} Module Count={1}: {2} {0}'.format(line, len(modules), loader))
             count = 0
             for mod in modules:
                 count += 1
-                log.info('|{0:>3}| {1:20}| {2}'.format(count, mod[0], mod[1]))
+                cp.log('|{0:>3}| {1:20}| {2}'.format(count, mod[0], mod[1]))
 
 
 if __name__ == "__main__":
     try:
         log_module_list()
     except Exception as e:
-        log.error('Exception occurred! exception: {}'.format(e))
+        cp.log('Exception occurred! exception: {}'.format(e))

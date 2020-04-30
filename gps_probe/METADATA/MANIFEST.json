@@ -1,0 +1,31 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T09:58:11.597615",
+        "files": {
+            "csclient.py": "c260a88a0f63c0709530e7d5a1c8c719a5ddbf21b8fc67158abb232623f9efa2",
+            "gps_probe.py": "80ee40f531e6c491fcc9756409c3ea81ba20cc831f79f6a46f5c4320debc0505",
+            "package.ini": "c777771a2ab593df9fbb9b94d9e88fdeceb5330ab3a5f4cacbd17e666935b072",
+            "readme.txt": "3e527d2531923a2c3b4be8894ba291080039d5be0fd0875c1d0e99a650ca5a43",
+            "start.sh": "5c7ba9d5afaccdd721e6ebd9b3bf9da0a87d59a81e63a1c59ba82e760eeebbe9",
+            "test/system/test_app 2.py": "67ebbd9b2c14a5ef70388857af9c35f735f7ed466fd1271aea95571972ca1985",
+            "test/system/test_app.py": "67ebbd9b2c14a5ef70388857af9c35f735f7ed466fd1271aea95571972ca1985",
+            "test/unit/test_app 2.py": "223eb84a774341ea7d40b9d1fb3fb16845fb9dda55be791119ae82dc52a4088e",
+            "test/unit/test_app.py": "223eb84a774341ea7d40b9d1fb3fb16845fb9dda55be791119ae82dc52a4088e"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "gps_probe",
+        "notes": "gps_probe",
+        "reboot": true,
+        "restart": false,
+        "uuid": "cde20cbb-b246-40ef-9f60-1234567890ab",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

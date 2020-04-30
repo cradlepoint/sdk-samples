@@ -1,0 +1,28 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T10:01:27.084617",
+        "files": {
+            "csclient.py": "c260a88a0f63c0709530e7d5a1c8c719a5ddbf21b8fc67158abb232623f9efa2",
+            "ibr1700_gnss.py": "3d4e6b8a175cc5fa66374f7987a630f575e5f26cbf67f4434869efabe9142eda",
+            "inetline.py": "4514d56adccba1ad6db2f8e9610bb94f60eb5b778f60da209a9984fd2773f413",
+            "package.ini": "9130cbb37dcafedfa46d0b0ff4bbf2eccef10e4cebf8bc3e63c5cd870a1e4367",
+            "readme.txt": "2178c9c1ae304a0638d766ae7f2d376442019d9ba6fd1ebbaf78502e88ca4353",
+            "start.sh": "e5122f341cb61f6492f11f0f1d81286a1ab985aa717bd3542482330d88a29fa9"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "ibr1700_gnss",
+        "notes": "A reference application for accessing GNSS on the IBR1700",
+        "reboot": true,
+        "restart": true,
+        "uuid": "5730b010-ff8c-4ea2-8694-030312482b97",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

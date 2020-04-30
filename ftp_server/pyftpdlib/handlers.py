@@ -1786,7 +1786,7 @@ class FTPHandler(AsyncChat):
     # this is defined earlier
     # log_prefix = '%(remote_ip)s:%(remote_port)s-[%(username)s]'
 
-    def log(self, msg, logfun=logger.info):
+    def log(self, msg: object, logfun: object = logger.info) -> object:
         """Log a message, including additional identifying session data."""
         prefix = self.log_prefix % self.__dict__
         logfun("%s %s" % (prefix, msg))

@@ -5,7 +5,7 @@ serial_vibration_test
 
 Application Version
 ===================
-1.0
+2.0
 
 
 NCOS Devices Supported

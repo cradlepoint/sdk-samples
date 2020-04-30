@@ -3,14 +3,12 @@ Gets the '/status' from the router config store and send it
 to a test server.
 '''
 
-
-import cs
 import datetime
 import urllib.request
 import urllib.parse
+from csclient import EventingCSClient
 
-
-APP_NAME = 'send_to_server'
+cp = EventingCSClient('send_to_server')
 
 
 def post_to_server():
@@ -20,8 +18,8 @@ def post_to_server():
         start_time = datetime.datetime.now()
 
         # Get the item from the router config store
-        tree_data = cs.CSClient().get(tree_item)
-        cs.CSClient().log(APP_NAME, "{}: {}".format(tree_item, tree_data))
+        tree_data = cp.get(tree_item)
+        cp.log("{}: {}".format(tree_item, tree_data))
 
         time_to_get = datetime.datetime.now() - start_time
         encode_start_time = datetime.datetime.now()
@@ -41,14 +39,14 @@ def post_to_server():
         end_time = datetime.datetime.now()
 
         # Log the response code and the processing timing information.
-        cs.CSClient().log(APP_NAME, "data sent, http response code: {}".format(response.code))
-        cs.CSClient().log(APP_NAME, 'Time to get data from router config store: {}'.format(time_to_get))
-        cs.CSClient().log(APP_NAME, 'Time to urlencode data: {}'.format(time_to_encode))
-        cs.CSClient().log(APP_NAME, 'Time to get reply from server: {}'.format(end_time - send_to_server_start_time))
-        cs.CSClient().log(APP_NAME, 'Time to get and send data in post request: {}'.format(end_time - start_time))
+        cp.log("data sent, http response code: {}".format(response.code))
+        cp.log('Time to get data from router config store: {}'.format(time_to_get))
+        cp.log('Time to urlencode data: {}'.format(time_to_encode))
+        cp.log('Time to get reply from server: {}'.format(end_time - send_to_server_start_time))
+        cp.log('Time to get and send data in post request: {}'.format(end_time - start_time))
 
     except Exception as ex:
-        cs.CSClient().log(APP_NAME, 'Something went wrong! ex: {}'.format(ex))
+        cp.log('Something went wrong! ex: {}'.format(ex))
 
 
 if __name__ == "__main__":

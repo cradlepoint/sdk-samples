@@ -1,0 +1,27 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T07:36:35.733071",
+        "files": {
+            "cpu_usage.py": "64a28b71acb508411a7afc7ac8ed1f14fe2e8f65594200258ce37dd180e3d02f",
+            "csclient.py": "0c6a55c889daf7df554ab1d22e3290cbb45540a081a62b485036d98ef01e681b",
+            "package.ini": "d092e1ebec577b4219c7b9a5293ee3fbc7e93b18fcf95532ef3916f9df572ac7",
+            "readme.txt": "86cc10bf6fc37a8165f449c6f4d7c73c3280b738ec49c8bd4c28e4484645ef3a",
+            "start.sh": "6f37a458f7fc95009b96f5f3e88f8bc13d840d41e1a55568cd5b209d554c3f13"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "cpu_usage",
+        "notes": "cpu_usage",
+        "reboot": true,
+        "restart": true,
+        "uuid": "f76921d7-d1e2-4a16-a6a0-2a54048f3c55",
+        "vendor": "Cradlepoint",
+        "version_major": 0,
+        "version_minor": 2
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

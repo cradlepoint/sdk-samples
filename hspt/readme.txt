@@ -5,7 +5,7 @@ hspt
 
 Application Version
 ===================
-1.6
+2.0
 
 
 NCOS Devices Supported

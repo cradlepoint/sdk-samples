@@ -1,0 +1,31 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T10:42:10.816349",
+        "files": {
+            "csclient.py": "ceb0eb49b5b34ba64cae9b5871b87c87af989e218aa2b6bae2de395322658048",
+            "package.ini": "021a4328568e026aafe8584b71c17e4181d2546e1b3961d5fb6e1c91ea0b5e89",
+            "readme.txt": "e294a7138887a57cdd0338dab5b0e6edca6de5bebf86d99abf04736dc1f7dea8",
+            "send_to_server.py": "1db02889ac746b36bd653e12ffb5c47cb7a480c44df8bbd31cdcf69bbcc7bbc4",
+            "start.sh": "06fe17792fb881975ff8bf1b0ab62885ab67c839aaa0502b2255a3eff787e8b0",
+            "test/system/test_app 2.py": "2c8fee181dd8743e2e5f35605b0479c04ab7bdb3da127c87075a32049e08048a",
+            "test/system/test_app.py": "2c8fee181dd8743e2e5f35605b0479c04ab7bdb3da127c87075a32049e08048a",
+            "test/unit/test_app 2.py": "abce24abcdd27b11c1d06adda39d28f9caa0342a3a7686f8e902fc8378fb4182",
+            "test/unit/test_app.py": "abce24abcdd27b11c1d06adda39d28f9caa0342a3a7686f8e902fc8378fb4182"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "send_to_server",
+        "notes": "Sends data to a server via http post.",
+        "reboot": true,
+        "restart": false,
+        "uuid": "82583a58-108e-4ac7-80e2-b0bba753330e",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

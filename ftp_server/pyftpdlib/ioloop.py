@@ -152,7 +152,7 @@ class _Scheduler(object):
         except IndexError:
             pass
 
-    def register(self, what):
+    def register(self, what: object) -> object:
         """Register a _CallLater instance."""
         heapq.heappush(self._tasks, what)
 
@@ -293,7 +293,7 @@ class _IOLoop(object):
                     cls._instance = cls()
         return cls._instance
 
-    def register(self, fd, instance, events):
+    def register(self, fd: object, instance: object, events: object) -> object:
         """Register a fd, handled by instance for the given events."""
         raise NotImplementedError('must be implemented in subclass')
 
@@ -414,7 +414,7 @@ class Select(_IOLoop):
         self._r = []
         self._w = []
 
-    def register(self, fd, instance, events):
+    def register(self, fd: object, instance: object, events: object) -> object:
         if fd not in self.socket_map:
             self.socket_map[fd] = instance
             if events & self.READ:
@@ -477,7 +477,7 @@ class _BasePollEpoll(_IOLoop):
         _IOLoop.__init__(self)
         self._poller = self._poller()
 
-    def register(self, fd, instance, events):
+    def register(self, fd: object, instance: object, events: object) -> object:
         try:
             self._poller.register(fd, events)
         except EnvironmentError as err:
@@ -648,7 +648,7 @@ if hasattr(select, 'kqueue'):  # pragma: no cover
             _IOLoop.close(self)
             self._kqueue.close()
 
-        def register(self, fd, instance, events):
+        def register(self, fd: object, instance: object, events: object) -> object:
             self.socket_map[fd] = instance
             try:
                 self._control(fd, events, select.KQ_EV_ADD)

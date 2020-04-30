@@ -15,17 +15,17 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
 
 - **README.html**
     - This README file.
-- **Router\_Application\_Development_Guide.html**
+- **Cradlepoint NCOS SDK v3.0 Application Developers Guide.html**
     - The main document that describes application development.
-- **Router\_APIs\_for_Applications.html**
-    - The router config store API in the router.
 
 ## Sample Application Directories
 
-- **app_template**
-    - A skeleton template for the creation of a new application.
-- **Boot1**
-    - On bootup, this application will select test the connection of each sim in a dual sim modem and enable the best.
+- **app_template_csclient**
+    - A template for the creation of a new application utilizing the csclient library.
+- **Boot2**
+    - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
+- **cpu_usage**
+    - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
@@ -40,24 +40,32 @@ This directory contains the NCOS SDK tools and sample applications. Below is a d
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
+- **mosquitto**
+    - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
     - Demonstrated MQTT using the paho library
-- **ping**
-    - Ping an address and log the results.
-- **python\_module_list**
+- **mqtt_azure_client**
+    - Sample Application which uses SDK to send sensor data to
+Microsoft Azure IoT Central.
+- **mqtt_azure_tls**
+    - Sample Application which uses SDK to send sensor data to
+Microsoft Azure IoT Central over TLS connection.
+- **ping_sample**
+    - Contains ping function and example usage.
+- **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
-- **send\_to_server**
+- **send_to_server**
     - Gets the '/status' from the device config store and send it to a test server.
-- **simple\_custom_dashboard**
+- **serial_temp**
+    - This is a test application to serial data from the data logger connected
+to the router and output that to MQTT messages that are forwarded from the
+router to Azure IoT Central.
+- **serial_vibration_test**
+    - This is a test developed for the Cradlepoint Serial Device (CSD) to be used during vibration testing of the CSD.  The application is a simple serial echo server that opens a port on the router.  Data is sent to the application and is echoed back to the client over the serial port.  A LAN device is connected and communicates with the router via port 5556.  When the vibration test is running, the LAN client will be notified if the serial cable is disconnected or connected.
+- **simple_custom_dashboard**
     - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
-- **simple\_web_server**
+- **simple_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
-- **cpu_usage**
-    - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
-
-
-
-
 
 ## SDK Directories
 

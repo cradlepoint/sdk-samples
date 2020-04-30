@@ -1,0 +1,33 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-17T10:00:51.816352",
+        "files": {
+            "csclient.py": "c260a88a0f63c0709530e7d5a1c8c719a5ddbf21b8fc67158abb232623f9efa2",
+            "dynui.txt": "1292904a530b7cc82b8f724e96ae239db806965bfd29faa29c3c91681a603526",
+            "hspt.py": "faa467a9b31c283a444589126988301dd7042643a8d84324bf92f630538906a1",
+            "index.tpl.html": "813629b317d96babd38a390aefe0abf41c58b2c345bd98f384957102bb238921",
+            "package.ini": "edf20c527042535238cdf4010b99686291928bdf0cfaf84624526c6935cc3379",
+            "readme.txt": "f22851058a561ee1b469621ae79b334a52e82deb7d740624b547fdfc4bd59f47",
+            "resources/generic 2.css": "ac30c739523ec302ed97beb6887af733336d6db67bbc58d4e44716f63599599f",
+            "resources/generic.css": "ac30c739523ec302ed97beb6887af733336d6db67bbc58d4e44716f63599599f",
+            "resources/netcloud-mobileimg 2.jpg": "7c19ac6c612add0c69c5320761909aa243a93029d16381954be94b65c50d372a",
+            "resources/netcloud-mobileimg.jpg": "7c19ac6c612add0c69c5320761909aa243a93029d16381954be94b65c50d372a",
+            "start.sh": "97205f2c117dedb3560e45ec89ae47f03d9e91bb1bb99c55cbcb7798fa869fa5"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "hspt",
+        "notes": "Router SDK Demo Application",
+        "reboot": true,
+        "restart": false,
+        "uuid": "7042c8fd-fe7a-4846-aed1-e3f8d6a1c91c",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}

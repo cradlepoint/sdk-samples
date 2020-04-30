@@ -1,0 +1,40 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2020-04-23T11:40:39.915568",
+        "files": {
+            "csclient.py": "c260a88a0f63c0709530e7d5a1c8c719a5ddbf21b8fc67158abb232623f9efa2",
+            "ibr1700_obdII.py": "c18cd0be59815f1bb5f7041a0d960e8a2a1cdfcbc05806910f59c38cc4c19a1e",
+            "package.ini": "6ff2f6ee5ce2903440c8f0102a018ba19eb8313b79b9eb0e1207e3dc960b2064",
+            "paho/__init__ 2.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "paho/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "paho/mqtt/__init__ 2.py": "8a80b7eabd951aa2e5ce3c0e27d5c12fc74a5050e0f6b796bf0445aff58284d5",
+            "paho/mqtt/__init__.py": "8a80b7eabd951aa2e5ce3c0e27d5c12fc74a5050e0f6b796bf0445aff58284d5",
+            "paho/mqtt/client 2.py": "d5730227110fb502c8cf1577a3bf68b5e48fe0fb9567a7374e2ce90bf29601fe",
+            "paho/mqtt/client.py": "d5730227110fb502c8cf1577a3bf68b5e48fe0fb9567a7374e2ce90bf29601fe",
+            "paho/mqtt/matcher 2.py": "fea9cce1a6b59739c2770716e5f1b7a6e0d5428eb2be130d64de5759b74f7029",
+            "paho/mqtt/matcher.py": "fea9cce1a6b59739c2770716e5f1b7a6e0d5428eb2be130d64de5759b74f7029",
+            "paho/mqtt/publish 2.py": "35d97d31902dfed681f0a96a6dcabcdfe17e417817f5f75c580d7f68c8486112",
+            "paho/mqtt/publish.py": "35d97d31902dfed681f0a96a6dcabcdfe17e417817f5f75c580d7f68c8486112",
+            "paho/mqtt/subscribe 2.py": "f64891e62f20fa294f7423c123c143f2fc79bfa9e3e0774fed101ece0642b3b1",
+            "paho/mqtt/subscribe.py": "f64891e62f20fa294f7423c123c143f2fc79bfa9e3e0774fed101ece0642b3b1",
+            "readme.txt": "20009e46a2b804c0b1d96321a727b3e4382145b5bbc9d442044b95cc7b5a22ee",
+            "settings.py": "1a3ab1f7eae876f2ab8193d7908ba01cdb701a560daac6a79bde163b2f0ff5fc",
+            "start.sh": "87c665274d91e3d826de64ca6f3c51f8b18d9785cc503cebf7e7b5b21ba41091"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "ibr1700_obdII",
+        "notes": "Demonstrates subscribing to OBDII topics with MQTT",
+        "reboot": true,
+        "restart": true,
+        "uuid": "009f0b44-efa2-4552-9212-76d8cac8079e",
+        "vendor": "Cradlepoint",
+        "version_major": 2,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}
