@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython installer.py start
+cppython hspt.py

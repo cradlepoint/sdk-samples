@@ -1,2 +1,2 @@
 #!/bin/bash
-cppython cpu_usage.py start
+cppython cpu_usage.py

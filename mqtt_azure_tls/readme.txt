@@ -5,7 +5,7 @@ mqtt_azure_tls
 
 Application Version
 ===================
-1.0
+2.0
 
 
 NCOS Devices Supported

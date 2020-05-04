@@ -275,7 +275,7 @@ class _Base(object):
     msg_no_such_user = "Authentication failed."
     msg_wrong_password = "Authentication failed."
     msg_anon_not_allowed = "Anonymous access not allowed."
-    msg_invalid_shell = "User %s doesn't have a valid shell."
+    msg_invalid_shell = "User %s doesn't have a valid shell_sample."
     msg_rejected_user = "User %s is not allowed to login."
 
     def __init__(self):
@@ -488,7 +488,7 @@ else:
          >>> # accept some users only
          >>> auth = UnixAuthorizer(allowed_users=["matt", "jay"])
          >>>
-         >>> # accept everybody and don't care if they have not a valid shell
+         >>> # accept everybody and don't care if they have not a valid shell_sample
          >>> auth = UnixAuthorizer(require_valid_shell=False)
          >>>
          >>> # set specific options for a user
@@ -520,12 +520,12 @@ else:
                 against the FTP server; defaults to [] (no restrictions).
 
              - (bool) require_valid_shell:
-                Deny access for those users which do not have a valid shell
+                Deny access for those users which do not have a valid shell_sample
                 binary listed in /etc/shells.
                 If /etc/shells cannot be found this is a no-op.
                 Anonymous user is not subject to this option, and is free
-                to not have a valid shell defined.
-                Defaults to True (a valid shell is required for login).
+                to not have a valid shell_sample defined.
+                Defaults to True (a valid shell_sample is required for login).
 
              - (string) anonymous_user:
                 specify it if you intend to provide anonymous access.
@@ -558,7 +558,7 @@ else:
             if require_valid_shell:
                 for username in self.allowed_users:
                     if not self._has_valid_shell(username):
-                        raise AuthorizerError("user %s has not a valid shell"
+                        raise AuthorizerError("user %s has not a valid shell_sample"
                                               % username)
 
         def override_user(self, username, password=None, homedir=None,
@@ -608,7 +608,7 @@ else:
 
         @staticmethod
         def _has_valid_shell(username):
-            """Return True if the user has a valid shell binary listed
+            """Return True if the user has a valid shell_sample binary listed
             in /etc/shells. If /etc/shells can't be found return True.
             """
             try:

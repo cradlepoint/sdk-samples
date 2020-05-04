@@ -403,7 +403,7 @@ class dispatcher:
     # logging and warning methods. In general, log is for 'hit' logging
     # and 'log_info' is for informational, warning and error logging.
 
-    def log(self, message):
+    def log(self, message: object) -> object:
         sys.stderr.write('log: %s\n' % str(message))
 
     def log_info(self, message, type='info'):

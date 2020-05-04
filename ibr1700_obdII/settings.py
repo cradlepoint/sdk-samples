@@ -1,12 +1,3 @@
-import cs
-
-# Used for logging or anytime the app name is needed
-APP_NAME = 'ibr1700_obdII'
-
-# MQTT Client
-MQTT_CLIENT_ID = cs.CSClient().get('/config/system/system_id').get('data', '')
-MQTT_LOGGING = False
-
 # MQTT Server settings
 MQTT_SERVER = '127.0.0.1'
 MQTT_PORT = 1883

@@ -6,17 +6,15 @@ based on the sample from here:
 Refer to section 'Using the MQTT protocol directly'.
 """
 
-import cs
 import os
 import ssl
 import urllib.parse
 
-from app_logging import AppLogger
+from csclient import EventingCSClient
 from paho.mqtt import client as mqtt
 
 
-# Create an AppLogger for logging to syslog in NCOS.
-log = AppLogger()
+cp = EventingCSClient('mqtt_azure_tls')
 
 # Path to the TLS certificates file. The certificates were copied from the certs.c file
 # located here: https://github.com/Azure/azure-iot-sdk-c/blob/master/certs/certs.c
@@ -35,19 +33,19 @@ sas_token = ''
 
 # Called when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):
-    log.info('Device connected with result code: {}'.format(rc))
+    cp.log('Device connected with result code: {}'.format(rc))
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     try:
         client.subscribe('devices/{}/messages/devicebound/#'.format(device_id))
     except Exception as ex:
-        log.error('Client Subscribe exception. ex={}'.format(ex))
+        cp.log('Client Subscribe exception. ex={}'.format(ex))
 
 
 # Called when the broker responds to our disconnect request.
 def on_disconnect(client, userdata, rc):
-    log.info('Device disconnected with result code: {}'.format(rc))
+    cp.log('Device disconnected with result code: {}'.format(rc))
 
 
 # Called when a message that was to be sent using the publish() call has
@@ -56,7 +54,7 @@ def on_disconnect(client, userdata, rc):
 # This callback is important because even if the publish() call returns success,
 # it does not always mean that the message has been sent.
 def on_publish(client, userdata, mid):
-    log.info('Device sent message.')
+    cp.log('Device sent message.')
 
 
 # Called when the broker responds to a subscribe request. The mid variable
@@ -64,7 +62,7 @@ def on_publish(client, userdata, mid):
 # The granted_qos variable is a list of integers that give the QoS level the
 # broker has granted for each of the different subscription requests.
 def on_subscribe(client, userdata, mid, granted_qos):
-    log.debug('Subscribe response: Message ID={}, granted_qos={}'.format(mid, granted_qos))
+    cp.log('Subscribe response: Message ID={}, granted_qos={}'.format(mid, granted_qos))
 
 
 # Called when a message has been received on a topic that the client subscribes
@@ -72,7 +70,7 @@ def on_subscribe(client, userdata, mid, granted_qos):
 # message_callback_add() to define a callback that will be called for specific
 # topic filters. on_message will serve as fallback when none matched.
 def on_message(client, userdata, msg):
-    log.debug('Device received topic: {}, msg: {}'.format(msg.topic, msg.payload))
+    cp.log('Device received topic: {}, msg: {}'.format(msg.topic, msg.payload))
 
 
 mqtt_client = mqtt.Client(client_id=device_id, protocol=mqtt.MQTTv311)
@@ -97,17 +95,17 @@ try:
 
     # Get some router data and publish to the IoT Hub
     device_data = dict()
-    log.info('device_data = {}'.format(device_data))
-    device_data['router_id'] = cs.CSClient().get('/config/system/system_id').get('data')
-    device_data['product_name'] = cs.CSClient().get('/status/product_info/product_name').get('data')
+    cp.log('device_data = {}'.format(device_data))
+    device_data['router_id'] = cp.get('/config/system/system_id')
+    device_data['product_name'] = cp.get('/status/product_info/product_name')
 
     # Not all CP devices have a modem_temperature
     if device_data['product_name'].startswith('ibr200') is False:
-        device_data['router_temperature'] = cs.CSClient().get('/status/system/modem_temperature').get('data')
+        device_data['router_temperature'] = cp.get('/status/system/modem_temperature')
 
     mqtt_client.publish('devices/' + device_id + '/messages/events/', urllib.parse.urlencode(device_data), qos=1)
 
     mqtt_client.loop_forever()
 
 except Exception as e:
-    log.error('Exception: {}'.format(e))
+    cp.log('Exception: {}'.format(e))

@@ -5,7 +5,7 @@ simple_custom_dashboard
 
 Application Version
 ===================
-1.0
+2.0
 
 
 NCOS Devices Supported

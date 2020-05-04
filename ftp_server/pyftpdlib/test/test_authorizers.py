@@ -495,7 +495,7 @@ class TestUnixAuthorizer(_SharedAuthorizerTests, unittest.TestCase):
         def get_fake_shell_user():
             for user in self.get_users():
                 shell = pwd.getpwnam(user).pw_shell
-                # On linux fake shell is usually /bin/false, on
+                # On linux fake shell_sample is usually /bin/false, on
                 # freebsd /usr/sbin/nologin;  in case of other
                 # UNIX variants test needs to be adjusted.
                 if '/false' in shell or '/nologin' in shell:
@@ -505,18 +505,18 @@ class TestUnixAuthorizer(_SharedAuthorizerTests, unittest.TestCase):
         user = get_fake_shell_user()
         self.assertRaisesWithMsg(
             AuthorizerError,
-            "user %s has not a valid shell" % user,
+            "user %s has not a valid shell_sample" % user,
             UnixAuthorizer, allowed_users=[user])
         # commented as it first fails for invalid home
         # self.assertRaisesWithMsg(
         #     ValueError,
-        #     "user %s has not a valid shell" % user,
+        #     "user %s has not a valid shell_sample" % user,
         #     UnixAuthorizer, anonymous_user=user)
         auth = UnixAuthorizer()
         self.assertTrue(auth._has_valid_shell(self.get_current_user()))
         self.assertFalse(auth._has_valid_shell(user))
         self.assertRaisesWithMsg(AuthorizerError,
-                                 "User %s doesn't have a valid shell." % user,
+                                 "User %s doesn't have a valid shell_sample." % user,
                                  auth.override_user, user, perm='r')
 
     def test_not_root(self):

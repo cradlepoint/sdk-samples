@@ -2,40 +2,17 @@
 A Simple HTTP Server for a custom dashboard.
 '''
 
-import cs
 import cgi
 import json
 import sys
-
-from app_logging import AppLogger
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from http import HTTPStatus
-
-# Create an AppLogger for logging to syslog in NCOS.
-log = AppLogger()
-
-
-def start_server():
-    # avoid 8080, as the router may have service on it.
-    # Firewall rules will need to be changed in the router
-    # to allow access on this port.
-    server_address = ('', 9001)
-
-    log.debug('Starting Server: {}'.format(server_address))
-    httpd = HTTPServer(server_address, WebServerRequestHandler)
-
-    try:
-        httpd.serve_forever()
-
-    except KeyboardInterrupt:
-        log.debug('Stopping Server, Key Board interrupt')
-
-    return 0
+from csclient import EventingCSClient
 
 
 def get_router_data():
-    system_id = cs.CSClient().get('/config/system/system_id').get('data', '')
-    modem_temp = cs.CSClient().get('/status/system/modem_temperature').get('data', '')
+    system_id = cp.get('/config/system/system_id').get('data', '')
+    modem_temp = cp.get('/status/system/modem_temperature').get('data', '')
     host_os = sys.platform
     router_data = {'host_os': host_os,
                    'system_id': system_id,
@@ -45,20 +22,20 @@ def get_router_data():
 
 
 def button_one_click():
-    log.debug('button_one_click()')
+    cp.log('button_one_click()')
 
 
 def button_two_click():
-    log.debug('button_two_click()')
+    cp.log('button_two_click()')
 
 
 def ip_config(ip_data):
-    log.debug('ip_config() - ipdata: {}'.format(ip_data))
+    cp.log('ip_config() - ipdata: {}'.format(ip_data))
 
 
 def handle_uploaded_config_file(file_data):
     file_data_str = file_data.decode('utf-8')
-    log.debug('handle_uploaded_config_file(): {}'.format(file_data_str))
+    cp.log('handle_uploaded_config_file(): {}'.format(file_data_str))
 
 
 def get_ip_config_info(form):
@@ -75,14 +52,14 @@ def get_ip_config_info(form):
 class WebServerRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
-        log.debug('Received Get request: {}'.format(self.path))
+        cp.log('Received Get request: {}'.format(self.path))
         # Add code here if you want to capture something in a GET request. Otherwise,
         # let the parent class handle it.
         super().do_GET()
 
     def do_POST(self):
         # Log the Get request
-        log.debug('Received Post request: {}'.format(self.path))
+        cp.log('Received Post request: {}'.format(self.path))
 
         # Parse the form data posted
         form = cgi.FieldStorage(
@@ -95,7 +72,7 @@ class WebServerRequestHandler(SimpleHTTPRequestHandler):
         # Get the information posted in the form
         for field in form.keys():
             field_item = form[field]
-            # log.debug('field_item: {}'.format(field_item))
+            # cp.log('field_item: {}'.format(field_item))
 
             if field_item.filename:
                 # The field contains an uploaded file
@@ -104,7 +81,7 @@ class WebServerRequestHandler(SimpleHTTPRequestHandler):
                 value = "file {}".format(field_item.filename)
             else:
                 value = form[field].value
-                log.debug('Received Post request value: {}'.format(value))
+                cp.log('Received Post request value: {}'.format(value))
 
                 # Check for the value that you want to handle.
                 if value == 'button_one_click':
@@ -132,8 +109,11 @@ class WebServerRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(bytes('<html><body><h1>Server Received: {}</h1></body></html>'.format(value), 'utf-8'))
 
 
-if __name__ == '__main__':
-    try:
-        start_server()
-    except Exception as e:
-        log.error('Exception occurred! exception: {}'.format(e))
+cp = EventingCSClient('simple_custom_dashboard')
+server_address = ('localhost', 9001)
+cp.log('Starting Server: {}'.format(server_address))
+httpd = HTTPServer(server_address, WebServerRequestHandler)
+try:
+    httpd.serve_forever()
+except KeyboardInterrupt:
+    cp.log('Stopping Server, Key Board interrupt')

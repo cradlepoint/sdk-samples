@@ -2,33 +2,22 @@ import time
 import serial
 import paho.mqtt.client as mqtt
 import json
-import sys
-import cs
-import logging
-import logging.handlers
+from csclient import EventingCSClient
 
-handlers = [logging.StreamHandler()]
-
-if sys.platform == 'linux2':
-    # on router also use the syslog
-    handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
-
-logging.basicConfig(level=logging.DEBUG,
-        format='%(asctime)s %(name)s: %(message)s',
-        datefmt='%b %d %H:%M:%S',
-        handlers=handlers)
-
-logger = logging.getLogger('serial-temp-sdk')
-
+cp = EventingCSClient('serial_temp')
 broker_address = '127.0.0.01'
 port = '/dev/ttyUSB0'
 speed = 9600
+my_sim = 'mdm-e152d8b2' # Change to your SIM slot UID
+
 
 class Timeout(Exception):
     pass
 
+
 def has_t1t2(chunks):
     return len(chunks) > 2 and '1.' in chunks[0] and '2.' in chunks[1]
+
 
 def parse_temp(temp_str):
     dotpos = temp_str.find('.')
@@ -37,32 +26,33 @@ def parse_temp(temp_str):
     else:
         return None
 
-def modem_state(client, state, sim='mdm-e152d8b2'):
+
+def modem_state(cp, state, sim):
     # Blocking call that will wait until a given state is shown as the modem's status
     timeout_counter = 0
     sleep_seconds = 0
     conn_path = '%s/%s/status/connection_state' % ('status/wan/devices', sim)
-    logger.info("modem_state waiting sim=%s state=%s", sim, state)
+    cp.log(f"modem_state waiting sim={sim} state={state}")
     while True:
         sleep_seconds += 5
-        conn_state = client.get(conn_path).get('data', '')
+        conn_state = cp.get(conn_path).get('data', '')
         # TODO add checking for error states
-        logger.info('waiting for state=%s on sim=%s curr state=%s',
-            state, sim, conn_state)
+        cp.log(f'waiting for state={state} on sim={sim} curr state={conn_state}')
         if conn_state == state:
             break
         if timeout_counter > 600:
-            logger.info("timeout waiting on sim=%s", sim)
+            cp.log(f"timeout waiting on sim={sim}")
             raise Timeout(conn_path)
         time.sleep(min(sleep_seconds, 45))
         timeout_counter += min(sleep_seconds, 45)
-    logger.info("sim=%s connected", sim)
+    cp.log(f"sim={sim} connected")
     return True
 
+
 def data_logger_to_mqtt_reader():
-    client = mqtt.Client("Datalogger2Mqtt", protocol=mqtt.MQTTv311) #create new instance
+    client = mqtt.Client("Datalogger2Mqtt", protocol=mqtt.MQTTv311)  # create new instance
     try:
-        client.connect(broker_address, port=9898) #connect to broker
+        client.connect(broker_address, port=9898)  # connect to broker
     except ConnectionRefusedError:
         return
     try:
@@ -76,11 +66,10 @@ def data_logger_to_mqtt_reader():
                     data = {"d1temp": d1temp, "d2temp": d2temp}
                     client.publish("measurement/", json.dumps(data))
     except Exception as e:
-        logger.debug("Exception is %s"%str(e))
+        cp.log(f"Exception is {e}")
     finally:
         client.disconnect()
 
-if __name__ == "__main__":
-    client = cs.CSClient()
-    if modem_state(client, state='connected', sim='mdm-e152d8b2'):
-        data_logger_to_mqtt_reader()
+
+if modem_state(cp, 'connected', my_sim):
+    data_logger_to_mqtt_reader()
