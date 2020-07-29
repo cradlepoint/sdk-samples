@@ -407,7 +407,7 @@ class SIMSpeedTest(object):
         self.wait_for_ncm_sync()
         if apikeys.get('X-ECM-API-ID') != 'YOUR':
             self.client.log(f'X-ECM-API-ID: {apikeys["X-ECM-API-ID"]} X-CP-API-ID: {apikeys["X-CP-API-ID"]}')
-            req = requests.put(f'{self.API_URL}/routers/{router_id}/', headers=apikeys, json={'custom1': results_text})
+            req = requests.put(f'{self.API_URL}/routers/{router_id}/', headers=apikeys, json={'custom1': results_text[:255]})
             self.client.log(f'NCM PUT Custom1 Result: {req.status_code}')
         else:
             self.client.log('No NCM API Keys configured, skipping PUT to custom1')
