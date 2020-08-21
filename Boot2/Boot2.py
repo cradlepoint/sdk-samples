@@ -320,8 +320,8 @@ class SIMSpeedTest(object):
                 rule = {
                     "_id_": f"0000000{i+1}-1234-1234-1234-123456789000",
                     "priority": -9 + i,
-                    "trigger_name": f"{self.sims[sim]['info']['port']} {self.sims[sim]['info']['sim']}",
-                    "trigger_string": f"type|is|mdm%sim|is|{self.sims[sim]['info']['sim']}%port|is|{self.sims[sim]['info']['port']}",
+                    "trigger_name": f"{self.sims[uid]['info']['port']} {self.sims[uid]['info']['sim']}",
+                    "trigger_string": f"type|is|mdm%sim|is|{self.sims[uid]['info']['sim']}%port|is|{self.sims[uid]['info']['port']}",
                     "disabled": True
                 }
                 rules.append(rule)
