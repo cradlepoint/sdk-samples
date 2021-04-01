@@ -35,7 +35,7 @@ def ping(host, **kwargs):
     try_count = 0
     while try_count < 15:
         result = cp.get('control/ping')
-        if result and result.get('data', {}).get('status') in ["error", "done"]:
+        if result and result.get('status') in ["error", "done"]:
             break
         time.sleep(2)
         try_count += 1
@@ -43,7 +43,7 @@ def ping(host, **kwargs):
         pingstats['error'] = "No Results - Execution Timed Out"
     else:
         # Parse results text
-        parsedresults = result.get('data', {}).get('result').split('\n')
+        parsedresults = result.get('result').split('\n')
         i = 0
         index = 1
         for item in parsedresults:
