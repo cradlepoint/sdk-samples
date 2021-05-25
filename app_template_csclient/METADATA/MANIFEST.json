@@ -1,0 +1,27 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2021-05-21T14:53:45.291756",
+        "files": {
+            "app_template_csclient.py": "74ee97850987c183909139936d1ffee4a7c01dec8ba8deae22c61e5387f0b46f",
+            "csclient.py": "0c6a55c889daf7df554ab1d22e3290cbb45540a081a62b485036d98ef01e681b",
+            "package.ini": "16db33d9d88cf7805fe595d02dc7fe317541fc24cfc33c04bf2d331294de698c",
+            "readme.txt": "ac6b252c07a50146499a5c16b39e0815f532a278c28801c3de86fe4acd6ec064",
+            "start.sh": "c7adc6484df19a8a378b67eee477061586a6595849f0206230ca977aeb22832c"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "app_template_csclient",
+        "notes": "Application Template for use with SDK 3.0",
+        "reboot": true,
+        "restart": true,
+        "uuid": "8a7f79cb-b11b-44bc-bd33-0f4ab3f06d60",
+        "vendor": "Cradlepoint",
+        "version_major": 1,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}
