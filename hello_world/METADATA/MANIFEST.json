@@ -1,0 +1,28 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2021-05-25T13:50:05.299442",
+        "files": {
+            ".idea/inspectionProfiles/profiles_settings.xml": "6172c5997eeb3cd19c9ca2b5b97d6e2983cdd1fa60b2460d7bbb74055edcaa46",
+            "csclient.py": "0c6a55c889daf7df554ab1d22e3290cbb45540a081a62b485036d98ef01e681b",
+            "hello_world.py": "225b3d0aed2cf86d98d6f10c10962c3ca407f55309682529ab25c6dc6f55dd3b",
+            "package.ini": "a80d2db5e639aefc38f9560126132f3243111735769bf18bd755994827c4b044",
+            "readme.txt": "014a18fbf1476c52fcc13033a0677875a6d67d1efed7fc861b8033af4b6b5f61",
+            "start.sh": "dc6e951b1a236b155fc7f2376c36ca84828b5852446ee1b7e011e6dbda6e8494"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "hello_world",
+        "notes": "hello_world",
+        "reboot": true,
+        "restart": true,
+        "uuid": "8a7f79cb-b11b-44bc-bd33-0f4ab3f06d60",
+        "vendor": "Cradlepoint",
+        "version_major": 1,
+        "version_minor": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}
