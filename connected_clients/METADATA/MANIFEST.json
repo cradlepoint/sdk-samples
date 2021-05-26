@@ -1,12 +1,12 @@
 {
     "app": {
         "auto_start": true,
-        "date": "2021-05-25T18:51:42.391867",
+        "date": "2021-05-25T20:38:18.207799",
         "files": {
             ".idea/inspectionProfiles/profiles_settings.xml": "6172c5997eeb3cd19c9ca2b5b97d6e2983cdd1fa60b2460d7bbb74055edcaa46",
-            "connected_clients.py": "9ff5b74b899d0ceecad6ffa04c27786ea112873d6d64684000bb6d18cc7e4f14",
+            "connected_clients.py": "562197c8600c4c1d0175d86ebb918411c7f8103c380439630e6a17c1bb525eb4",
             "csclient.py": "0c6a55c889daf7df554ab1d22e3290cbb45540a081a62b485036d98ef01e681b",
-            "package.ini": "e263f40c9b3bae29b0c8b89419453352926193a672d72e90b96291af5c6b2e75",
+            "package.ini": "5618fda3c813820238724d774f2eb3bd6060df1f1cade01fa1a61b57f107db94",
             "readme.txt": "9e68e4dbdf206d2cd3db7dddb5aa369c519fcd4ab57f1125c6c08566a23c0943",
             "start.sh": "2cd4c5f35bc80fb479fe3d66bc0a09ae8b80da1388bff565aea12cfb42c0db3b"
         },
@@ -19,7 +19,7 @@
         "uuid": "3d7bd17a-3a62-4217-9deb-66a52b9067ee",
         "vendor": "Starbucks",
         "version_major": 1,
-        "version_minor": 0
+        "version_minor": 1
     },
     "pmf": {
         "version_major": 1,
