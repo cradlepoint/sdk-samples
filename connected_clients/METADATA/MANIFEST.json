@@ -1,10 +1,10 @@
 {
     "app": {
         "auto_start": true,
-        "date": "2021-05-25T18:46:52.833941",
+        "date": "2021-05-25T18:51:42.391867",
         "files": {
             ".idea/inspectionProfiles/profiles_settings.xml": "6172c5997eeb3cd19c9ca2b5b97d6e2983cdd1fa60b2460d7bbb74055edcaa46",
-            "connected_clients.py": "dab7b21cda0c9b34ae3ce5e27b04e7224d026ac98f05267ab25559b6025b99d5",
+            "connected_clients.py": "9ff5b74b899d0ceecad6ffa04c27786ea112873d6d64684000bb6d18cc7e4f14",
             "csclient.py": "0c6a55c889daf7df554ab1d22e3290cbb45540a081a62b485036d98ef01e681b",
             "package.ini": "e263f40c9b3bae29b0c8b89419453352926193a672d72e90b96291af5c6b2e75",
             "readme.txt": "9e68e4dbdf206d2cd3db7dddb5aa369c519fcd4ab57f1125c6c08566a23c0943",

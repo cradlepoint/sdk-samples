@@ -15,5 +15,4 @@ while True:
     mac_addresses = ','.join(mac_addresses)
     cp.log('connected clients: {}'.format(mac_addresses))
     cp.put('/config/system/desc/', mac_addresses)
-    desc = cp.get('/config/system/desc/')
     sleep(SCAN_INTERVAL)
