@@ -47,5 +47,5 @@ Copyright © 2018 Cradlepoint, Inc.  All rights reserved.
     - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **simple_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
-- **tornado_sample
+- **tornado_sample**
 	- A webserver using Tornado with NCM-themed example to set WiFi SSIDs.
