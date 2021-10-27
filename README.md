@@ -2,13 +2,13 @@
 
 ----------
 
-This directory contains the NCOS SDK tools and sample applications. Below is a description of each. The Router Applications Development Guide is the best document to read first.
+This directory contains the NCOS SDK tools and sample applications. Below is a description of each. The Application Developmers Guide is the best document to read first.
 
 ## Documents
 
 - **README.html**
     - This README file.
-- **Cradlepoint NCOS SDK v3.0 Application Developers Guide.html**
+- **Cradlepoint NCOS SDK v3.1 Application Developers Guide.html**
     - The main document that describes application development.
 
 ## Sample Application Directories
