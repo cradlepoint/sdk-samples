@@ -2,7 +2,9 @@
 
 ----------
 
-This directory contains the NCOS SDK tools and sample applications. Below is a description of each. The Application Developmers Guide is the best document to read first.
+This directory contains the NCOS SDK tools and sample applications. 
+
+The Application Developmers Guide is the best document to read first.
 
 ## Documents
 
