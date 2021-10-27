@@ -69,7 +69,7 @@ router to Azure IoT Central.
 - **built_apps/**
     - Ready to use sample apps - Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
 
-- **tools**
+- **tools/**
     - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
 
 ## Files
