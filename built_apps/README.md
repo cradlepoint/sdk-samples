@@ -10,6 +10,13 @@ Copyright © 2018 Cradlepoint, Inc.  All rights reserved.
 ----------
 
 ## Built Apps
+These files are sample SDK Applications that are ready to use for testing and do not require modification or "building" of the app from source files.  
+
+To use:
+Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
+
+Additional documentation:
+https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
 
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
