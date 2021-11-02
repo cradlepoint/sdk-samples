@@ -63,7 +63,7 @@ class CSClient(object):
     def __init__(self, app_name, init=False):
         self.app_name = app_name
         handlers = [logging.StreamHandler()]
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
                             handlers=handlers)
@@ -78,7 +78,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
               specified data.
-            - If the app is running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
+            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
 
         Args:
             base: String representing a path to a resource on a router tree,
@@ -91,7 +91,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
 
         """
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = "get\n{}\n{}\n{}\n".format(base, query, tree)
             return self._dispatch(cmd).get('data')
         else:
@@ -117,7 +117,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
               specified data.
-            - If the app running remotely from a computer it prints that decrypt is only available in NCOS.
+            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
 
         Args:
             base: String representing a path to a resource on a router tree,
@@ -130,11 +130,11 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
 
         """
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = "decrypt\n{}\n{}\n{}\n".format(base, query, tree)
             return self._dispatch(cmd).get('data')
         else:
-            # Running in a computer and can't decrypt.
+            # Running in a computer and can't actually send the alert.
             print('Decrypt is only available when running the app in NCOS.')
 
     def put(self, base, value='', query='', tree=0):
@@ -159,7 +159,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
         value = json.dumps(value)
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
         else:
@@ -201,7 +201,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
         value = json.dumps(value)
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = f"post\n{base}\n{query}\n{value}\n"
             return self._dispatch(cmd)
         else:
@@ -229,7 +229,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
               the router tree.
-            - If the app is running remotely from a computer it calls the HTTP PATCH method to update or add the specified
+            - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
               data.
 
 
@@ -244,11 +244,11 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
         value = json.dumps(value)
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = "patch\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
         else:
-            # Running in a computer so use http to send the patch to the device.
+            # Running in a computer so use http to send the put to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
@@ -272,7 +272,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on(and executed from) a device, it directly deletes the specified data to
               the router tree.
-            - If the app is running remotely from a computer it calls the HTTP DELETE method to update or add the specified
+            - If the app running remotely from a computer it calls the HTTP DELETE method to update or add the specified
               data.
 
 
@@ -284,7 +284,7 @@ class CSClient(object):
         Returns:
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = "delete\n{}\n{}\n".format(base, query)
             return self._dispatch(cmd)
         else:
@@ -319,7 +319,7 @@ class CSClient(object):
             Success: None
             Failure: An error
         """
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             cmd = "alert\n{}\n{}\n".format(self.app_name, value)
             return self._dispatch(cmd)
         else:
@@ -337,7 +337,7 @@ class CSClient(object):
         Returns:
         None
         """
-        if 'linux' in sys.platform:
+        if sys.platform == 'linux2':
             self.logger.info(value)
         else:
             # Running in a computer so just use print for the log.
@@ -376,7 +376,7 @@ class CSClient(object):
         device_username = ''
         device_password = ''
 
-        if if 'linux' in sys.platform:
+        if sys.platform != 'linux2':
             import os
             import configparser
 

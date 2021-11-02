@@ -110,6 +110,33 @@ class CSClient(object):
 
             return json.loads(response.text).get('data')
 
+    def decrypt(self, base, query='', tree=0):
+        """
+        Constructs and sends a decrypt/get request to retrieve specified data from a device.
+
+        The behavior of this method is contextual:
+            - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
+              specified data.
+            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
+
+        Args:
+            base: String representing a path to a resource on a router tree,
+                  (i.e. '/config/system/logging/level').
+            value: Not required.
+            query: Not required.
+            tree: Not required.
+
+        Returns:
+            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+
+        """
+        if sys.platform == 'linux2':
+            cmd = "decrypt\n{}\n{}\n{}\n".format(base, query, tree)
+            return self._dispatch(cmd).get('data')
+        else:
+            # Running in a computer and can't actually send the alert.
+            print('Decrypt is only available when running the app in NCOS.')
+
     def put(self, base, value='', query='', tree=0):
         """
         Constructs and sends a put request to update or add specified data to the device router tree.
@@ -195,6 +222,49 @@ class CSClient(object):
 
             return json.loads(response.text)
 
+    def patch(self, base, value='', query='', tree=0):
+        """
+        Constructs and sends a patch request to update or add specified data to the device router tree.
+
+        The behavior of this method is contextual:
+            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
+              the router tree.
+            - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
+              data.
+
+
+        Args:
+            base: String representing a path to a resource on a router tree,
+                  (i.e. '/config/system/logging/level').
+            value: list containing dict of add/changes, and list of removals:  [{add},[remove]]
+            query: Not required.
+            tree: Not required.
+
+        Returns:
+            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+        """
+        value = json.dumps(value)
+        if sys.platform == 'linux2':
+            cmd = "patch\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
+            return self._dispatch(cmd)
+        else:
+            # Running in a computer so use http to send the put to the device.
+            import requests
+            device_ip, username, password = self._get_device_access_info()
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
+
+            try:
+                response = requests.patch(device_api,
+                                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                        auth=self._get_auth(device_ip, username, password),
+                                        data={"data": '{}'.format(value)})
+            except (requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError):
+                print("Timeout: device at {} did not respond.".format(device_ip))
+                return None
+
+            return json.loads(response.text)
+
     def delete(self, base, query=''):
         """
         Constructs and sends a delete request to delete specified data to the device router tree.
@@ -227,7 +297,7 @@ class CSClient(object):
                 response = requests.delete(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
                                         auth=self._get_auth(device_ip, username, password),
-                                        data={"data": '{}'.format(value)})
+                                        data={"data": '{}'.format(base)})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
                 print("Timeout: device at {} did not respond.".format(device_ip))
@@ -443,7 +513,7 @@ class EventingCSClient(CSClient):
     def stop(self):
         if not self.running:
             return
-        self.log(f"Stopping {self.app_name}")
+        self.log(f"Stopping")
         for k in list(self.registry.keys()):
             self.unregister(k)
         self.event_sock.close()
@@ -523,7 +593,7 @@ def clean_up_reg(signal, frame):
     clean up registrations. Even if it did, the comm module can't rely on an external service
     to clean up.
     """
-    EventingCSClient().stop()
+    EventingCSClient('CSClient').stop()
     sys.exit(0)
 
 
