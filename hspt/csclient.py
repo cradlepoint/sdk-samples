@@ -63,7 +63,7 @@ class CSClient(object):
     def __init__(self, app_name, init=False):
         self.app_name = app_name
         handlers = [logging.StreamHandler()]
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
                             handlers=handlers)
@@ -91,7 +91,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
 
         """
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = "get\n{}\n{}\n{}\n".format(base, query, tree)
             return self._dispatch(cmd).get('data')
         else:
@@ -130,7 +130,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
 
         """
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = "decrypt\n{}\n{}\n{}\n".format(base, query, tree)
             return self._dispatch(cmd).get('data')
         else:
@@ -159,7 +159,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
         value = json.dumps(value)
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
         else:
@@ -201,7 +201,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
         value = json.dumps(value)
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = f"post\n{base}\n{query}\n{value}\n"
             return self._dispatch(cmd)
         else:
@@ -244,7 +244,7 @@ class CSClient(object):
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
         value = json.dumps(value)
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = "patch\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
         else:
@@ -284,7 +284,7 @@ class CSClient(object):
         Returns:
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = "delete\n{}\n{}\n".format(base, query)
             return self._dispatch(cmd)
         else:
@@ -319,7 +319,7 @@ class CSClient(object):
             Success: None
             Failure: An error
         """
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             cmd = "alert\n{}\n{}\n".format(self.app_name, value)
             return self._dispatch(cmd)
         else:
@@ -337,7 +337,7 @@ class CSClient(object):
         Returns:
         None
         """
-        if sys.platform == 'linux2':
+        if 'linux' in sys.platform:
             self.logger.info(value)
         else:
             # Running in a computer so just use print for the log.
@@ -376,7 +376,7 @@ class CSClient(object):
         device_username = ''
         device_password = ''
 
-        if sys.platform != 'linux2':
+        if 'linux' not in sys.platform:
             import os
             import configparser
 
