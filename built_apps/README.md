@@ -1,22 +1,16 @@
-# NCOS SDK and Sample Applications.
+# Built Apps
+These files are sample SDK Applications that are ready to use for testing and do not require modification or "building" of the app from source files.  
+
+## How to use these files: ##
+Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
+
+Additional documentation:
+https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
 
 ----------
 
-This directory contains the NCOS SDK tools and sample applications. 
+## App Descriptions ##
 
-The Application Developmers Guide is the best document to read first.
-
-## Documents
-
-- **README.html**
-    - This README file.
-- **Cradlepoint NCOS SDK v3.1 Application Developers Guide.html**
-    - The main document that describes application development.
-
-## Sample Application Directories
-
-- **app_template_csclient**
-    - A template for the creation of a new application utilizing the csclient library.
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
 - **cpu_usage**
@@ -40,23 +34,15 @@ The Application Developmers Guide is the best document to read first.
 - **mqtt_app**
     - Demonstrated MQTT using the paho library
 - **mqtt_azure_client**
-    - Sample Application which uses SDK to send sensor data to
-Microsoft Azure IoT Central.
+    - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central.
 - **mqtt_azure_tls**
-    - Sample Application which uses SDK to send sensor data to
-Microsoft Azure IoT Central over TLS connection.
+    - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central over TLS connection.
 - **ping_sample**
     - Contains ping function and example usage.
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
 - **send_to_server**
     - Gets the '/status' from the device config store and send it to a test server.
-- **serial_temp**
-    - This is a test application to serial data from the data logger connected
-to the router and output that to MQTT messages that are forwarded from the
-router to Azure IoT Central.
-- **serial_vibration_test**
-    - This is a test developed for the Cradlepoint Serial Device (CSD) to be used during vibration testing of the CSD.  The application is a simple serial echo server that opens a port on the router.  Data is sent to the application and is echoed back to the client over the serial port.  A LAN device is connected and communicates with the router via port 5556.  When the vibration test is running, the LAN client will be notified if the serial cable is disconnected or connected.
 - **simple_custom_dashboard**
     - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **simple_web_server**
@@ -64,20 +50,6 @@ router to Azure IoT Central.
 - **tornado_sample**
 	- A webserver using Tornado with NCM-themed example to set WiFi SSIDs.
 
-## SDK Directories
-
-- **built_apps/**
-    - Ready to use sample apps - Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
-
-- **tools/**
-    - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
-
-## Files
-
-- **make.py**
-    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
-- **sdk_settings.ini**
-    - This is the ini file that contains the settings used by python make.py.
 
 ----------
 

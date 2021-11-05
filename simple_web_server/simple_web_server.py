@@ -29,7 +29,7 @@ cp = EventingCSClient('simple_web_server')
 
 WEB_MESSAGE = "Hello World from Cradlepoint router!"
 
-server_address = ('localhost', 9001)
+server_address = ("", 9001)
 
 cp.log("Starting Server: {}".format(server_address))
 cp.log("Web Message is: {}".format(WEB_MESSAGE))

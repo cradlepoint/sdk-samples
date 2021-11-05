@@ -110,7 +110,7 @@ class WebServerRequestHandler(SimpleHTTPRequestHandler):
 
 
 cp = EventingCSClient('simple_custom_dashboard')
-server_address = ('localhost', 9001)
+server_address = ('', 9001)
 cp.log('Starting Server: {}'.format(server_address))
 httpd = HTTPServer(server_address, WebServerRequestHandler)
 try:
