@@ -78,7 +78,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
               specified data.
-            - If the app is running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
+            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
 
         Args:
             base: String representing a path to a resource on a router tree,
@@ -117,7 +117,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
               specified data.
-            - If the app running remotely from a computer it prints that decrypt is only available in NCOS.
+            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
 
         Args:
             base: String representing a path to a resource on a router tree,
@@ -134,7 +134,7 @@ class CSClient(object):
             cmd = "decrypt\n{}\n{}\n{}\n".format(base, query, tree)
             return self._dispatch(cmd).get('data')
         else:
-            # Running in a computer and can't decrypt.
+            # Running in a computer and can't actually send the alert.
             print('Decrypt is only available when running the app in NCOS.')
 
     def put(self, base, value='', query='', tree=0):
@@ -229,7 +229,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
               the router tree.
-            - If the app is running remotely from a computer it calls the HTTP PATCH method to update or add the specified
+            - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
               data.
 
 
@@ -248,7 +248,7 @@ class CSClient(object):
             cmd = "patch\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
         else:
-            # Running in a computer so use http to send the patch to the device.
+            # Running in a computer so use http to send the put to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
@@ -272,7 +272,7 @@ class CSClient(object):
         The behavior of this method is contextual:
             - If the app is installed on(and executed from) a device, it directly deletes the specified data to
               the router tree.
-            - If the app is running remotely from a computer it calls the HTTP DELETE method to update or add the specified
+            - If the app running remotely from a computer it calls the HTTP DELETE method to update or add the specified
               data.
 
 
@@ -376,7 +376,7 @@ class CSClient(object):
         device_username = ''
         device_password = ''
 
-        if if 'linux' in sys.platform:
+        if 'linux' not in sys.platform:
             import os
             import configparser
 
