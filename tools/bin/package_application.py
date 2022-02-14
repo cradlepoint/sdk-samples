@@ -59,7 +59,7 @@ def pack_package(app_root, app_name):
     print("pack TAR:%s" % tar_name)
     #TODO: Consider using 'w:gz' to skip the additional gzip step.
     with tarfile.open(tar_name, 'w') as tar:
-        tar.add(app_root, arcname=os.path.basename(app_root))
+        tar.add(app_root, arcname=app_name)
 
     gzip_name = "{}.tar.gz".format(app_name)
     print("gzip archive:%s" % gzip_name)
@@ -73,8 +73,8 @@ def pack_package(app_root, app_name):
 
 def create_signature(meta_data_folder, pkey):
     manifest_file = os.path.join(meta_data_folder, MANIFEST_FILE)
+    checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
     with open(os.path.join(meta_data_folder, SIGNATURE_FILE), 'wb') as sf:
-        checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
         if pkey:
             sf.write(crypto.sign(pkey, checksum, 'sha256'))
         else:
@@ -162,9 +162,9 @@ def package_application(app_root, pkey):
 
         create_signature(app_metadata_folder, pkey)
 
-        pack_package(app_root, section)
+        pack_package(app_root, app_name)
 
-        print('Package {}.tar.gz created'.format(section))
+        print('Package {}.tar.gz created'.format(app_name))
 
 
 def argument_list(args):
