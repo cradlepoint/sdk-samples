@@ -55,14 +55,14 @@ def hash_dir(target, hash_func=hashlib.sha256):
 def pack_package(app_root, app_name):
     print('app_root: {}'.format(app_root))
     print('app_name: {}'.format(app_name))
-    print("pack TAR:%s.tar" % app_name)
     tar_name = "{}.tar".format(app_name)
-    tar = tarfile.open(tar_name, 'w')
-    tar.add(app_root, arcname=os.path.basename(app_root))
-    tar.close()
+    print("pack TAR:%s" % tar_name)
+    #TODO: Consider using 'w:gz' to skip the additional gzip step.
+    with tarfile.open(tar_name, 'w') as tar:
+        tar.add(app_root, arcname=os.path.basename(app_root))
 
-    print("gzip archive:%s.tar.gz" % app_name)
     gzip_name = "{}.tar.gz".format(app_name)
+    print("gzip archive:%s" % gzip_name)
     with open(tar_name, 'rb') as f_in:
         with gzip.open(gzip_name, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
@@ -108,8 +108,8 @@ def package_application(app_root, pkey):
     app_manifest_file = os.path.join(app_metadata_folder, MANIFEST_FILE)
     config = configparser.ConfigParser()
     config.read(app_config_file)
-    if not os.path.exists(app_metadata_folder):
-        os.makedirs(app_metadata_folder)
+
+    os.makedirs(app_metadata_folder, exist_ok=True)
 
     for section in config.sections():
         app_name = section
@@ -119,12 +119,24 @@ def package_application(app_root, pkey):
 
         clean_bytecode_files(app_root)
 
-        pmf = {}
-        pmf['version_major'] = int(1)
-        pmf['version_minor'] = int(0)
+        pmf = {
+            'version_major': 1,
+            'version_minor': 0,
+        }
 
-        app = {}
-        app['name'] = str(section)
+        app = {
+            'name': str(section),
+            'vendor': config[section]['vendor'],
+            'notes': config[section]['notes'],
+            'version_major': int(config[section]['version_major']),
+            'version_minor': int(config[section]['version_minor']),
+            'firmware_major': int(config[section]['firmware_major']),
+            'firmware_minor': int(config[section]['firmware_minor']),
+            'restart': config[section].getboolean('restart'),
+            'reboot': config[section].getboolean('reboot'),
+            'date': datetime.datetime.now().isoformat(),
+        }
+
         try:
             app['uuid'] = config[section]['uuid']
         except KeyError:
@@ -132,29 +144,21 @@ def package_application(app_root, pkey):
                 app['uuid'] = str(uuid.uuid4())
             else:
                 raise
-        app['vendor'] = config[section]['vendor']
-        app['notes'] = config[section]['notes']
-        app['version_major'] = int(config[section]['version_major'])
-        app['version_minor'] = int(config[section]['version_minor'])
-        app['firmware_major'] = int(config[section]['firmware_major'])
-        app['firmware_minor'] = int(config[section]['firmware_minor'])
-        app['restart'] = config[section].getboolean('restart')
-        app['reboot'] = config[section].getboolean('reboot')
-        app['date'] = datetime.datetime.now().isoformat()
         if config.has_option(section, 'auto_start'):
             app['auto_start'] = config[section].getboolean('auto_start')
         if config.has_option(section, 'app_type'):
             app['app_type'] = int(config[section]['app_type'])
 
 
-        data = {}
-        data['pmf'] = pmf
-        data['app'] = app
+        data = {
+            'pmf': pmf,
+            'app': app,
+        }
 
         app['files'] = hash_dir(app_root)
 
         with open(app_manifest_file, 'w') as f:
-            f.write(json.dumps(data, indent=4, sort_keys=True))
+            json.dump(data, f, indent=4, sort_keys=True)
 
         create_signature(app_metadata_folder, pkey)
 
