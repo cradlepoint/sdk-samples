@@ -33,23 +33,37 @@ def file_checksum(hash_func=hashlib.sha256, file=None):
     return h.hexdigest()
 
 
-def hash_dir(target, hash_func=hashlib.sha256):
-    hashed_files = {}
-    for path, d, f in os.walk(target):
+def get_paths_to_include(app_root):
+    """Return value: Maps relative-to-app_root to relative-to-cwd.
+    """
+    paths = {}
+    for path, d, f in os.walk(app_root):
+        # TODO: Why not just skip the folder completely if it has a dot? (E.g. .git)
         for fl in f:
-            if not fl.startswith('.') and not os.path.basename(path).startswith('.'):
-                # we need this be LINUX fashion!
-                if sys.platform == "win32":
-                    # swap the network\\tcp_echo to be network/tcp_echo
-                    fully_qualified_file = path.replace('\\', '/') + '/' + fl
-                else:  # else allow normal method
-                    fully_qualified_file = os.path.join(path, fl)
-                hashed_files[fully_qualified_file[len(target) + 1:]] =\
-                    file_checksum(hash_func, fully_qualified_file)
-            else:
+            if not shouldinclude(path, fl):
                 print("Did not include {} in the App package.".format(fl))
+                continue
+            fully_qualified_file = os.path.join(path, fl)
+            relpath = os.path.relpath(fully_qualified_file, app_root)
+            # we need this be LINUX fashion!
+            if sys.platform == "win32":
+                # swap the network\\tcp_echo to be network/tcp_echo
+                relpath = relpath.replace('\\', '/')
+            paths[relpath] = fully_qualified_file
 
-    return hashed_files
+    return paths
+
+
+def hash_paths(paths, hash_func=hashlib.sha256):
+    hashes = {}
+    for arcpath, fpath in paths.items():
+        hashes[arcpath] = file_checksum(hash_func, fpath)
+    return hashes
+
+
+def shouldinclude(dirpath, filename):
+    # Possible bug: A parent can have a dot and not be included, but the child's files will still be included.
+    return not filename.startswith('.') and not os.path.basename(dirpath).startswith('.')
 
 
 def pack_package(app_root, app_name):
@@ -155,7 +169,8 @@ def package_application(app_root, pkey):
             'app': app,
         }
 
-        app['files'] = hash_dir(app_root)
+        paths = get_paths_to_include(app_root)
+        app['files'] = hash_paths(paths)
 
         with open(app_manifest_file, 'w') as f:
             json.dump(data, f, indent=4, sort_keys=True)
