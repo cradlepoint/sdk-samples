@@ -19,7 +19,7 @@ CONFIG_FILE = 'package.ini'
 SIGNATURE_FILE = 'SIGNATURE.DS'
 MANIFEST_FILE = 'MANIFEST.json'
 
-BYTE_CODE_FILES = re.compile('^.*\.(pyc|pyo|pyd)$')
+BYTE_CODE_FILES = re.compile(r'^.*\.(pyc|pyo|pyd)$')
 BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
 
 
@@ -94,9 +94,9 @@ def clean_manifest_folder(app_metadata_folder):
 
 def clean_bytecode_files(app_root):
     for path, dirs, files in os.walk(app_root):
-        for file in filter(lambda x: BYTE_CODE_FILES.match(x), files):
+        for file in filter(BYTE_CODE_FILES.match, files):
             os.remove(os.path.join(path, file))
-        for d in filter(lambda x: BYTE_CODE_FOLDERS.match(x), dirs):
+        for d in filter(BYTE_CODE_FOLDERS.match, dirs):
             shutil.rmtree(os.path.join(path, d))
     pass
 
