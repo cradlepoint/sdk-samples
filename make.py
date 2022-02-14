@@ -175,7 +175,7 @@ def package():
     package_dir = os.path.join('tools', 'bin')
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     app_path = os.path.join(g_app_name)
-    scan_for_cr(app_path)
+    # scan_for_cr(app_path)
 
     try:
         subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
