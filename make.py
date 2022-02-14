@@ -371,33 +371,25 @@ def init(ceate_new_uuid):
     config.read(settings_file)
 
     # Initialize the globals based on the sdk_settings.ini contents.
-    if sdk_key in config:
-        if app_key in config[sdk_key]:
-            g_app_name = config[sdk_key][app_key]
-        else:
-            success = False
-            print('ERROR 1: The {} key does not exist in {}'.format(app_key, settings_file))
+    if sdk_key not in config:
+        print('ERROR: The {} section does not exist in {}'.format(sdk_key, settings_file))
+        return False
 
-        if ip_key in config[sdk_key]:
-            g_dev_client_ip = config[sdk_key][ip_key]
-        else:
-            success = False
-            print('ERROR 2: The {} key does not exist in {}'.format(ip_key, settings_file))
+    section = config[sdk_key]
 
-        if username_key in config[sdk_key]:
-            g_dev_client_username = config[sdk_key][username_key]
-        else:
+    for key in [app_key, ip_key, username_key, password_key]:
+        if key not in section:
+            print('ERROR: The {} key does not exist in {}'.format(key, settings_file))
+            # Maintain previous behavior of warning about each missing key by saving a flag instead of short-circuiting.
             success = False
-            print('ERROR 3: The {} key does not exist in {}'.format(username_key, settings_file))
 
-        if password_key in config[sdk_key]:
-            g_dev_client_password = config[sdk_key][password_key]
-        else:
-            success = False
-            print('ERROR 4: The {} key does not exist in {}'.format(password_key, settings_file))
-    else:
-        success = False
-        print('ERROR 5: The {} section does not exist in {}'.format(sdk_key, settings_file))
+    if not success:
+        return False
+
+    g_app_name = section[app_key]
+    g_dev_client_ip = section[ip_key]
+    g_dev_client_username = section[username_key]
+    g_dev_client_password = section[password_key]
 
     # This will also create a UUID if needed.
     get_app_uuid(ceate_new_uuid)
