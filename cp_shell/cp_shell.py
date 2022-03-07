@@ -55,5 +55,5 @@ if __name__ == "__main__":
         (r"/(.*)", tornado.web.StaticFileHandler,
          {"path": static_path, "default_filename": "index.html"}),
     ])
-    application.listen(8000)
+    application.listen(8022)
     tornado.ioloop.IOLoop.current().start()
