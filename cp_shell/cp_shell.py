@@ -1,6 +1,4 @@
-''' cp_shell provides a web based interface to interact with the Cradlepoint router shell.
-
-'''
+"""cp_shell is a web interface to interact with the Cradlepoint router shell."""
 
 import os
 import subprocess
@@ -15,7 +13,8 @@ static_path = os.path.dirname(__file__)
 
 def shell(cmd):
     """
-    executes a linux shell command and returns the output
+    execute a linux shell command and returns the output.
+
     :param path: string
         API path triggering callback
     :param cmd: string
@@ -35,10 +34,10 @@ def shell(cmd):
 
 
 class ShellHandler(tornado.web.RequestHandler):
-    """
-    handles requests for the /shell endpoint.
-    """
+    """handle requests for the /shell endpoint."""
+
     def get(self):
+        """return command response."""
         response = ''
         try:
             cmd = self.get_argument('cmd')
