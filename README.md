@@ -19,6 +19,8 @@ The Application Developmers Guide is the best document to read first.
     - A template for the creation of a new application utilizing the csclient library.
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
+- **cp_shell_**
+    - Web interface for running linux shell commands.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
 - **ftp_client**
