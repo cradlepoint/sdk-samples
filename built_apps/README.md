@@ -39,6 +39,8 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
     - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central over TLS connection.
 - **ping_sample**
     - Contains ping function and example usage.
+- **ports_status**
+    - Sets the device description to visually show the LAN/WAN/WWAN/Modem/IP Verify status
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
 - **send_to_server**
