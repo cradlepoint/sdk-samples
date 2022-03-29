@@ -1,7 +1,7 @@
 """
 NCOS communication module for SDK applications.
 
-Copyright (c) 2018 Cradlepoint, Inc. <www.cradlepoint.com>.  All rights reserved.
+Copyright (c) 2022 Cradlepoint, Inc. <www.cradlepoint.com>.  All rights reserved.
 
 This file contains confidential information of CradlePoint, Inc. and your use of
 this file is subject to the CradlePoint Software License Agreement distributed with
@@ -222,7 +222,7 @@ class CSClient(object):
 
             return json.loads(response.text)
 
-    def patch(self, base, value='', query='', tree=0):
+    def patch(self, value):
         """
         Constructs and sends a patch request to update or add specified data to the device router tree.
 
@@ -232,32 +232,33 @@ class CSClient(object):
             - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
               data.
 
-
         Args:
-            base: String representing a path to a resource on a router tree,
-                  (i.e. '/config/system/logging/level').
             value: list containing dict of add/changes, and list of removals:  [{add},[remove]]
-            query: Not required.
-            tree: Not required.
 
         Returns:
             A dictionary containing the response (i.e. {"success": True, "data:": {}}
         """
-        value = json.dumps(value)
+
         if 'linux' in sys.platform:
-            cmd = "patch\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
+            if value[0].get("config"):
+                adds = value[0]
+            else:
+                adds = {"config": value[0]}
+            adds = json.dumps(adds)
+            removals = json.dumps(value[1])
+            cmd = f"patch\n{adds}\n{removals}\n"
             return self._dispatch(cmd)
         else:
             # Running in a computer so use http to send the put to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
-            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
+            device_api = 'http://{}/api/'.format(device_ip)
 
             try:
                 response = requests.patch(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
                                         auth=self._get_auth(device_ip, username, password),
-                                        data={"data": '{}'.format(value)})
+                                        data={"data": '{}'.format(json.dumps(value))})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
                 print("Timeout: device at {} did not respond.".format(device_ip))

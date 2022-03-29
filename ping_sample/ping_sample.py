@@ -25,13 +25,12 @@ def ping(host, **kwargs):
     """
     import time
     start = {"host": host}
-    for k, v in kwargs:
+    pingstats = {'host': host}
+    for k, v in kwargs.items():
         start[k] = v
+        pingstats[k] = v
     cp.put('control/ping/start', start)
     result = {}
-    pingstats = {'host': host}
-    for k, v in kwargs:
-        pingstats[k] = v
     try_count = 0
     while try_count < 15:
         result = cp.get('control/ping')
