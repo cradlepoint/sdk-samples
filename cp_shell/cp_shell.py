@@ -1,4 +1,5 @@
-"""cp_shell is a web interface to interact with the Cradlepoint router shell."""
+"""cp_shell is a web interface on port 8022.
+It allows you to interact with the Cradlepoint router linux shell."""
 
 import os
 import subprocess
@@ -7,6 +8,8 @@ from select import select
 import tornado.web
 from functools import partial
 from csclient import EventingCSClient
+
+server_port = 8022
 
 static_path = os.path.dirname(__file__)
 
@@ -41,7 +44,7 @@ class ShellHandler(tornado.web.RequestHandler):
         response = ''
         try:
             cmd = self.get_argument('cmd')
-            response = shell2(cmd) or 'No Response'
+            response = shell(cmd) or 'No Response'
         except Exception as e:
             cp.log(e)
         self.write(response)
@@ -49,11 +52,11 @@ class ShellHandler(tornado.web.RequestHandler):
 
 if __name__ == "__main__":
     cp = EventingCSClient('cp_shell')
-    cp.log('Starting...')
+    cp.log(f'Starting webserver on port {server_port}...')
     application = tornado.web.Application([
         (r"/shell", ShellHandler),
         (r"/(.*)", tornado.web.StaticFileHandler,
          {"path": static_path, "default_filename": "index.html"}),
     ])
-    application.listen(8022)
+    application.listen(server_port)
     tornado.ioloop.IOLoop.current().start()
