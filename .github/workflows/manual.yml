@@ -1,0 +1,18 @@
+name: Test make and package contents consistency
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  run-make:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python make.py package
+      - run: python make.py build
+      - run: python make.py package_all
+      - run: python make.py clean
+      - run: python make.py clean_all
+
