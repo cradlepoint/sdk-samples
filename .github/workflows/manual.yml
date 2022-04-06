@@ -10,6 +10,7 @@ jobs:
   run-make:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - run: python make.py package
       - run: python make.py build
       - run: python make.py package_all
