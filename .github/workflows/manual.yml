@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: python make.py package
-      - run: python make.py build
-      - run: python make.py package_all
-      - run: python make.py clean
-      - run: python make.py clean_all
+      - run: python3 make.py package
+      - run: python3 make.py build
+      - run: python3 make.py package_all
+      - run: python3 make.py clean
+      - run: python3 make.py clean_all
 
