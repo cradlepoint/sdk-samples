@@ -7,6 +7,7 @@ do
 	if [ -n "$result" ]
 	then
 		echo "Error with app: $result"
+		cat output.txt
 		exit 1
 	else
 		cat output.txt
