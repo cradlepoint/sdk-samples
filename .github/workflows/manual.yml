@@ -15,7 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - id: build1
-      - if: contains('["error", "failure", "assert"]', python3 make.py build)
+      - run: python3 make.py build
+      - if: contains('["error", "failure", "assert"]', )
         run: exit 1
       - id: buildAll
         run: python3 make.py build all
