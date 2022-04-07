@@ -15,8 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-          chmod +x build.sh
-          ./build.sh
+          chmod +x builds.sh
+          ./builds.sh
         shell: bash
   
 
