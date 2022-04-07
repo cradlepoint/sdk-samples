@@ -3,10 +3,11 @@ declare -a commands=("python3 make.py build" "python3 make.py build all" "python
 for cmds in "${commands[@]}";
 do
 	echo $cmds
-	result=$($cmds 2>&1 > /dev/null)
+	result=$($cmds 2>&1)
 	if [ -n "$result" ]
 	then
 		echo "Error with app: $result"
 		exit 1
+		
 	fi
 done
