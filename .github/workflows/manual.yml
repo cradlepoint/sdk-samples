@@ -16,8 +16,15 @@ jobs:
       - uses: actions/checkout@v2
       - id: build1
         run: python3 make.py build
+      - id: check_build1
+        if: contains(steps.build1.outputs, '["failure", "error"]')
+        run: exit 1
       - id: buildAll
         run: python3 make.py build all
+      - id: check_buildAll
+        if: contains(steps.buildAll.outputs, '["failure", "error"]')
+        run: exit 1
       - run: python3 make.py clean
       - run: python3 make.py clean all
+  
 
