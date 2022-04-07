@@ -11,8 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: python3 make.py build
-      - run: python3 make.py build all
+      - id: build1
+        run: python3 make.py build
+      - if: contains('["error", "failure", "assert"]', setps.build1.output)
+        run: exit 1
+      - id: buildAll
+        run: python3 make.py build all
       - run: python3 make.py clean
       - run: python3 make.py clean all
 
