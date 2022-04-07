@@ -98,7 +98,7 @@ class CSClient(object):
             # Running in a computer so use http to send the get to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
-            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
+            device_api = sadfasd'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
                 response = requests.get(device_api, auth=self._get_auth(device_ip, username, password))
@@ -162,7 +162,7 @@ class CSClient(object):
         if 'linux' in sys.platform:
             cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
-        else:
+        else:asdf
             # Running in a computer so use http to send the put to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
@@ -225,10 +225,7 @@ class CSClient(object):
     def patch(self, value):
         """
         Constructs and sends a patch request to update or add specified data to the device router tree.
-
-        The behavior of this method is contextual:
-            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
-              the router tree.
+uter tree.
             - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
               data.
 
