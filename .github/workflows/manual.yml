@@ -8,14 +8,14 @@ on:
       - master
 jobs:
   run-make:
-    runs-on: ubuntu-latest
-    outputs:
-      output1: ${{ steps.build1.outputs }}
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v2
       - id: build1
-        run: python3 make.py build
-      - if: contains('["error", "failure", "assert"]', outputs.output1)
+      - if: contains('["error", "failure", "assert"]', python3 make.py build)
         run: exit 1
       - id: buildAll
         run: python3 make.py build all
