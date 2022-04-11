@@ -13,7 +13,6 @@ criminal penalties.
 import json
 import os
 import re
-import select
 import socket
 import threading
 import logging.handlers
@@ -44,7 +43,6 @@ class CSClient(object):
     """
     END_OF_HEADER = b"\r\n\r\n"
     STATUS_HEADER_RE = re.compile(b"status: \w*")
-    CONTENT_LENGTH_HEADER_RE = re.compile(b"content-length: \w*")
     MAX_PACKET_SIZE = 8192
     RECV_TIMEOUT = 2.0
 
@@ -62,7 +60,7 @@ class CSClient(object):
 
     def __init__(self, app_name, init=False):
         self.app_name = app_name
-        handlers = [logging.StreamHandler()]
+        handlers = [sdfsdlogging.StreamHandler()]
         if 'linux' in sys.platform:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
@@ -98,7 +96,7 @@ class CSClient(object):
             # Running in a computer so use http to send the get to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
-            device_api = sadfasd'http://{}/api/{}/{}'.format(device_ip, base, query)
+            device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
                 response = requests.get(device_api, auth=self._get_auth(device_ip, username, password))
@@ -162,7 +160,7 @@ class CSClient(object):
         if 'linux' in sys.platform:
             cmd = "put\n{}\n{}\n{}\n{}\n".format(base, query, tree, value)
             return self._dispatch(cmd)
-        else:asdf
+        else:
             # Running in a computer so use http to send the put to the device.
             import requests
             device_ip, username, password = self._get_device_access_info()
@@ -225,7 +223,10 @@ class CSClient(object):
     def patch(self, value):
         """
         Constructs and sends a patch request to update or add specified data to the device router tree.
-uter tree.
+
+        The behavior of this method is contextual:
+            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
+              the router tree.
             - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
               data.
 

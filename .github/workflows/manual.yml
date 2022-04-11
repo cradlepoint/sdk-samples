@@ -18,9 +18,16 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
+  required-files:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04]
+    steps:
+      - uses: actions/checkout@v2
       - run: |
           chmod +x ./.github/workflows/cslient_compare.sh
-          ./.github/workflows/cslient_compare.sh 
+          ./.github/workflows/cslient_compare.sh
         shell: bash
       - run: |
           chmod +x ./.github/workflows/check_for_bin.sh
