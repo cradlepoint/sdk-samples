@@ -22,3 +22,13 @@ jobs:
           chmod +x ./.github/workflows/cslient_compare.sh
           ./.github/workflows/cslient_compare.sh 
         shell: bash
+      - run: |
+          chmod +x ./.github/workflows/check_for_bin.sh
+          ./.github/workflows/check_for_bin.sh
+        shell: bash
+      - run: |
+          chmod +x ./.github/workflows/check_for_readme.sh
+          ./.github/workflows/check_for_readme.sh
+        shell: bash
+
+
