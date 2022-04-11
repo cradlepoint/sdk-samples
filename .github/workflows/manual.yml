@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-          chmod +x ./.github/workflows/cslient_compare.sh
+          chmod +x ./.github/workflows/csclient_compare.sh
           ./.github/workflows/cslient_compare.sh
         shell: bash
       - run: |

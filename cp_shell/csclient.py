@@ -13,6 +13,7 @@ criminal penalties.
 import json
 import os
 import re
+import select
 import socket
 import threading
 import logging.handlers
@@ -43,6 +44,7 @@ class CSClient(object):
     """
     END_OF_HEADER = b"\r\n\r\n"
     STATUS_HEADER_RE = re.compile(b"status: \w*")
+    CONTENT_LENGTH_HEADER_RE = re.compile(b"content-length: \w*")
     MAX_PACKET_SIZE = 8192
     RECV_TIMEOUT = 2.0
 
@@ -60,7 +62,7 @@ class CSClient(object):
 
     def __init__(self, app_name, init=False):
         self.app_name = app_name
-        handlers = [sdfsdlogging.StreamHandler()]
+        handlers = [logging.StreamHandler()]
         if 'linux' in sys.platform:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
