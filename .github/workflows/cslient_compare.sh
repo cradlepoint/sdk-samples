@@ -1,4 +1,5 @@
 #!/bin/bash
+#Every app should have the same version of csclient.py. This test verifies a new app or modified app does not have an out of date csclient.py.
 file2="hello_world/csclient.py"
 for folder in ./*/;
 do
