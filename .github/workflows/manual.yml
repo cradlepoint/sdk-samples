@@ -18,6 +18,13 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
+      - name: Commit built apps
+        with:
+            github_token: ${{ secrets.github_token }}
+            run: |
+              git add built_apps/*
+              git commit -m "Rebuilt apps"
+              git push
   required-files:
     runs-on: ${{matrix.os}}
     strategy:
@@ -25,17 +32,14 @@ jobs:
         os: [ubuntu-18.04]
     steps:
       - uses: actions/checkout@v2
-      - run: |
-          chmod +x ./.github/workflows/csclient_compare.sh
-          ./.github/workflows/csclient_compare.sh
-        shell: bash
-      - run: |
-          chmod +x ./.github/workflows/check_for_bin.sh
-          ./.github/workflows/check_for_bin.sh
-        shell: bash
-      - run: |
+      - name: Check each app has a readme.txt
+        run: |
           chmod +x ./.github/workflows/check_for_readme.sh
           ./.github/workflows/check_for_readme.sh
         shell: bash
-
+      - name: Check if there is a new csclient.py
+        run: |
+          chmod +x ./.github/workflows/csclient_compare.sh
+          ./.github/workflows/csclient_compare.sh
+        shell: bash
 
