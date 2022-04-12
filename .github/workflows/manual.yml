@@ -31,6 +31,7 @@ jobs:
           ./.github/workflows/builds.sh
         shell: bash
       - name: Commit newly built apps to github
+        if: github.event_name == 'push'
         run: |
           git config --global user.name 'Github actions auto build packages'
           git config --global user.email 'Github_actions_auto_build_packages@users.noreply.github.com'
