@@ -1,0 +1,45 @@
+name: Test make and package contents consistency
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  run-make:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check each app has a readme.txt
+        run: |
+          chmod +x ./.github/workflows/check_for_readme.sh
+          ./.github/workflows/check_for_readme.sh
+        shell: bash
+      - name: Check root readme entries
+        run: |
+           chmod +x ./.github/workflows/check_root_readme_entries.sh 
+           ./.github/workflows/check_root_readme_entries.sh 
+        shell: bash       
+      - name: Check if there is a new csclient.py
+        run: |
+          chmod +x ./.github/workflows/csclient_compare.sh
+          ./.github/workflows/csclient_compare.sh
+        shell: bash
+      - uses: actions/checkout@v2
+      - name: Run make build and clean
+        run: |
+          chmod +x ./.github/workflows/builds.sh
+          ./.github/workflows/builds.sh
+        shell: bash
+      - name: Commit newly built apps to github
+        if: github.event_name == 'push'
+        run: |
+          git config --global user.name 'Github actions auto build packages'
+          git config --global user.email 'Github_actions_auto_build_packages@users.noreply.github.com'
+          git add built_apps/*
+          git commit -m "Rebuilt apps"
+          git push
