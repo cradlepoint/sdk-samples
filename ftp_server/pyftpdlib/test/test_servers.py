@@ -32,11 +32,12 @@ from pyftpdlib.test.test_functional import TestIPv4Environment
 from pyftpdlib.test.test_functional import TestIPv6Environment
 
 
-MPROCESS_SUPPORT = hasattr(servers, 'MultiprocessFTPServer')
+MPROCESS_SUPPORT = hasattr(servers, "MultiprocessFTPServer")
 
 
 class TestFTPServer(unittest.TestCase):
     """Tests for *FTPServer classes."""
+
     server_class = ThreadedTestFTPd
     client_class = ftplib.FTP
 
@@ -83,8 +84,7 @@ class ThreadFTPTestMixin:
     server_class = _TFTPd
 
 
-class TestFtpAuthenticationThreadMixin(ThreadFTPTestMixin,
-                                       TestFtpAuthentication):
+class TestFtpAuthenticationThreadMixin(ThreadFTPTestMixin, TestFtpAuthentication):
     pass
 
 
@@ -147,19 +147,21 @@ class TestCornerCasesThreadMixin(ThreadFTPTestMixin, TestCornerCases):
 # =====================================================================
 
 if MPROCESS_SUPPORT:
+
     class MultiProcFTPd(ThreadedTestFTPd):
         server_class = servers.MultiprocessFTPServer
 
     class MProcFTPTestMixin:
         server_class = MultiProcFTPd
+
 else:
+
     @unittest.skipIf(True, "multiprocessing module not installed")
     class MProcFTPTestMixin:
         pass
 
 
-class TestFtpAuthenticationMProcMixin(MProcFTPTestMixin,
-                                      TestFtpAuthentication):
+class TestFtpAuthenticationMProcMixin(MProcFTPTestMixin, TestFtpAuthentication):
     pass
 
 
@@ -172,7 +174,6 @@ class TestFtpCmdsSemanticMProcMixin(MProcFTPTestMixin, TestFtpCmdsSemantic):
 
 
 class TestFtpFsOperationsMProcMixin(MProcFTPTestMixin, TestFtpFsOperations):
-
     def test_unforeseen_mdtm_event(self):
         pass
 
@@ -220,5 +221,5 @@ configure_logging()
 remove_test_files()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=VERBOSITY)

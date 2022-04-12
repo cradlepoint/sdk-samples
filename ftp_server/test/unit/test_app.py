@@ -11,7 +11,6 @@ from threading import Thread
 
 
 class TestApp(unittest.TestCase):
-
     @contextlib.contextmanager
     def _capture_output(self):
         new_out, new_err = io.StringIO(), io.StringIO()
@@ -29,7 +28,9 @@ class TestApp(unittest.TestCase):
 
             importlib.reload(ftp_server)
             # Make the thread a daemon so it will be killed when the test ends
-            server_thread = Thread(target=ftp_server.start_ftp_server, args=(), daemon=True)
+            server_thread = Thread(
+                target=ftp_server.start_ftp_server, args=(), daemon=True
+            )
             server_thread.start()
 
             # Need a delay to allow some time for the thread to start
@@ -42,6 +43,4 @@ class TestApp(unittest.TestCase):
 
         # if the test passed, stdout should have captured output
         # Just make sure nothing went wrong
-        self.assertNotIn('Exception occurred!', output)
-
-
+        self.assertNotIn("Exception occurred!", output)

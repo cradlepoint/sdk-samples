@@ -4,11 +4,11 @@ import paho.mqtt.client as mqtt
 import json
 from csclient import EventingCSClient
 
-cp = EventingCSClient('serial_temp')
-broker_address = '127.0.0.01'
-port = '/dev/ttyUSB0'
+cp = EventingCSClient("serial_temp")
+broker_address = "127.0.0.01"
+port = "/dev/ttyUSB0"
 speed = 9600
-my_sim = 'mdm-e152d8b2' # Change to your SIM slot UID
+my_sim = "mdm-e152d8b2"  # Change to your SIM slot UID
 
 
 class Timeout(Exception):
@@ -16,13 +16,13 @@ class Timeout(Exception):
 
 
 def has_t1t2(chunks):
-    return len(chunks) > 2 and '1.' in chunks[0] and '2.' in chunks[1]
+    return len(chunks) > 2 and "1." in chunks[0] and "2." in chunks[1]
 
 
 def parse_temp(temp_str):
-    dotpos = temp_str.find('.')
+    dotpos = temp_str.find(".")
     if dotpos:
-        return float(temp_str[dotpos+1:-1])
+        return float(temp_str[dotpos + 1 : -1])
     else:
         return None
 
@@ -31,13 +31,13 @@ def modem_state(cp, state, sim):
     # Blocking call that will wait until a given state is shown as the modem's status
     timeout_counter = 0
     sleep_seconds = 0
-    conn_path = '%s/%s/status/connection_state' % ('status/wan/devices', sim)
+    conn_path = "%s/%s/status/connection_state" % ("status/wan/devices", sim)
     cp.log(f"modem_state waiting sim={sim} state={state}")
     while True:
         sleep_seconds += 5
-        conn_state = cp.get(conn_path).get('data', '')
+        conn_state = cp.get(conn_path).get("data", "")
         # TODO add checking for error states
-        cp.log(f'waiting for state={state} on sim={sim} curr state={conn_state}')
+        cp.log(f"waiting for state={state} on sim={sim} curr state={conn_state}")
         if conn_state == state:
             break
         if timeout_counter > 600:
@@ -50,13 +50,15 @@ def modem_state(cp, state, sim):
 
 
 def data_logger_to_mqtt_reader():
-    client = mqtt.Client("Datalogger2Mqtt", protocol=mqtt.MQTTv311)  # create new instance
+    client = mqtt.Client(
+        "Datalogger2Mqtt", protocol=mqtt.MQTTv311
+    )  # create new instance
     try:
         client.connect(broker_address, port=9898)  # connect to broker
     except ConnectionRefusedError:
         return
     try:
-        with serial.Serial('/dev/ttyUSB0', 9600, timeout=1) as ser:
+        with serial.Serial("/dev/ttyUSB0", 9600, timeout=1) as ser:
             while True:
                 line = ser.readline()
                 chunks = line.decode("utf-8").split(",")
@@ -71,5 +73,5 @@ def data_logger_to_mqtt_reader():
         client.disconnect()
 
 
-if modem_state(cp, 'connected', my_sim):
+if modem_state(cp, "connected", my_sim):
     data_logger_to_mqtt_reader()

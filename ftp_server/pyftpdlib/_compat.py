@@ -11,6 +11,7 @@ import sys
 PY3 = sys.version_info[0] == 3
 
 if PY3:
+
     def u(s):
         return s
 
@@ -21,6 +22,7 @@ if PY3:
     unicode = str
     xrange = range
 else:
+
     def u(s):
         return unicode(s)
 
@@ -36,6 +38,7 @@ else:
 try:
     callable = callable
 except Exception:
+
     def callable(obj):
         for klass in type(obj).__mro__:
             if "__call__" in klass.__dict__:

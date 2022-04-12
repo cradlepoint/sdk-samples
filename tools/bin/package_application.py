@@ -14,21 +14,21 @@ import tarfile
 import gzip
 from OpenSSL import crypto
 
-META_DATA_FOLDER = 'METADATA'
-CONFIG_FILE = 'package.ini'
-SIGNATURE_FILE = 'SIGNATURE.DS'
-MANIFEST_FILE = 'MANIFEST.json'
+META_DATA_FOLDER = "METADATA"
+CONFIG_FILE = "package.ini"
+SIGNATURE_FILE = "SIGNATURE.DS"
+MANIFEST_FILE = "MANIFEST.json"
 
-BYTE_CODE_FILES = re.compile('^.*\.(pyc|pyo|pyd)$')
-BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
+BYTE_CODE_FILES = re.compile("^.*\.(pyc|pyo|pyd)$")
+BYTE_CODE_FOLDERS = re.compile("^(__pycache__)$")
 
 
 def file_checksum(hash_func=hashlib.sha256, file=None):
     h = hash_func()
     buffer_size = h.block_size * 64
 
-    with open(file, 'rb') as f:
-        for buffer in iter(lambda: f.read(buffer_size), b''):
+    with open(file, "rb") as f:
+        for buffer in iter(lambda: f.read(buffer_size), b""):
             h.update(buffer)
     return h.hexdigest()
 
@@ -37,15 +37,16 @@ def hash_dir(target, hash_func=hashlib.sha256):
     hashed_files = {}
     for path, d, f in os.walk(target):
         for fl in f:
-            if not fl.startswith('.') and not os.path.basename(path).startswith('.'):
+            if not fl.startswith(".") and not os.path.basename(path).startswith("."):
                 # we need this be LINUX fashion!
                 if sys.platform == "win32":
                     # swap the network\\tcp_echo to be network/tcp_echo
-                    fully_qualified_file = path.replace('\\', '/') + '/' + fl
+                    fully_qualified_file = path.replace("\\", "/") + "/" + fl
                 else:  # else allow normal method
                     fully_qualified_file = os.path.join(path, fl)
-                hashed_files[fully_qualified_file[len(target) + 1:]] =\
-                    file_checksum(hash_func, fully_qualified_file)
+                hashed_files[fully_qualified_file[len(target) + 1 :]] = file_checksum(
+                    hash_func, fully_qualified_file
+                )
             else:
                 print("Did not include {} in the App package.".format(fl))
 
@@ -53,18 +54,18 @@ def hash_dir(target, hash_func=hashlib.sha256):
 
 
 def pack_package(app_root, app_name):
-    print('app_root: {}'.format(app_root))
-    print('app_name: {}'.format(app_name))
+    print("app_root: {}".format(app_root))
+    print("app_name: {}".format(app_name))
     print("pack TAR:%s.tar" % app_name)
     tar_name = "{}.tar".format(app_name)
-    tar = tarfile.open(tar_name, 'w')
+    tar = tarfile.open(tar_name, "w")
     tar.add(app_root, arcname=os.path.basename(app_root))
     tar.close()
 
     print("gzip archive:%s.tar.gz" % app_name)
     gzip_name = "{}.tar.gz".format(app_name)
-    with open(tar_name, 'rb') as f_in:
-        with gzip.open(gzip_name, 'wb') as f_out:
+    with open(tar_name, "rb") as f_in:
+        with gzip.open(gzip_name, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
     if os.path.isfile(tar_name):
@@ -73,10 +74,10 @@ def pack_package(app_root, app_name):
 
 def create_signature(meta_data_folder, pkey):
     manifest_file = os.path.join(meta_data_folder, MANIFEST_FILE)
-    with open(os.path.join(meta_data_folder, SIGNATURE_FILE), 'wb') as sf:
-        checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
+    with open(os.path.join(meta_data_folder, SIGNATURE_FILE), "wb") as sf:
+        checksum = file_checksum(hashlib.sha256, manifest_file).encode("utf-8")
         if pkey:
-            sf.write(crypto.sign(pkey, checksum, 'sha256'))
+            sf.write(crypto.sign(pkey, checksum, "sha256"))
         else:
             sf.write(checksum)
 
@@ -120,51 +121,50 @@ def package_application(app_root, pkey):
         clean_bytecode_files(app_root)
 
         pmf = {}
-        pmf['version_major'] = int(1)
-        pmf['version_minor'] = int(0)
+        pmf["version_major"] = int(1)
+        pmf["version_minor"] = int(0)
 
         app = {}
-        app['name'] = str(section)
+        app["name"] = str(section)
         try:
-            app['uuid'] = config[section]['uuid']
+            app["uuid"] = config[section]["uuid"]
         except KeyError:
             if not pkey:
-                app['uuid'] = str(uuid.uuid4())
+                app["uuid"] = str(uuid.uuid4())
             else:
                 raise
-        app['vendor'] = config[section]['vendor']
-        app['notes'] = config[section]['notes']
-        app['version_major'] = int(config[section]['version_major'])
-        app['version_minor'] = int(config[section]['version_minor'])
-        app['firmware_major'] = int(config[section]['firmware_major'])
-        app['firmware_minor'] = int(config[section]['firmware_minor'])
-        app['restart'] = config[section].getboolean('restart')
-        app['reboot'] = config[section].getboolean('reboot')
-        app['date'] = datetime.datetime.now().isoformat()
-        if config.has_option(section, 'auto_start'):
-            app['auto_start'] = config[section].getboolean('auto_start')
-        if config.has_option(section, 'app_type'):
-            app['app_type'] = int(config[section]['app_type'])
-
+        app["vendor"] = config[section]["vendor"]
+        app["notes"] = config[section]["notes"]
+        app["version_major"] = int(config[section]["version_major"])
+        app["version_minor"] = int(config[section]["version_minor"])
+        app["firmware_major"] = int(config[section]["firmware_major"])
+        app["firmware_minor"] = int(config[section]["firmware_minor"])
+        app["restart"] = config[section].getboolean("restart")
+        app["reboot"] = config[section].getboolean("reboot")
+        app["date"] = datetime.datetime.now().isoformat()
+        if config.has_option(section, "auto_start"):
+            app["auto_start"] = config[section].getboolean("auto_start")
+        if config.has_option(section, "app_type"):
+            app["app_type"] = int(config[section]["app_type"])
 
         data = {}
-        data['pmf'] = pmf
-        data['app'] = app
+        data["pmf"] = pmf
+        data["app"] = app
 
-        app['files'] = hash_dir(app_root)
+        app["files"] = hash_dir(app_root)
 
-        with open(app_manifest_file, 'w') as f:
+        with open(app_manifest_file, "w") as f:
             f.write(json.dumps(data, indent=4, sort_keys=True))
 
         create_signature(app_metadata_folder, pkey)
 
         pack_package(app_root, section)
 
-        print('Package {}.tar.gz created'.format(section))
+        print("Package {}.tar.gz created".format(section))
 
 
 def argument_list(args):
-    print('{} <applicationRoot> <path_to_private_OPTIONAL>'.format(args[0]))
+    print("{} <applicationRoot> <path_to_private_OPTIONAL>".format(args[0]))
 
 
 if __name__ == "__main__":
@@ -175,9 +175,11 @@ if __name__ == "__main__":
 
         pkey = None
         if 3 == len(sys.argv):
-            with open(sys.argv[2], 'r') as pf:
+            with open(sys.argv[2], "r") as pf:
                 pkey = crypto.load_privatekey(
-                        type=crypto.FILETYPE_PEM, buffer=pf.read(),
-                        passphrase='pass'.encode('utf-8'))
+                    type=crypto.FILETYPE_PEM,
+                    buffer=pf.read(),
+                    passphrase="pass".encode("utf-8"),
+                )
 
         package_application(sys.argv[1], pkey)

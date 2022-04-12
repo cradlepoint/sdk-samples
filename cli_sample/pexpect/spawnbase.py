@@ -6,11 +6,13 @@ import errno
 from .exceptions import ExceptionPexpect, EOF, TIMEOUT
 from .expect import Expecter, searcher_string, searcher_re
 
-PY3 = (sys.version_info[0] >= 3)
+PY3 = sys.version_info[0] >= 3
 text_type = str if PY3 else unicode
+
 
 class _NullCoder(object):
     """Pass bytes through unchanged."""
+
     @staticmethod
     def encode(b, final=False):
         return b
@@ -19,18 +21,27 @@ class _NullCoder(object):
     def decode(b, final=False):
         return b
 
+
 class SpawnBase(object):
     """A base class providing the backwards-compatible spawn API for Pexpect.
 
     This should not be instantiated directly: use :class:`pexpect.spawn` or
     :class:`pexpect.fdpexpect.fdspawn`.
     """
+
     encoding = None
     pid = None
     flag_eof = False
 
-    def __init__(self, timeout=30, maxread=2000, searchwindowsize=None,
-                 logfile=None, encoding=None, codec_errors='strict'):
+    def __init__(
+        self,
+        timeout=30,
+        maxread=2000,
+        searchwindowsize=None,
+        logfile=None,
+        encoding=None,
+        codec_errors="strict",
+    ):
         self.stdin = sys.stdin
         self.stdout = sys.stdout
         self.stderr = sys.stderr
@@ -77,7 +88,7 @@ class SpawnBase(object):
         # interpreter lock).
         self.delayafterread = 0.0001
         self.softspace = False
-        self.name = '<' + repr(self) + '>'
+        self.name = "<" + repr(self) + ">"
         self.closed = True
 
         # Unicode interface
@@ -87,16 +98,18 @@ class SpawnBase(object):
             # bytes mode (accepts some unicode for backwards compatibility)
             self._encoder = self._decoder = _NullCoder()
             self.string_type = bytes
-            self.crlf = b'\r\n'
+            self.crlf = b"\r\n"
             if PY3:
                 self.allowed_string_types = (bytes, str)
-                self.linesep = os.linesep.encode('ascii')
+                self.linesep = os.linesep.encode("ascii")
+
                 def write_to_stdout(b):
                     try:
                         return sys.stdout.buffer.write(b)
                     except AttributeError:
                         # If stdout has been replaced, it may not have .buffer
-                        return sys.stdout.write(b.decode('ascii', 'replace'))
+                        return sys.stdout.write(b.decode("ascii", "replace"))
+
                 self.write_to_stdout = write_to_stdout
             else:
                 self.allowed_string_types = (basestring,)  # analysis:ignore
@@ -107,12 +120,12 @@ class SpawnBase(object):
             self._encoder = codecs.getincrementalencoder(encoding)(codec_errors)
             self._decoder = codecs.getincrementaldecoder(encoding)(codec_errors)
             self.string_type = text_type
-            self.crlf = u'\r\n'
-            self.allowed_string_types = (text_type, )
+            self.crlf = "\r\n"
+            self.allowed_string_types = (text_type,)
             if PY3:
                 self.linesep = os.linesep
             else:
-                self.linesep = os.linesep.decode('ascii')
+                self.linesep = os.linesep.decode("ascii")
             # This can handle unicode in both Python 2 and 3
             self.write_to_stdout = sys.stdout.write
         # storage for async transport
@@ -122,7 +135,7 @@ class SpawnBase(object):
         if self.logfile is not None:
             self.logfile.write(s)
             self.logfile.flush()
-        second_log = self.logfile_send if (direction=='send') else self.logfile_read
+        second_log = self.logfile_send if (direction == "send") else self.logfile_read
         if second_log is not None:
             second_log.write(s)
             second_log.flush()
@@ -132,12 +145,12 @@ class SpawnBase(object):
     # only.
     def _coerce_expect_string(self, s):
         if self.encoding is None and not isinstance(s, bytes):
-            return s.encode('ascii')
+            return s.encode("ascii")
         return s
 
     def _coerce_send_string(self, s):
         if self.encoding is None and not isinstance(s, bytes):
-            return s.encode('utf-8')
+            return s.encode("utf-8")
         return s
 
     def read_nonblocking(self, size=1, timeout=None):
@@ -154,29 +167,29 @@ class SpawnBase(object):
             if err.args[0] == errno.EIO:
                 # Linux-style EOF
                 self.flag_eof = True
-                raise EOF('End Of File (EOF). Exception style platform.')
+                raise EOF("End Of File (EOF). Exception style platform.")
             raise
-        if s == b'':
+        if s == b"":
             # BSD-style EOF
             self.flag_eof = True
-            raise EOF('End Of File (EOF). Empty string style platform.')
+            raise EOF("End Of File (EOF). Empty string style platform.")
 
         s = self._decoder.decode(s, final=False)
-        self._log(s, 'read')
+        self._log(s, "read")
         return s
 
     def _pattern_type_err(self, pattern):
-        raise TypeError('got {badtype} ({badobj!r}) as pattern, must be one'
-                        ' of: {goodtypes}, pexpect.EOF, pexpect.TIMEOUT'\
-                        .format(badtype=type(pattern),
-                                badobj=pattern,
-                                goodtypes=', '.join([str(ast)\
-                                    for ast in self.allowed_string_types])
-                                )
-                        )
+        raise TypeError(
+            "got {badtype} ({badobj!r}) as pattern, must be one"
+            " of: {goodtypes}, pexpect.EOF, pexpect.TIMEOUT".format(
+                badtype=type(pattern),
+                badobj=pattern,
+                goodtypes=", ".join([str(ast) for ast in self.allowed_string_types]),
+            )
+        )
 
     def compile_pattern_list(self, patterns):
-        '''This compiles a pattern-string or a list of pattern-strings.
+        """This compiles a pattern-string or a list of pattern-strings.
         Patterns must be a StringType, EOF, TIMEOUT, SRE_Pattern, or a list of
         those. Patterns may also be None which results in an empty list (you
         might do this if waiting for an EOF or TIMEOUT condition without
@@ -197,7 +210,7 @@ class SpawnBase(object):
                 ...
                 i = self.expect_list(cpl, timeout)
                 ...
-        '''
+        """
 
         if patterns is None:
             return []
@@ -217,14 +230,14 @@ class SpawnBase(object):
                 compiled_pattern_list.append(EOF)
             elif p is TIMEOUT:
                 compiled_pattern_list.append(TIMEOUT)
-            elif isinstance(p, type(re.compile(''))):
+            elif isinstance(p, type(re.compile(""))):
                 compiled_pattern_list.append(p)
             else:
                 self._pattern_type_err(p)
         return compiled_pattern_list
 
     def expect(self, pattern, timeout=-1, searchwindowsize=-1, async_=False, **kw):
-        '''This seeks through the stream until a pattern is matched. The
+        """This seeks through the stream until a pattern is matched. The
         pattern is overloaded and may take several types. The pattern can be a
         StringType, EOF, a compiled re, or a list of any of those types.
         Strings will be compiled to re types. This returns the index into the
@@ -316,19 +329,21 @@ class SpawnBase(object):
         With this non-blocking form::
 
             index = yield from p.expect(patterns, async_=True)
-        '''
-        if 'async' in kw:
-            async_ = kw.pop('async')
+        """
+        if "async" in kw:
+            async_ = kw.pop("async")
         if kw:
             raise TypeError("Unknown keyword arguments: {}".format(kw))
 
         compiled_pattern_list = self.compile_pattern_list(pattern)
-        return self.expect_list(compiled_pattern_list,
-                timeout, searchwindowsize, async_)
+        return self.expect_list(
+            compiled_pattern_list, timeout, searchwindowsize, async_
+        )
 
-    def expect_list(self, pattern_list, timeout=-1, searchwindowsize=-1,
-                    async_=False, **kw):
-        '''This takes a list of compiled regular expressions and returns the
+    def expect_list(
+        self, pattern_list, timeout=-1, searchwindowsize=-1, async_=False, **kw
+    ):
+        """This takes a list of compiled regular expressions and returns the
         index into the pattern_list that matched the child output. The list may
         also contain EOF or TIMEOUT(which are not compiled regular
         expressions). This method is similar to the expect() method except that
@@ -339,25 +354,27 @@ class SpawnBase(object):
 
         Like :meth:`expect`, passing ``async_=True`` will make this return an
         asyncio coroutine.
-        '''
+        """
         if timeout == -1:
             timeout = self.timeout
-        if 'async' in kw:
-            async_ = kw.pop('async')
+        if "async" in kw:
+            async_ = kw.pop("async")
         if kw:
             raise TypeError("Unknown keyword arguments: {}".format(kw))
 
         exp = Expecter(self, searcher_re(pattern_list), searchwindowsize)
         if async_:
             from ._async import expect_async
+
             return expect_async(exp, timeout)
         else:
             return exp.expect_loop(timeout)
 
-    def expect_exact(self, pattern_list, timeout=-1, searchwindowsize=-1,
-                     async_=False, **kw):
+    def expect_exact(
+        self, pattern_list, timeout=-1, searchwindowsize=-1, async_=False, **kw
+    ):
 
-        '''This is similar to expect(), but uses plain string matching instead
+        """This is similar to expect(), but uses plain string matching instead
         of compiled regular expressions in 'pattern_list'. The 'pattern_list'
         may be a string; a list or other sequence of strings; or TIMEOUT and
         EOF.
@@ -371,16 +388,18 @@ class SpawnBase(object):
 
         Like :meth:`expect`, passing ``async_=True`` will make this return an
         asyncio coroutine.
-        '''
+        """
         if timeout == -1:
             timeout = self.timeout
-        if 'async' in kw:
-            async_ = kw.pop('async')
+        if "async" in kw:
+            async_ = kw.pop("async")
         if kw:
             raise TypeError("Unknown keyword arguments: {}".format(kw))
 
-        if (isinstance(pattern_list, self.allowed_string_types) or
-                pattern_list in (TIMEOUT, EOF)):
+        if isinstance(pattern_list, self.allowed_string_types) or pattern_list in (
+            TIMEOUT,
+            EOF,
+        ):
             pattern_list = [pattern_list]
 
         def prepare_pattern(pattern):
@@ -399,26 +418,27 @@ class SpawnBase(object):
         exp = Expecter(self, searcher_string(pattern_list), searchwindowsize)
         if async_:
             from ._async import expect_async
+
             return expect_async(exp, timeout)
         else:
             return exp.expect_loop(timeout)
 
     def expect_loop(self, searcher, timeout=-1, searchwindowsize=-1):
-        '''This is the common loop used inside expect. The 'searcher' should be
+        """This is the common loop used inside expect. The 'searcher' should be
         an instance of searcher_re or searcher_string, which describes how and
         what to search for in the input.
 
-        See expect() for other arguments, return value and exceptions. '''
+        See expect() for other arguments, return value and exceptions."""
 
         exp = Expecter(self, searcher, searchwindowsize)
         return exp.expect_loop(timeout)
 
     def read(self, size=-1):
-        '''This reads at most "size" bytes from the file (less if the read hits
+        """This reads at most "size" bytes from the file (less if the read hits
         EOF before obtaining size bytes). If the size argument is negative or
         omitted, read all data until EOF is reached. The bytes are returned as
         a string object. An empty string is returned when EOF is encountered
-        immediately. '''
+        immediately."""
 
         if size == 0:
             return self.string_type()
@@ -434,7 +454,7 @@ class SpawnBase(object):
         # worry about if I have to later modify read() or expect().
         # Note, it's OK if size==-1 in the regex. That just means it
         # will never match anything in which case we stop only on EOF.
-        cre = re.compile(self._coerce_expect_string('.{%d}' % size), re.DOTALL)
+        cre = re.compile(self._coerce_expect_string(".{%d}" % size), re.DOTALL)
         # delimiter default is EOF
         index = self.expect([cre, self.delimiter])
         if index == 0:
@@ -443,7 +463,7 @@ class SpawnBase(object):
         return self.before
 
     def readline(self, size=-1):
-        '''This reads and returns one entire line. The newline at the end of
+        """This reads and returns one entire line. The newline at the end of
         line is returned as part of the string, unless the file ends without a
         newline. An empty string is returned if EOF is encountered immediately.
         This looks for a newline as a CR/LF pair (\\r\\n) even on UNIX because
@@ -452,7 +472,7 @@ class SpawnBase(object):
 
         If the size argument is 0 then an empty string is returned. In all
         other cases the size argument is ignored, which is not standard
-        behavior for a file-like object. '''
+        behavior for a file-like object."""
 
         if size == 0:
             return self.string_type()
@@ -464,17 +484,16 @@ class SpawnBase(object):
             return self.before
 
     def __iter__(self):
-        '''This is to support iterators over a file-like object.
-        '''
+        """This is to support iterators over a file-like object."""
         return iter(self.readline, self.string_type())
 
     def readlines(self, sizehint=-1):
-        '''This reads until EOF using readline() and returns a list containing
+        """This reads until EOF using readline() and returns a list containing
         the lines thus read. The optional 'sizehint' argument is ignored.
         Remember, because this reads until EOF that means the child
         process should have closed its stdout. If you run this method on
         a child that is still running with its stdout open then this
-        method will block until it timesout.'''
+        method will block until it timesout."""
 
         lines = []
         while True:
@@ -485,13 +504,12 @@ class SpawnBase(object):
         return lines
 
     def fileno(self):
-        '''Expose file descriptor for a file-like interface
-        '''
+        """Expose file descriptor for a file-like interface"""
         return self.child_fd
 
     def flush(self):
-        '''This does nothing. It is here to support the interface for a
-        File-like object. '''
+        """This does nothing. It is here to support the interface for a
+        File-like object."""
         pass
 
     def isatty(self):

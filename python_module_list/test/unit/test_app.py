@@ -9,7 +9,6 @@ import python_module_list
 
 
 class TestApp(unittest.TestCase):
-
     @contextlib.contextmanager
     def _capture_output(self):
         new_out, new_err = io.StringIO(), io.StringIO()
@@ -27,11 +26,11 @@ class TestApp(unittest.TestCase):
             importlib.reload(python_module_list)
             python_module_list.log_module_list()
 
-            # pull info out of stderr 
+            # pull info out of stderr
             output = err.getvalue().strip()
 
         # if the test passed, stderr should have captured output
-        self.assertIn('---------- Python Version:', output)
-        self.assertIn('---------- Module Count=', output)
+        self.assertIn("---------- Python Version:", output)
+        self.assertIn("---------- Module Count=", output)
 
-        self.assertNotIn('Exception occurred!', output)
+        self.assertNotIn("Exception occurred!", output)

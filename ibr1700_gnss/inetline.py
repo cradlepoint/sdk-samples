@@ -15,12 +15,12 @@ STATE_RECV_LINE = 1
 STATE_WAIT_LF = 2
 STATE_WAIT_SOL = 3
 
-CR = '\x0d'
-LF = '\x0a'
+CR = "\x0d"
+LF = "\x0a"
 
 
 class ReadLine(object):
-    """State machine to read CR/LF style line. Input controlled from outside. """
+    """State machine to read CR/LF style line. Input controlled from outside."""
 
     # Keeping the read or recv or whatever outside the class allows me to handle
     # weird conditions around sockets, serial ports, etc.

@@ -9,7 +9,6 @@ import ftp_client
 
 
 class TestApp(unittest.TestCase):
-
     @contextlib.contextmanager
     def _capture_output(self):
         new_out, new_err = io.StringIO(), io.StringIO()
@@ -34,6 +33,5 @@ class TestApp(unittest.TestCase):
             output = out.getvalue().strip()
 
         # if the test passed, stdout should have captured output
-        self.assertIn('FTP login reply: 230 Login successful.', output)
-        self.assertIn('FTP STOR reply: 226 Transfer complete.', output)
-
+        self.assertIn("FTP login reply: 230 Login successful.", output)
+        self.assertIn("FTP STOR reply: 226 Transfer complete.", output)

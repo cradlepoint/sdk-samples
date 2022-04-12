@@ -7,7 +7,6 @@ import send_to_server
 
 
 class TestApp(unittest.TestCase):
-
     @contextlib.contextmanager
     def _capture_output(self):
         new_out, new_err = io.StringIO(), io.StringIO()
@@ -25,10 +24,10 @@ class TestApp(unittest.TestCase):
             importlib.reload(send_to_server)
             send_to_server.post_to_server()
 
-            # pull info out of stderr 
+            # pull info out of stderr
             output = out.getvalue().strip()
 
         # if the test passed, stderr should have captured output
-        self.assertIn('data sent, http response code: 200', output)
+        self.assertIn("data sent, http response code: 200", output)
 
-        self.assertNotIn('Exception occurred!', output)
+        self.assertNotIn("Exception occurred!", output)

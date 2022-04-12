@@ -62,11 +62,11 @@ class async_chat(asyncore.dispatcher):
     # sign of an application bug that we don't want to pass silently
 
     use_encoding = 0
-    encoding = 'latin-1'
+    encoding = "latin-1"
 
     def __init__(self, sock=None, map=None):
         # for string terminator matching
-        self.ac_in_buffer = b''
+        self.ac_in_buffer = b""
 
         # we use a list here rather than io.BytesIO for a few reasons...
         # del lst[:] is faster than bio.truncate(0)
@@ -85,7 +85,7 @@ class async_chat(asyncore.dispatcher):
         self.incoming.append(data)
 
     def _get_data(self):
-        d = b''.join(self.incoming)
+        d = b"".join(self.incoming)
         del self.incoming[:]
         return d
 
@@ -100,7 +100,7 @@ class async_chat(asyncore.dispatcher):
         if isinstance(term, str) and self.use_encoding:
             term = bytes(term, self.encoding)
         elif isinstance(term, int) and term < 0:
-            raise ValueError('the number of received bytes must be positive')
+            raise ValueError("the number of received bytes must be positive")
         self.terminator = term
 
     def get_terminator(self):
@@ -136,13 +136,13 @@ class async_chat(asyncore.dispatcher):
             if not terminator:
                 # no terminator, collect it all
                 self.collect_incoming_data(self.ac_in_buffer)
-                self.ac_in_buffer = b''
+                self.ac_in_buffer = b""
             elif isinstance(terminator, int):
                 # numeric terminator
                 n = terminator
                 if lb < n:
                     self.collect_incoming_data(self.ac_in_buffer)
-                    self.ac_in_buffer = b''
+                    self.ac_in_buffer = b""
                     self.terminator = self.terminator - lb
                 else:
                     self.collect_incoming_data(self.ac_in_buffer[:n])
@@ -165,7 +165,7 @@ class async_chat(asyncore.dispatcher):
                         # don't bother reporting the empty string
                         # (source of subtle bugs)
                         self.collect_incoming_data(self.ac_in_buffer[:index])
-                    self.ac_in_buffer = self.ac_in_buffer[index+terminator_len:]
+                    self.ac_in_buffer = self.ac_in_buffer[index + terminator_len :]
                     # This does the Right Thing if the terminator
                     # is changed here.
                     self.found_terminator()
@@ -181,7 +181,7 @@ class async_chat(asyncore.dispatcher):
                     else:
                         # no prefix, collect it all
                         self.collect_incoming_data(self.ac_in_buffer)
-                        self.ac_in_buffer = b''
+                        self.ac_in_buffer = b""
 
     def handle_write(self):
         self.initiate_send()
@@ -191,12 +191,11 @@ class async_chat(asyncore.dispatcher):
 
     def push(self, data):
         if not isinstance(data, (bytes, bytearray, memoryview)):
-            raise TypeError('data argument must be byte-ish (%r)',
-                            type(data))
+            raise TypeError("data argument must be byte-ish (%r)", type(data))
         sabs = self.ac_out_buffer_size
         if len(data) > sabs:
             for i in range(0, len(data), sabs):
-                self.producer_fifo.append(data[i:i+sabs])
+                self.producer_fifo.append(data[i : i + sabs])
         else:
             self.producer_fifo.append(data)
         self.initiate_send()
@@ -263,33 +262,34 @@ class async_chat(asyncore.dispatcher):
 
     def discard_buffers(self):
         # Emergencies only!
-        self.ac_in_buffer = b''
+        self.ac_in_buffer = b""
         del self.incoming[:]
         self.producer_fifo.clear()
 
 
 class simple_producer:
-
     def __init__(self, data, buffer_size=512):
         self.data = data
         self.buffer_size = buffer_size
 
     def more(self):
         if len(self.data) > self.buffer_size:
-            result = self.data[:self.buffer_size]
-            self.data = self.data[self.buffer_size:]
+            result = self.data[: self.buffer_size]
+            self.data = self.data[self.buffer_size :]
             return result
         else:
             result = self.data
-            self.data = b''
+            self.data = b""
             return result
 
 
 class fifo:
     def __init__(self, list=None):
         import warnings
-        warnings.warn('fifo class will be removed in Python 3.6',
-                      DeprecationWarning, stacklevel=2)
+
+        warnings.warn(
+            "fifo class will be removed in Python 3.6", DeprecationWarning, stacklevel=2
+        )
         if not list:
             self.list = deque()
         else:
@@ -328,6 +328,7 @@ class fifo:
 # old python:   18307/s
 # re:        12820/s
 # regex:     14035/s
+
 
 def find_prefix_at_end(haystack, needle):
     l = len(needle) - 1

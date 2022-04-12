@@ -15,6 +15,7 @@ import tempfile
 import threading
 import time
 import warnings
+
 try:
     from unittest import mock  # py3
 except ImportError:
@@ -36,7 +37,7 @@ if not hasattr(unittest.TestCase, "assertRaisesRegex"):
     unittest.TestCase.assertRaisesRegex = unittest.TestCase.assertRaisesRegexp
 
 sendfile = None
-if os.name == 'posix':
+if os.name == "posix":
     try:
         import sendfile
     except ImportError:
@@ -45,32 +46,33 @@ if os.name == 'posix':
 
 # Attempt to use IP rather than hostname (test suite will run a lot faster)
 try:
-    HOST = socket.gethostbyname('localhost')
+    HOST = socket.gethostbyname("localhost")
 except socket.error:
-    HOST = 'localhost'
-USER = 'user'
-PASSWD = '12345'
+    HOST = "localhost"
+USER = "user"
+PASSWD = "12345"
 HOME = getcwdu()
-TESTFN = 'tmp-pyftpdlib'
-TESTFN_UNICODE = TESTFN + '-unicode-' + '\xe2\x98\x83'
-TESTFN_UNICODE_2 = TESTFN_UNICODE + '-2'
+TESTFN = "tmp-pyftpdlib"
+TESTFN_UNICODE = TESTFN + "-unicode-" + "\xe2\x98\x83"
+TESTFN_UNICODE_2 = TESTFN_UNICODE + "-2"
 TIMEOUT = 2
 BUFSIZE = 1024
 INTERRUPTED_TRANSF_SIZE = 32768
 NO_RETRIES = 5
 OSX = sys.platform.startswith("darwin")
-POSIX = os.name == 'posix'
-WINDOWS = os.name == 'nt'
-TRAVIS = bool(os.environ.get('TRAVIS'))
-VERBOSITY = 1 if os.getenv('SILENT') else 2
+POSIX = os.name == "posix"
+WINDOWS = os.name == "nt"
+TRAVIS = bool(os.environ.get("TRAVIS"))
+VERBOSITY = 1 if os.getenv("SILENT") else 2
 
 
 class TestCase(unittest.TestCase):
-
     def __str__(self):
         return "%s.%s.%s" % (
-            self.__class__.__module__, self.__class__.__name__,
-            self._testMethodName)
+            self.__class__.__module__,
+            self.__class__.__name__,
+            self._testMethodName,
+        )
 
 
 # Hack that overrides default unittest.TestCase in order to print
@@ -90,9 +92,9 @@ def try_address(host, port=0, family=socket.AF_INET):
         return True
 
 
-SUPPORTS_IPV4 = try_address('127.0.0.1')
-SUPPORTS_IPV6 = socket.has_ipv6 and try_address('::1', family=socket.AF_INET6)
-SUPPORTS_SENDFILE = hasattr(os, 'sendfile') or sendfile is not None
+SUPPORTS_IPV4 = try_address("127.0.0.1")
+SUPPORTS_IPV6 = socket.has_ipv6 and try_address("::1", family=socket.AF_INET6)
+SUPPORTS_SENDFILE = hasattr(os, "sendfile") or sendfile is not None
 
 
 def safe_remove(*files):
@@ -101,7 +103,7 @@ def safe_remove(*files):
         try:
             os.remove(file)
         except OSError as err:
-            if os.name == 'nt':
+            if os.name == "nt":
                 return
             if err.errno != errno.ENOENT:
                 raise
@@ -112,7 +114,7 @@ def safe_rmdir(dir):
     try:
         os.rmdir(dir)
     except OSError as err:
-        if os.name == 'nt':
+        if os.name == "nt":
             return
         if err.errno != errno.ENOENT:
             raise
@@ -129,13 +131,13 @@ def safe_mkdir(dir):
 
 def touch(name):
     """Create a file and return its name."""
-    with open(name, 'w') as f:
+    with open(name, "w") as f:
         return f.name
 
 
 def remove_test_files():
     """Remove files and directores created during tests."""
-    for name in os.listdir(u('.')):
+    for name in os.listdir(u(".")):
         if name.startswith(tempfile.template):
             if os.path.isdir(name):
                 shutil.rmtree(name)
@@ -145,29 +147,32 @@ def remove_test_files():
 
 def warn(msg):
     """Add warning message to be executed on exit."""
-    atexit.register(warnings.warn, str(msg) + " - tests have been skipped",
-                    RuntimeWarning)
+    atexit.register(
+        warnings.warn, str(msg) + " - tests have been skipped", RuntimeWarning
+    )
 
 
 def configure_logging():
     """Set pyftpdlib logger to "WARNING" level."""
     channel = logging.StreamHandler()
-    logger = logging.getLogger('pyftpdlib')
+    logger = logging.getLogger("pyftpdlib")
     logger.setLevel(logging.WARNING)
     logger.addHandler(channel)
 
 
 def disable_log_warning(fun):
     """Temporarily set FTP server's logging level to ERROR."""
+
     @functools.wraps(fun)
     def wrapper(self, *args, **kwargs):
-        logger = logging.getLogger('pyftpdlib')
+        logger = logging.getLogger("pyftpdlib")
         level = logger.getEffectiveLevel()
         logger.setLevel(logging.ERROR)
         try:
             return fun(self, *args, **kwargs)
         finally:
             logger.setLevel(level)
+
     return wrapper
 
 
@@ -186,6 +191,7 @@ def cleanup():
 
 def retry_on_failure(ntimes=None):
     """Decorator to retry a test in case of failure."""
+
     def decorator(fun):
         @functools.wraps(fun)
         def wrapper(*args, **kwargs):
@@ -195,7 +201,9 @@ def retry_on_failure(ntimes=None):
                 except AssertionError as _:
                     err = _
             raise err
+
         return wrapper
+
     return decorator
 
 
@@ -209,7 +217,7 @@ def call_until(fun, expr, timeout=TIMEOUT):
         if eval(expr):
             return ret
         time.sleep(0.001)
-    raise RuntimeError('timed out (ret=%r)' % ret)
+    raise RuntimeError("timed out (ret=%r)" % ret)
 
 
 def get_server_handler():
@@ -357,17 +365,17 @@ class ThreadedTestFTPd(ThreadWorker):
     The instance returned can be used to start(), stop() and
     eventually re-start() the server.
     """
+
     handler = FTPHandler
     server_class = FTPServer
     shutdown_after = 10
     poll_interval = 0.001 if TRAVIS else 0.000001
 
     def __init__(self, addr=None):
-        super(ThreadedTestFTPd, self).__init__(
-            poll_interval=self.poll_interval)
+        super(ThreadedTestFTPd, self).__init__(poll_interval=self.poll_interval)
         self.addr = (HOST, 0) if addr is None else addr
         authorizer = DummyAuthorizer()
-        authorizer.add_user(USER, PASSWD, HOME, perm='elradfmwM')  # full perms
+        authorizer.add_user(USER, PASSWD, HOME, perm="elradfmwM")  # full perms
         authorizer.add_anonymous(HOME)
         self.handler.authorizer = authorizer
         # lower buffer sizes = more "loops" while transfering data
@@ -383,8 +391,7 @@ class ThreadedTestFTPd(ThreadWorker):
 
     def poll(self):
         self.server.serve_forever(timeout=self.poll_interval, blocking=False)
-        if (self.shutdown_after and
-                time.time() >= self.start_time + self.shutdown_after):
+        if self.shutdown_after and time.time() >= self.start_time + self.shutdown_after:
             now = time.time()
             if now <= now + self.shutdown_after:
                 self.server.close_all()

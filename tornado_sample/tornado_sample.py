@@ -10,10 +10,12 @@ class MainHandler(tornado.web.RequestHandler):
 
 
 if __name__ == "__main__":
-    cp = EventingCSClient('tornado_sample')
-    cp.log('Starting...')
-    application = tornado.web.Application([
-        (r"/", MainHandler),
-    ])
+    cp = EventingCSClient("tornado_sample")
+    cp.log("Starting...")
+    application = tornado.web.Application(
+        [
+            (r"/", MainHandler),
+        ]
+    )
     application.listen(9001)
     tornado.ioloop.IOLoop.current().start()

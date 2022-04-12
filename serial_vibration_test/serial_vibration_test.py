@@ -3,14 +3,14 @@ import time
 import socket
 import serial
 
-_host = ('localhost', 5556)
-_message = 'Found that the uart port is {}\n'
-_port = '/dev/ttyUSB0'
+_host = ("localhost", 5556)
+_message = "Found that the uart port is {}\n"
+_port = "/dev/ttyUSB0"
 _speed = 9600
 
 
 def status(port):
-    return '{}connected'.format('' if os.path.exists(port) else 'dis')
+    return "{}connected".format("" if os.path.exists(port) else "dis")
 
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -18,7 +18,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.listen(1)
     conn, addr = s.accept()
     with conn:
-        conn.send('Connected from {} port {}\n'.format(addr[0], addr[1]).encode())
+        conn.send("Connected from {} port {}\n".format(addr[0], addr[1]).encode())
 
         ser = serial.Serial(_port, _speed, timeout=0)
 
@@ -33,7 +33,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 conn.send(_message.format(prev_state).encode())
 
             try:
-                if curr_state == 'connected':
+                if curr_state == "connected":
                     if not ser.isOpen():
                         ser.open()
 
@@ -41,7 +41,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         data = ser.read(ser.in_waiting)
                         ser.write(data)
 
-                if curr_state == 'disconnected':
+                if curr_state == "disconnected":
                     if ser.isOpen():
                         ser.close()
 

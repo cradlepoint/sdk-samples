@@ -7,18 +7,18 @@
 from csclient import EventingCSClient
 import time
 
-ipverify_uid = '00000000-91a5-3a5b-ac9b-5ae6367d2d59'
+ipverify_uid = "00000000-91a5-3a5b-ac9b-5ae6367d2d59"
 
 
 def custom_action(path, value, *args):
     if not value:  # Test has failed
-        cp.log('VPN Monitor Failed - Restarting Tunnel.')
-        cp.put('config/vpn/enabled', False)
+        cp.log("VPN Monitor Failed - Restarting Tunnel.")
+        cp.put("config/vpn/enabled", False)
         time.sleep(1)
-        cp.put('config/vpn/enabled', True)
+        cp.put("config/vpn/enabled", True)
 
 
-cp = EventingCSClient('ipverify_custom_action')
-cp.log('Starting...')
-cp.on('put', f'status/ipverify/{ipverify_uid}/pass', custom_action)
+cp = EventingCSClient("ipverify_custom_action")
+cp.log("Starting...")
+cp.on("put", f"status/ipverify/{ipverify_uid}/pass", custom_action)
 time.sleep(999999)

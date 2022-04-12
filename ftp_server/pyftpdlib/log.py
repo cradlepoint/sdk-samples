@@ -13,6 +13,7 @@ Instead you should use logging.basicConfig before serve_forever().
 import logging
 import sys
 import time
+
 try:
     import curses
 except ImportError:
@@ -22,7 +23,7 @@ from ._compat import unicode
 
 
 # default logger
-logger = logging.getLogger('pyftpdlib')
+logger = logging.getLogger("pyftpdlib")
 
 
 def _stderr_supports_color():
@@ -39,7 +40,7 @@ def _stderr_supports_color():
 
 # configurable options
 LEVEL = logging.INFO
-PREFIX = '[%(levelname)1.1s %(asctime)s]'
+PREFIX = "[%(levelname)1.1s %(asctime)s]"
 COLOURED = _stderr_supports_color()
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -66,8 +67,7 @@ class LogFormatter(logging.Formatter):
             # works with unicode strings.  The explicit calls to
             # unicode() below are harmless in python2 but will do the
             # right conversion in python 3.
-            fg_color = (curses.tigetstr("setaf") or curses.tigetstr("setf") or
-                        "")
+            fg_color = curses.tigetstr("setaf") or curses.tigetstr("setf") or ""
             if (3, 0) < sys.version_info < (3, 2, 3):
                 fg_color = unicode(fg_color, "ascii")
             self._colors = {
@@ -78,7 +78,7 @@ class LogFormatter(logging.Formatter):
                 # yellow
                 logging.WARNING: unicode(curses.tparm(fg_color, 3), "ascii"),
                 # red
-                logging.ERROR: unicode(curses.tparm(fg_color, 1), "ascii")
+                logging.ERROR: unicode(curses.tparm(fg_color, 1), "ascii"),
             }
             self._normal = unicode(curses.tigetstr("sgr0"), "ascii")
 
@@ -88,12 +88,12 @@ class LogFormatter(logging.Formatter):
         except Exception as err:
             record.message = "Bad message (%r): %r" % (err, record.__dict__)
 
-        record.asctime = time.strftime(TIME_FORMAT,
-                                       self.converter(record.created))
+        record.asctime = time.strftime(TIME_FORMAT, self.converter(record.created))
         prefix = PREFIX % record.__dict__
         if self._coloured:
-            prefix = (self._colors.get(record.levelno, self._normal) +
-                      prefix + self._normal)
+            prefix = (
+                self._colors.get(record.levelno, self._normal) + prefix + self._normal
+            )
 
         # Encoding notes:  The logging module prefers to work with character
         # strings, but only enforces that log messages are instances of
@@ -133,7 +133,7 @@ def debug(s, inst=None):
 
 
 def is_logging_configured():
-    if logging.getLogger('pyftpdlib').handlers:
+    if logging.getLogger("pyftpdlib").handlers:
         return True
     if logging.root.handlers:
         return True
@@ -151,7 +151,7 @@ def config_logging(level=LEVEL, prefix=PREFIX, other_loggers=None):
         logging.logThreads = False
     handler = logging.StreamHandler()
     handler.setFormatter(LogFormatter())
-    loggers = [logging.getLogger('pyftpdlib')]
+    loggers = [logging.getLogger("pyftpdlib")]
     if other_loggers is not None:
         loggers.extend(other_loggers)
     for logger in loggers:

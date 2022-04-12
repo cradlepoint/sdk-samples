@@ -11,7 +11,6 @@ from threading import Thread
 
 
 class TestApp(unittest.TestCase):
-
     @contextlib.contextmanager
     def _capture_output(self):
         new_out, new_err = io.StringIO(), io.StringIO()
@@ -43,14 +42,21 @@ class TestApp(unittest.TestCase):
             output = err.getvalue().strip()
 
         # if the test passed, stdout should have captured output
-        self.assertIn('MQTT connect reply to test.mosquitto.org, 1883: Connection Accepted.', output)
-        self.assertIn('MQTT Client connection results: Connection Accepted.', output)
-        self.assertIn('Published msg received. topic: /status/gps/lastpos', output)
-        self.assertIn('Published msg received. topic: /status/wan/connection_state', output)
-        self.assertIn('Published msg received. topic: /status/system/modem_temperature', output)
-        self.assertIn('MQTT published file:', output)
+        self.assertIn(
+            "MQTT connect reply to test.mosquitto.org, 1883: Connection Accepted.",
+            output,
+        )
+        self.assertIn("MQTT Client connection results: Connection Accepted.", output)
+        self.assertIn("Published msg received. topic: /status/gps/lastpos", output)
+        self.assertIn(
+            "Published msg received. topic: /status/wan/connection_state", output
+        )
+        self.assertIn(
+            "Published msg received. topic: /status/system/modem_temperature", output
+        )
+        self.assertIn("MQTT published file:", output)
 
-        self.assertNotIn('Exception in publish_file().', output)
-        self.assertNotIn('Exception in publish_thread().', output)
-        self.assertNotIn('Exception in start_mqtt()!', output)
-        self.assertNotIn('Exception during start_app()!', output)
+        self.assertNotIn("Exception in publish_file().", output)
+        self.assertNotIn("Exception in publish_thread().", output)
+        self.assertNotIn("Exception in start_mqtt()!", output)
+        self.assertNotIn("Exception during start_app()!", output)

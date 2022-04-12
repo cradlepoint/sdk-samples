@@ -6,6 +6,7 @@ import os
 import stat
 import tempfile
 import time
+
 try:
     from stat import filemode as _filemode  # PY 3.3
 except ImportError:
@@ -28,16 +29,29 @@ from ._compat import u
 from ._compat import unicode
 
 
-__all__ = ['FilesystemError', 'AbstractedFS']
+__all__ = ["FilesystemError", "AbstractedFS"]
 
 
-_months_map = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-               7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+_months_map = {
+    1: "Jan",
+    2: "Feb",
+    3: "Mar",
+    4: "Apr",
+    5: "May",
+    6: "Jun",
+    7: "Jul",
+    8: "Aug",
+    9: "Sep",
+    10: "Oct",
+    11: "Nov",
+    12: "Dec",
+}
 
 
 # ===================================================================
 # --- custom exceptions
 # ===================================================================
+
 
 class FilesystemError(Exception):
     """Custom class for filesystem-related exceptions.
@@ -49,6 +63,7 @@ class FilesystemError(Exception):
 # ===================================================================
 # --- base class
 # ===================================================================
+
 
 class AbstractedFS(object):
     """A class used to interact with the file system, providing a
@@ -71,8 +86,8 @@ class AbstractedFS(object):
 
     def __init__(self, root, cmd_channel):
         """
-         - (str) root: the user "real" home directory (e.g. '/home/user')
-         - (instance) cmd_channel: the FTPHandler class instance
+        - (str) root: the user "real" home directory (e.g. '/home/user')
+        - (instance) cmd_channel: the FTPHandler class instance
         """
         assert isinstance(root, unicode)
         # Set initial current working directory.
@@ -80,7 +95,7 @@ class AbstractedFS(object):
         # If a different behavior is desired (e.g. initial cwd = root,
         # to reflect the real filesystem) users overriding this class
         # are responsible to set _cwd attribute as necessary.
-        self._cwd = u('/')
+        self._cwd = u("/")
         self._root = root
         self.cmd_channel = cmd_channel
 
@@ -129,7 +144,7 @@ class AbstractedFS(object):
         # os.path.normpath supports UNC paths (e.g. "//a/b/c") but we
         # don't need them.  In case we get an UNC path we collapse
         # redundant separators appearing at the beginning of the string
-        while p[:2] == '//':
+        while p[:2] == "//":
             p = p[1:]
         # Anti path traversal: don't trust user input, in the event
         # that self.cwd is not absolute, return "/" as a safety measure.
@@ -178,11 +193,11 @@ class AbstractedFS(object):
         else:
             p = os.path.normpath(os.path.join(self.root, fspath))
         if not self.validpath(p):
-            return u('/')
+            return u("/")
         p = p.replace(os.sep, "/")
-        p = p[len(self.root):]
-        if not p.startswith('/'):
-            p = '/' + p
+        p = p[len(self.root) :]
+        if not p.startswith("/"):
+            p = "/" + p
         return p
 
     def validpath(self, path):
@@ -202,7 +217,7 @@ class AbstractedFS(object):
             root = root + os.sep
         if not path.endswith(os.sep):
             path = path + os.sep
-        if path[0:len(root)] == root:
+        if path[0 : len(root)] == root:
             return True
         return False
 
@@ -213,13 +228,13 @@ class AbstractedFS(object):
         assert isinstance(filename, unicode), filename
         return open(filename, mode)
 
-    def mkstemp(self, suffix='', prefix='', dir=None, mode='wb'):
+    def mkstemp(self, suffix="", prefix="", dir=None, mode="wb"):
         """A wrap around tempfile.mkstemp creating a file with a unique
         name.  Unlike mkstemp it returns an object with a file-like
         interface.
         """
-        class FileWrapper:
 
+        class FileWrapper:
             def __init__(self, fd, name):
                 self.file = fd
                 self.name = name
@@ -227,7 +242,7 @@ class AbstractedFS(object):
             def __getattr__(self, attr):
                 return getattr(self.file, attr)
 
-        text = 'b' not in mode
+        text = "b" not in mode
         # max number of tries to find out a unique file name
         tempfile.TMP_MAX = 50
         fd, name = tempfile.mkstemp(suffix, prefix, dir, text=text)
@@ -277,7 +292,7 @@ class AbstractedFS(object):
     def chmod(self, path, mode):
         """Change file/directory mode."""
         assert isinstance(path, unicode), path
-        if not hasattr(os, 'chmod'):
+        if not hasattr(os, "chmod"):
             raise NotImplementedError
         os.chmod(path, mode)
 
@@ -287,16 +302,19 @@ class AbstractedFS(object):
         # assert isinstance(path, unicode), path
         return os.stat(path)
 
-    if hasattr(os, 'lstat'):
+    if hasattr(os, "lstat"):
+
         def lstat(self, path):
             """Like stat but does not follow symbolic links."""
             # on python 2 we might also get bytes from os.lisdir()
             # assert isinstance(path, unicode), path
             return os.lstat(path)
+
     else:
         lstat = stat
 
-    if hasattr(os, 'readlink'):
+    if hasattr(os, "readlink"):
+
         def readlink(self, path):
             """Return a string representing the path to which a
             symbolic link points.
@@ -348,6 +366,7 @@ class AbstractedFS(object):
         return os.path.lexists(path)
 
     if pwd is not None:
+
         def get_user_by_uid(self, uid):
             """Return the username associated with user id.
             If this can't be determined return raw uid instead.
@@ -357,11 +376,14 @@ class AbstractedFS(object):
                 return pwd.getpwuid(uid).pw_name
             except KeyError:
                 return uid
+
     else:
+
         def get_user_by_uid(self, uid):
             return "owner"
 
     if grp is not None:
+
         def get_group_by_gid(self, gid):
             """Return the groupname associated with group id.
             If this can't be determined return raw gid instead.
@@ -371,7 +393,9 @@ class AbstractedFS(object):
                 return grp.getgrgid(gid).gr_name
             except KeyError:
                 return gid
+
     else:
+
         def get_group_by_gid(self, gid):
             return "group"
 
@@ -404,7 +428,7 @@ class AbstractedFS(object):
         else:
             timefunc = time.localtime
         SIX_MONTHS = 180 * 24 * 60 * 60
-        readlink = getattr(self, 'readlink', None)
+        readlink = getattr(self, "readlink", None)
         now = time.time()
         for basename in listing:
             if not PY3:
@@ -418,7 +442,7 @@ class AbstractedFS(object):
                     # http://bugs.python.org/issue683592
                     file = os.path.join(bytes(basedir), bytes(basename))
                     if not isinstance(basename, unicode):
-                        basename = unicode(basename, 'utf8', 'ignore')
+                        basename = unicode(basename, "utf8", "ignore")
             else:
                 file = os.path.join(basedir, basename)
             try:
@@ -444,15 +468,19 @@ class AbstractedFS(object):
             else:
                 fmtstr = "%d %H:%M"
             try:
-                mtimestr = "%s %s" % (_months_map[mtime.tm_mon],
-                                      time.strftime(fmtstr, mtime))
+                mtimestr = "%s %s" % (
+                    _months_map[mtime.tm_mon],
+                    time.strftime(fmtstr, mtime),
+                )
             except ValueError:
                 # It could be raised if last mtime happens to be too
                 # old (prior to year 1900) in which case we return
                 # the current time as last mtime.
                 mtime = timefunc()
-                mtimestr = "%s %s" % (_months_map[mtime.tm_mon],
-                                      time.strftime("%d %H:%M", mtime))
+                mtimestr = "%s %s" % (
+                    _months_map[mtime.tm_mon],
+                    time.strftime("%d %H:%M", mtime),
+                )
 
             # same as stat.S_ISLNK(st.st_mode) but slighlty faster
             islink = (st.st_mode & 61440) == stat.S_IFLNK
@@ -467,8 +495,15 @@ class AbstractedFS(object):
 
             # formatting is matched with proftpd ls output
             line = "%s %3s %-8s %-8s %8s %s %s\r\n" % (
-                perms, nlinks, uname, gname, size, mtimestr, basename)
-            yield line.encode('utf8', self.cmd_channel.unicode_errors)
+                perms,
+                nlinks,
+                uname,
+                gname,
+                size,
+                mtimestr,
+                basename,
+            )
+            yield line.encode("utf8", self.cmd_channel.unicode_errors)
 
     def format_mlsx(self, basedir, listing, perms, facts, ignore_err=True):
         """Return an iterator object that yields the entries of a given
@@ -501,21 +536,21 @@ class AbstractedFS(object):
             timefunc = time.gmtime
         else:
             timefunc = time.localtime
-        permdir = ''.join([x for x in perms if x not in 'arw'])
-        permfile = ''.join([x for x in perms if x not in 'celmp'])
-        if ('w' in perms) or ('a' in perms) or ('f' in perms):
-            permdir += 'c'
-        if 'd' in perms:
-            permdir += 'p'
-        show_type = 'type' in facts
-        show_perm = 'perm' in facts
-        show_size = 'size' in facts
-        show_modify = 'modify' in facts
-        show_create = 'create' in facts
-        show_mode = 'unix.mode' in facts
-        show_uid = 'unix.uid' in facts
-        show_gid = 'unix.gid' in facts
-        show_unique = 'unique' in facts
+        permdir = "".join([x for x in perms if x not in "arw"])
+        permfile = "".join([x for x in perms if x not in "celmp"])
+        if ("w" in perms) or ("a" in perms) or ("f" in perms):
+            permdir += "c"
+        if "d" in perms:
+            permdir += "p"
+        show_type = "type" in facts
+        show_perm = "perm" in facts
+        show_size = "size" in facts
+        show_modify = "modify" in facts
+        show_create = "create" in facts
+        show_mode = "unix.mode" in facts
+        show_uid = "unix.uid" in facts
+        show_gid = "unix.gid" in facts
+        show_unique = "unique" in facts
         for basename in listing:
             retfacts = dict()
             if not PY3:
@@ -529,7 +564,7 @@ class AbstractedFS(object):
                     # http://bugs.python.org/issue683592
                     file = os.path.join(bytes(basedir), bytes(basename))
                     if not isinstance(basename, unicode):
-                        basename = unicode(basename, 'utf8', 'ignore')
+                        basename = unicode(basename, "utf8", "ignore")
             else:
                 file = os.path.join(basedir, basename)
             # in order to properly implement 'unique' fact (RFC-3659,
@@ -546,26 +581,27 @@ class AbstractedFS(object):
             isdir = (st.st_mode & 61440) == stat.S_IFDIR
             if isdir:
                 if show_type:
-                    if basename == '.':
-                        retfacts['type'] = 'cdir'
-                    elif basename == '..':
-                        retfacts['type'] = 'pdir'
+                    if basename == ".":
+                        retfacts["type"] = "cdir"
+                    elif basename == "..":
+                        retfacts["type"] = "pdir"
                     else:
-                        retfacts['type'] = 'dir'
+                        retfacts["type"] = "dir"
                 if show_perm:
-                    retfacts['perm'] = permdir
+                    retfacts["perm"] = permdir
             else:
                 if show_type:
-                    retfacts['type'] = 'file'
+                    retfacts["type"] = "file"
                 if show_perm:
-                    retfacts['perm'] = permfile
+                    retfacts["perm"] = permfile
             if show_size:
-                retfacts['size'] = st.st_size  # file size
+                retfacts["size"] = st.st_size  # file size
             # last modification time
             if show_modify:
                 try:
-                    retfacts['modify'] = time.strftime("%Y%m%d%H%M%S",
-                                                       timefunc(st.st_mtime))
+                    retfacts["modify"] = time.strftime(
+                        "%Y%m%d%H%M%S", timefunc(st.st_mtime)
+                    )
                 # it could be raised if last mtime happens to be too old
                 # (prior to year 1900)
                 except ValueError:
@@ -573,17 +609,18 @@ class AbstractedFS(object):
             if show_create:
                 # on Windows we can provide also the creation time
                 try:
-                    retfacts['create'] = time.strftime("%Y%m%d%H%M%S",
-                                                       timefunc(st.st_ctime))
+                    retfacts["create"] = time.strftime(
+                        "%Y%m%d%H%M%S", timefunc(st.st_ctime)
+                    )
                 except ValueError:
                     pass
             # UNIX only
             if show_mode:
-                retfacts['unix.mode'] = oct(st.st_mode & 511)
+                retfacts["unix.mode"] = oct(st.st_mode & 511)
             if show_uid:
-                retfacts['unix.uid'] = st.st_uid
+                retfacts["unix.uid"] = st.st_uid
             if show_gid:
-                retfacts['unix.gid'] = st.st_gid
+                retfacts["unix.gid"] = st.st_gid
 
             # We provide unique fact (see RFC-3659, chapter 7.5.2) on
             # posix platforms only; we get it by mixing st_dev and
@@ -594,21 +631,22 @@ class AbstractedFS(object):
             # platforms should use some platform-specific method (e.g.
             # on Windows NTFS filesystems MTF records could be used).
             if show_unique:
-                retfacts['unique'] = "%xg%x" % (st.st_dev, st.st_ino)
+                retfacts["unique"] = "%xg%x" % (st.st_dev, st.st_ino)
 
             # facts can be in any order but we sort them by name
-            factstring = "".join(["%s=%s;" % (x, retfacts[x])
-                                  for x in sorted(retfacts.keys())])
+            factstring = "".join(
+                ["%s=%s;" % (x, retfacts[x]) for x in sorted(retfacts.keys())]
+            )
             line = "%s %s\r\n" % (factstring, basename)
-            yield line.encode('utf8', self.cmd_channel.unicode_errors)
+            yield line.encode("utf8", self.cmd_channel.unicode_errors)
 
 
 # ===================================================================
 # --- platform specific implementation
 # ===================================================================
 
-if os.name == 'posix':
-    __all__.append('UnixFilesystem')
+if os.name == "posix":
+    __all__.append("UnixFilesystem")
 
     class UnixFilesystem(AbstractedFS):
         """Represents the real UNIX filesystem.

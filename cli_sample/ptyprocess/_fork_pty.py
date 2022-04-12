@@ -3,10 +3,11 @@
 import os
 import errno
 
-from pty import (STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, CHILD)
+from pty import STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, CHILD
+
 
 def fork_pty():
-    '''This implements a substitute for the forkpty system call. This
+    """This implements a substitute for the forkpty system call. This
     should be more portable than the pty.fork() function. Specifically,
     this should work on Solaris.
 
@@ -17,7 +18,7 @@ def fork_pty():
 
         http://mail.python.org/pipermail/python-dev/2003-May/035281.html
 
-    '''
+    """
 
     parent_fd, child_fd = os.openpty()
     if parent_fd < 0 or child_fd < 0:
@@ -39,10 +40,11 @@ def fork_pty():
 
     return pid, parent_fd
 
+
 def pty_make_controlling_tty(tty_fd):
-    '''This makes the pseudo-terminal the controlling tty. This should be
+    """This makes the pseudo-terminal the controlling tty. This should be
     more portable than the pty.fork() function. Specifically, this should
-    work on Solaris. '''
+    work on Solaris."""
 
     child_name = os.ttyname(tty_fd)
 

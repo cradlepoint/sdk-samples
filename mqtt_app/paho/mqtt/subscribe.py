@@ -28,44 +28,56 @@ def _on_connect(client, userdata, flags, rc):
     if rc != 0:
         raise mqtt.MQTTException(paho.connack_string(rc))
 
-    if isinstance(userdata['topics'], list):
-        for topic in userdata['topics']:
-            client.subscribe(topic, userdata['qos'])
+    if isinstance(userdata["topics"], list):
+        for topic in userdata["topics"]:
+            client.subscribe(topic, userdata["qos"])
     else:
-        client.subscribe(userdata['topics'], userdata['qos'])
+        client.subscribe(userdata["topics"], userdata["qos"])
 
 
 def _on_message_callback(client, userdata, message):
     """Internal callback"""
-    userdata['callback'](client, userdata['userdata'], message)
+    userdata["callback"](client, userdata["userdata"], message)
 
 
 def _on_message_simple(client, userdata, message):
     """Internal callback"""
 
-    if userdata['msg_count'] == 0:
+    if userdata["msg_count"] == 0:
         return
 
     # Don't process stale retained messages if 'retained' was false
-    if message.retain and not userdata['retained']:
+    if message.retain and not userdata["retained"]:
         return
 
-    userdata['msg_count'] = userdata['msg_count'] - 1
+    userdata["msg_count"] = userdata["msg_count"] - 1
 
-    if userdata['messages'] is None and userdata['msg_count'] == 0:
-        userdata['messages'] = message
+    if userdata["messages"] is None and userdata["msg_count"] == 0:
+        userdata["messages"] = message
         client.disconnect()
         return
 
-    userdata['messages'].append(message)
-    if userdata['msg_count'] == 0:
+    userdata["messages"].append(message)
+    if userdata["msg_count"] == 0:
         client.disconnect()
 
 
-def callback(callback, topics, qos=0, userdata=None, hostname="localhost",
-             port=1883, client_id="", keepalive=60, will=None, auth=None,
-             tls=None, protocol=paho.MQTTv311, transport="tcp",
-             clean_session=True):
+def callback(
+    callback,
+    topics,
+    qos=0,
+    userdata=None,
+    hostname="localhost",
+    port=1883,
+    client_id="",
+    keepalive=60,
+    will=None,
+    auth=None,
+    tls=None,
+    protocol=paho.MQTTv311,
+    transport="tcp",
+    clean_session=True,
+):
     """Subscribe to a list of topics and process them in a callback function.
 
     This function creates an MQTT client, connects to a broker and subscribes
@@ -128,28 +140,34 @@ def callback(callback, topics, qos=0, userdata=None, hostname="localhost",
     """
 
     if qos < 0 or qos > 2:
-        raise ValueError('qos must be in the range 0-2')
+        raise ValueError("qos must be in the range 0-2")
 
     callback_userdata = {
-        'callback':callback,
-        'topics':topics,
-        'qos':qos,
-        'userdata':userdata}
+        "callback": callback,
+        "topics": topics,
+        "qos": qos,
+        "userdata": userdata,
+    }
 
-    client = paho.Client(client_id=client_id, userdata=callback_userdata,
-                         protocol=protocol, transport=transport,
-                         clean_session=clean_session)
+    client = paho.Client(
+        client_id=client_id,
+        userdata=callback_userdata,
+        protocol=protocol,
+        transport=transport,
+        clean_session=clean_session,
+    )
     client.on_message = _on_message_callback
     client.on_connect = _on_connect
 
     if auth:
-        username = auth.get('username')
+        username = auth.get("username")
         if username:
-            password = auth.get('password')
+            password = auth.get("password")
             client.username_pw_set(username, password)
         else:
-            raise KeyError("The 'username' key was not found, this is "
-                           "required for auth")
+            raise KeyError(
+                "The 'username' key was not found, this is " "required for auth"
+            )
 
     if will is not None:
         client.will_set(**will)
@@ -165,10 +183,22 @@ def callback(callback, topics, qos=0, userdata=None, hostname="localhost",
     client.loop_forever()
 
 
-def simple(topics, qos=0, msg_count=1, retained=True, hostname="localhost",
-           port=1883, client_id="", keepalive=60, will=None, auth=None,
-           tls=None, protocol=paho.MQTTv311, transport="tcp",
-           clean_session=True):
+def simple(
+    topics,
+    qos=0,
+    msg_count=1,
+    retained=True,
+    hostname="localhost",
+    port=1883,
+    client_id="",
+    keepalive=60,
+    will=None,
+    auth=None,
+    tls=None,
+    protocol=paho.MQTTv311,
+    transport="tcp",
+    clean_session=True,
+):
     """Subscribe to a list of topics and return msg_count messages.
 
     This function creates an MQTT client, connects to a broker and subscribes
@@ -236,7 +266,7 @@ def simple(topics, qos=0, msg_count=1, retained=True, hostname="localhost",
     """
 
     if msg_count < 1:
-        raise ValueError('msg_count must be > 0')
+        raise ValueError("msg_count must be > 0")
 
     # Set ourselves up to return a single message if msg_count == 1, or a list
     # if > 1.
@@ -245,10 +275,23 @@ def simple(topics, qos=0, msg_count=1, retained=True, hostname="localhost",
     else:
         messages = []
 
-    userdata = {'retained':retained, 'msg_count':msg_count, 'messages':messages}
+    userdata = {"retained": retained, "msg_count": msg_count, "messages": messages}
 
-    callback(_on_message_simple, topics, qos, userdata, hostname, port,
-             client_id, keepalive, will, auth, tls, protocol, transport,
-             clean_session)
+    callback(
+        _on_message_simple,
+        topics,
+        qos,
+        userdata,
+        hostname,
+        port,
+        client_id,
+        keepalive,
+        will,
+        auth,
+        tls,
+        protocol,
+        transport,
+        clean_session,
+    )
 
-    return userdata['messages']
+    return userdata["messages"]

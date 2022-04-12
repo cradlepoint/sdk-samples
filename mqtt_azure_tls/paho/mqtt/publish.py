@@ -33,12 +33,12 @@ def _do_publish(client):
     elif isinstance(message, tuple):
         client.publish(*message)
     else:
-        raise ValueError('message must be a dict or a tuple')
+        raise ValueError("message must be a dict or a tuple")
 
 
 def _on_connect(client, userdata, flags, rc):
     """Internal callback"""
-    #pylint: disable=invalid-name, unused-argument
+    # pylint: disable=invalid-name, unused-argument
 
     if rc == 0:
         if len(userdata) > 0:
@@ -49,7 +49,7 @@ def _on_connect(client, userdata, flags, rc):
 
 def _on_publish(client, userdata, mid):
     """Internal callback"""
-    #pylint: disable=unused-argument
+    # pylint: disable=unused-argument
 
     if len(userdata) == 0:
         client.disconnect()
@@ -57,9 +57,18 @@ def _on_publish(client, userdata, mid):
         _do_publish(client)
 
 
-def multiple(msgs, hostname="localhost", port=1883, client_id="", keepalive=60,
-             will=None, auth=None, tls=None, protocol=paho.MQTTv311,
-             transport="tcp"):
+def multiple(
+    msgs,
+    hostname="localhost",
+    port=1883,
+    client_id="",
+    keepalive=60,
+    will=None,
+    auth=None,
+    tls=None,
+    protocol=paho.MQTTv311,
+    transport="tcp",
+):
     """Publish multiple messages to a broker, then disconnect cleanly.
 
     This function creates an MQTT client, connects to a broker and publishes a
@@ -122,22 +131,24 @@ def multiple(msgs, hostname="localhost", port=1883, client_id="", keepalive=60,
     """
 
     if not isinstance(msgs, list):
-        raise ValueError('msgs must be a list')
+        raise ValueError("msgs must be a list")
 
-    client = paho.Client(client_id=client_id,
-                         userdata=msgs, protocol=protocol, transport=transport)
+    client = paho.Client(
+        client_id=client_id, userdata=msgs, protocol=protocol, transport=transport
+    )
 
     client.on_publish = _on_publish
     client.on_connect = _on_connect
 
     if auth:
-        username = auth.get('username')
+        username = auth.get("username")
         if username:
-            password = auth.get('password')
+            password = auth.get("password")
             client.username_pw_set(username, password)
         else:
-            raise KeyError("The 'username' key was not found, this is "
-                           "required for auth")
+            raise KeyError(
+                "The 'username' key was not found, this is " "required for auth"
+            )
 
     if will is not None:
         client.will_set(**will)
@@ -153,9 +164,21 @@ def multiple(msgs, hostname="localhost", port=1883, client_id="", keepalive=60,
     client.loop_forever()
 
 
-def single(topic, payload=None, qos=0, retain=False, hostname="localhost",
-           port=1883, client_id="", keepalive=60, will=None, auth=None,
-           tls=None, protocol=paho.MQTTv311, transport="tcp"):
+def single(
+    topic,
+    payload=None,
+    qos=0,
+    retain=False,
+    hostname="localhost",
+    port=1883,
+    client_id="",
+    keepalive=60,
+    will=None,
+    auth=None,
+    tls=None,
+    protocol=paho.MQTTv311,
+    transport="tcp",
+):
     """Publish a single message to a broker, then disconnect cleanly.
 
     This function creates an MQTT client, connects to a broker and publishes a
@@ -210,7 +233,17 @@ def single(topic, payload=None, qos=0, retain=False, hostname="localhost",
           raw TCP. Set to "websockets" to use WebSockets as the transport.
     """
 
-    msg = {'topic':topic, 'payload':payload, 'qos':qos, 'retain':retain}
+    msg = {"topic": topic, "payload": payload, "qos": qos, "retain": retain}
 
-    multiple([msg], hostname, port, client_id, keepalive, will, auth, tls,
-             protocol, transport)
+    multiple(
+        [msg],
+        hostname,
+        port,
+        client_id,
+        keepalive,
+        will,
+        auth,
+        tls,
+        protocol,
+        transport,
+    )

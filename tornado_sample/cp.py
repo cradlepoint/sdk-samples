@@ -2,5 +2,6 @@
 
 import time
 
+
 def uptime():
     return time.time()

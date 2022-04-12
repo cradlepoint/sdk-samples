@@ -17,8 +17,11 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 
 
 def main():
-    testmodules = [os.path.splitext(x)[0] for x in os.listdir(HERE)
-                   if x.endswith('.py') and x.startswith('test_')]
+    testmodules = [
+        os.path.splitext(x)[0]
+        for x in os.listdir(HERE)
+        if x.endswith(".py") and x.startswith("test_")
+    ]
     configure_logging()
     remove_test_files()
     suite = unittest.TestSuite()
@@ -30,6 +33,6 @@ def main():
     return result.wasSuccessful()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if not main():
         sys.exit(1)

@@ -17,17 +17,13 @@ def mkroutes(route, directory):
     route_map.append((route, location))
 
 
-cp = EventingCSClient('hspt')
+cp = EventingCSClient("hspt")
 
 # Build route maps for / and /resources
 route_map = []
-sys.path.append('.')
-mkroutes('/(.*)', '')
-mkroutes('/resources/(.*)', 'resources/')
+sys.path.append(".")
+mkroutes("/(.*)", "")
+mkroutes("/resources/(.*)", "resources/")
 
-value = {
-    'action': 'start',
-    'routes': route_map,
-    'server': 'hotspotServer'
-}
-cp.put('/control/system/httpserver', value)
+value = {"action": "start", "routes": route_map, "server": "hotspotServer"}
+cp.put("/control/system/httpserver", value)

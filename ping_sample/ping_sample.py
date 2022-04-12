@@ -24,39 +24,41 @@ def ping(host, **kwargs):
     cp = SDK CS Client.  (e.g. CSClient() or EventingCSClient())
     """
     import time
+
     start = {"host": host}
-    pingstats = {'host': host}
+    pingstats = {"host": host}
     for k, v in kwargs.items():
         start[k] = v
         pingstats[k] = v
-    cp.put('control/ping/start', start)
+    cp.put("control/ping/start", start)
     result = {}
     try_count = 0
     while try_count < 15:
-        result = cp.get('control/ping')
-        if result and result.get('status') in ["error", "done"]:
+        result = cp.get("control/ping")
+        if result and result.get("status") in ["error", "done"]:
             break
         time.sleep(2)
         try_count += 1
     if try_count == 15:
-        pingstats['error'] = "No Results - Execution Timed Out"
+        pingstats["error"] = "No Results - Execution Timed Out"
     else:
         # Parse results text
-        parsedresults = result.get('result').split('\n')
+        parsedresults = result.get("result").split("\n")
         i = 0
         index = 1
         for item in parsedresults:
-            if item[0:3] == "---": index = i + 1
+            if item[0:3] == "---":
+                index = i + 1
             i += 1
-        pingstats['tx'] = int(parsedresults[index].split(' ')[0])
-        pingstats['rx'] = int(parsedresults[index].split(' ')[3])
-        pingstats['loss'] = float(parsedresults[index].split(' ')[6].split('%')[0])
-        pingstats['min'] = float(parsedresults[index + 1].split(' ')[5].split('/')[0])
-        pingstats['avg'] = float(parsedresults[index + 1].split(' ')[5].split('/')[1])
-        pingstats['max'] = float(parsedresults[index + 1].split(' ')[5].split('/')[2])
+        pingstats["tx"] = int(parsedresults[index].split(" ")[0])
+        pingstats["rx"] = int(parsedresults[index].split(" ")[3])
+        pingstats["loss"] = float(parsedresults[index].split(" ")[6].split("%")[0])
+        pingstats["min"] = float(parsedresults[index + 1].split(" ")[5].split("/")[0])
+        pingstats["avg"] = float(parsedresults[index + 1].split(" ")[5].split("/")[1])
+        pingstats["max"] = float(parsedresults[index + 1].split(" ")[5].split("/")[2])
     return pingstats
 
 
-cp = EventingCSClient('ping_sample')
-cp.log('Starting...')
-cp.log('Output:\n' + json.dumps(ping('8.8.8.8')))
+cp = EventingCSClient("ping_sample")
+cp.log("Starting...")
+cp.log("Output:\n" + json.dumps(ping("8.8.8.8")))

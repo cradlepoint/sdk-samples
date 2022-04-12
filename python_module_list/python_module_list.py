@@ -26,12 +26,12 @@ import collections
 from importlib import util
 from csclient import EventingCSClient
 
-cp = EventingCSClient('python_module_list')
+cp = EventingCSClient("python_module_list")
 
 
 def log_module_list():
     # name this file (module)
-    this_module_name = os.path.basename(__file__).rsplit('.')[0]
+    this_module_name = os.path.basename(__file__).rsplit(".")[0]
 
     # dict for loaders with their modules
     loaders = collections.OrderedDict()
@@ -67,25 +67,28 @@ def log_module_list():
         # Add a name and a location about an imported module in the dict.
         # Don't include files that were created for this app or any
         # shared libraries.
-        if this_module_name not in module_info.origin and '.so' not in module_info.origin:
+        if (
+            this_module_name not in module_info.origin
+            and ".so" not in module_info.origin
+        ):
             loaders[loader].append((module_info.name, module_info.origin))
 
-    line = '-' * 10
+    line = "-" * 10
     # Log the python version running in the device
-    cp.log('{0} Python Version: {1} {0}'.format(line, platform.python_version()))
+    cp.log("{0} Python Version: {1} {0}".format(line, platform.python_version()))
 
     # Log the python module that were found in the device
     for loader, modules in loaders.items():
         if len(modules) != 0:
-            cp.log('{0} Module Count={1}: {2} {0}'.format(line, len(modules), loader))
+            cp.log("{0} Module Count={1}: {2} {0}".format(line, len(modules), loader))
             count = 0
             for mod in modules:
                 count += 1
-                cp.log('|{0:>3}| {1:20}| {2}'.format(count, mod[0], mod[1]))
+                cp.log("|{0:>3}| {1:20}| {2}".format(count, mod[0], mod[1]))
 
 
 if __name__ == "__main__":
     try:
         log_module_list()
     except Exception as e:
-        cp.log('Exception occurred! exception: {}'.format(e))
+        cp.log("Exception occurred! exception: {}".format(e))

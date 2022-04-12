@@ -12,10 +12,11 @@ def shell(cmd):
         output of shell command
     """
     from subprocess import Popen, PIPE
-    output = ''
-    cmd = cmd.split(' ')
+
+    output = ""
+    cmd = cmd.split(" ")
     tail = Popen(cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-    for line in iter(tail.stdout.readline, ''):
+    for line in iter(tail.stdout.readline, ""):
         if tail.returncode:
             break
         if line:
@@ -23,6 +24,6 @@ def shell(cmd):
     return output
 
 
-cp = EventingCSClient('shell_sample')
-cp.log('Starting...')
-cp.log('Output:\n' + shell('ls -al'))
+cp = EventingCSClient("shell_sample")
+cp.log("Starting...")
+cp.log("Output:\n" + shell("ls -al"))

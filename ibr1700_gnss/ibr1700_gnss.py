@@ -10,11 +10,11 @@ import socket
 from inetline import ReadLine
 from csclient import EventingCSClient
 
-cp = EventingCSClient('ibr1700_gnss')
+cp = EventingCSClient("ibr1700_gnss")
 gnssd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 try:
-    cp.log('Starting...')
+    cp.log("Starting...")
     gnss_addr = ("127.0.0.1", 17488)
 
     cp.log("Attempting sock.connect({})".format(gnss_addr))
@@ -22,11 +22,11 @@ try:
 
     # Turns on ALL messages. Only way to turn off is to close the socket.
     cp.log("Attempting sock.send(b'ALL\\r\\n')")
-    gnssd_sock.sendall(b'ALL\r\n')
+    gnssd_sock.sendall(b"ALL\r\n")
 
     # Enable IMU messages
     cp.log("Attempting sock.send(b'IMU yes\\r\\n')")
-    gnssd_sock.sendall(b'IMU yes\n\r')
+    gnssd_sock.sendall(b"IMU yes\n\r")
 
     receive_line = ReadLine()
 
@@ -46,7 +46,7 @@ try:
         time.sleep(10)
 
 except Exception as e:
-    cp.log('Exception: {}'.format(e))
+    cp.log("Exception: {}".format(e))
 finally:
     if gnssd_sock:
         gnssd_sock.shutdown(socket.SHUT_RDWR)

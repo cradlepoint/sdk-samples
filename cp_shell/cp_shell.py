@@ -25,14 +25,15 @@ def shell(cmd):
     :arg *args
     """
     from subprocess import Popen, PIPE
-    output = ''
-    cmd = cmd.split(' ')
+
+    output = ""
+    cmd = cmd.split(" ")
     tail = Popen(cmd, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-    for line in iter(tail.stdout.readline, ''):
+    for line in iter(tail.stdout.readline, ""):
         if tail.returncode:
             break
         if line:
-            output += line + '<br>'
+            output += line + "<br>"
     return output
 
 
@@ -41,22 +42,27 @@ class ShellHandler(tornado.web.RequestHandler):
 
     def get(self):
         """return command response."""
-        response = ''
+        response = ""
         try:
-            cmd = self.get_argument('cmd')
-            response = shell(cmd) or 'No Response'
+            cmd = self.get_argument("cmd")
+            response = shell(cmd) or "No Response"
         except Exception as e:
             cp.log(e)
         self.write(response)
 
 
 if __name__ == "__main__":
-    cp = EventingCSClient('cp_shell')
-    cp.log(f'Starting webserver on port {server_port}...')
-    application = tornado.web.Application([
-        (r"/shell", ShellHandler),
-        (r"/(.*)", tornado.web.StaticFileHandler,
-         {"path": static_path, "default_filename": "index.html"}),
-    ])
+    cp = EventingCSClient("cp_shell")
+    cp.log(f"Starting webserver on port {server_port}...")
+    application = tornado.web.Application(
+        [
+            (r"/shell", ShellHandler),
+            (
+                r"/(.*)",
+                tornado.web.StaticFileHandler,
+                {"path": static_path, "default_filename": "index.html"},
+            ),
+        ]
+    )
     application.listen(server_port)
     tornado.ioloop.IOLoop.current().start()

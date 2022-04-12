@@ -49,13 +49,14 @@ from .log import is_logging_configured
 from .log import logger
 
 
-__all__ = ['FTPServer']
-_BSD = 'bsd' in sys.platform
+__all__ = ["FTPServer"]
+_BSD = "bsd" in sys.platform
 
 
 # ===================================================================
 # --- base class
 # ===================================================================
+
 
 class FTPServer(Acceptor):
     """Creates a socket listening on <address>, dispatching the requests
@@ -104,9 +105,9 @@ class FTPServer(Acceptor):
         self.ip_map = []
         # in case of FTPS class not properly configured we want errors
         # to be raised here rather than later, when client connects
-        if hasattr(handler, 'get_ssl_context'):
+        if hasattr(handler, "get_ssl_context"):
             handler.get_ssl_context()
-        if callable(getattr(address_or_socket, 'listen', None)):
+        if callable(getattr(address_or_socket, "listen", None)):
             sock = address_or_socket
             sock.setblocking(0)
             self.set_socket(sock)
@@ -145,59 +146,63 @@ class FTPServer(Acceptor):
             config_logging()
 
         if self.handler.passive_ports:
-            pasv_ports = "%s->%s" % (self.handler.passive_ports[0],
-                                     self.handler.passive_ports[-1])
+            pasv_ports = "%s->%s" % (
+                self.handler.passive_ports[0],
+                self.handler.passive_ports[-1],
+            )
         else:
             pasv_ports = None
         addr = self.address
-        if hasattr(self.handler, 'ssl_protocol'):
+        if hasattr(self.handler, "ssl_protocol"):
             proto = "FTP+SSL"
         else:
             proto = "FTP"
-        logger.info(">>> starting %s server on %s:%s, pid=%i <<<"
-                    % (proto, addr[0], addr[1], os.getpid()))
-        if ('ThreadedFTPServer' in __all__ and
-                issubclass(self.__class__, ThreadedFTPServer)):
+        logger.info(
+            ">>> starting %s server on %s:%s, pid=%i <<<"
+            % (proto, addr[0], addr[1], os.getpid())
+        )
+        if "ThreadedFTPServer" in __all__ and issubclass(
+            self.__class__, ThreadedFTPServer
+        ):
             logger.info("concurrency model: multi-thread")
-        elif ('MultiprocessFTPServer' in __all__ and
-                issubclass(self.__class__, MultiprocessFTPServer)):
+        elif "MultiprocessFTPServer" in __all__ and issubclass(
+            self.__class__, MultiprocessFTPServer
+        ):
             logger.info("concurrency model: multi-process")
         elif issubclass(self.__class__, FTPServer):
             logger.info("concurrency model: async")
 
-        logger.info("masquerade (NAT) address: %s",
-                    self.handler.masquerade_address)
+        logger.info("masquerade (NAT) address: %s", self.handler.masquerade_address)
         logger.info("passive ports: %s", pasv_ports)
         logger.debug("poller: %r", get_fqname(self.ioloop))
         logger.debug("authorizer: %r", get_fqname(self.handler.authorizer))
-        if os.name == 'posix':
+        if os.name == "posix":
             logger.debug("use sendfile(2): %s", self.handler.use_sendfile)
         logger.debug("handler: %r", get_fqname(self.handler))
         logger.debug("max connections: %s", self.max_cons or "unlimited")
-        logger.debug("max connections per ip: %s",
-                     self.max_cons_per_ip or "unlimited")
+        logger.debug("max connections per ip: %s", self.max_cons_per_ip or "unlimited")
         logger.debug("timeout: %s", self.handler.timeout or "unlimited")
         logger.debug("banner: %r", self.handler.banner)
         logger.debug("max login attempts: %r", self.handler.max_login_attempts)
-        if getattr(self.handler, 'certfile', None):
+        if getattr(self.handler, "certfile", None):
             logger.debug("SSL certfile: %r", self.handler.certfile)
-        if getattr(self.handler, 'keyfile', None):
+        if getattr(self.handler, "keyfile", None):
             logger.debug("SSL keyfile: %r", self.handler.keyfile)
 
     def serve_forever(self, timeout=None, blocking=True, handle_exit=True):
         """Start serving.
 
-         - (float) timeout: the timeout passed to the underlying IO
-           loop expressed in seconds.
+        - (float) timeout: the timeout passed to the underlying IO
+          loop expressed in seconds.
 
-         - (bool) blocking: if False loop once and then return the
-           timeout of the next scheduled call next to expire soonest
-           (if any).
+        - (bool) blocking: if False loop once and then return the
+          timeout of the next scheduled call next to expire soonest
+          (if any).
 
-         - (bool) handle_exit: when True catches KeyboardInterrupt and
-           SystemExit exceptions (generally caused by SIGTERM / SIGINT
-           signals) and gracefully exits after cleaning up resources.
-           Also, logs server start and stop.
+        - (bool) handle_exit: when True catches KeyboardInterrupt and
+          SystemExit exceptions (generally caused by SIGTERM / SIGINT
+          signals) and gracefully exits after cleaning up resources.
+          Also, logs server start and stop.
         """
         if handle_exit:
             log = handle_exit and blocking
@@ -210,9 +215,9 @@ class FTPServer(Acceptor):
             if blocking:
                 if log:
                     logger.info(
-                        ">>> shutting down FTP server (%s active socket "
-                        "fds) <<<",
-                        self._map_len())
+                        ">>> shutting down FTP server (%s active socket " "fds) <<<",
+                        self._map_len(),
+                    )
                 self.close_all()
         else:
             self.ioloop.loop(timeout, blocking)
@@ -277,6 +282,7 @@ class FTPServer(Acceptor):
 # --- extra implementations
 # ===================================================================
 
+
 class _SpawnerBase(FTPServer):
     """Base class shared by multiple threads/process dispatcher.
     Not supposed to be used.
@@ -289,18 +295,19 @@ class _SpawnerBase(FTPServer):
     _exit = None
 
     def __init__(self, address_or_socket, handler, ioloop=None, backlog=100):
-        FTPServer.__init__(self, address_or_socket, handler,
-                           ioloop=ioloop, backlog=backlog)
+        FTPServer.__init__(
+            self, address_or_socket, handler, ioloop=ioloop, backlog=backlog
+        )
         self._active_tasks = []
 
     def _start_task(self, *args, **kwargs):
-        raise NotImplementedError('must be implemented in subclass')
+        raise NotImplementedError("must be implemented in subclass")
 
     def _current_task(self):
-        raise NotImplementedError('must be implemented in subclass')
+        raise NotImplementedError("must be implemented in subclass")
 
     def _map_len(self):
-        raise NotImplementedError('must be implemented in subclass')
+        raise NotImplementedError("must be implemented in subclass")
 
     def _loop(self, handler):
         """Serve handler's IO loop in a separate thread or process."""
@@ -312,8 +319,7 @@ class _SpawnerBase(FTPServer):
                 if err.errno == errno.EBADF:
                     # we might get here in case the other end quickly
                     # disconnected (see test_quick_connect())
-                    debug("call: %s._loop(); add_channel() returned EBADF",
-                          self)
+                    debug("call: %s._loop(); add_channel() returned EBADF", self)
                     return
                 else:
                     raise
@@ -321,11 +327,12 @@ class _SpawnerBase(FTPServer):
             # Here we localize variable access to minimize overhead.
             poll = ioloop.poll
             sched_poll = ioloop.sched.poll
-            poll_timeout = getattr(self, 'poll_timeout', None)
+            poll_timeout = getattr(self, "poll_timeout", None)
             soonest_timeout = poll_timeout
 
-            while (ioloop.socket_map or ioloop.sched._tasks) and \
-                    not self._exit.is_set():
+            while (
+                ioloop.socket_map or ioloop.sched._tasks
+            ) and not self._exit.is_set():
                 try:
                     if ioloop.socket_map:
                         poll(timeout=soonest_timeout)
@@ -354,14 +361,16 @@ class _SpawnerBase(FTPServer):
                 except select.error as err:
                     # on Windows we can get WSAENOTSOCK if the client
                     # rapidly connect and disconnects
-                    if os.name == 'nt' and err[0] == 10038:
+                    if os.name == "nt" and err[0] == 10038:
                         for fd in list(ioloop.socket_map.keys()):
                             try:
                                 select.select([fd], [], [], 0)
                             except select.error:
                                 try:
-                                    logger.info("discarding broken socket %r",
-                                                ioloop.socket_map[fd])
+                                    logger.info(
+                                        "discarding broken socket %r",
+                                        ioloop.socket_map[fd],
+                                    )
                                     del ioloop.socket_map[fd]
                                 except KeyError:
                                     # dict changed during iteration
@@ -370,8 +379,7 @@ class _SpawnerBase(FTPServer):
                         raise
                 else:
                     if poll_timeout:
-                        if (soonest_timeout is None or
-                                soonest_timeout > poll_timeout):
+                        if soonest_timeout is None or soonest_timeout > poll_timeout:
                             soonest_timeout = poll_timeout
 
     def handle_accepted(self, sock, addr):
@@ -386,7 +394,7 @@ class _SpawnerBase(FTPServer):
             t.start()
 
             # it is a different process so free resources here
-            if hasattr(t, 'pid'):
+            if hasattr(t, "pid"):
                 handler.close()
 
             with self._lock:
@@ -414,7 +422,8 @@ class _SpawnerBase(FTPServer):
                 if log:
                     logger.info(
                         ">>> shutting down FTP server (%s active workers) <<<",
-                        self._map_len())
+                        self._map_len(),
+                    )
                 self.close_all()
         else:
             self.ioloop.loop(timeout, blocking)
@@ -424,7 +433,7 @@ class _SpawnerBase(FTPServer):
         # this must be set after getting active tasks as it causes
         # thread objects to get out of the list too soon
         self._exit.set()
-        if tasks and hasattr(tasks[0], 'terminate'):
+        if tasks and hasattr(tasks[0], "terminate"):
             # we're dealing with subprocesses
             for t in tasks:
                 try:
@@ -454,7 +463,7 @@ class _SpawnerBase(FTPServer):
                 # Set timeout to None so that we will exit immediately
                 # in case also other threads/processes are hanging.
                 self.join_timeout = None
-                if hasattr(t, 'terminate'):
+                if hasattr(t, "terminate"):
                     msg = "could not terminate process %r" % t
                     if not _BSD:
                         warn(msg + "; sending SIGKILL as last resort")
@@ -474,16 +483,17 @@ try:
 except ImportError:
     pass
 else:
-    __all__ += ['ThreadedFTPServer']
+    __all__ += ["ThreadedFTPServer"]
 
     # compatibility with python <= 2.6
-    if not hasattr(threading.Thread, 'is_alive'):
+    if not hasattr(threading.Thread, "is_alive"):
         threading.Thread.is_alive = threading.Thread.isAlive
 
     class ThreadedFTPServer(_SpawnerBase):
         """A modified version of base FTPServer class which spawns a
         thread every time a new connection is established.
         """
+
         # The timeout passed to thread's IOLoop.poll() call on every
         # loop. Necessary since threads ignore KeyboardInterrupt.
         poll_timeout = 1.0
@@ -491,7 +501,7 @@ else:
         _exit = threading.Event()
 
         # compatibility with python <= 2.6
-        if not hasattr(_exit, 'is_set'):
+        if not hasattr(_exit, "is_set"):
             _exit.is_set = _exit.isSet
 
         def _start_task(self, *args, **kwargs):
@@ -504,18 +514,19 @@ else:
             return threading.activeCount()
 
 
-if os.name == 'posix':
+if os.name == "posix":
     try:
         import multiprocessing
     except ImportError:
         pass
     else:
-        __all__ += ['MultiprocessFTPServer']
+        __all__ += ["MultiprocessFTPServer"]
 
         class MultiprocessFTPServer(_SpawnerBase):
             """A modified version of base FTPServer class which spawns a
             process every time a new connection is established.
             """
+
             _lock = multiprocessing.Lock()
             _exit = multiprocessing.Event()
 
