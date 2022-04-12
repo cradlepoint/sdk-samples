@@ -14,17 +14,15 @@ jobs:
         os: [ubuntu-18.04]
     steps:
       - uses: actions/checkout@v2
+        with:
+            github_token: ${{ secrets.github_token }}
       - run: |
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
-        shell: bash
-      - name: Commit built apps
-        with:
-            github_token: ${{ secrets.github_token }}
-            run: |
-              git add built_apps/*
-              git commit -m "Rebuilt apps"
-              git push
+          git add built_apps/*
+          git commit -m "Rebuilt apps"
+          git push
+          shell: bash
   required-files:
     runs-on: ${{matrix.os}}
     strategy:
