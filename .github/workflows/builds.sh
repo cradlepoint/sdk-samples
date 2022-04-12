@@ -1,5 +1,5 @@
 #!/bin/bash
-declare -a commands=("python3 make.py build" "python3 make.py build all" "python3 make.py clean" "python3 make.py clean all")
+declare -a commands=("python3 make.py build" "python3 make.py build all" "cp *.tar.gz built_apps" "python3 make.py clean" "python3 make.py clean all")
 for cmds in "${commands[@]}";
 do
 	echo $cmds
