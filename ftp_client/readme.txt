@@ -26,4 +26,4 @@ using ftplib.py. Server speedtest.tele2.net is used as an example
 Expected Output
 ===============
 A file is sent to an FTP server speedtest.tele2.net.
-
+klh
