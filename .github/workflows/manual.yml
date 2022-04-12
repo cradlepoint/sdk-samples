@@ -19,13 +19,6 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
           shell: bash
-      - name: Commit newly built apps to github
-        run: |
-          git config --global user.name 'Github actions auto build packages'
-          git config --global user.email 'Github_actions_auto_build_packages@users.noreply.github.com'
-          git add built_apps/*
-          git commit -m "Rebuilt apps"
-          git push
   required-files:
     runs-on: ${{matrix.os}}
     strategy:
