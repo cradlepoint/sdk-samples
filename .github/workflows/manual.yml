@@ -35,6 +35,7 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
+      - uses: actions/checkout@v2
       - name: Commit newly built apps to github
         run: |
           git config --global user.name 'Github actions auto build packages'
