@@ -36,6 +36,8 @@ jobs:
           ./.github/workflows/builds.sh
         shell: bash
       - uses: actions/checkout@v2
+        with: 
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Commit newly built apps to github
         run: |
           git config --global user.name 'Github actions auto build packages'
