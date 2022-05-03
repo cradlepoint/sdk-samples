@@ -23,6 +23,8 @@ The Application Developmers Guide is the best document to read first.
     - Web interface for running linux shell commands.
 - **cli_sample**
     - Includes cppxssh module that enables SSH access to local CLI to send commands and return output.
+- **DESC_Interactive**
+    - Run commands in the descripton feild and paste output back into description feild.
 - **ipverify_custom_action**
     - Create a custom action in a function to be called when an IPverify test status changes.
 - **cpu_usage**
