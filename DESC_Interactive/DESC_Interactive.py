@@ -5,7 +5,7 @@ Created on Wed Jan 27 15:39:31 2021
 @author: amickel
 """
 
-import cs
+import csclient as cs
 import time
 
 APP_NAME = 'DESC_Interactive'
