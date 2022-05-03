@@ -19,8 +19,12 @@ The Application Developmers Guide is the best document to read first.
     - A template for the creation of a new application utilizing the csclient library.
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
-- **cp_shell_**
+- **cp_shell**
     - Web interface for running linux shell commands.
+- **cli_sample**
+    - Includes cppxssh module that enables SSH access to local CLI to send commands and return output.
+- **ipverify_custom_action**
+    - Create a custom action in a function to be called when an IPverify test status changes.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
 - **ftp_client**
@@ -53,6 +57,8 @@ Microsoft Azure IoT Central over TLS connection.
     - Sets the device description to visually show the LAN/WAN/WWAN/Modem/IP Verify status.
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
+- **shell_sample**
+    - Provides example how to execute commands at OS shell: "ls - al".
 - **send_to_server**
     - Gets the '/status' from the device config store and send it to a test server.
 - **serial_temp**
@@ -67,8 +73,10 @@ router to Azure IoT Central.
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **tornado_sample**
 	- A webserver using Tornado with NCM-themed example to set WiFi SSIDs.
-
-## SDK Directories
+- **throttle_cellular_datacap**
+	-  Upon *any* Modem interface reaching 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit (minbwup and minbwdown variables).
+- **throttle_cellular_datacap_rate_tiered**
+	-  Upon *any* Modem interface reaching 70, 80, 90 or 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit as set by the rate tier (minbwup and minbwdown variables).
 
 - **built_apps/**
     - Ready to use sample apps - Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
