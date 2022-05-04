@@ -27,6 +27,8 @@ The Application Developmers Guide is the best document to read first.
     - Create a custom action in a function to be called when an IPverify test status changes.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
+- **DESC_Interactive**
+    - Allows NCM device description field to be used to interact with the NCOS API.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
