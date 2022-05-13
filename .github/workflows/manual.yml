@@ -29,16 +29,19 @@ jobs:
           chmod +x ./.github/workflows/csclient_compare.sh
           ./.github/workflows/csclient_compare.sh
         shell: bash
-      - uses: actions/checkout@v2
       - name: Run make build and clean
+        if: github.event_name == 'pull_request'
         run: |
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
-      - name: Commit newly built apps to github
+      - name: Run make build and clean and commit newly built apps to github
+        if: github.event_name != 'pull_request'
         run: |
           git config --global user.name 'Github actions auto build packages'
           git config --global user.email 'Github_actions_auto_build_packages@users.noreply.github.com'
+          chmod +x ./.github/workflows/builds.sh
+          ./.github/workflows/builds.sh
           git add built_apps/*
           git commit -m "Rebuilt apps"
           git push
