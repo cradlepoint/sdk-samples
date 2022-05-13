@@ -1,3 +1,5 @@
+![Mobile Site Survey Screenshot](screenshot.png)
+
 Application Name
 ================
 Mobile Site Survey
@@ -16,7 +18,7 @@ External Requirements
 
 Application Purpose
 ===================
-This app is intended to perform drive testing of cellular networks.
+This app is intended to perform drive testing of cellular networks.  It can also be used to test stationary deployments.
 
 The app is configurable through a webUI running on port 8000.  Use remote connect to 127.0.0.1, or add a ZFW Forwarding
 from LAN Zone to Router Zone for local access.
@@ -24,7 +26,7 @@ from LAN Zone to Router Zone for local access.
 By default the app will check for GPS lock and every 50 meters will collect modem diagnostics and run speedtests.
 It will write results to a .csv file in flash memory.  An FTP server provides access to files.
 
-Edit default settings in settings.py
+Edit the apps default settings in settings.py
 
 Send to Server will HTTP POST the results in JSON body to the Server URL and supply the optional Server Token (Bearer)
 Options to include full interface diagnostics and application logs.
@@ -36,3 +38,5 @@ The following fields are reported tests.
 'RSRP', 'RSRQ', 'State', 'Download', 'Upload', 'Latency', 'Bytes Sent', 'Bytes Received', 'Results URL'
 
 Surveyors are other routers running Mobile Site Survey that you want to control from a master.
+
+Clickt the Browse Surveys button to connect to the FTP Server to download results in .csv format
