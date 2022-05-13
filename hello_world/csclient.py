@@ -62,7 +62,6 @@ class CSClient(object):
 
     def __init__(self, app_name, init=False):
         self.app_name = app_name
-        self.ncos = '/var/mnt/sdk' in os.getcwd()  # Running in NCOS
         handlers = [logging.StreamHandler()]
         if 'linux' in sys.platform:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
@@ -339,17 +338,11 @@ class CSClient(object):
         Returns:
         None
         """
-        if self.ncos:
-            # Running in NCOS so write to the logger
+        if 'linux' in sys.platform:
             self.logger.info(value)
-        elif 'linux' in sys.platform:
-            # Running in Linux (container?) so write to stdout
-            with open('/dev/stdout', 'w') as log:
-                log.write(f'{self.app_name}: {value}\n')
         else:
             # Running in a computer so just use print for the log.
             print(value)
-
 
     def _get_auth(self, device_ip, username, password):
         # This is only needed when the app is running in a computer.
