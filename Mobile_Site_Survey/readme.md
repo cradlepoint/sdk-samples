@@ -1,3 +1,5 @@
+![Mobile Site Survey Screenshot](screenshot.png)
+
 Application Name
 ================
 Mobile Site Survey
@@ -26,7 +28,7 @@ It will write results to a .csv file in flash memory.  An FTP server provides ac
 
 Edit the apps default settings in settings.py
 
-Send to Server will HTTP POST the results in JSON body to the Server URL and supply the optional Server Token (Bearer)
+Send to Server will HTTP POST the results in JSON body to the Server URL and supply the optional Server Token (Bearer).  
 Options to include full interface diagnostics and application logs.
 
 If Write to CSV is enabled, a CSV file will be created in the routers flash storage named "Mobile Site Survey - ICCID {ICCID}.csv"
@@ -37,4 +39,4 @@ The following fields are reported tests.
 
 Surveyors are other routers running Mobile Site Survey that you want to control from a master.
 
-Clickt the Browse Surveys button to connect to the FTP Server to download results in .csv format
+Click the Browse Surveys button to connect to the FTP Server to download results in .csv format
