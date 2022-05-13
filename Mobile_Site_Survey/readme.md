@@ -39,4 +39,4 @@ The following fields are reported tests.
 
 Surveyors are other routers running Mobile Site Survey that you want to control from a master.
 
-Clickt the Browse Surveys button to connect to the FTP Server to download results in .csv format
+Click the Browse Surveys button to connect to the FTP Server to download results in .csv format
