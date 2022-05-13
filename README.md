@@ -41,6 +41,8 @@ The Application Developmers Guide is the best document to read first.
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
+- **Mobile_Site_Survey**
+    - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
 - **mosquitto**
     - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
