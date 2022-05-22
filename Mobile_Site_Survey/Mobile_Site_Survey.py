@@ -199,6 +199,8 @@ class Dispatcher:
                                 executor.map(run_tests, self.modems)
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
+                        if not self.total_bytes:
+                            self.total_bytes = 0.0
                         megabytes = round(self.total_bytes / 1000 / 1000)
                         cp.log(f'Total data used since app start: {megabytes} MB.')
                         self.timestamp = None
@@ -227,15 +229,15 @@ class Surveyor:
 def get_location():
     """Return latitude and longitude as floats"""
     # convert latitude to decimal
-    lat_deg = cp.get('/status/gps/fix/latitude/degree')
-    lat_min = cp.get('/status/gps/fix/latitude/minute')
-    lat_sec = cp.get('/status/gps/fix/latitude/second')
+    lat_deg = cp.get('/status/gps/fix/latitude/degree') or 0
+    lat_min = cp.get('/status/gps/fix/latitude/minute') or 0
+    lat_sec = cp.get('/status/gps/fix/latitude/second') or 0
     lat = dec(lat_deg, lat_min, lat_sec)
 
     # convert longitude to decimal
-    lon_deg = cp.get('/status/gps/fix/longitude/degree')
-    lon_min = cp.get('/status/gps/fix/longitude/minute')
-    lon_sec = cp.get('/status/gps/fix/longitude/second')
+    lon_deg = cp.get('/status/gps/fix/longitude/degree') or 0
+    lon_min = cp.get('/status/gps/fix/longitude/minute') or 0
+    lon_sec = cp.get('/status/gps/fix/longitude/second') or 0
     long = dec(lon_deg, lon_min, lon_sec)
 
     accuracy = cp.get('status/gps/fix/accuracy')
@@ -393,7 +395,11 @@ def run_tests(sim):
             logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
             cp.log(f'Speedtest Complete on {product} {carrier}.')
+            if not download:
+                download = 0.0
             download = round(ookla.results.download / 1000 / 1000, 2)
+            if not upload:
+                upload = 0.0
             upload = round(ookla.results.upload / 1000 / 1000, 2)
             latency = ookla.results.ping
             bytes_sent = ookla.results.bytes_sent
