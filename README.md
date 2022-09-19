@@ -17,8 +17,12 @@ The Application Developmers Guide is the best document to read first.
 
 - **app_template_csclient**
     - A template for the creation of a new application utilizing the csclient library.
+- **Autoinstall**
+    - Automatically choose fastest SIM on install.  On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed.  Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.  
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
+- **Mobile_Site_Survey**
+    - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
 - **cp_shell**
     - Web interface for running linux shell commands.
 - **cli_sample**
@@ -41,8 +45,6 @@ The Application Developmers Guide is the best document to read first.
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
-- **Mobile_Site_Survey**
-    - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
 - **mosquitto**
     - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
