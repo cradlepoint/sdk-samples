@@ -17,6 +17,8 @@ The Application Developmers Guide is the best document to read first.
 
 - **app_template_csclient**
     - A template for the creation of a new application utilizing the csclient library.
+- **Autoinstall**
+    - Automatically choose fastest SIM on install.  On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed.  Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.  
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
 - **Mobile_Site_Survey**
