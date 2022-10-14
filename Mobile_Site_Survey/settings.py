@@ -10,7 +10,7 @@ settings = {
     "send_to_server": False,
     "full_diagnostics": False,
     "include_logs": False,
-    "server_url": "",
+    "server_url": "https://5g-ready.io/injector",
     "server_token": "",
     "enable_surveyors": False,
     "surveyors": []

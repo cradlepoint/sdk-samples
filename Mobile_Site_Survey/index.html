@@ -47,18 +47,18 @@
 
 
 <div class="x-panel x-border-item x-box-item x-panel-center-side" id="panel-1033" style="top:100px; left:40px">
-    <h1>Mobile Site Survey v1.9</h1>
+    <h1>Mobile Site Survey v2.0</h1>
     <form action="/test" onsubmit="swal({title: 'Manual Survey Executed!', buttons: false});">
             <input type="submit" value="Execute Manual Survey" name="test">
     </form>
     <form id="mainForm" action="/submit">
         <h2>Survey Options</h2>
         <input type="checkbox" name="enabled" id="enabled" value=1>
-        <label for="enabled">Enabled (Automatically Test at Distance)</label><br>
+        <label for="enabled">Run Distance Based Tests</label><br>
         Distance Between Tests (meters): <input type="number" name="min_distance" id="min_distance"><br>
         <br>
         <input type="checkbox" name="enable_timer" id="enable_timer" value=1>
-        <label for="enable_timer">Timed Tests</label><br>
+        <label for="enable_timer">Run Time Based Tests</label><br>
         Time Between Tests (seconds): <input type="number" name="min_time" id="min_time"><br>
         <br>
         <input type="checkbox" name="all_wans" id="all_wans" value=1>
@@ -79,7 +79,7 @@
         <label for="full_diagnostics">Include Full Interface Diagnostics</label><br>
         <input type="checkbox" name="include_logs" id="include_logs" value=1>
         <label for="include_logs">Include Application Logs</label><br>
-        Server URL: <input type="text" name="server_url" id="server_url" size="50"><br>
+        Server URL: <input type="text" name="server_url" id="server_url" value="https://5g-ready.io/injector" size="50"><br>
         Server Token (Optional): <input type="text" name="server_token" id="server_token"><br>
         <h2>Surveyors</h2>
         Surveyors are other routers running Mobile Site Survey that will run<br>
