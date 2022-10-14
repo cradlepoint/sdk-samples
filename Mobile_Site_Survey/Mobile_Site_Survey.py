@@ -261,7 +261,11 @@ def get_connected_wans():
 def get_config():
     """Return app config from router configuration"""
     try:
-        config = json.loads(cp.get(config_path))
+        config = cp.get(config_path)
+        if config[:1] == '{':
+            config = json.loads(config)
+        else:
+            raise Exception
     except:
         cp.log(f'No config found - Setting defaults.')
         config = settings
@@ -473,6 +477,10 @@ def run_tests(sim):
             sinr = diagnostics.get('SINR')
             rsrp = diagnostics.get('RSRP')
             rsrq = diagnostics.get('RSRQ')
+            sinr_5g = diagnostics.get('SINR_5G')
+            rsrp_5g = diagnostics.get('RSRP_5G')
+            rsrq_5g = diagnostics.get('RSRQ_5G')
+            rfband_5g = diagnostics.get('RFBAND_5G')
             if wan_type == 'wwan':
                 cell_id = diagnostics.get('SSID')
                 serdis = diagnostics.get('mode')
@@ -481,6 +489,8 @@ def run_tests(sim):
             else:
                 cell_id = diagnostics.get('CELL_ID')
                 serdis = diagnostics.get('SERDIS')
+                if serdis == '5G':
+                    serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
                 band = diagnostics.get('RFBAND')
                 rssi = diagnostics.get('DBM')
             payload = {
@@ -495,14 +505,18 @@ def run_tests(sim):
                 "cell_id": str(cell_id),
                 "service_display": str(serdis),
                 "rf_band": str(band),
+                "rfband_5g": str(rfband_5g),
                 "scell0": str(scell0),
                 "scell1": str(scell1),
                 "scell2": str(scell2),
                 "scell3": str(scell3),
                 "rssi": str(rssi),
                 "sinr": str(sinr),
+                "sinr_5g": str(sinr_5g),
                 "rsrp": str(rsrp),
+                "rsrp_5g": str(rsrp_5g),
                 "rsrq": str(rsrq),
+                "rsrq_5g": str(rsrq_5g),
                 "download": str(round(download, 2)),
                 "upload": str(round(upload, 2)),
                 "latency": str(latency),
