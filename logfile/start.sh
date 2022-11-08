@@ -1,4 +1,4 @@
 #!/bin/bash
-cppython epilog.py &
+cppython logfile.py &
 cd logs
 cppython -m http.server 8000

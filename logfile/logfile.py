@@ -1,4 +1,4 @@
-"""epilog - SDK Application that writes logs to files on flash available for download via HTTP/Remote Connect.
+"""logfile - SDK Application that writes log to files on flash available for download via HTTP/Remote Connect.
 
 Never lose another log!  Remote Syslog!
 No more logs rolling over, no more physical USB flash drives,
@@ -17,8 +17,8 @@ from subprocess import Popen, PIPE
 import datetime
 import time
 
-cp = EventingCSClient('epilog')
-cp.log(f'Download log via NCM LAN Manager - HTTP 127.0.0.1 port 8000')
+cp = EventingCSClient('logfile')
+cp.log(f'Download logs via NCM LAN Manager - HTTP 127.0.0.1 port 8000')
 
 try:
     mac = cp.get('status/product_info/mac0').replace(':', '').upper()

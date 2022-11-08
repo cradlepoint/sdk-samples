@@ -1,6 +1,6 @@
 Application Name
 ================
-epilog
+logfile
 
 
 Application Version

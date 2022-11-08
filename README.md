@@ -31,8 +31,6 @@ The Application Developmers Guide is the best document to read first.
     - Create a custom action in a function to be called when an IPverify test status changes.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
-- **epilog**
-    - Writes router logs to flash available for download via HTTP/LAN Manager.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
@@ -47,6 +45,8 @@ The Application Developmers Guide is the best document to read first.
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
+- **logfile**
+    - Writes router logs to flash available for download via HTTP/LAN Manager.
 - **mosquitto**
     - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
