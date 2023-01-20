@@ -35,7 +35,7 @@ def file_checksum(hash_func=hashlib.sha256, file=None):
 
 def hash_dir(target, hash_func=hashlib.sha256):
     hashed_files = {}
-    for path, d, f in os.walk(target):
+    for path, d, f in os.walk(target, followlinks=True):
         for fl in f:
             if not fl.startswith('.') and not os.path.basename(path).startswith('.'):
                 # we need this be LINUX fashion!
@@ -57,7 +57,7 @@ def pack_package(app_root, app_name):
     print('app_name: {}'.format(app_name))
     print("pack TAR:%s.tar" % app_name)
     tar_name = "{}.tar".format(app_name)
-    tar = tarfile.open(tar_name, 'w')
+    tar = tarfile.open(tar_name, 'w', dereference=True)
     tar.add(app_root, arcname=os.path.basename(app_root))
     tar.close()
 
