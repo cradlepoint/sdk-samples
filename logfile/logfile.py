@@ -27,7 +27,20 @@ backup_count = 10
 
 def write_logs():
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    logfile = f'logs/Log - {mac}.{timestamp}.txt'
+    logfile = f'logs/Log - {mac} {timestamp}'
+    if os.path.exists(f'{logfile}.txt'):
+        i = 1
+        while True:
+            suffix = f'({i})'
+            if not os.path.exists(f'{logfile} {suffix}.txt'):
+                logfile = f'{logfile} {suffix}.txt'
+                cp.log(f'LOGFILE {logfile}')
+                break
+            else:
+                cp.log('NOPE!')
+                i += 1
+    else:
+        logfile += '.txt'
     f = open(logfile, 'wt')
     try:
         cmd = ['/usr/bin/tail', '/var/log/messages', '-n1', '-F']
@@ -42,6 +55,8 @@ def write_logs():
                 pass
             line = ' '.join(line)
             f.write(line)
+            f.flush()
+            os.sync()
             if f.tell() > max_file_size:
                 f.close()
                 time.sleep(1)
