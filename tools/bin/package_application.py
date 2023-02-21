@@ -122,6 +122,7 @@ def package_application(app_root, pkey):
         pmf = {}
         pmf['version_major'] = int(1)
         pmf['version_minor'] = int(0)
+        pmf['version_patch'] = int(0)
 
         app = {}
         app['name'] = str(section)
@@ -138,6 +139,7 @@ def package_application(app_root, pkey):
         app['version_minor'] = int(config[section]['version_minor'])
         app['firmware_major'] = int(config[section]['firmware_major'])
         app['firmware_minor'] = int(config[section]['firmware_minor'])
+        app['version_patch'] = int(config[section].get('version_patch', '0'))
         app['restart'] = config[section].getboolean('restart')
         app['reboot'] = config[section].getboolean('reboot')
         app['date'] = datetime.datetime.now().isoformat()
