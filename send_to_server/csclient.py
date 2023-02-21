@@ -434,7 +434,7 @@ class CSClient(object):
             # ignore the command error, continue on to next command
             errmsg = "dispatch failed with exception={} err={}".format(type(err), str(err))
         if errmsg is not None:
-            self.log(self.app_name, errmsg)
+            self.log(errmsg)
             pass
         return result
 
@@ -486,7 +486,7 @@ class CSClient(object):
             # ignore the command error, continue on to next command
             errmsg = "_receive failed with exception={} err={}".format(type(err), str(err))
         if errmsg is not None:
-            self.log(self.app_name, errmsg)
+            self.log(errmsg)
         return result
 
 

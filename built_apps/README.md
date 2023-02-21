@@ -37,6 +37,8 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
+- **logfile**
+    - Writes router logs to flash available for download via HTTP/NCM LAN Manager.
 - **mosquitto**
     - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
