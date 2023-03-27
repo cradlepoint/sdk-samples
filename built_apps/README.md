@@ -21,8 +21,6 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
     - Web interface for running linux shell commands.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
-- **epilog**
-    - Writes router logs to flash available for download via HTTP/LAN Manager.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
@@ -38,7 +36,7 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
 - **logfile**
-    - Writes router logs to flash available for download via HTTP/NCM LAN Manager.
+    - Writes router logs to flash available for download via HTTP/NCM LAN Manager port 8000.
 - **mosquitto**
     - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
