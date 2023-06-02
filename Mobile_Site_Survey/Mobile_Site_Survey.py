@@ -1,11 +1,13 @@
 """Mobile Site Survey -  Drive testing application for cellular diagnostics with speedtests.
 
+Access web interface on port 8000.  Results CSV files can be accessed on port 8001.
 Collects GPS, interface diagnostics, and speedtests and writes results to csv file.
 Also supports https://5g-ready.io for data aggregation and export.
-Separate ftp_server.py runs on port 2121 for file access.
+Results are also put in the description field for easy viewing in NCM devices grid.
+Delete the description to run a manual test.
 
 Supports timed testing (for stationary), and all WAN interface types (mdm, wwan, ethernet)
-and slave "surveyors" that can be linked and synced.
+and slave "surveyors" (other routers) than can synchronize tests with the master.
 
 See readme.txt for details
 
@@ -24,9 +26,7 @@ import os
 import time
 import datetime
 
-config_path = 'config/hotspot/tos/text'
-ftp_dir = 'FTP'
-
+results_dir = 'results'
 
 class TestHandler(tornado.web.RequestHandler):
     """Handles test/ endpoint requests."""
@@ -52,7 +52,8 @@ class ConfigHandler(tornado.web.RequestHandler):
 
     def get(self):
         """Return app config in JSON for web UI."""
-        config = get_config()
+        config = get_config('Mobile_Site_Survey')
+        config["results"] = dispatcher.results
         self.write(json.dumps(config))
         return
 
@@ -93,6 +94,10 @@ class SubmitHandler(tornado.web.RequestHandler):
             dispatcher.config["speedtests"] = bool(self.get_argument('speedtests'))
         except:
             dispatcher.config["speedtests"] = False
+        try:
+            dispatcher.config["packet_loss"] = bool(self.get_argument('packet_loss'))
+        except:
+            dispatcher.config["packet_loss"] = False
         try:
             dispatcher.config["write_csv"] = bool(self.get_argument('write_csv'))
         except:
@@ -136,10 +141,12 @@ class Dispatcher:
     """Event Handler for tests"""
     config = {}
     modems = []
+    pings = {}
+    results = ''
     surveyors = []
     manual = False
     timestamp = None
-    total_bytes = 0
+    total_bytes = {}
     lat, long, accuracy = None, None, None
     serial_number, mac_address, router_id = None, None, None
 
@@ -147,22 +154,36 @@ class Dispatcher:
         self.serial_number = cp.get('status/product_info/manufacturing/serial_num')
         self.mac_address = cp.get('status/product_info/mac0')
         self.router_id = cp.get('status/ecm/client_id')
-        self.config = get_config()
+        self.config = get_config('Mobile_Site_Survey')
 
     def loop(self):
         last_location = None
         next_timer = None
         while True:
             try:
+                self.modems = get_connected_wans()
+                # Run pings:
+                if self.config["packet_loss"]:
+                    for modem in self.modems:
+                        if not self.pings.get(modem):
+                            self.pings[modem] = {"tx": 0, "rx": 0}
+                        iface = cp.get(f'status/wan/devices/{modem}/info/iface')
+                        pong = ping('8.8.8.8', iface)
+                        debug_log(json.dumps(pong))
+                        # Track total tx/rx per modem to calculate loss between points
+                        self.pings[modem]["tx"] += pong["tx"]
+                        self.pings[modem]["rx"] += pong["rx"]
+                        debug_log(
+                            f'Cumulative ping results for {modem}: {self.pings[modem]["rx"]} of {self.pings[modem]["tx"]}')
+
                 # CHECK TIMER:
                 if self.config["enable_timer"]:
                     if next_timer is None:
+                        next_timer = time.time()
+                    if time.time() >= next_timer:
+                        cp.log('Starting timed test.')
                         next_timer = time.time() + self.config["min_time"]
-                    else:
-                        if time.time() > next_timer:
-                            cp.log('Starting timed test.')
-                            next_timer = time.time() + self.config["min_time"]
-                            self.manual = True
+                        self.manual = True
 
                 # Verify GPS lock:
                 gps_lock = cp.get('/status/gps/fix/lock')
@@ -185,8 +206,10 @@ class Dispatcher:
 
                     # RUN TESTS:
                     if (self.config["enabled"] and not too_close) or self.manual:
-                        cp.log('---> Starting Mobile Site Survey <---')
-                        self.modems = get_connected_wans()
+                        cp.log('---> Starting Survey <---')
+                        for modem in self.modems:
+                            if not self.total_bytes.get(modem):
+                                self.total_bytes[modem] = 0
                         if self.timestamp is None:  # If not triggered remotely
                             self.timestamp = datetime.datetime.now().timestamp()
                             if self.config["enable_surveyors"]:
@@ -197,17 +220,20 @@ class Dispatcher:
                             routing_tables = cp.get('config/routing/tables')
                             with concurrent.futures.ThreadPoolExecutor(len(self.modems)) as executor:
                                 executor.map(run_tests, self.modems)
+                            pretty_timestamp = datetime.datetime.fromtimestamp(self.timestamp).strftime(
+                                '%Y-%m-%d %H:%M:%S')
+                            title = f' 📅 {pretty_timestamp} 📍{dispatcher.lat}, {dispatcher.long} '
+                            bar = '〰〰〰'
+                            self.results = f'  {bar}{title}{bar}\n\n' + self.results
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
-                        if not self.total_bytes:
-                            self.total_bytes = 0.0
-                        megabytes = round(self.total_bytes / 1000 / 1000)
-                        cp.log(f'Total data used since app start: {megabytes} MB.')
+                        cp.log('---> Survey Complete <---')
                         self.timestamp = None
                         self.manual = False
                         last_location = latlong
+                time.sleep(0.1)
             except Exception as e:
-                cp.log(e)
+                cp.log(f'Exception in dispatcher loop: {e}')
 
 
 class Surveyor:
@@ -228,22 +254,20 @@ class Surveyor:
 
 def get_location():
     """Return latitude and longitude as floats"""
-    # convert latitude to decimal
-    lat_deg = cp.get('/status/gps/fix/latitude/degree') or 0
-    lat_min = cp.get('/status/gps/fix/latitude/minute') or 0
-    lat_sec = cp.get('/status/gps/fix/latitude/second') or 0
-    lat = dec(lat_deg, lat_min, lat_sec)
-
-    # convert longitude to decimal
-    lon_deg = cp.get('/status/gps/fix/longitude/degree') or 0
-    lon_min = cp.get('/status/gps/fix/longitude/minute') or 0
-    lon_sec = cp.get('/status/gps/fix/longitude/second') or 0
-    long = dec(lon_deg, lon_min, lon_sec)
-
-    accuracy = cp.get('status/gps/fix/accuracy')
-
-    return lat, long, accuracy
-    
+    fix = cp.get('status/gps/fix')
+    try:
+        lat_deg = fix['latitude']['degree']
+        lat_min = fix['latitude']['minute']
+        lat_sec = fix['latitude']['second']
+        lon_deg = fix['longitude']['degree']
+        lon_min = fix['longitude']['minute']
+        lon_sec = fix['longitude']['second']
+        lat = dec(lat_deg, lat_min, lat_sec)
+        long = dec(lon_deg, lon_min, lon_sec)
+        accuracy = fix.get('accuracy')
+        return lat, long, accuracy
+    except:
+        return None, None, None
 
 def get_connected_wans():
     """Return list of connected WAN interfaces"""
@@ -254,32 +278,30 @@ def get_connected_wans():
     for device in devices:
         if cp.get(f'status/wan/devices/{device}/status/connection_state') == 'connected':
             wans.append(device)
-    debug_log(f'get_connected_wans(): {wans}')
     return wans
 
-
-def get_config():
-    """Return app config from router configuration"""
+def get_appdata(name):
     try:
-        config = cp.get(config_path)
-        if config[:1] == '{':
-            config = json.loads(config)
-        else:
-            raise Exception
-    except:
-        cp.log(f'No config found - Setting defaults.')
-        config = settings
-        cp.put(config_path, json.dumps(config))
-    return config
+        appdata = cp.get('config/system/sdk/appdata')
+        return json.loads([x["value"] for x in appdata if x["name"] == name][0])
+    except Exception as e:
+        return None
 
+def get_config(name):
+    config = get_appdata(name)
+    if not config:
+        config = settings
+        cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(config)})
+        cp.log(f'No config found - Saved default config: {config}')
+    return config
 
 def dec(deg, min, sec):
     """Return decimal version of lat or long from deg, min, sec"""
-    if str(deg)[:1] == '-':
+    if str(deg)[0] == '-':
         dec = deg - (min / 60) - (sec / 3600)
     else:
         dec = deg + (min / 60) + (sec / 3600)
-    return dec
+    return round(dec, 5)
 
 
 def debug_log(msg):
@@ -287,38 +309,49 @@ def debug_log(msg):
     if dispatcher.config["debug"]:
         cp.log(msg)
 
+def log_all(msg, logs):
+    """Write consistent messages across all logs"""
+    logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cp.log(msg)
+    logs.append(f'{logstamp} {msg}')
+    dispatcher.results = f'{msg}\n\n' + dispatcher.results
 
-def ping(host, srcaddr):
+def ping(host, iface):
     """Ping host and return dict of results"""
     try:
-        start = {"host": host, "srcaddr": srcaddr}
+        start = {"bind_ip": False, "deadline": "Same as timeout", "df": "do", "family": "inet", "fwmark": None,
+                 "host": host, "iface": iface, "interval": 0.5, "num": 10, "size": 56, "srcaddr": None, "timeout": 15}
+
         cp.put('control/ping/start', {})
+        cp.put('control/ping/status', '')
         cp.put('control/ping/start', start)
-        result = {}
         pingstats = start
         try_count = 0
-        while try_count < 15:
+        while try_count < 30:
             result = cp.get('control/ping')
-            if result and result.get('status') in ["error", "done"]:
+            if result.get('status') in ["error", "done"]:
                 break
-            time.sleep(2)
+            time.sleep(0.5)
             try_count += 1
-        if try_count == 15:
-            pingstats['error'] = "No Results - Execution Timed Out"
         else:
-            # Parse results text
-            parsedresults = result.get('result').split('\n')
-            i = 0
-            index = 1
-            for item in parsedresults:
-                if item[0:3] == "---": index = i + 1
-                i += 1
+            pingstats['error'] = "No Results - Execution Timed Out"
+            return pingstats
+        # Parse results text
+        parsedresults = result.get('result').split('\n')
+        i = 0
+        index = 1
+        for item in parsedresults:
+            if item[0:3] == "---": index = i + 1
+            i += 1
+        try:
             pingstats['tx'] = int(parsedresults[index].split(' ')[0])
             pingstats['rx'] = int(parsedresults[index].split(' ')[3])
             pingstats['loss'] = float(parsedresults[index].split(' ')[6].split('%')[0])
             pingstats['min'] = float(parsedresults[index + 1].split(' ')[5].split('/')[0])
             pingstats['avg'] = float(parsedresults[index + 1].split(' ')[5].split('/')[1])
             pingstats['max'] = float(parsedresults[index + 1].split(' ')[5].split('/')[2])
+        except Exception as e:
+            cp.log(f'Exception parsing ping results: {e}')
         return pingstats
     except Exception as e:
         cp.log(f'Exception in PING: {e}')
@@ -327,13 +360,12 @@ def ping(host, srcaddr):
 def run_tests(sim):
     """Main testing function - multithreaded by Dispatcher"""
     download, upload, latency = 0.0, 0.0, 0.0
-    bytes_sent, bytes_received = 0, 0
+    bytes_sent, bytes_received, packet_loss_percent = 0, 0, 0
     share = ''
     source_ip = None
     ookla = None
     logs = []
 
-    """Perform diagnostics and speedtests as configured"""
     # ROUTING - Packets sourced from modem IP egress modem device:
     try:
         source_ip = cp.get(f'status/wan/devices/{sim}/status/ipinfo/ip_address')
@@ -346,18 +378,28 @@ def run_tests(sim):
         time.sleep(1)
         route_policy = {"ip_version": "ip4", "priority": 1, "table": route_table_id, "src_ip_network": source_ip}
         cp.post(f'config/routing/policies/', route_policy)
+        time.sleep(1)
 
-        time.sleep(1)  # Let the route simma down
-        temptables = cp.get('config/routing/tables')
-        temppolicies = cp.get('config/routing/policies')
-        debug_log(f'Tables: {temptables} --- Policies: {temppolicies}')
-        ookla = Speedtest(source_address=source_ip)
+        # Instantiate Ookla with source_ip from sim
+        retries = 0
+        while retries < 5:
+            try:
+                ookla = Speedtest(source_address=source_ip)
+                break
+            except:
+                cp.log(f'Ookla failed to start for source {source_ip} on {sim}.  Trying again...')
+                time.sleep(1)
+                pass
+        else:
+            log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}')
+            raise Exception
     except Exception as e:
-        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logs.append(f'{logstamp} Exception in routing: {e}')
-        cp.log(f'Exception in routing: {e}')
+        msg = f'Exception in routing: {e}'
+        log_all(msg, logs)
 
-    wan_type = cp.get(f'status/wan/devices/{sim}/info/type')
+    wan_info = cp.get(f'status/wan/devices/{sim}/info')
+    wan_type = wan_info.get('type')
+    iface = wan_info.get('iface')
 
     # GET MODEM DIAGNOSTICS:
     if wan_type == 'mdm':
@@ -376,49 +418,77 @@ def run_tests(sim):
         iccid = sim
         product = sim
 
-    # RUN SPEEDTESTS or latency:
-    if not dispatcher.config["speedtests"]:
-        pong = ping('8.8.8.8', srcaddr=source_ip)
-        if pong.get('loss') == 100.0:
-            latency = 'FAIL'
-        else:
-            latency = pong.get('avg')
+    # Latency test:
+    pong = ping('8.8.8.8', iface)
+    if pong.get('loss') == 100.0:
+        latency = 'FAIL'
     else:
-        try:
-            ookla.get_best_server()
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
-            cp.log(f'Starting Download Test on {product} {carrier}.')
-            ookla.download()
-            if wan_type == 'mdm':  # Capture CA Bands for modems
-                diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
-            cp.log(f'Starting Upload Test on {product} {carrier}.')
-            ookla.upload(pre_allocate=False)
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
-            cp.log(f'Speedtest Complete on {product} {carrier}.')
-            if not download:
-                download = 0.0
-            download = round(ookla.results.download / 1000 / 1000, 2)
-            if not upload:
-                upload = 0.0
-            upload = round(ookla.results.upload / 1000 / 1000, 2)
-            latency = ookla.results.ping
-            bytes_sent = ookla.results.bytes_sent
-            bytes_received = ookla.results.bytes_received
-            share = ookla.results.share()
-            dispatcher.total_bytes += bytes_sent + bytes_received
-        except Exception as e:
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Exception in ookla_speedtest for {product} {carrier}: {e}')
-            cp.log(f'Exception in ookla_speedtest for {product} {carrier}: {e}')
+        latency = round(pong.get('avg'))
 
+    # Ookla Speedtest
     try:
-        pretty_timestamp = datetime.datetime.fromtimestamp(dispatcher.timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        retries = 0
+        while retries < 3:
+            try:
+                ookla.get_best_server()
+                break
+            except Exception as e:
+                retries += 1
+                cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
+                raise Exception
+
+        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
+        cp.log(f'Starting Download Test on {product} {carrier}.')
+        ookla.download()  # Ookla Download Test
+        if wan_type == 'mdm':  # Capture CA Bands for modems
+            diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
+        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
+        cp.log(f'Starting Upload Test on {product} {carrier}.')
+        ookla.upload(pre_allocate=False)  # Ookla upload test
+        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
+        cp.log(f'Speedtest Complete on {product} {carrier}.')
+
+        # Format results
+        if not download:
+            download = 0.0
+        download = round(ookla.results.download / 1000 / 1000, 2)
+        if not upload:
+            upload = 0.0
+        upload = round(ookla.results.upload / 1000 / 1000, 2)
+        latency = round(ookla.results.ping)
+        bytes_sent = ookla.results.bytes_sent or 0
+        bytes_received = ookla.results.bytes_received or 0
+        share = ookla.results.share()
+        debug_log(f'bytes_sent: {bytes_sent} bytes_received: {bytes_received}')
+        dispatcher.total_bytes[sim] += bytes_sent + bytes_received
+    except Exception as e:
+        msg = f'Exception in run_tests() for {product} {carrier}: {e}'
+        log_all(msg, logs)
+
+    # Calculate packet loss
+    try:
+        if dispatcher.config["packet_loss"]:
+            tx = dispatcher.pings[sim]["tx"]
+            rx = dispatcher.pings[sim]["rx"]
+            if tx == rx:
+                packet_loss_percent = 0
+            else:
+                packet_loss_percent = round((tx-rx)/tx*100)
+            dispatcher.pings[sim]["rx"] = 0
+            dispatcher.pings[sim]["tx"] = 0
+        else:
+            tx, rx, packet_loss_percent = 0, 0, 0
+    except Exception as e:
+        cp.log(f'Exception calculating packet loss: {e}')
+
+    # Log results
+    pretty_timestamp = datetime.datetime.fromtimestamp(dispatcher.timestamp).strftime('%Y-%m-%d %H:%M:%S')
+    try:
         row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
-               download, upload, latency, bytes_sent, bytes_received, share]
+               carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
         if wan_type in ['mdm', 'wwan']:
             row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
         debug_log(f'ROW: {row}')
@@ -427,28 +497,30 @@ def run_tests(sim):
         logs.append(f'{logstamp} Results: {text}')
         cp.log(f'Results: {text}')
         cp.put('config/system/desc', text[:1000])
+        pretty_results = f'                   📶 {carrier} ⏱{latency}ms ⇄ {packet_loss_percent}% loss ({rx} of {tx})\n' \
+                         f'                   ↓{download}Mbps ↑{upload}Mbps 📈 {round(dispatcher.total_bytes[sim] / 1000 / 1000)}MB used.'
+        log_all(pretty_results, logs)
     except Exception as e:
-        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logs.append(f'{logstamp} Exception formatting results: {e}')
-        cp.log(f'Exception formatting results: {e}')
+        msg = f'Exception formatting results: {e}'
+        log_all(msg, logs)
 
     # Write to CSV:
     if dispatcher.config["write_csv"]:
         filename = f'Mobile Site Survey - ICCID {iccid}.csv'.replace(':', '')
 
-        # CREATE ftp_dir if it doesnt exist:
-        if not os.path.exists(ftp_dir):
-            os.makedirs(ftp_dir)
+        # CREATE results_dir if it doesnt exist:
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
 
         # CREATE CSV IF IT DOESNT EXIST:
-        debug_log(' '.join(os.listdir(ftp_dir)))
-        if not os.path.isfile(f'{ftp_dir}/{filename}'):
+        debug_log(' '.join(os.listdir(results_dir)))
+        if not os.path.isfile(f'{results_dir}/{filename}'):
             logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} {filename} not found.')
             cp.log(f'{filename} not found.')
-            with open(f'{ftp_dir}/{filename}', 'wt') as f:
-                header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Download', 'Upload',
-                          'Latency', 'bytes_sent', 'bytes_received', 'Results Image']
+            with open(f'{results_dir}/{filename}', 'wt') as f:
+                header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Carrier', 'Download', 'Upload',
+                          'Latency', 'Packet Loss Percent', 'bytes_sent', 'bytes_received', 'Results Image']
                 if diagnostics:
                     header = header + [*diagnostics]
                 line = ','.join(header) + '\n'
@@ -459,13 +531,12 @@ def run_tests(sim):
 
         # APPEND TO CSV:
         try:
-            with open(f'{ftp_dir}/{filename}', 'a') as f:
+            with open(f'{results_dir}/{filename}', 'a') as f:
                 f.write(text)
                 debug_log(f'Successfully wrote to {filename}.')
         except Exception as e:
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Unable to write to {filename}. {e}')
-            cp.log(f'Unable to write to {filename}. {e}')
+            msg = f'Unable to write to {filename}. {e}'
+            log_all(msg, logs)
 
     # SEND TO SERVER:
     if dispatcher.config["send_to_server"]:
@@ -520,6 +591,7 @@ def run_tests(sim):
                 "download": str(round(download, 2)),
                 "upload": str(round(upload, 2)),
                 "latency": str(latency),
+                "packet_loss_percent": packet_loss_percent,
                 "bytes_sent": bytes_sent,
                 "bytes_received": bytes_received,
                 "results_url": share
@@ -537,13 +609,26 @@ def run_tests(sim):
             debug_log(f'HTTP POST - URL: {url}')
             debug_log(f'HTTP POST - Headers: {headers}')
             debug_log(f'HTTP POST - Payload: {payload}')
-            req = requests.post(url, headers=headers, json=payload)
+            # retries
+            retries = 0
+            while retries < 5:
+                try:
+                    req = requests.post(url, headers=headers, json=payload)
+                    if req.status_code < 300:
+                        break
+                except Exception as e:
+                    cp.log(f'Exception in POST: {e}')
+                    time.sleep(1)
+                retries += 1
             cp.log(f'HTTP POST Result: {req.status_code} {req.text}')
         except Exception as e:
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Exception in Send to Server: {e}')
-            cp.log(f'Exception in Send to Server: {e}')
+            msg = f'Exception in Send to Server: {e}'
+            log_all(msg, logs)
 
+def manual_test(path, value, *args):
+    if not value:
+        debug_log('Blank Description - Executing Manual Test')
+        dispatcher.manual = True
 
 if __name__ == "__main__":
     cp = EventingCSClient('Mobile Site Survey')
@@ -556,14 +641,13 @@ if __name__ == "__main__":
         
     dispatcher = Dispatcher()
     Thread(target=dispatcher.loop, daemon=True).start()
+    cp.on('put','config/system/desc', manual_test)
     application = tornado.web.Application([
         (r"/config", ConfigHandler),
         (r"/submit", SubmitHandler),
         (r"/test", TestHandler),
         (r"/(.*)", tornado.web.StaticFileHandler,
-         {"path": os.path.dirname(__file__), "default_filename": "index.html"}),
-        (r"/FTP", tornado.web.StaticFileHandler,
-         {"path": os.path.dirname(__file__) + '/FTP'})
+         {"path": os.path.dirname(__file__), "default_filename": "index.html"})
     ])
     application.listen(8000)
-    tornado.ioloop.IOLoop.current().start()
+    tornado.ioloop.IOLoop.instance().start()
