@@ -635,7 +635,7 @@ if __name__ == "__main__":
     cp.log('Starting...')
     
     # Wait for WAN connection
-    while not cp.get('status/ecm/state') == 'connected':
+    while not cp.get('status/wan/connection_state') == 'connected':
         time.sleep(1)
     time.sleep(3)
         
