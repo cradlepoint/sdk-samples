@@ -131,7 +131,7 @@ class SubmitHandler(tornado.web.RequestHandler):
         except:
             dispatcher.config["all_wans"] = False
 
-        cp.put(config_path, json.dumps(dispatcher.config))
+        save_config(dispatcher.config)
         cp.log(f'Saved new config: {dispatcher.config}')
         self.redirect('/')
         return
@@ -295,6 +295,16 @@ def get_config(name):
         cp.log(f'No config found - Saved default config: {config}')
     return config
 
+def save_config(config):
+    try:
+        appdata = cp.get('config/system/sdk/appdata')
+        for data in appdata:
+            if data["name"] == 'Mobile_Site_Survey':
+                cp.put(f'config/system/sdk/appdata/{data["_id_"]}/value', json.dumps(config))
+                return
+    except Exception as e:
+        cp.logger.exception(e)
+        
 def dec(deg, min, sec):
     """Return decimal version of lat or long from deg, min, sec"""
     if str(deg)[0] == '-':
@@ -302,7 +312,6 @@ def dec(deg, min, sec):
     else:
         dec = deg + (min / 60) + (sec / 3600)
     return round(dec, 5)
-
 
 def debug_log(msg):
     """Write log when in debug mode"""
