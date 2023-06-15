@@ -1,3 +1,3 @@
 #!/bin/bash
-cppython ftp_server.py &
-cppython Mobile_Site_Survey.py
+cppython Mobile_Site_Survey.py &
+./miniserve -p 8001 results/
