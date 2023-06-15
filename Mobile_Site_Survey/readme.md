@@ -7,7 +7,7 @@ Mobile Site Survey
 
 Application Version
 ===================
-1.9
+2.3.2
 
 
 External Requirements
@@ -18,14 +18,20 @@ External Requirements
 
 Application Purpose
 ===================
-This app is intended to perform drive testing of cellular networks but also works for testing stationary deployments.  
-It will run automatic tests collecting location (GPS), interface diagnostics (including cellular signal)  
+This app is intended to perform testing of cellular networks and connections.
+It will run automatic tests collecting location (GPS), interface diagnostics (including cellular signal),
+latency, and packet loss.
 
-The app is configurable through a webUI running on port 8000.  Forward the Primary LAN Zone to the Router Zone with
-the Default Allow All policy.  
-You can also use NCM Remote Connect to 127.0.0.1 port 8000 HTTP (No FTP Support)
+Create an NCM Remote Connect LAN Manager profile for "Mobile Site Survey" at 127.0.0.1 port **8000** HTTP.
+Create an NCM Remote Connect LAN Manager profile for "Survey Results" at 127.0.0.1 port **8001** HTTP.
 
-* Execute Manual Survey - a button is provided at the top to start testing.  
+If accessing the UI locally, forward the PrimaryLAN Zone to the Router Zone with the Default Allow All policy.  
+
+Buttons:
+
+* Run Survey Now - a button is provided at the top to start testing.
+* Download Results (Local Only - No Remote Connect) - List results files for download.
+* Save Config - saves configuration to /config/system/sdk/appdata/
 
 Survey Options:  
 
@@ -56,10 +62,6 @@ If you have multiple routers that you would like to synchronize testing with the
 Be sure routers are reachable on port 8000.  
 * Enable Surveyors - Trigger remote routers applications to test at the same time  
 * Surveyors - Enter the IP Addresses of other routers, separated by commas.  
-
-* SUBMIT - Save settings  
-
-* Browse Surveys - Click this button to link to the FTP Server where you can download all the results in .csv format.  
 
 ---
 
