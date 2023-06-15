@@ -1,4 +1,4 @@
-![Mobile Site Survey Screenshot](screenshot.png)
+![image](https://github.com/phate999/sdk-samples/assets/7169690/2586842b-d489-4963-97ce-e465fb0cf0ad)
 
 Application Name
 ================
