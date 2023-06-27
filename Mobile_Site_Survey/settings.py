@@ -5,6 +5,7 @@ settings = {
     "enable_timer": False,
     "min_time": 0,
     "speedtests": True,
+    "packet_loss": True,
     "write_csv": True,
     "debug": False,
     "send_to_server": False,
