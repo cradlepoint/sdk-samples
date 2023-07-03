@@ -1,16 +1,14 @@
 """Mobile Site Survey -  Drive testing application for cellular diagnostics with speedtests.
 
-Access web interface on port 8000.  Results CSV files can be accessed on port 8001.
+Access web interface on HTTP port 8000.  Results CSV files can be downloaded via HTTP port 8001.
 Collects GPS, interface diagnostics, and speedtests and writes results to csv file.
 Also supports https://5g-ready.io for data aggregation and export.
-Results are also put in the description field for easy viewing in NCM devices grid.
-Delete the description to run a manual test.
+
+Run manual survey from CLI:
+put control/survey 1
 
 Supports timed testing (for stationary), and all WAN interface types (mdm, wwan, ethernet)
 and slave "surveyors" (other routers) than can synchronize tests with the master.
-
-See readme.txt for details
-
 """
 
 from csclient import EventingCSClient
@@ -223,7 +221,7 @@ class Dispatcher:
                             pretty_timestamp = datetime.datetime.fromtimestamp(self.timestamp).strftime(
                                 '%Y-%m-%d %H:%M:%S')
                             title = f' 📅 {pretty_timestamp} 📍{dispatcher.lat}, {dispatcher.long} '
-                            bar = '〰〰〰'
+                            bar = '〰〰'
                             self.results = f'  {bar}{title}{bar}\n\n' + self.results
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
@@ -269,6 +267,21 @@ def get_location():
     except:
         return None, None, None
 
+def get_location_DR():
+    """Return latitude and longitude from PCPTMINR (Dead Reckoning) as floats"""
+    try:
+        nmea = cp.get('status/gps/nmea')
+        for sentence in nmea:
+            fields = sentence.split(',')
+            if fields[0] == '$PCPTMINR':
+                lat = fields[2]
+                long = fields[3]
+                accuracy = round((float(fields[8]) + float(fields[9]))/2, 2)
+                return lat, long, accuracy
+    except Exception as e:
+        cp.logger.exception(e)
+        return None, None, None
+
 def get_connected_wans():
     """Return list of connected WAN interfaces"""
     wans = []
@@ -279,6 +292,16 @@ def get_connected_wans():
         if cp.get(f'status/wan/devices/{device}/status/connection_state') == 'connected':
             wans.append(device)
     return wans
+
+def save_config(config):
+    try:
+        appdata = cp.get('config/system/sdk/appdata')
+        for data in appdata:
+            if data["name"] == 'Mobile_Site_Survey':
+                cp.put(f'config/system/sdk/appdata/{data["_id_"]}/value', json.dumps(config))
+                return
+    except Exception as e:
+        cp.logger.exception(e)
 
 def get_appdata(name):
     try:
@@ -295,16 +318,6 @@ def get_config(name):
         cp.log(f'No config found - Saved default config: {config}')
     return config
 
-def save_config(config):
-    try:
-        appdata = cp.get('config/system/sdk/appdata')
-        for data in appdata:
-            if data["name"] == 'Mobile_Site_Survey':
-                cp.put(f'config/system/sdk/appdata/{data["_id_"]}/value', json.dumps(config))
-                return
-    except Exception as e:
-        cp.logger.exception(e)
-        
 def dec(deg, min, sec):
     """Return decimal version of lat or long from deg, min, sec"""
     if str(deg)[0] == '-':
@@ -312,6 +325,7 @@ def dec(deg, min, sec):
     else:
         dec = deg + (min / 60) + (sec / 3600)
     return round(dec, 5)
+
 
 def debug_log(msg):
     """Write log when in debug mode"""
@@ -505,7 +519,7 @@ def run_tests(sim):
         logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         logs.append(f'{logstamp} Results: {text}')
         cp.log(f'Results: {text}')
-        cp.put('config/system/desc', text[:1000])
+        # cp.put('config/system/desc', text[:1000])
         pretty_results = f'                   📶 {carrier} ⏱{latency}ms ⇄ {packet_loss_percent}% loss ({rx} of {tx})\n' \
                          f'                   ↓{download}Mbps ↑{upload}Mbps 📈 {round(dispatcher.total_bytes[sim] / 1000 / 1000)}MB used.'
         log_all(pretty_results, logs)
@@ -635,9 +649,10 @@ def run_tests(sim):
             log_all(msg, logs)
 
 def manual_test(path, value, *args):
-    if not value:
-        debug_log('Blank Description - Executing Manual Test')
+    if value:
+        debug_log('Executing Manual Survey')
         dispatcher.manual = True
+        cp.put('control/survey', None)
 
 if __name__ == "__main__":
     cp = EventingCSClient('Mobile Site Survey')
@@ -650,7 +665,7 @@ if __name__ == "__main__":
         
     dispatcher = Dispatcher()
     Thread(target=dispatcher.loop, daemon=True).start()
-    cp.on('put','config/system/desc', manual_test)
+    cp.on('put','control/survey', manual_test)
     application = tornado.web.Application([
         (r"/config", ConfigHandler),
         (r"/submit", SubmitHandler),
