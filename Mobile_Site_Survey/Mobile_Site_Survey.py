@@ -223,7 +223,7 @@ class Dispatcher:
                             pretty_timestamp = datetime.datetime.fromtimestamp(self.timestamp).strftime(
                                 '%Y-%m-%d %H:%M:%S')
                             title = f' 📅 {pretty_timestamp} 📍{dispatcher.lat}, {dispatcher.long} '
-                            bar = '〰〰〰'
+                            bar = '〰〰'
                             self.results = f'  {bar}{title}{bar}\n\n' + self.results
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
@@ -269,6 +269,21 @@ def get_location():
     except:
         return None, None, None
 
+def get_location_DR():
+    """Return latitude and longitude from PCPTMINR (Dead Reckoning) as floats"""
+    try:
+        nmea = cp.get('status/gps/nmea')
+        for sentence in nmea:
+            fields = sentence.split(',')
+            if fields[0] == '$PCPTMINR':
+                lat = fields[2]
+                long = fields[3]
+                accuracy = round((float(fields[8]) + float(fields[9]))/2, 2)
+                return lat, long, accuracy
+    except Exception as e:
+        cp.logger.exception(e)
+        return None, None, None
+
 def get_connected_wans():
     """Return list of connected WAN interfaces"""
     wans = []
@@ -279,6 +294,16 @@ def get_connected_wans():
         if cp.get(f'status/wan/devices/{device}/status/connection_state') == 'connected':
             wans.append(device)
     return wans
+
+def save_config(config):
+    try:
+        appdata = cp.get('config/system/sdk/appdata')
+        for data in appdata:
+            if data["name"] == 'Mobile_Site_Survey':
+                cp.put(f'config/system/sdk/appdata/{data["_id_"]}/value', json.dumps(config))
+                return
+    except Exception as e:
+        cp.logger.exception(e)
 
 def get_appdata(name):
     try:
@@ -295,16 +320,6 @@ def get_config(name):
         cp.log(f'No config found - Saved default config: {config}')
     return config
 
-def save_config(config):
-    try:
-        appdata = cp.get('config/system/sdk/appdata')
-        for data in appdata:
-            if data["name"] == 'Mobile_Site_Survey':
-                cp.put(f'config/system/sdk/appdata/{data["_id_"]}/value', json.dumps(config))
-                return
-    except Exception as e:
-        cp.logger.exception(e)
-        
 def dec(deg, min, sec):
     """Return decimal version of lat or long from deg, min, sec"""
     if str(deg)[0] == '-':
@@ -312,6 +327,7 @@ def dec(deg, min, sec):
     else:
         dec = deg + (min / 60) + (sec / 3600)
     return round(dec, 5)
+
 
 def debug_log(msg):
     """Write log when in debug mode"""
@@ -505,7 +521,7 @@ def run_tests(sim):
         logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         logs.append(f'{logstamp} Results: {text}')
         cp.log(f'Results: {text}')
-        cp.put('config/system/desc', text[:1000])
+        # cp.put('config/system/desc', text[:1000])
         pretty_results = f'                   📶 {carrier} ⏱{latency}ms ⇄ {packet_loss_percent}% loss ({rx} of {tx})\n' \
                          f'                   ↓{download}Mbps ↑{upload}Mbps 📈 {round(dispatcher.total_bytes[sim] / 1000 / 1000)}MB used.'
         log_all(pretty_results, logs)
