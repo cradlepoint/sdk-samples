@@ -1,16 +1,14 @@
 """Mobile Site Survey -  Drive testing application for cellular diagnostics with speedtests.
 
-Access web interface on port 8000.  Results CSV files can be accessed on port 8001.
+Access web interface on HTTP port 8000.  Results CSV files can be downloaded via HTTP port 8001.
 Collects GPS, interface diagnostics, and speedtests and writes results to csv file.
 Also supports https://5g-ready.io for data aggregation and export.
-Results are also put in the description field for easy viewing in NCM devices grid.
-Delete the description to run a manual test.
+
+Run manual survey from CLI:
+put control/survey 1
 
 Supports timed testing (for stationary), and all WAN interface types (mdm, wwan, ethernet)
 and slave "surveyors" (other routers) than can synchronize tests with the master.
-
-See readme.txt for details
-
 """
 
 from csclient import EventingCSClient
@@ -651,9 +649,10 @@ def run_tests(sim):
             log_all(msg, logs)
 
 def manual_test(path, value, *args):
-    if not value:
-        debug_log('Blank Description - Executing Manual Test')
+    if value:
+        debug_log('Executing Manual Survey')
         dispatcher.manual = True
+        cp.put('control/survey', None)
 
 if __name__ == "__main__":
     cp = EventingCSClient('Mobile Site Survey')
@@ -666,7 +665,7 @@ if __name__ == "__main__":
         
     dispatcher = Dispatcher()
     Thread(target=dispatcher.loop, daemon=True).start()
-    cp.on('put','config/system/desc', manual_test)
+    cp.on('put','control/survey', manual_test)
     application = tornado.web.Application([
         (r"/config", ConfigHandler),
         (r"/submit", SubmitHandler),
