@@ -1,14 +1,16 @@
 """Mobile Site Survey -  Drive testing application for cellular diagnostics with speedtests.
 
-Access web interface on HTTP port 8000.  Results CSV files can be downloaded via HTTP port 8001.
+Access web interface on port 8000.  Results CSV files can be accessed on port 8001.
 Collects GPS, interface diagnostics, and speedtests and writes results to csv file.
 Also supports https://5g-ready.io for data aggregation and export.
-
-Run manual survey from CLI:
-put control/survey 1
+Results are also put in the description field for easy viewing in NCM devices grid.
+Delete the description to run a manual test.
 
 Supports timed testing (for stationary), and all WAN interface types (mdm, wwan, ethernet)
 and slave "surveyors" (other routers) than can synchronize tests with the master.
+
+See readme.txt for details
+
 """
 
 from csclient import EventingCSClient
@@ -512,8 +514,27 @@ def run_tests(sim):
     try:
         row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
                carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
-        if wan_type in ['mdm', 'wwan']:
+        if wan_type == 'wwan':
             row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
+        elif wan_type == 'mdm':
+            cell_id = diagnostics.get('CELL_ID')
+            rfband = diagnostics.get('RFBAND')
+            scell0 = diagnostics.get("BAND_SCELL0")
+            scell1 = diagnostics.get("BAND_SCELL1")
+            scell2 = diagnostics.get("BAND_SCELL2")
+            scell3 = diagnostics.get("BAND_SCELL3")
+            serdis = diagnostics.get('SERDIS')
+            if serdis == '5G':
+                serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
+            dbm = diagnostics.get('DBM')
+            sinr = diagnostics.get('SINR')
+            rsrp = diagnostics.get('RSRP')
+            rsrq = diagnostics.get('RSRQ')
+            sinr_5g = diagnostics.get('SINR_5G')
+            rsrp_5g = diagnostics.get('RSRP_5G')
+            rsrq_5g = diagnostics.get('RSRQ_5G')
+            rfband_5g = diagnostics.get('RFBAND_5G')
+            row = row + [dbm, sinr, rsrp, rsrq, sinr_5g, rsrp_5g, rsrq_5g, cell_id, serdis, rfband, rfband_5g, scell0, scell1, scell2, scell3]
         debug_log(f'ROW: {row}')
         text = ','.join(str(x) for x in row) + '\n'
         logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -545,7 +566,11 @@ def run_tests(sim):
                 header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Carrier', 'Download', 'Upload',
                           'Latency', 'Packet Loss Percent', 'bytes_sent', 'bytes_received', 'Results Image']
                 if diagnostics:
-                    header = header + [*diagnostics]
+                    if wan_type == 'wwan':
+                        header = header + [*diagnostics]
+                    elif wan_type =='mdm':
+                        header = header + ['DBM', 'SINR', 'RSRP', 'RSRQ', 'SINR_5G', 'RSRP_5G', 'RSRQ_5G', 'Cell ID',
+                                           'Serice Display', 'RF Band', 'RF Band 5G', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3',]
                 line = ','.join(header) + '\n'
                 f.write(line)
             logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -649,10 +674,9 @@ def run_tests(sim):
             log_all(msg, logs)
 
 def manual_test(path, value, *args):
-    if value:
-        debug_log('Executing Manual Survey')
+    if not value:
+        debug_log('Blank Description - Executing Manual Test')
         dispatcher.manual = True
-        cp.put('control/survey', None)
 
 if __name__ == "__main__":
     cp = EventingCSClient('Mobile Site Survey')
@@ -665,7 +689,7 @@ if __name__ == "__main__":
         
     dispatcher = Dispatcher()
     Thread(target=dispatcher.loop, daemon=True).start()
-    cp.on('put','control/survey', manual_test)
+    cp.on('put','config/system/desc', manual_test)
     application = tornado.web.Application([
         (r"/config", ConfigHandler),
         (r"/submit", SubmitHandler),

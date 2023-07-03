@@ -69,4 +69,6 @@ h1 {
   height: 49px;
   width: 200px;
 }
-
+td {
+  padding: 15px;
+}
