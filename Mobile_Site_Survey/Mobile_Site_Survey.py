@@ -169,10 +169,10 @@ class Dispatcher:
                         pong = ping('8.8.8.8', iface)
                         debug_log(json.dumps(pong))
                         # Track total tx/rx per modem to calculate loss between points
-                        self.pings[modem]["tx"] += pong["tx"]
-                        self.pings[modem]["rx"] += pong["rx"]
-                        debug_log(
-                            f'Cumulative ping results for {modem}: {self.pings[modem]["rx"]} of {self.pings[modem]["tx"]}')
+                        if pong.get('tx') and pong.get('rx'):
+                            self.pings[modem]["tx"] += pong["tx"]
+                            self.pings[modem]["rx"] += pong["rx"]
+                            debug_log(f'Cumulative ping results for {modem}: {self.pings[modem]["rx"]} of {self.pings[modem]["tx"]}')
 
                 # CHECK TIMER:
                 if self.config["enable_timer"]:
