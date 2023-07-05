@@ -414,7 +414,7 @@ def run_tests(sim):
                 time.sleep(1)
                 pass
         else:
-            log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}')
+            log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}', logs)
             raise Exception
     except Exception as e:
         msg = f'Exception in routing: {e}'
