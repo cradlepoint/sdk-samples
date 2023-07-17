@@ -20,4 +20,4 @@ None
 
 Application Purpose
 ===================
-Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
+Get various system diagnostics, alert on thresholds, and put current status in asset_id field
