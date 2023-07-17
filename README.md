@@ -69,14 +69,14 @@ Microsoft Azure IoT Central over TLS connection.
     - Gets the '/status' from the device config store and send it to a test server.
 - **serial_temp**
     - This is a test application to serial data from the data logger connected.
-- **system_monitor**
-    - Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
 - **serial_vibration_test**
     - This is a test developed for the Cradlepoint Serial Device (CSD) to be used during vibration testing of the CSD.  The application is a simple serial echo server that opens a port on the router.  Data is sent to the application and is echoed back to the client over the serial port.  A LAN device is connected and communicates with the router via port 5556.  When the vibration test is running, the LAN client will be notified if the serial cable is disconnected or connected.
 - **simple_custom_dashboard**
     - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **simple_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
+- **system_monitor**
+    - Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
 - **tornado_sample**
 	- A webserver using Tornado with NCM-themed example to set WiFi SSIDs.
 - **throttle_cellular_datacap**
