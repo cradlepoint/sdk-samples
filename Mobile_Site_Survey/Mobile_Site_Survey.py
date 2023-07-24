@@ -189,7 +189,7 @@ class Dispatcher:
                     cp.log('No GPS lock.  Waiting 2 seconds.')
                     time.sleep(2)
                 if (self.config["enabled"] and gps_lock) or self.manual:
-                    self.lat, self.long, self.accuracy = get_location()
+                    self.lat, self.long, self.accuracy = get_location_DR()
                     latlong = (self.lat, self.long)
 
                     # CHECK FOR MINIMUM DISTANCE:
@@ -393,32 +393,44 @@ def run_tests(sim):
     try:
         source_ip = cp.get(f'status/wan/devices/{sim}/status/ipinfo/ip_address')
         cp.put('config/routing/policies/0/priority', 10)
-
-        route_table = {"name": f'MSS-{sim}', "routes": [{"netallow": False, "ip_network": "0.0.0.0/0", "dev": sim, "auto_gateway": True}]}
-        req = cp.post('config/routing/tables/', route_table)
-        route_table_index = req["data"]
-        route_table_id = cp.get(f'config/routing/tables/{route_table_index}/_id_')
-        time.sleep(1)
-        route_policy = {"ip_version": "ip4", "priority": 1, "table": route_table_id, "src_ip_network": source_ip}
-        cp.post(f'config/routing/policies/', route_policy)
-        time.sleep(1)
-
-        # Instantiate Ookla with source_ip from sim
-        retries = 0
-        while retries < 5:
-            try:
-                ookla = Speedtest(source_address=source_ip)
-                break
-            except:
-                cp.log(f'Ookla failed to start for source {source_ip} on {sim}.  Trying again...')
-                time.sleep(1)
-                pass
-        else:
-            log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}', logs)
-            raise Exception
+        route_tables = cp.get('config/routing/tables')
+        exists = False
+        for table in route_tables:
+            if table["name"] == f'MSS-{sim}':  # avoid duplicate routes
+                route_table_id = table["_id_"]
+                exists = True
+        if not exists:
+            route_table = {"name": f'MSS-{sim}', "routes": [{"netallow": False, "ip_network": "0.0.0.0/0", "dev": sim, "auto_gateway": True}]}
+            req = cp.post('config/routing/tables/', route_table)
+            route_table_index = req["data"]
+            route_table_id = cp.get(f'config/routing/tables/{route_table_index}/_id_')
+            time.sleep(1)
+        route_policies = cp.get('config/routing/policies')
+        exists = False
+        for policy in route_policies:
+            if policy["table"] == route_table_id:  # avoid duplicate policies
+                exists = True
+        if not exists:
+            route_policy = {"ip_version": "ip4", "priority": 1, "table": route_table_id, "src_ip_network": source_ip}
+            cp.post(f'config/routing/policies/', route_policy)
+            time.sleep(1)
     except Exception as e:
         msg = f'Exception in routing: {e}'
         log_all(msg, logs)
+
+    # Instantiate Ookla with source_ip from sim
+    retries = 0
+    while retries < 5:
+        try:
+            ookla = Speedtest(source_address=source_ip)
+            break
+        except:
+            cp.log(f'Ookla failed to start for source {source_ip} on {sim}.  Trying again...')
+            time.sleep(1)
+            pass
+    else:
+        log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}', logs)
+        raise Exception
 
     wan_info = cp.get(f'status/wan/devices/{sim}/info')
     wan_type = wan_info.get('type')
