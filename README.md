@@ -36,7 +36,7 @@ The Application Developmers Guide is the best document to read first.
 - **ftp_server**
     - Creates an FTP server in the device. A USB memory device is used as the FTP directory.
 - **geofences**
-    - Send alert when entering or exiting configured geofences.
+    - Send alert when entering or exiting geofences.  Configure geofences in SDK app data after loading app.
 - **gpio_any_wan_connected**
     - Set GPIO out high when any wan (not just modems) is connected.
 - **gps_probe**
