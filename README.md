@@ -37,6 +37,8 @@ The Application Developmers Guide is the best document to read first.
     - Creates an FTP server in the device. A USB memory device is used as the FTP directory.
 - **geofences**
     - Send alert when entering or exiting configured geofences.
+- **gpio_any_wan_connected**
+    - Set GPIO out high when any wan (not just modems) is connected.
 - **gps_probe**
     - Probe the GPS hardware and log the results.
 - **hello_world**
