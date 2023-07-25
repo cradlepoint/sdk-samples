@@ -35,6 +35,8 @@ The Application Developmers Guide is the best document to read first.
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
     - Creates an FTP server in the device. A USB memory device is used as the FTP directory.
+- **geofences**
+    - Send alert when entering or exiting configured geofences.
 - **gps_probe**
     - Probe the GPS hardware and log the results.
 - **hello_world**
