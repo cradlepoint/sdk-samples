@@ -189,7 +189,7 @@ class Dispatcher:
                     cp.log('No GPS lock.  Waiting 2 seconds.')
                     time.sleep(2)
                 if (self.config["enabled"] and gps_lock) or self.manual:
-                    self.lat, self.long, self.accuracy = get_location_DR()
+                    self.lat, self.long, self.accuracy = get_location()
                     latlong = (self.lat, self.long)
 
                     # CHECK FOR MINIMUM DISTANCE:
