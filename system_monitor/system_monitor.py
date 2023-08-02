@@ -1,4 +1,5 @@
 # system_monitor will get various system diagnostics, alert on thresholds, and put current status in asset_id field.
+# use sample code blocks at the bottom or build your own.
 
 from csclient import EventingCSClient
 import time
