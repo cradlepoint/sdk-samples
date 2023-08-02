@@ -52,7 +52,7 @@ while True:
     # Memory Utilization
     try:
         mem = cp.get('status/system/memory')
-        status["memory"] = round((mem["memtotal"] - mem["memfree"]) / mem["memtotal"] * 100)
+        status["memory"] = round((mem["memtotal"] - mem["memavailable"]) / mem["memtotal"] * 100)
         if status["memory"] > mem_threshold:
             cp.alert(f'Memory at {status["memory"]}%')
     except Exception as e:
