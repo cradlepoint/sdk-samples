@@ -13,7 +13,7 @@ Application Version
 External Requirements
 =====================
 - Modem(s) with cellular connectivity  
-- GPS antenna and location lock  
+- GPS antenna with lock  
 
 
 Application Purpose
