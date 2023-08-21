@@ -7,13 +7,13 @@ Mobile Site Survey
 
 Application Version
 ===================
-2.3.2
+2.3.6
 
 
 External Requirements
 =====================
 - Modem(s) with cellular connectivity  
-- GPS antenna and location lock  
+- GPS antenna with lock  
 
 
 Application Purpose
