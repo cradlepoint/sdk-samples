@@ -49,6 +49,8 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
     - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central.
 - **mqtt_azure_tls**
     - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central over TLS connection.
+- **OBDII_monitor**
+    - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
 - **ping_sample**
     - Contains ping function and example usage.
 - **ports_status**
