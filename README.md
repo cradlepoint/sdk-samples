@@ -56,11 +56,11 @@ The Application Developmers Guide is the best document to read first.
 - **mqtt_app**
     - Demonstrated MQTT using the paho library
 - **mqtt_azure_client**
-    - Sample Application which uses SDK to send sensor data to
-Microsoft Azure IoT Central.
+    - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central.
 - **mqtt_azure_tls**
-    - Sample Application which uses SDK to send sensor data to
-Microsoft Azure IoT Central over TLS connection.
+    - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central over TLS connection.
+- **OBDII_monitor**
+    - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
 - **ping_sample**
     - Contains ping function and example usage.
 - **ports_status**
