@@ -59,26 +59,29 @@ def results_field_check(path, results, *args):
     return
 
 def speedtest():
-    cp.log('Starting Speedtest...')
-    s = Speedtest()
-    server = s.get_best_server()
-    cp.log(f'Found Best Ookla Server: {server["sponsor"]}')
-    cp.log("Performing Ookla Download Test...")
-    d = s.download()
-    cp.log("Performing Ookla Upload Test...")
-    u = s.upload(pre_allocate=False)
-    download = '{:.2f}'.format(d / 1000 / 1000)
-    upload = '{:.2f}'.format(u / 1000 / 1000)
-    cp.log('Ookla Speedtest Complete! Results:')
-    cp.log(f'Client ISP: {s.results.timestamp}')
-    cp.log(f'Ookla Server: {s.results.server["sponsor"]}')
-    cp.log(f'Ping: {s.results.ping}ms')
-    cp.log(f'Download Speed: {download}Mb/s')
-    cp.log(f'Upload Speed: {upload} Mb/s')
-    cp.log(f'Ookla Results Image: {s.results.share()}')
-    text = f'DL:{download}Mbps - UL:{upload}Mbps - Ping:{s.results.ping}ms - Server:{s.results.server["sponsor"]} - ISP:{s.results.client["isp"]} - TimeGMT:{s.results.timestamp} - Img:{s.results.share()}'
-    cp.put(results_path, text)
-    return
+    try:
+        cp.log('Starting Speedtest...')
+        s = Speedtest()
+        server = s.get_best_server()
+        cp.log(f'Found Best Ookla Server: {server["sponsor"]}')
+        cp.log("Performing Ookla Download Test...")
+        d = s.download()
+        cp.log("Performing Ookla Upload Test...")
+        u = s.upload(pre_allocate=False)
+        download = '{:.2f}'.format(d / 1000 / 1000)
+        upload = '{:.2f}'.format(u / 1000 / 1000)
+        cp.log('Ookla Speedtest Complete! Results:')
+        cp.log(f'Client ISP: {s.results.client["isp"]}')
+        cp.log(f'Ookla Server: {s.results.server["sponsor"]}')
+        cp.log(f'Ping: {s.results.ping}ms')
+        cp.log(f'Download Speed: {download}Mb/s')
+        cp.log(f'Upload Speed: {upload} Mb/s')
+        cp.log(f'Ookla Results Image: {s.results.share()}')
+        text = f'DL:{download}Mbps - UL:{upload}Mbps - Ping:{s.results.ping}ms - Server:{s.results.server["sponsor"]} - ISP:{s.results.client["isp"]} - TimeGMT:{s.results.timestamp} - Img:{s.results.share()}'
+        cp.put(results_path, text)
+        return
+    except Exception as e:
+        cp.logger.exception(e)
 
 cp = EventingCSClient('5GSpeed')
 try:
