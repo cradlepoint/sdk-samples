@@ -11,6 +11,8 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
 
 ## App Descriptions ##
 
+- **5GSpeed**
+    - Run Ookla speedtests via NCM API.  Results are put in asset_id field (configurable in SDK Data).  Clearing the results starts a new test.  This can be done easily via NCM API v2 /routers/ endpoint.
 - **Autoinstall**
     - Automatically choose fastest SIM on install.  On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed.  Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.  
 - **Boot2**
