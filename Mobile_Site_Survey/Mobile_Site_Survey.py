@@ -159,13 +159,13 @@ class Dispatcher:
     def __init__(self):
         self.serial_number = cp.get('status/product_info/manufacturing/serial_num')
         self.mac_address = cp.get('status/product_info/mac0')
-        self.router_id = cp.get('status/ecm/client_id')
         self.config = get_config('Mobile_Site_Survey')
 
     def loop(self):
         last_location = None
         next_timer = None
         while True:
+            self.router_id = cp.get('status/ecm/client_id')
             try:
                 self.modems = get_connected_wans()
                 # Run pings:
