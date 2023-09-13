@@ -39,6 +39,3 @@ function loadForm(config) {
 
 // Calling that async function
 getapi(api_url);
-
-var newURL = "http://" + window.location.hostname + ":8001";
-$("#browse").prop('action', newURL);
