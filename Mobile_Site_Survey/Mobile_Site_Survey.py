@@ -165,7 +165,7 @@ class Dispatcher:
         last_location = None
         next_timer = None
         while True:
-            self.router_id = cp.get('status/ecm/client_id')
+            self.router_id = cp.get('status/ecm/client_id') or 0
             try:
                 self.modems = get_connected_wans()
                 # Run pings:
