@@ -1,14 +1,16 @@
 """Mobile Site Survey -  Drive testing application for cellular diagnostics with speedtests.
 
-Access web interface on HTTP port 8000.  Results CSV files can be downloaded via HTTP port 8001.
+Access web interface on port 8000.  Results CSV files can be accessed on port 8001.
 Collects GPS, interface diagnostics, and speedtests and writes results to csv file.
 Also supports https://5g-ready.io for data aggregation and export.
-
-Run manual survey from CLI:
-put control/survey 1
+Results are also put in the description field for easy viewing in NCM devices grid.
+Delete the description to run a manual test.
 
 Supports timed testing (for stationary), and all WAN interface types (mdm, wwan, ethernet)
 and slave "surveyors" (other routers) than can synchronize tests with the master.
+
+See readme.txt for details
+
 """
 
 from csclient import EventingCSClient
@@ -134,6 +136,12 @@ class SubmitHandler(tornado.web.RequestHandler):
         self.redirect('/')
         return
 
+class ResultsHandler(tornado.web.RequestHandler):
+    def get(self):
+        files = os.listdir("./results")
+        url = self.request.full_url().replace('http://aoobm-haproxy', 'https://aoobm-haproxy').replace('?','')
+        files_paths = sorted([f"{url}/{f}" for f in files])
+        self.render("template.html", items=files_paths)
 
 class Dispatcher:
     """Event Handler for tests"""
@@ -172,7 +180,8 @@ class Dispatcher:
                         if pong.get('tx') and pong.get('rx'):
                             self.pings[modem]["tx"] += pong["tx"]
                             self.pings[modem]["rx"] += pong["rx"]
-                            debug_log(f'Cumulative ping results for {modem}: {self.pings[modem]["rx"]} of {self.pings[modem]["tx"]}')
+                            debug_log(
+                                f'Cumulative ping results for {modem}: {self.pings[modem]["rx"]} of {self.pings[modem]["tx"]}')
 
                 # CHECK TIMER:
                 if self.config["enable_timer"]:
@@ -389,48 +398,51 @@ def run_tests(sim):
     ookla = None
     logs = []
 
-    # ROUTING - Packets sourced from modem IP egress modem device:
-    try:
-        source_ip = cp.get(f'status/wan/devices/{sim}/status/ipinfo/ip_address')
-        cp.put('config/routing/policies/0/priority', 10)
-        route_tables = cp.get('config/routing/tables')
-        exists = False
-        for table in route_tables:
-            if table["name"] == f'MSS-{sim}':  # avoid duplicate routes
-                route_table_id = table["_id_"]
-                exists = True
-        if not exists:
-            route_table = {"name": f'MSS-{sim}', "routes": [{"netallow": False, "ip_network": "0.0.0.0/0", "dev": sim, "auto_gateway": True}]}
-            req = cp.post('config/routing/tables/', route_table)
-            route_table_index = req["data"]
-            route_table_id = cp.get(f'config/routing/tables/{route_table_index}/_id_')
-            time.sleep(1)
-        route_policies = cp.get('config/routing/policies')
-        exists = False
-        for policy in route_policies:
-            if policy["table"] == route_table_id:  # avoid duplicate policies
-                exists = True
-        if not exists:
-            route_policy = {"ip_version": "ip4", "priority": 1, "table": route_table_id, "src_ip_network": source_ip}
-            cp.post(f'config/routing/policies/', route_policy)
-            time.sleep(1)
-    except Exception as e:
-        msg = f'Exception in routing: {e}'
-        log_all(msg, logs)
-
-    # Instantiate Ookla with source_ip from sim
-    retries = 0
-    while retries < 5:
+    if dispatcher.config["speedtests"]:
+        # ROUTING - Packets sourced from modem IP egress modem device:
         try:
-            ookla = Speedtest(source_address=source_ip)
-            break
-        except:
-            cp.log(f'Ookla failed to start for source {source_ip} on {sim}.  Trying again...')
-            time.sleep(1)
-            pass
-    else:
-        log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}', logs)
-        raise Exception
+            source_ip = cp.get(f'status/wan/devices/{sim}/status/ipinfo/ip_address')
+            cp.put('config/routing/policies/0/priority', 10)
+            route_tables = cp.get('config/routing/tables')
+            exists = False
+            for table in route_tables:
+                if table["name"] == f'MSS-{sim}':  # avoid duplicate routes
+                    route_table_id = table["_id_"]
+                    exists = True
+            if not exists:
+                route_table = {"name": f'MSS-{sim}', "routes": [{"netallow": False, "ip_network": "0.0.0.0/0", "dev": sim, "auto_gateway": True}]}
+                req = cp.post('config/routing/tables/', route_table)
+                route_table_index = req["data"]
+                route_table_id = cp.get(f'config/routing/tables/{route_table_index}/_id_')
+                time.sleep(1)
+            route_policies = cp.get('config/routing/policies')
+            exists = False
+            for policy in route_policies:
+                if policy["table"] == route_table_id:  # avoid duplicate policies
+                    exists = True
+            if not exists:
+                route_policy = {"ip_version": "ip4", "priority": 1, "table": route_table_id, "src_ip_network": source_ip}
+                cp.post(f'config/routing/policies/', route_policy)
+                time.sleep(1)
+        except Exception as e:
+            msg = f'Exception in routing: {e}'
+            log_all(msg, logs)
+        try:
+            # Instantiate Ookla with source_ip from sim
+            retries = 0
+            while retries < 5:
+                try:
+                    ookla = Speedtest(source_address=source_ip)
+                    break
+                except:
+                    retries += 1
+                    cp.log(f'Ookla failed to start for source {source_ip} on {sim}.  Trying again...')
+                    time.sleep(1)
+            else:
+                log_all(f'Ookla startup exceeded retries for source {source_ip} on {sim}')
+        except Exception as e:
+            msg = f'Exception in Ookla startup: {e}'
+            log_all(msg, logs)
 
     wan_info = cp.get(f'status/wan/devices/{sim}/info')
     wan_type = wan_info.get('type')
@@ -460,49 +472,6 @@ def run_tests(sim):
     else:
         latency = round(pong.get('avg'))
 
-    # Ookla Speedtest
-    try:
-        retries = 0
-        while retries < 3:
-            try:
-                ookla.get_best_server()
-                break
-            except Exception as e:
-                retries += 1
-                cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
-                raise Exception
-
-        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
-        cp.log(f'Starting Download Test on {product} {carrier}.')
-        ookla.download()  # Ookla Download Test
-        if wan_type == 'mdm':  # Capture CA Bands for modems
-            diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
-        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
-        cp.log(f'Starting Upload Test on {product} {carrier}.')
-        ookla.upload(pre_allocate=False)  # Ookla upload test
-        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
-        cp.log(f'Speedtest Complete on {product} {carrier}.')
-
-        # Format results
-        if not download:
-            download = 0.0
-        download = round(ookla.results.download / 1000 / 1000, 2)
-        if not upload:
-            upload = 0.0
-        upload = round(ookla.results.upload / 1000 / 1000, 2)
-        latency = round(ookla.results.ping)
-        bytes_sent = ookla.results.bytes_sent or 0
-        bytes_received = ookla.results.bytes_received or 0
-        share = ookla.results.share()
-        debug_log(f'bytes_sent: {bytes_sent} bytes_received: {bytes_received}')
-        dispatcher.total_bytes[sim] += bytes_sent + bytes_received
-    except Exception as e:
-        msg = f'Exception in run_tests() for {product} {carrier}: {e}'
-        log_all(msg, logs)
-
     # Calculate packet loss
     try:
         if dispatcher.config["packet_loss"]:
@@ -519,13 +488,79 @@ def run_tests(sim):
     except Exception as e:
         cp.log(f'Exception calculating packet loss: {e}')
 
+
+    if dispatcher.config["speedtests"]:
+        # Ookla Speedtest
+        try:
+            retries = 0
+            while retries < 3:
+                try:
+                    ookla.get_best_server()
+                    break
+                except Exception as e:
+                    retries += 1
+                    cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
+                    raise Exception
+
+            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
+            cp.log(f'Starting Download Test on {product} {carrier}.')
+            ookla.download()  # Ookla Download Test
+            if wan_type == 'mdm':  # Capture CA Bands for modems
+                diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
+            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
+            cp.log(f'Starting Upload Test on {product} {carrier}.')
+            ookla.upload(pre_allocate=False)  # Ookla upload test
+            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
+            cp.log(f'Speedtest Complete on {product} {carrier}.')
+
+            # Format results
+            if not download:
+                download = 0.0
+            download = round(ookla.results.download / 1000 / 1000, 2)
+            if not upload:
+                upload = 0.0
+            upload = round(ookla.results.upload / 1000 / 1000, 2)
+            latency = round(ookla.results.ping)
+            bytes_sent = ookla.results.bytes_sent or 0
+            bytes_received = ookla.results.bytes_received or 0
+            share = ookla.results.share()
+            debug_log(f'bytes_sent: {bytes_sent} bytes_received: {bytes_received}')
+            dispatcher.total_bytes[sim] += bytes_sent + bytes_received
+        except Exception as e:
+            msg = f'Exception running Ookla speedtest for {product} {carrier}: {e}'
+            log_all(msg, logs)
+
     # Log results
     pretty_timestamp = datetime.datetime.fromtimestamp(dispatcher.timestamp).strftime('%Y-%m-%d %H:%M:%S')
     try:
         row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
                carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
-        if wan_type in ['mdm', 'wwan']:
+        if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
             row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
+        elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
+            cell_id = diagnostics.get('CELL_ID')
+            pci = diagnostics.get('PHY_CELL_ID')
+            nr_cell_id = diagnostics.get('NR_CELL_ID')
+            rfband = diagnostics.get('RFBAND')
+            scell0 = diagnostics.get("BAND_SCELL0")
+            scell1 = diagnostics.get("BAND_SCELL1")
+            scell2 = diagnostics.get("BAND_SCELL2")
+            scell3 = diagnostics.get("BAND_SCELL3")
+            serdis = diagnostics.get('SERDIS')
+            if serdis == '5G':
+                serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
+            dbm = diagnostics.get('DBM')
+            sinr = diagnostics.get('SINR')
+            rsrp = diagnostics.get('RSRP')
+            rsrq = diagnostics.get('RSRQ')
+            sinr_5g = diagnostics.get('SINR_5G')
+            rsrp_5g = diagnostics.get('RSRP_5G')
+            rsrq_5g = diagnostics.get('RSRQ_5G')
+            rfband_5g = diagnostics.get('RFBAND_5G')
+            row = row + [dbm, sinr, rsrp, rsrq, sinr_5g, rsrp_5g, rsrq_5g, cell_id, pci, nr_cell_id, serdis, rfband, rfband_5g, scell0, scell1, scell2, scell3]
         debug_log(f'ROW: {row}')
         text = ','.join(str(x) for x in row) + '\n'
         logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -557,7 +592,11 @@ def run_tests(sim):
                 header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Carrier', 'Download', 'Upload',
                           'Latency', 'Packet Loss Percent', 'bytes_sent', 'bytes_received', 'Results Image']
                 if diagnostics:
-                    header = header + [*diagnostics]
+                    if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
+                        header = header + [*diagnostics]
+                    elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
+                        header = header + ['DBM', 'SINR', 'RSRP', 'RSRQ', 'SINR_5G', 'RSRP_5G', 'RSRQ_5G', 'Cell ID',
+                                           'PCI', 'NR Cell ID', 'Serice Display', 'RF Band', 'RF Band 5G', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3',]
                 line = ','.join(header) + '\n'
                 f.write(line)
             logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -594,6 +633,7 @@ def run_tests(sim):
                 rssi = diagnostics.get('signal_strength')
             else:
                 cell_id = diagnostics.get('CELL_ID')
+                pci = diagnostics.get('PHY_CELL_ID')
                 serdis = diagnostics.get('SERDIS')
                 if serdis == '5G':
                     serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
@@ -609,6 +649,7 @@ def run_tests(sim):
                 "accuracy": str(dispatcher.accuracy),
                 "carrier": carrier,
                 "cell_id": str(cell_id),
+                "pci": str(pci),
                 "service_display": str(serdis),
                 "rf_band": str(band),
                 "rfband_5g": str(rfband_5g),
@@ -661,26 +702,26 @@ def run_tests(sim):
             log_all(msg, logs)
 
 def manual_test(path, value, *args):
-    if value:
-        debug_log('Executing Manual Survey')
+    if not value:
+        debug_log('Blank Description - Executing Manual Test')
         dispatcher.manual = True
-        cp.put('control/survey', None)
 
 if __name__ == "__main__":
     cp = EventingCSClient('Mobile Site Survey')
     cp.log('Starting...')
-    
+
     # Wait for WAN connection
     while not cp.get('status/wan/connection_state') == 'connected':
         time.sleep(1)
     time.sleep(3)
-        
+
     dispatcher = Dispatcher()
     Thread(target=dispatcher.loop, daemon=True).start()
-    cp.on('put','control/survey', manual_test)
+    cp.on('put','config/system/desc', manual_test)
     application = tornado.web.Application([
         (r"/config", ConfigHandler),
         (r"/submit", SubmitHandler),
+        (r"/results", ResultsHandler),
         (r"/test", TestHandler),
         (r"/(.*)", tornado.web.StaticFileHandler,
          {"path": os.path.dirname(__file__), "default_filename": "index.html"})
