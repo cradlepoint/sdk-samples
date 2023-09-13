@@ -51,7 +51,7 @@ Powered by https://5g-ready.io
 * Include Full Interface Diagnostics - send all available diagnostics (not just signal)
 * Include Application Logs - send testing logs (useful for troubleshooting)
 * Server URL - The URL of the HTTP server to send the results to (e.g. https://5g-ready.io/injector)
-* Server Token (optional): Bearer token for server authentication
+* Server Token - Bearer token for server authentication
 
 Surveyors
 If you have multiple routers that you would like to synchronize testing with the app will start them at the same time.
