@@ -5,7 +5,7 @@ Mobile Site Survey
 
 Application Version
 ===================
-2.3
+2.5
 
 
 External Requirements
@@ -23,20 +23,23 @@ The app is configurable through a webUI running on port 8000.  Use NCM Remote Co
 Or locally, forward the Primary LAN Zone to the Router Zone with the Default Allow All policy.
 
 * Execute Manual Survey - a button is provided at the top to start testing. Or delete the description field.
+* Download Results - Opens a new tab with results files (CSV) available for download.
+* Save Config - saves Mobile Site Survey configuration to router.
 
 Survey Options:
 
-* Enabled (Automatically test at distance) - The app will run tests when the router has moved the distance defined
+* Run Distance based tests - The app will run tests when the router has moved the distance defined
 * Distance Between Tests (meters) - Set the distance for automatic testing
 
-* Timed Tests - The app will run tests at the time interval defined
+* Run Time based tests - The app will run tests at the time interval defined
 * Time Between Tests (seconds) - Set the time interval for automatic testing
 
 Both distance and timed tests can be enabled.
 Note: New tests cannot start until all current interface tests complete.
 
-* Test ALL connected WAN interfaces (not just modems) - This will also test Ethernet and Wifi-as-WAN interfaces.
+* Test Ethernet and Wifi-as-WAN - Disabled only tests cellular modems
 * Run Speedtests - Include Ookla TCP upload and download tests (if disabled, app will ping 8.8.8.8 to measure latency)
+* Monitor Packet Loss Between Tests - Continuously ping 8.8.8.8 and track tx/rx, packet loss
 * Write to .csv - Write test results to .csv file on router flash (Accessible via FTP server)
 * Debug Logs - Additional debugging logs for application troubleshooting.
 
@@ -54,14 +57,8 @@ Be sure routers are reachable on port 8000.
 * Enable Surveyors - Trigger remote routers applications to test at the same time
 * Surveyors - Enter the IP Addresses of other routers, separated by commas.
 
-*SUBMIT - Save settings
-
 ---
 
 By default the app will tests every 50 meters including speedtests and write results to a .csv file.
 
 You can edit the default settings in settings.py
-
-The following fields are reported by default:
-'Time', 'Latitude', 'Longitude', 'Carrier', 'Cell ID', 'Service Display', 'Band', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3', 'RSSI', 'SINR',
-'RSRP', 'RSRQ', 'State', 'Download', 'Upload', 'Latency', 'Bytes Sent', 'Bytes Received', 'Results URL'
