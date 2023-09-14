@@ -576,7 +576,10 @@ def run_tests(sim):
 
     # Write to CSV:
     if dispatcher.config["write_csv"]:
-        filename = f'Mobile Site Survey - ICCID {iccid}.csv'.replace(':', '')
+        diag = ''
+        if dispatcher.config["full_diagnostics"]:
+            diag = ' Diagnostics'
+        filename = f'Mobile Site Survey - ICCID {iccid}{diag}.csv'.replace(':', '')
 
         # CREATE results_dir if it doesnt exist:
         if not os.path.exists(results_dir):
