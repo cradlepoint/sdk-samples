@@ -3,7 +3,7 @@
 Steps to use:
 =============
 The app will create an entry in the router configuration under System > SDK Data named "5GSpeed" with the path for the results field.
-Default is "config/system/asset_id"
+Default is config/system/asset_id
 
 Clear the results by performing any of the following:
 
@@ -44,19 +44,22 @@ default_results_path = "config/system/asset_id"
 def get_config(name):
     try:
         appdata = cp.get('config/system/sdk/appdata')
-        return json.loads([x["value"] for x in appdata if x["name"] == name][0])
+        return [x["value"] for x in appdata if x["name"] == name][0]
     except:
         cp.log('No config found - saving defaults.')
-        cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(default_results_path)})
+        cp.post('config/system/sdk/appdata', {"name": name, "value": default_results_path})
         return default_results_path
 
 def results_field_check(path, results, *args):
-    if not results:
-        cp.log('Initiating Speedtest due to cleared results...')
-        speedtest()
-    else:
-        cp.log(f'5GSpeed ready. To start speedtest: put {results_path} ""')
-    return
+    try:
+        if not results:
+            cp.log('Initiating Speedtest due to cleared results...')
+            speedtest()
+        else:
+            cp.log(f'5GSpeed ready. To start speedtest: put {results_path} ""')
+        return
+    except Exception as e:
+        cp.logger.exception(e)
 
 def speedtest():
     try:
