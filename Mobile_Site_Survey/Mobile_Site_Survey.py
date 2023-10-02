@@ -500,7 +500,6 @@ def run_tests(sim):
                 except Exception as e:
                     retries += 1
                     cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
-                    raise Exception
 
             logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
