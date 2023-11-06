@@ -26,6 +26,8 @@ Never lose another log!  Remote Syslog!
 No more logs rolling over, no more physical USB flash drives,
 and you can recover logs after a reboot.  Via Remote Connect!
 
+![image](https://github.com/cradlepoint/sdk-samples/assets/7169690/962df5a3-8793-4386-8cf0-1cf7fd3b3b5a)
+
 Log files will be created with filenames containing the router MAC address and timestamp.  Example:
 Log - 0030443B3877.2022-11-11 09:52:25.txt
 
