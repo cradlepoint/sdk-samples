@@ -1,25 +1,6 @@
-Application Name
-================
 logfile
+================
 
-
-Application Version
-===================
-v0.1
-
-
-NCOS Devices Supported
-======================
-ALL
-
-
-External Requirements
-=====================
-None
-
-
-Application Purpose
-===================
 SDK Application that writes log to files on flash available for download via HTTP/Remote Connect.
 
 Never lose another log!  Remote Syslog!
