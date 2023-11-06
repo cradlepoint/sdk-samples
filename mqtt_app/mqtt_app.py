@@ -3,9 +3,9 @@ An MQTT App example
 Reference: https://www.eclipse.org/paho/clients/python/docs/
 
 This app does the following:
-- Connects to MQTT test server ‘test.mosquitto.org’
+- Connects to MQTT test server defined in settings.py.
 - Subscribes to topics as defined in settings.py.
-- Runs a background thread which publishes data to the topics defined in settings.py every 10 secs.
+- Runs a background thread which publishes data to the topics defined in settings.py at the interval defined
 - Generates a log when the MQTT server sends the published information for topics subscribed.
 """
 import os
@@ -33,9 +33,9 @@ def on_connect(client, userdata, flags, rc):
     # QOS 2: The broker will deliver the message exactly once by using a four step handshake.
     #
     # A list of tuples (i.e. topic, qos). Both topic and qos must be present in the tuple.
-    topics = [(settings.GPS_TOPIC, 2),
-              (settings.MODEM_TEMP_TOPIC, 1),
-              (settings.WAN_CONNECTION_STATE_TOPIC, 0)]
+
+    topics = [(topic, 1) for topic in settings.topics]
+
     try:
         client.subscribe(topics)
     except Exception as ex:
@@ -95,37 +95,20 @@ def publish_thread():
     cp.log('Start publish_thread()')
     while True:
         try:
-            gps_lastpos = cp.get(settings.GPS_TOPIC)
-            gps_pos = {'longitude': gps_lastpos.get('longitude'),
-                       'latitude': gps_lastpos.get('latitude')}
-
-            # Single Topic Publish example
-            # QOS 0: The client will deliver the message once, with no confirmation.
-            publish.single(topic=settings.GPS_TOPIC, payload=json.dumps(gps_pos), qos=0,
-                           hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
-
-            time.sleep(1)
-
-            # Multiple Topics Publish example
-            modem_temp = cp.get(settings.MODEM_TEMP_TOPIC)
-            wan_connection_state = cp.get(settings.WAN_CONNECTION_STATE_TOPIC)
-
+            #
             # Using tuples to define multiple messages,
             # the form must be: ("<topic>", "<payload>", qos, retain)
             # QOS 1: The client will deliver the message at least once, with confirmation required.
             # QOS 2: The client will deliver the message exactly once by using a four step handshake.
-            msgs = [(settings.MODEM_TEMP_TOPIC, modem_temp, 1, False),
-                    (settings.WAN_CONNECTION_STATE_TOPIC, wan_connection_state, 2, False)]
 
+
+            msgs = []
+            for topic, values in settings.topics.items():
+                for value, path in values.items():
+                    payload = cp.get(path)
+                    msgs.append((topic, f'{value}: {payload}', 1, False))
             publish.multiple(msgs=msgs, hostname=settings.MQTT_SERVER, port=settings.MQTT_PORT)
-
-            time.sleep(1)
-
-            # Publish the package.ini file as an example
-            file_name = 'package.ini'
-            publish_file(file_name, os.path.join(os.getcwd(), file_name))
-
-            time.sleep(10)
+            time.sleep(settings.PUBLISH_INTERVAL)
         except Exception as ex:
             cp.log('Exception in publish_thread(). ex: {}'.format(ex))
 
@@ -146,7 +129,7 @@ def start_mqtt():
 
         # Set a Will to be sent by the broker in case the client disconnects unexpectedly.
         # QOS 2: The broker will deliver the message exactly once by using a four step handshake.
-        mqtt_client.will_set('/will/oops', payload='{} has vanished!'.format(settings.MQTT_CLIENT_ID), qos=2)
+        mqtt_client.will_set('/will/oops', payload='{} has vanished!'.format(system_id), qos=2)
 
         connack_code = mqtt_client.connect(settings.MQTT_SERVER, settings.MQTT_PORT)
         cp.log('MQTT connect reply to {}, {}: {}'.format(settings.MQTT_SERVER, settings.MQTT_PORT,
@@ -161,6 +144,5 @@ def start_mqtt():
 
 
 cp.log('Starting...')
-mqtt_thread = Thread(target=start_mqtt, args=())
-mqtt_thread.start()
+mqtt_thread = Thread(target=start_mqtt, args=()).start()
 publish_thread()
