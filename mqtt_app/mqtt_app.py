@@ -144,5 +144,5 @@ def start_mqtt():
 
 
 cp.log('Starting...')
-mqtt_thread = Thread(target=start_mqtt, args=()).start()
+mqtt_thread = Thread(target=start_mqtt, daemon=True, args=()).start()
 publish_thread()
