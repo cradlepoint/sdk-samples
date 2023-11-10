@@ -3,7 +3,7 @@ Installer_UI
 **Provide a simple web interface for installers to configure WiFi and run speedtests.**
 
 Usage
-===================
+=====
 
 The application runs a webserver on port 8000.  
 The application adds a zone firewall forwarding from the Primary LAN Zone to the Router Zone to allow access to the UI.  
@@ -19,6 +19,8 @@ changed by admin users.
 Click "Save Settings" to save the WiFi configuration.  Requires installer password.  
 Click "Run Speedtest" to perform an Ookla speedtest.  Requires installer password.  
 
+Customize
+=========
 Colors and branding can be customized:  
 index.html can be found in /templates  
-logo and CSS resources are in /static  
+logo, CSS, and other resources are in /static  
