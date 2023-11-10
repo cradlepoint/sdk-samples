@@ -17,6 +17,8 @@ https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
     - Automatically choose fastest SIM on install.  On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed.  Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.  
 - **Boot2**
     - On bootup, this application will perform a speedtest on each SIM and prioritize them based on TCP download.  Results are logged, sent as an alert, and PUT to NCM API "custom1" field.
+- **Installer_UI**
+    - Provide a web interface for installers to configure WiFi and run speedtests.
 - **Mobile_Site_Survey**
     - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
 - **cp_shell_**
