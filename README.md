@@ -28,7 +28,7 @@ The Application Developmers Guide is the best document to read first.
 - **cp_shell**
     - Web interface for running linux shell commands.
 - **cli_sample**
-    - Includes cppxssh module that enables SSH access to local CLI to send commands and return output.
+    - Includes csterm module that enables access to local CLI to send commands and return output.
 - **ipverify_custom_action**
     - Create a custom action in a function to be called when an IPverify test status changes.
 - **cpu_usage**
