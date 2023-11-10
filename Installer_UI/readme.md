@@ -19,5 +19,6 @@ changed by admin users.
 Click "Save Settings" to save the WiFi configuration.  Requires installer password.  
 Click "Run Speedtest" to perform an Ookla speedtest.  Requires installer password.  
 
+Colors and branding can be customized:
 index.html can be found in /templates  
-other resources are in /static  
+logo and CSS resources are in /static  
