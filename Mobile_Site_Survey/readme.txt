@@ -62,3 +62,8 @@ Be sure routers are reachable on port 8000.
 By default the app will tests every 50 meters including speedtests and write results to a .csv file.
 
 You can edit the default settings in settings.py
+
+---
+
+Change Log:
+- v2.5.2 (11/20/23) - Converted all timestamps to UTC.
