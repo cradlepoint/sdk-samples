@@ -218,7 +218,7 @@ class Dispatcher:
                             if not self.total_bytes.get(modem):
                                 self.total_bytes[modem] = 0
                         if self.timestamp is None:  # If not triggered remotely
-                            self.timestamp = datetime.datetime.now().timestamp()
+                            self.timestamp = datetime.datetime.utcnow().timestamp()
                             if self.config["enable_surveyors"]:
                                 for surveyor in self.config["surveyors"]:
                                     Thread(target=Surveyor.start, args=(surveyor, self.timestamp), daemon=True).start()
@@ -343,7 +343,7 @@ def debug_log(msg):
 
 def log_all(msg, logs):
     """Write consistent messages across all logs"""
-    logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     cp.log(msg)
     logs.append(f'{logstamp} {msg}')
     dispatcher.results = f'{msg}\n\n' + dispatcher.results
@@ -501,17 +501,17 @@ def run_tests(sim):
                     retries += 1
                     cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
 
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
             cp.log(f'Starting Download Test on {product} {carrier}.')
             ookla.download()  # Ookla Download Test
             if wan_type == 'mdm':  # Capture CA Bands for modems
                 diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
             cp.log(f'Starting Upload Test on {product} {carrier}.')
             ookla.upload(pre_allocate=False)  # Ookla upload test
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
             cp.log(f'Speedtest Complete on {product} {carrier}.')
 
@@ -562,7 +562,7 @@ def run_tests(sim):
             row = row + [dbm, sinr, rsrp, rsrq, sinr_5g, rsrp_5g, rsrq_5g, cell_id, pci, nr_cell_id, serdis, rfband, rfband_5g, scell0, scell1, scell2, scell3]
         debug_log(f'ROW: {row}')
         text = ','.join(str(x) for x in row) + '\n'
-        logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
         logs.append(f'{logstamp} Results: {text}')
         cp.log(f'Results: {text}')
         # cp.put('config/system/desc', text[:1000])
@@ -587,7 +587,7 @@ def run_tests(sim):
         # CREATE CSV IF IT DOESNT EXIST:
         debug_log(' '.join(os.listdir(results_dir)))
         if not os.path.isfile(f'{results_dir}/{filename}'):
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} {filename} not found.')
             cp.log(f'{filename} not found.')
             with open(f'{results_dir}/{filename}', 'wt') as f:
@@ -601,7 +601,7 @@ def run_tests(sim):
                                            'PCI', 'NR Cell ID', 'Serice Display', 'RF Band', 'RF Band 5G', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3',]
                 line = ','.join(header) + '\n'
                 f.write(line)
-            logstamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             logs.append(f'{logstamp} Created new {filename} file.')
             cp.log(f'Created new {filename} file.')
 
