@@ -3,13 +3,22 @@ The application detects SIMs, and ensures (clones) they have unique WAN profiles
 Then the app collects diagnostics and runs Ookla speedtests on each SIM.
 Then the app prioritizes the SIMs WAN Profiles by TCP download speed.
 Results are written to the log, set as the description field, and sent as a custom alert.
-The app can be manually triggered again by clearing out the description field in NCM."""
+The app can be manually triggered again by clearing out the description field in NCM.
+App settings can be configured in System > SDK Data."""
 
 from csclient import EventingCSClient
 from speedtest import Speedtest
 import time
 import datetime
+import json
 
+defaults = {
+    "MIN_DOWNLOAD_SPD": 0.0,  # Mbps
+    "MIN_UPLOAD_SPD": 0.0,  # Mbps
+    "SCHEDULE": 0,  # Run AutoInstall every {SCHEDULE} minutes. 0 = Only run on boot.
+    "NUM_ACTIVE_SIMS": 0,  # Number of fastest (download) SIMs to keep active.  0 = all; do not disable SIMs
+    "ONLY_RUN_ONCE": False  # True means do not run if AutoInstall has been run on this device before.
+}
 
 class AutoInstallException(Exception):
     """General AutoInstall Exception."""
@@ -50,6 +59,23 @@ class AutoInstall(object):
     def __init__(self):
         self.client = EventingCSClient('AutoInstall')
         self.speedtest = Speedtest()
+
+    def get_config(self, name):
+        """Return config from /config/system/sdk/appdata."""
+        appdata = cp.get('config/system/sdk/appdata')
+        try:
+            config = json.loads([x["value"] for x in appdata if x["name"] == name][0])
+            if not config:
+                config = defaults
+        except:
+            config = defaults
+            cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(config)})
+        self.MIN_DOWNLOAD_SPD = config["MIN_DOWNLOAD_SPD"]
+        self.MIN_UPLOAD_SPD = config["MIN_UPLOAD_SPD"]
+        self.SCHEDULE = config["SCHEDULE"]
+        self.NUM_ACTIVE_SIMS = config["NUM_ACTIVE_SIMS"]
+        self.ONLY_RUN_ONCE = config["ONLY_RUN_ONCE"]
+        return
 
     def check_if_run_before(self):
         """Check if AutoInstall has been run before and return boolean."""
@@ -169,7 +195,7 @@ class AutoInstall(object):
                                 config.pop('_id_')
                                 config['priority'] += i
                                 i += 0.1
-                                config['trigger_name'] = f'{stat["info"]["port"]} {stat["info"]["sim"]}'
+                                config['trigger_name'] = f'{stat["diagnostics"]["HOMECARRID"]} {stat["info"]["port"]} {stat["info"]["sim"]}'
                                 config['trigger_string'] = \
                                     f'type|is|mdm%sim|is|{stat["info"]["sim"]}%port|is|{stat["info"]["port"]}'
                                 self.client.log(f'NEW WAN RULE: {config}')
@@ -292,6 +318,7 @@ class AutoInstall(object):
 
     def run(self):
         """Start of Main Application."""
+        self.get_config('AutoInstall')
         self.client.log(
             f'AutoInstall Starting... MIN_DOWNLOAD_SPD:{self.MIN_DOWNLOAD_SPD} MIN_UPLOAD_SPD:{self.MIN_UPLOAD_SPD} '
             f'SCHEDULE:{self.SCHEDULE} NUM_ACTIVE_SIMS:{self.NUM_ACTIVE_SIMS} ONLY_RUN_ONCE:{self.ONLY_RUN_ONCE}')
@@ -340,7 +367,8 @@ class AutoInstall(object):
                 self.client.put(f'config/wan/rules2/{rule_id}/disabled', True)
 
         # Prioritizes SIMs based on download speed
-        sorted_results = sorted(self.sims, key=lambda x: self.sims[x]['download'], reverse=True)
+        sorted_results = sorted(self.sims, key=lambda x: int(self.sims[x]['download']), reverse=True)  # Sort by download speed
+        # sorted_results = sorted(self.sims, key=lambda x: int(self.sims[x]['diagnostics']['RSRP']), reverse=True)  # Sort by RSRP
 
         # Configure WAN Profiles
         self.client.log(f'Prioritizing SIMs: {sorted_results}')
