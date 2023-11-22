@@ -5,7 +5,7 @@ AutoInstall
 
 Application Version
 ===================
-0.8
+0.9
 
 NCOS Devices Supported
 ======================
@@ -19,7 +19,9 @@ None
 
 Application Purpose
 ===================
-“AutoInstall” is a SIM Speedtest app designed to test TCP throughput on multiple SIMs, supporting multiple modems, and prioritize them based on download speed, including the following configurable options:
+“AutoInstall” is a SIM Speedtest app designed to test TCP throughput on multiple SIMs, supporting multiple modems, and prioritize them based on download speed.
+
+One the app has been loaded, the following settings can be configured in the router configuration under System > SDK Data:
 
 •	MIN_DOWNLOAD_SPD – If no SIM download speed meets minimum, a FAILURE report is sent.  SIMs are still prioritized and slowest SIMs are disabled according to NUM_ACTIVE_SIMS.
 Default Value = 0.0
@@ -29,7 +31,7 @@ Default Value = 0.0
 Default Value = 0
 •	NUM_ACTIVE_SIMS – Number of fastest SIMs to keep active. 0=all; do not disable any SIMs.
 Default Value = 0
-•	ONLY_RUN_ONCE – True means do not run if Boot2 has run on this device before. (common for install usage).
+•	ONLY_RUN_ONCE – True means do not run if AutoInstall has run on this device before. (common for install usage).
 Default Value = False
 
 Overwrites "description" field with results
