@@ -25,6 +25,7 @@ import json
 import os
 import time
 import datetime
+import configparser
 
 results_dir = 'results'
 
@@ -137,6 +138,8 @@ class SubmitHandler(tornado.web.RequestHandler):
         return
 
 class ResultsHandler(tornado.web.RequestHandler):
+    """Handles results/ endpoint requests."""
+
     def get(self):
         files = os.listdir("./results")
         url = self.request.full_url().replace('http://aoobm-haproxy', 'https://aoobm-haproxy').replace('?','')
@@ -149,6 +152,7 @@ class Dispatcher:
     modems = []
     pings = {}
     results = ''
+    version = ''
     surveyors = []
     manual = False
     timestamp = None
@@ -160,13 +164,22 @@ class Dispatcher:
         self.serial_number = cp.get('status/product_info/manufacturing/serial_num')
         self.mac_address = cp.get('status/product_info/mac0')
         self.config = get_config('Mobile_Site_Survey')
+        package = configparser.ConfigParser()
+        package.read('package.ini')
+        major = package.get('Mobile_Site_Survey', 'version_major')
+        minor = package.get('Mobile_Site_Survey', 'version_minor')
+        patch = package.get('Mobile_Site_Survey', 'version_patch')
+        self.version = f'{major}.{minor}.{patch}'
+        cp.log(f'Version: {self.version}')
 
     def loop(self):
         last_location = None
         next_timer = None
+        self.router_id = cp.get('status/ecm/client_id') or 0
         while True:
-            self.router_id = cp.get('status/ecm/client_id') or 0
             try:
+                if self.config["dead_reckoning"]:
+                    enable_GPS_send_to_server()
                 self.modems = get_connected_wans()
                 # Run pings:
                 if self.config["packet_loss"]:
@@ -194,11 +207,14 @@ class Dispatcher:
 
                 # Verify GPS lock:
                 gps_lock = cp.get('/status/gps/fix/lock')
-                if self.config["enabled"] and not self.manual and not gps_lock:
+                if self.config["enabled"] and not any([self.manual, gps_lock, self.config["dead_reckoning"]]):
                     cp.log('No GPS lock.  Waiting 2 seconds.')
                     time.sleep(2)
-                if (self.config["enabled"] and gps_lock) or self.manual:
-                    self.lat, self.long, self.accuracy = get_location()
+                if (self.config["enabled"] and gps_lock) or any([self.manual, self.config["dead_reckoning"]]):
+                    if self.config["dead_reckoning"]:
+                        self.lat, self.long, self.accuracy = get_location_DR()
+                    else:
+                        self.lat, self.long, self.accuracy = get_location()
                     latlong = (self.lat, self.long)
 
                     # CHECK FOR MINIMUM DISTANCE:
@@ -228,10 +244,13 @@ class Dispatcher:
                             with concurrent.futures.ThreadPoolExecutor(len(self.modems)) as executor:
                                 executor.map(run_tests, self.modems)
                             pretty_timestamp = datetime.datetime.fromtimestamp(self.timestamp).strftime(
-                                '%Y-%m-%d %H:%M:%S')
-                            title = f' 📅 {pretty_timestamp} 📍{dispatcher.lat}, {dispatcher.long} '
-                            bar = '〰〰'
-                            self.results = f'  {bar}{title}{bar}\n\n' + self.results
+                                '%I:%M:%S%p  %m/%d/%Y')
+                            pretty_lat = '{:.6f}'.format(self.lat)
+                            pretty_lon = '{:.6f}'.format(self.long)
+                            title = f' ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' \
+                                    f' ┣┅  {pretty_timestamp}   ⌖{pretty_lat}, {pretty_lon} \n' \
+                                    f' ┃\n'
+                            self.results = f'{title}' + self.results
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
                         cp.log('---> Survey Complete <---')
@@ -258,6 +277,60 @@ class Surveyor:
             cp.log(f'Exception starting surveyor: {ip_address} {e}')
         return
 
+def enable_GPS_send_to_server():
+    try:
+        connections = cp.get('config/system/gps/connections/')
+        for connection in connections:
+            if connection["name"] == 'MSS':
+                return
+        cp.log('Enabling GPS Send-to-server to localhost:10000 to enable Dead Reckoning NMEA.')
+        gps_config = {
+            "client": {
+                "destination": "server",
+                "num_sentences": 1000,
+                "port": 10000,
+                "server": "127.0.0.1",
+                "time_interval": {
+                    "enabled": False,
+                    "end_time": "5:00 PM",
+                    "start_time": "9:00 AM"
+                },
+                "useudp": True
+            },
+            "distance_interval_meters": 0,
+            "enabled": True,
+            "interval": 5,
+            "language": "nmea",
+            "name": "MSS",
+            "nmea": {
+                "custom_id": "system_id",
+                "custom_string": "",
+                "include_id": True,
+                "prepend_id": False,
+                "provide_gga": True,
+                "provide_gns": True,
+                "provide_inr": True,
+                "provide_obd": True,
+                "provide_rmc": True,
+                "provide_vtg": True
+            },
+            "stationary_distance_threshold_meters": 20,
+            "stationary_movement_event_threshold_seconds": 0,
+            "stationary_time_interval_seconds": 0,
+            "taip": {
+                "include_cr_lf_enabled": False,
+                "provide_al": True,
+                "provide_cp": True,
+                "provide_id": False,
+                "provide_ln": True,
+                "provide_pv": True,
+                "report_msg_checksum_enabled": True,
+                "vehicle_id_reporting_enabled": True
+            }
+        }
+        cp.post('config/system/gps/connections', gps_config)
+    except Exception as e:
+        cp.logger.exception(e)
 
 def get_location():
     """Return latitude and longitude as floats"""
@@ -270,26 +343,33 @@ def get_location():
         lon_min = fix['longitude']['minute']
         lon_sec = fix['longitude']['second']
         lat = dec(lat_deg, lat_min, lat_sec)
-        long = dec(lon_deg, lon_min, lon_sec)
+        lon = dec(lon_deg, lon_min, lon_sec)
         accuracy = fix.get('accuracy')
-        return lat, long, accuracy
+        return lat, lon, accuracy
     except:
         return None, None, None
 
 def get_location_DR():
-    """Return latitude and longitude from PCPTMINR (Dead Reckoning) as floats"""
+    """If GPRMC Sentence indicates invalid data ('V') return latitude and longitude from PCPTMINR (Dead Reckoning) as floats"""
     try:
+        DR = False
         nmea = cp.get('status/gps/nmea')
         for sentence in nmea:
             fields = sentence.split(',')
+            if fields[0] == '$GPRMC':
+                DR = fields[2] == 'V'
             if fields[0] == '$PCPTMINR':
                 lat = fields[2]
-                long = fields[3]
+                lon = fields[3]
                 accuracy = round((float(fields[8]) + float(fields[9]))/2, 2)
-                return lat, long, accuracy
+                if lat == 0.0 and lon == 0.0:
+                    return get_location()
+        if DR:
+            return lat, lon, accuracy
+        return get_location()
     except Exception as e:
         cp.logger.exception(e)
-        return None, None, None
+        return get_location()
 
 def get_connected_wans():
     """Return list of connected WAN interfaces"""
@@ -333,7 +413,7 @@ def dec(deg, min, sec):
         dec = deg - (min / 60) - (sec / 3600)
     else:
         dec = deg + (min / 60) + (sec / 3600)
-    return round(dec, 5)
+    return round(dec, 6)
 
 
 def debug_log(msg):
@@ -487,6 +567,7 @@ def run_tests(sim):
             tx, rx, packet_loss_percent = 0, 0, 0
     except Exception as e:
         cp.log(f'Exception calculating packet loss: {e}')
+        tx, rx, packet_loss_percent = 0, 0, 0
 
 
     if dispatcher.config["speedtests"]:
@@ -532,91 +613,12 @@ def run_tests(sim):
             msg = f'Exception running Ookla speedtest for {product} {carrier}: {e}'
             log_all(msg, logs)
 
-    # Log results
-    pretty_timestamp = datetime.datetime.fromtimestamp(dispatcher.timestamp).strftime('%Y-%m-%d %H:%M:%S')
-    try:
-        row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
-               carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
-        if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
-            row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
-        elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
-            cell_id = diagnostics.get('CELL_ID')
-            pci = diagnostics.get('PHY_CELL_ID')
-            nr_cell_id = diagnostics.get('NR_CELL_ID')
-            rfband = diagnostics.get('RFBAND')
-            scell0 = diagnostics.get("BAND_SCELL0")
-            scell1 = diagnostics.get("BAND_SCELL1")
-            scell2 = diagnostics.get("BAND_SCELL2")
-            scell3 = diagnostics.get("BAND_SCELL3")
-            serdis = diagnostics.get('SERDIS')
-            if serdis == '5G':
-                serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
-            dbm = diagnostics.get('DBM')
-            sinr = diagnostics.get('SINR')
-            rsrp = diagnostics.get('RSRP')
-            rsrq = diagnostics.get('RSRQ')
-            sinr_5g = diagnostics.get('SINR_5G')
-            rsrp_5g = diagnostics.get('RSRP_5G')
-            rsrq_5g = diagnostics.get('RSRQ_5G')
-            rfband_5g = diagnostics.get('RFBAND_5G')
-            row = row + [dbm, sinr, rsrp, rsrq, sinr_5g, rsrp_5g, rsrq_5g, cell_id, pci, nr_cell_id, serdis, rfband, rfband_5g, scell0, scell1, scell2, scell3]
-        debug_log(f'ROW: {row}')
-        text = ','.join(str(x) for x in row) + '\n'
-        logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-        logs.append(f'{logstamp} Results: {text}')
-        cp.log(f'Results: {text}')
-        # cp.put('config/system/desc', text[:1000])
-        pretty_results = f'                   📶 {carrier} ⏱{latency}ms ⇄ {packet_loss_percent}% loss ({rx} of {tx})\n' \
-                         f'                   ↓{download}Mbps ↑{upload}Mbps 📈 {round(dispatcher.total_bytes[sim] / 1000 / 1000)}MB used.'
-        log_all(pretty_results, logs)
-    except Exception as e:
-        msg = f'Exception formatting results: {e}'
-        log_all(msg, logs)
-
-    # Write to CSV:
-    if dispatcher.config["write_csv"]:
-        diag = ''
-        if dispatcher.config["full_diagnostics"]:
-            diag = ' Diagnostics'
-        filename = f'Mobile Site Survey - ICCID {iccid}{diag}.csv'.replace(':', '')
-
-        # CREATE results_dir if it doesnt exist:
-        if not os.path.exists(results_dir):
-            os.makedirs(results_dir)
-
-        # CREATE CSV IF IT DOESNT EXIST:
-        debug_log(' '.join(os.listdir(results_dir)))
-        if not os.path.isfile(f'{results_dir}/{filename}'):
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} {filename} not found.')
-            cp.log(f'{filename} not found.')
-            with open(f'{results_dir}/{filename}', 'wt') as f:
-                header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Carrier', 'Download', 'Upload',
-                          'Latency', 'Packet Loss Percent', 'bytes_sent', 'bytes_received', 'Results Image']
-                if diagnostics:
-                    if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
-                        header = header + [*diagnostics]
-                    elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
-                        header = header + ['DBM', 'SINR', 'RSRP', 'RSRQ', 'SINR_5G', 'RSRP_5G', 'RSRQ_5G', 'Cell ID',
-                                           'PCI', 'NR Cell ID', 'Serice Display', 'RF Band', 'RF Band 5G', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3',]
-                line = ','.join(header) + '\n'
-                f.write(line)
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-            logs.append(f'{logstamp} Created new {filename} file.')
-            cp.log(f'Created new {filename} file.')
-
-        # APPEND TO CSV:
-        try:
-            with open(f'{results_dir}/{filename}', 'a') as f:
-                f.write(text)
-                debug_log(f'Successfully wrote to {filename}.')
-        except Exception as e:
-            msg = f'Unable to write to {filename}. {e}'
-            log_all(msg, logs)
-
     # SEND TO SERVER:
+    pretty_timestamp = datetime.datetime.fromtimestamp(dispatcher.timestamp).strftime('%Y-%m-%d %H:%M:%S')
+    post_success = ''
     if dispatcher.config["send_to_server"]:
         try:
+            post_success = '5g-ready:❌'
             scell0 = diagnostics.get("BAND_SCELL0")
             scell1 = diagnostics.get("BAND_SCELL1")
             scell2 = diagnostics.get("BAND_SCELL2")
@@ -633,9 +635,13 @@ def run_tests(sim):
                 serdis = diagnostics.get('mode')
                 band = diagnostics.get('channel')
                 rssi = diagnostics.get('signal_strength')
+                pci = ''
             else:
                 cell_id = diagnostics.get('CELL_ID')
                 pci = diagnostics.get('PHY_CELL_ID')
+                cur_plmn = diagnostics.get('CUR_PLMN')
+                tac = diagnostics.get('TAC')
+                lac = diagnostics.get('LAC')
                 serdis = diagnostics.get('SERDIS')
                 if serdis == '5G':
                     serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
@@ -650,6 +656,9 @@ def run_tests(sim):
                 "longitude": str(dispatcher.long),
                 "accuracy": str(dispatcher.accuracy),
                 "carrier": carrier,
+                "cur_plmn": str(cur_plmn),
+                "tac": str(tac),
+                "lac": str(lac),
                 "cell_id": str(cell_id),
                 "pci": str(pci),
                 "service_display": str(serdis),
@@ -672,7 +681,8 @@ def run_tests(sim):
                 "packet_loss_percent": packet_loss_percent,
                 "bytes_sent": bytes_sent,
                 "bytes_received": bytes_received,
-                "results_url": share
+                "results_url": share,
+                "version": dispatcher.version
             }
             if dispatcher.config["full_diagnostics"]:
                 payload["diagnostics"] = json.dumps(diagnostics)
@@ -693,6 +703,7 @@ def run_tests(sim):
                 try:
                     req = requests.post(url, headers=headers, json=payload)
                     if req.status_code < 300:
+                        post_success = '5g-ready:✓️'
                         break
                 except Exception as e:
                     cp.log(f'Exception in POST: {e}')
@@ -702,6 +713,93 @@ def run_tests(sim):
         except Exception as e:
             msg = f'Exception in Send to Server: {e}'
             log_all(msg, logs)
+
+    # Log results
+    try:
+        row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
+               carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
+        if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
+            row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
+        elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
+            cell_id = diagnostics.get('CELL_ID')
+            pci = diagnostics.get('PHY_CELL_ID')
+            nr_cell_id = diagnostics.get('NR_CELL_ID')
+            cur_plmn = diagnostics.get('CUR_PLMN')
+            tac = diagnostics.get('TAC')
+            lac = diagnostics.get('LAC')
+            rfband = diagnostics.get('RFBAND')
+            scell0 = diagnostics.get("BAND_SCELL0")
+            scell1 = diagnostics.get("BAND_SCELL1")
+            scell2 = diagnostics.get("BAND_SCELL2")
+            scell3 = diagnostics.get("BAND_SCELL3")
+            serdis = diagnostics.get('SERDIS')
+            if serdis == '5G':
+                serdis = diagnostics.get('SRVC_TYPE_DETAILS', '5G')
+            dbm = diagnostics.get('DBM')
+            sinr = diagnostics.get('SINR')
+            rsrp = diagnostics.get('RSRP')
+            rsrq = diagnostics.get('RSRQ')
+            sinr_5g = diagnostics.get('SINR_5G')
+            rsrp_5g = diagnostics.get('RSRP_5G')
+            rsrq_5g = diagnostics.get('RSRQ_5G')
+            rfband_5g = diagnostics.get('RFBAND_5G')
+            row = row + [dbm, sinr, rsrp, rsrq, sinr_5g, rsrp_5g, rsrq_5g, cell_id, pci, cur_plmn, tac, lac, nr_cell_id, serdis, rfband, rfband_5g, scell0, scell1, scell2, scell3]
+        debug_log(f'ROW: {row}')
+        text = ','.join(str(x) for x in row) + '\n'
+        logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        logs.append(f'{logstamp} Results: {text}')
+        cp.log(f'Results: {text}')
+        # cp.put('config/system/desc', text[:1000])
+        pretty_results = f' ┣┅┅┅   ☏{carrier}  ⏱{latency}ms   ⇄ {packet_loss_percent}% loss ({tx-rx} of {tx}) {post_success}\n' \
+                         f' ┗┅┅┅   ↓{download}Mbps ↑{upload}Mbps  ⛗{round(dispatcher.total_bytes[sim] / 1000 / 1000)}MB used.'
+        log_all(pretty_results, logs)
+    except Exception as e:
+        msg = f'Exception formatting results: {e}'
+        text = msg
+        log_all(msg, logs)
+
+    # Write to CSV:
+    if dispatcher.config["write_csv"]:
+        diag = ''
+        if dispatcher.config["full_diagnostics"]:
+            diag = ' Diagnostics'
+        filename = f'Mobile Site Survey v{dispatcher.version} - ICCID {iccid}{diag}.csv'.replace(':', '')
+
+        # CREATE results_dir if it doesnt exist:
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+
+        # CREATE CSV IF IT DOESNT EXIST:
+        debug_log(' '.join(os.listdir(results_dir)))
+        if not os.path.isfile(f'{results_dir}/{filename}'):
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logs.append(f'{logstamp} {filename} not found.')
+            cp.log(f'{filename} not found.')
+            with open(f'{results_dir}/{filename}', 'wt') as f:
+                header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Carrier', 'Download', 'Upload',
+                          'Latency', 'Packet Loss Percent', 'bytes_sent', 'bytes_received', 'Results Image']
+                if diagnostics:
+                    if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
+                        header = header + [*diagnostics]
+                    elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
+                        header = header + ['DBM', 'SINR', 'RSRP', 'RSRQ', 'SINR_5G', 'RSRP_5G', 'RSRQ_5G', 'Cell ID',
+                                           'PCI', 'CUR_PLMN', 'TAC', 'LAC', 'NR Cell ID', 'Serice Display', 'RF Band', 'RF Band 5G', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3',]
+                line = ','.join(header) + '\n'
+                f.write(line)
+            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logs.append(f'{logstamp} Created new {filename} file.')
+            cp.log(f'Created new {filename} file.')
+
+        # APPEND TO CSV:
+        try:
+            with open(f'{results_dir}/{filename}', 'a') as f:
+                f.write(text)
+                debug_log(f'Successfully wrote to {filename}.')
+        except Exception as e:
+            msg = f'Unable to write to {filename}. {e}'
+            log_all(msg, logs)
+
+
 
 def manual_test(path, value, *args):
     if not value:
