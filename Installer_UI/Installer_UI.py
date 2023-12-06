@@ -87,7 +87,7 @@ def run_speedtest():
         cp.log(f'Download Speed: {download}Mb/s')
         cp.log(f'Upload Speed: {upload} Mb/s')
         cp.log(f'Ookla Results Image: {s.results.share()}')
-        text = f'{s.results.client["isp"]}\nDL:{download}Mbps\nUL:{upload}Mbps\nPing:{s.results.ping:.0f}ms'
+        text = f'Carrier: {s.results.client["isp"]}\nServer: {s.results.server["sponsor"]}\nDL:{download}Mbps\nUL:{upload}Mbps\nPing:{s.results.ping:.0f}ms'
         return text
     except Exception as e:
         cp.logger.exception(e)
