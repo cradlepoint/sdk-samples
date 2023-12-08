@@ -93,7 +93,7 @@ def run_speedtest():
         cp.logger.exception(e)
 
 def get_ssid():
-    return cp.get('config/wlan/radio/1/bss/0/ssid')
+    return cp.get('config/wlan/radio/0/bss/0/ssid')
 
 def get_config(name):
     appdata = cp.get('config/system/sdk/appdata')
