@@ -72,12 +72,14 @@ def run_speedtest():
     try:
         cp.log('Starting Speedtest...')
         s = Speedtest()
+        threads = 24
+        s.get_servers()
         server = s.get_best_server()
         cp.log(f'Found Best Ookla Server: {server["sponsor"]}')
         cp.log("Performing Ookla Download Test...")
-        d = s.download()
+        d = s.download(threads=threads)
         cp.log("Performing Ookla Upload Test...")
-        u = s.upload(pre_allocate=False)
+        u = s.upload(threads=threads, pre_allocate=False)
         download = '{:.2f}'.format(d / 1000 / 1000)
         upload = '{:.2f}'.format(u / 1000 / 1000)
         cp.log('Ookla Speedtest Complete! Results:')
