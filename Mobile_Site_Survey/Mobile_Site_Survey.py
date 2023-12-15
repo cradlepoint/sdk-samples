@@ -402,6 +402,9 @@ def get_appdata(name):
 
 def get_config(name):
     config = get_appdata(name)
+    if config.get('dead_reckoning') is None:
+        config['dead_reckoning'] = False
+        save_config(config)
     if not config:
         config = settings
         cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(config)})
