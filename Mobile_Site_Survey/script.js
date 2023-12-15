@@ -32,6 +32,7 @@ function loadForm(config) {
     $('#enable_surveyors').prop('checked', config.enable_surveyors);
     $('#surveyors').attr('value', config.surveyors);
     $('#debug').attr('checked', config.debug);
+    $('#version').text('Mobile Site Survey v' + config.version);
     if (config.results) {
         $('#results').val(config.results);
     }
