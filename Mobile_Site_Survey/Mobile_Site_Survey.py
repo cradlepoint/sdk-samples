@@ -1,6 +1,6 @@
 """Mobile Site Survey -  Drive testing application for cellular diagnostics with speedtests.
 
-Access web interface on port 8000.  Results CSV files can be accessed on port 8001.
+Access web interface on port 8000.
 Collects GPS, interface diagnostics, and speedtests and writes results to csv file.
 Also supports https://5g-ready.io for data aggregation and export.
 Results are also put in the description field for easy viewing in NCM devices grid.
@@ -55,6 +55,7 @@ class ConfigHandler(tornado.web.RequestHandler):
         """Return app config in JSON for web UI."""
         config = get_config('Mobile_Site_Survey')
         config["results"] = dispatcher.results
+        config["version"] = dispatcher.version
         self.write(json.dumps(config))
         return
 
@@ -171,6 +172,8 @@ class Dispatcher:
         patch = package.get('Mobile_Site_Survey', 'version_patch')
         self.version = f'{major}.{minor}.{patch}'
         cp.log(f'Version: {self.version}')
+        if self.config["dead_reckoning"]:
+            enable_GPS_send_to_server()
 
     def loop(self):
         last_location = None
@@ -178,8 +181,6 @@ class Dispatcher:
         self.router_id = cp.get('status/ecm/client_id') or 0
         while True:
             try:
-                if self.config["dead_reckoning"]:
-                    enable_GPS_send_to_server()
                 self.modems = get_connected_wans()
                 # Run pings:
                 if self.config["packet_loss"]:
@@ -401,6 +402,9 @@ def get_appdata(name):
 
 def get_config(name):
     config = get_appdata(name)
+    if config.get('dead_reckoning') is None:
+        config['dead_reckoning'] = False
+        save_config(config)
     if not config:
         config = settings
         cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(config)})

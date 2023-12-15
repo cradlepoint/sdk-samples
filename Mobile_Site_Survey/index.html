@@ -45,7 +45,7 @@
 
 
 <div class="x-panel x-border-item x-box-item x-panel-center-side" id="panel-1033" style="top:100px; left:40px">
-    <center><h2>Mobile Site Survey v2.5</h2></center>
+    <center><h2 id="version">Mobile Site Survey</h2></center>
     <table>
     	<tr>
     		<td>
@@ -73,17 +73,16 @@
 					<label for="speedtests">Run Speedtests</label><br>
 					<input type="checkbox" name="packet_loss" id="packet_loss" value=1>
 					<label for="packet_loss">Monitor Packet Loss between tests</label><br>
+					<input type="checkbox" name="full_diagnostics" id="full_diagnostics" value=1>
+					<label for="full_diagnostics">Include Full Interface Diagnostics</label><br>
 					<input type="checkbox" name="write_csv" id="write_csv" value=1>
 					<label for="write_csv">Write to CSV</label><br>
 					<input type="checkbox" name="debug" id="debug" value=1>
 					<label for="debug">Debug Logs</label><br>
 					<h4>Send to Server - Powered by <a href="https://5g-ready.io">5g-ready.io</a></h4>
-					Send to Server will send results via HTTP POST<br>
-					to the Server URL with optional bearer token.<br>
+					HTTP POST results to the Server URL.<br>
 					<input type="checkbox" name="send_to_server" id="send_to_server" value=1>
 					<label for="send_to_server">Enable Send to Server</label><br>
-					<input type="checkbox" name="full_diagnostics" id="full_diagnostics" value=1>
-					<label for="full_diagnostics">Include Full Interface Diagnostics</label><br>
 					<input type="checkbox" name="include_logs" id="include_logs" value=1>
 					<label for="include_logs">Include Application Logs</label><br>
 					Server URL: <input type="text" name="server_url" id="server_url" value="https://5g-ready.io/injector" size="31"><br>
