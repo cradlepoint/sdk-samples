@@ -15,6 +15,6 @@ settings = {
     "server_url": "https://5g-ready.io/injector",
     "server_token": "",
     "enable_surveyors": False,
-    "surveyors": []
+    "surveyors": [],
     "speedtest_url": "www.speedtest.net/api/api.php"
 }
