@@ -406,8 +406,11 @@ def get_config(name):
         config = settings
         cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(config)})
         cp.log(f'No config found - Saved default config: {config}')
-    elif config.get('dead_reckoning') is None:
-        config['dead_reckoning'] = False
+    else:  # Update config with any new settings
+        if config.get('dead_reckoning') is None:
+            config['dead_reckoning'] = settings['dead_reckoning']
+        if config.get('speedtest_url') is None:
+            config['speedtest_url'] = settings['speedtest_url']
         save_config(config)
     return config
 
