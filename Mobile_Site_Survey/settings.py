@@ -16,4 +16,5 @@ settings = {
     "server_token": "",
     "enable_surveyors": False,
     "surveyors": []
+    "speedtest_url": "www.speedtest.net/api/api.php"
 }
