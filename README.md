@@ -75,6 +75,10 @@ The Application Developmers Guide is the best document to read first.
     - Sets the device description to visually show the LAN/WAN/WWAN/Modem/IP Verify status.
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
+- **rproxy**
+    - A reverse proxy similar to port forwarding, except traffic forwarded to a
+    udp/tcp target will be sourced from the router's IP. This reverse proxy can
+    be dynamically added to clients as they connect. 
 - **shell_sample**
     - Provides example how to execute commands at OS shell: "ls - al".
 - **send_to_server**
