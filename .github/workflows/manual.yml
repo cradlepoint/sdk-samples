@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - v*
   pull_request:
     branches:
       - master
@@ -35,13 +37,21 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
-      - name: Run make build and clean and commit newly built apps to github
-        if: github.event_name != 'pull_request'
+      - name: Tag
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v')
         run: |
           git config --global user.name 'Github actions auto build packages'
           git config --global user.email 'Github_actions_auto_build_packages@users.noreply.github.com'
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
-          git add built_apps/*
-          git commit -m "Rebuilt apps"
-          git push
+          git tag -a v1 -m "v1"
+          git push origin --tags
+        shell: bash
+      - name: Publish
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        # TODO: if any of the build step fails, the release should be deleted.
+        with:
+          files: 'built_apps/*'
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
