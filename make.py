@@ -176,6 +176,7 @@ def package():
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     app_path = os.path.join(g_app_name)
     scan_for_cr(app_path)
+    setup_script(app_path)
 
     try:
         subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
@@ -197,6 +198,7 @@ def package_all():
     for app in app_dirs:
         app_path = os.path.join(app)
         scan_for_cr(app_path)
+        setup_script(app_path)
         try:
             print('Build app: {}'.format(app_path))
             subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
@@ -205,6 +207,22 @@ def package_all():
             success = False
 
     return success
+
+
+def setup_script(app_path):
+    # check app_path for setup.py and execute it
+    setup_path = os.path.join(app_path, 'setup.py')
+    if os.path.isfile(setup_path):
+        cwd = os.getcwd()
+        os.chdir(app_path)
+        print('Running setup.py for {}'.format(app_path))
+        try:
+            out = subprocess.check_output('{} {}'.format(g_python_cmd, 'setup.py'), stderr=subprocess.STDOUT, shell=True).decode()
+        except subprocess.CalledProcessError as e:
+            print ('[ERROR]: Exit code != 0')
+            out = e.output.decode()
+        print(out)
+        os.chdir(cwd)
 
 
 # Get the SDK status from the NCOS device
