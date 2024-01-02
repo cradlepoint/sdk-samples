@@ -58,6 +58,6 @@ jobs:
         with:
           files: 'built_apps/*.tar.gz'
           tag_name: "built_apps"
-          token: ${{ secrets.TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ./built_apps/README.md
           name: "Built Apps"
