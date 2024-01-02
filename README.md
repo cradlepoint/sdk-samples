@@ -4,7 +4,7 @@
 
 This directory contains the NCOS SDK tools and sample applications. 
 
-The Application Developmers Guide is the best document to read first.
+The Application Developers Guide is the best document to read first.
 
 ## Documents
 
@@ -13,7 +13,16 @@ The Application Developmers Guide is the best document to read first.
 - **Cradlepoint NCOS SDK v3.1 Application Developers Guide.html**
     - The main document that describes application development.
 
-## Sample Application Directories
+## Files
+
+- **make.py**
+    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
+- **sdk_settings.ini**
+    - This is the ini file that contains the settings used by python make.py.
+- **tools/**
+    - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
+
+## Sample Application Descriptions
 
 - **5GSpeed**
     - Run Ookla speedtests via NCM API.  Results are put in asset_id field (configurable in SDK Data).  Clearing the results starts a new test.  This can be done easily via NCM API v2 /routers/ endpoint.
@@ -99,19 +108,6 @@ The Application Developmers Guide is the best document to read first.
 	-  Upon *any* Modem interface reaching 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit (minbwup and minbwdown variables).
 - **throttle_cellular_datacap_rate_tiered**
 	-  Upon *any* Modem interface reaching 70, 80, 90 or 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit as set by the rate tier (minbwup and minbwdown variables).
-
-- **built_apps/**
-    - Ready to use sample apps - Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
-
-- **tools/**
-    - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
-
-## Files
-
-- **make.py**
-    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
-- **sdk_settings.ini**
-    - This is the ini file that contains the settings used by python make.py.
 
 ----------
 
