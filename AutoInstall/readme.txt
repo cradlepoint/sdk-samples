@@ -38,7 +38,7 @@ Overwrites "description" field with results
 
 Expected Output
 ===============
-AutoInstall will perform a netperf speedtest on all SIMs and prioritize by TCP download speed.  It does not delete WAN profiles, but will clone profiles if multiple SIMs match a profile.
+AutoInstall will perform a Ookla speedtest on all SIMs and prioritize by TCP download speed.  It does not delete WAN profiles, but will clone profiles if multiple SIMs match a profile.
 
 AutoInstall will send custom NCM alerts when it starts, when a SIM test times out, and when it completes.
 
