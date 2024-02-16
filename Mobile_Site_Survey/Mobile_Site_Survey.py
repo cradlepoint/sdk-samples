@@ -47,6 +47,14 @@ class TestHandler(tornado.web.RequestHandler):
         self.redirect('/')
         return
 
+class ClearHandler(tornado.web.RequestHandler):
+    """Handles clear/ endpoint requests."""
+
+    def get(self):
+        """Clear the dispatcher results"""
+        dispatcher.results = ''
+        self.redirect('/')
+        return
 
 class ConfigHandler(tornado.web.RequestHandler):
     """Handles config/ endpoint requests."""
@@ -246,12 +254,12 @@ class Dispatcher:
                                 executor.map(run_tests, self.modems)
                             pretty_timestamp = datetime.datetime.fromtimestamp(self.timestamp).strftime(
                                 '%I:%M:%S%p  %m/%d/%Y')
-                            pretty_lat = '{:.6f}'.format(self.lat)
-                            pretty_lon = '{:.6f}'.format(self.long)
+                            pretty_lat = '{:.6f}'.format(float(self.lat))
+                            pretty_lon = '{:.6f}'.format(float(self.long))
                             title = f' ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' \
                                     f' ┣┅  {pretty_timestamp}   ⌖{pretty_lat}, {pretty_lon} \n' \
                                     f' ┃\n'
-                            self.results = f'{title}' + self.results
+                            self.results = title + self.results
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
                         cp.log('---> Survey Complete <---')
@@ -830,6 +838,7 @@ if __name__ == "__main__":
         (r"/submit", SubmitHandler),
         (r"/results", ResultsHandler),
         (r"/test", TestHandler),
+        (r"/clear", ClearHandler),
         (r"/(.*)", tornado.web.StaticFileHandler,
          {"path": os.path.dirname(__file__), "default_filename": "index.html"})
     ])

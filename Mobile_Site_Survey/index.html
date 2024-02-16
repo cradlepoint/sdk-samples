@@ -48,7 +48,7 @@
     <center><h2 id="version">Mobile Site Survey</h2></center>
     <table>
     	<tr>
-    		<td>
+    		<td valign=top>
 				<form action="/test" id="test" style="display: inline" onsubmit="swal({title: 'Running Manual Survey!', buttons: false});">
 						<input type="submit" value="Run Survey Now" name="test">
 				</form>
@@ -88,14 +88,17 @@
 					Server URL: <input type="text" name="server_url" id="server_url" value="https://5g-ready.io/injector" size="31"><br>
 					Server Token: <input type="text" name="server_token" id="server_token"><br>
 					<h4>Surveyors</h4>
-        <input type="checkbox" name="enable_surveyors" id="enable_surveyors" value=1>
-        <label for="enable_surveyors">Enable Surveyors</label><br>
-		Enter IP Addresses separated by commas:<br>
-        Surveyors: <input type="text" name="surveyors" id="surveyors" size="32"><br>
-        <br>
+					<input type="checkbox" name="enable_surveyors" id="enable_surveyors" value=1>
+					<label for="enable_surveyors">Enable Surveyors</label><br>
+					Enter IP Addresses separated by commas:<br>
+					Surveyors: <input type="text" name="surveyors" id="surveyors" size="32"><br>
+					<br>
 				</form>
 			</td>
 			<td valign=top>
+				<form action="/clear" id="clear" style="display: inline">
+					<input type="submit" value="Clear Results" id="clear_results_btn">
+					<br><br>
 				<textarea id="results" name="results" rows=37 cols=59>
 				Waiting for test results...
 				</textarea>
