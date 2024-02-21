@@ -232,8 +232,35 @@ def status():
     response = get(status_tree)
     print(response)
 
+# Create new app from app_template using supplied app name
+def create():
+    app_name = option
+    if not app_name:
+        print('Please include new app name.  Example: python make.py create my_new_app')
+        return
+    if os.path.exists(app_name):
+        print('App already exists.  Please choose a different name.')
+        return
 
-# Transfer the app app tar.gz package to the NCOS device
+    try:
+        # Copy app_template folder and rename to new app name
+        shutil.copytree('app_template', app_name)
+        os.rename(f'{app_name}/app_template.py', f'{app_name}/{app_name}.py')
+
+        # Replace app_template with new app name in all files
+        files = [f'{app_name}.py', 'package.ini', 'readme.txt', 'start.sh']
+        for file in files:
+            path = f'{app_name}/{file}'
+            with open(path, 'r') as in_file:
+                filedata = in_file.read()
+            filedata = filedata.replace('app_template', app_name)
+            with open(path, 'w') as out_file:
+                out_file.write(filedata)
+        print(f'App {app_name} created successfully.')
+    except Exception as e:
+        print(f'Error creating app: {e}')
+
+# Transfer the app tar.gz package to the NCOS device
 def install():
     if is_NCOS_device_in_DEV_mode():
         app_archive = get_app_pack()
@@ -312,6 +339,8 @@ def output_help():
     print('Command format is: {} make.py <action>\n'.format(g_python_cmd))
     print('Actions include:')
     print('================')
+    print('create: Create a new app from the app_template folder.')
+    print(f'\tInclude new app name.  Example: {g_python_cmd} make.py create my_new_app.\n')
     print('clean: Clean all project artifacts.')
     print('\tTo clean all the apps, add the option "all" (i.e. clean all).\n')
     print('build or package: Create the app archive tar.gz file.')
@@ -448,6 +477,9 @@ if __name__ == "__main__":
             package_all()
         else:
             package()
+
+    elif utility_name == 'create':
+        create()
 
     elif utility_name == 'status':
         status()

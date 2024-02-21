@@ -1,11 +1,12 @@
 Application Name
 ================
-app_template_csclient
+app_template
 
 
 Application Version
 ===================
-1.0
+0.1.0
+
 
 NCOS Devices Supported
 ======================
@@ -19,10 +20,4 @@ None
 
 Application Purpose
 ===================
-This is a template using SDK v3.0 csclient.py
-
-
-Expected Output
-===============
-Info Level Log Message: "Starting..."
-
+Application Template for creating new NCOS SDK applications

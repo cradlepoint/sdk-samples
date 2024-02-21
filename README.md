@@ -16,7 +16,7 @@ The Application Developers Guide is the best document to read first.
 ## Files
 
 - **make.py**
-    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
+    - The main python tool used to manage application paackages.  Supports actions: create, build, install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
 - **sdk_settings.ini**
     - This is the ini file that contains the settings used by python make.py.
 - **tools/**
@@ -26,7 +26,7 @@ The Application Developers Guide is the best document to read first.
 
 - **5GSpeed**
     - Run Ookla speedtests via NCM API.  Results are put in asset_id field (configurable in SDK Data).  Clearing the results starts a new test.  This can be done easily via NCM API v2 /routers/ endpoint.
-- **app_template_csclient**
+- **app_template**
     - A template for the creation of a new application utilizing the csclient library.
 - **app_holder**
     - Just a holder for dynamic_app. See dynamic_app.
