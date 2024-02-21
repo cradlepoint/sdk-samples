@@ -26,7 +26,7 @@ The Application Developers Guide is the best document to read first.
 
 - **5GSpeed**
     - Run Ookla speedtests via NCM API.  Results are put in asset_id field (configurable in SDK Data).  Clearing the results starts a new test.  This can be done easily via NCM API v2 /routers/ endpoint.
-- **app_template_csclient**
+- **app_template**
     - A template for the creation of a new application utilizing the csclient library.
 - **app_holder**
     - Just a holder for dynamic_app. See dynamic_app.
