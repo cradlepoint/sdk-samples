@@ -16,7 +16,7 @@ The Application Developers Guide is the best document to read first.
 ## Files
 
 - **make.py**
-    - The main python tool used to build application packages and install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
+    - The main python tool used to manage application paackages.  Supports actions: create, build, install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
 - **sdk_settings.ini**
     - This is the ini file that contains the settings used by python make.py.
 - **tools/**
