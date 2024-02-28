@@ -361,7 +361,7 @@ def output_help():
 
 
 # Get the uuid from application package.ini if not already set
-def get_app_uuid(ceate_new_uuid=False):
+def get_app_uuid():
     global g_app_uuid
 
     if g_app_uuid == '':
@@ -373,7 +373,7 @@ def get_app_uuid(ceate_new_uuid=False):
             if uuid_key in config[g_app_name]:
                 g_app_uuid = config[g_app_name][uuid_key]
 
-                if ceate_new_uuid or g_app_uuid == '':
+                if g_app_uuid == '':
                     # Create a UUID if it does not exist
                     _uuid = str(uuid.uuid4())
                     config.set(g_app_name, uuid_key, _uuid)
@@ -389,7 +389,7 @@ def get_app_uuid(ceate_new_uuid=False):
 
 
 # Setup all the globals based on the OS and the sdk_settings.ini file.
-def init(ceate_new_uuid):
+def init():
     global g_python_cmd
     global g_app_name
     global g_dev_client_ip
@@ -425,6 +425,9 @@ def init(ceate_new_uuid):
             success = False
             print('ERROR 1: The {} key does not exist in {}'.format(app_key, settings_file))
 
+        if g_app_name == '':
+            print('The app_name key is empty in {}'.format(settings_file))
+
         if ip_key in config[sdk_key]:
             g_dev_client_ip = config[sdk_key][ip_key]
         else:
@@ -447,7 +450,7 @@ def init(ceate_new_uuid):
         print('ERROR 5: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
     # This will also create a UUID if needed.
-    get_app_uuid(ceate_new_uuid)
+    get_app_uuid()
 
     return success
 
@@ -463,8 +466,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         option = str(sys.argv[2]).lower()
 
-    if not init(ceate_new_uuid=utility_name == 'uuid'):
-        sys.exit(0)
+    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'install', 'start', 'stop', 'uninstall', 'purge']:
+        # Load the settings from the sdk_settings.ini file.
+        if not init():
+            sys.exit(0)
 
     if utility_name == 'clean':
         if option == 'all':
