@@ -170,7 +170,6 @@ def scan_for_cr(path):
 
 # Package the app files into a tar.gz archive.
 def package():
-    global g_app_name
     print("Packaging {}".format(g_app_name))
     success = True
     package_dir = os.path.join('tools', 'bin')
