@@ -120,8 +120,8 @@ def put(value):
 
 
 # Cleans the SDK directory for a given app by removing files created during packaging.
-def clean():
-    app_name = g_app_name
+def clean(app=None):
+    app_name = app or g_app_name
     print("Cleaning {}".format(app_name))
     app_pack_name = app_name + ".tar.gz"
     try:
@@ -167,8 +167,8 @@ def scan_for_cr(path):
                     raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
 
 # Package the app files into a tar.gz archive.
-def package():
-    app_name = g_app_name
+def package(app=None):
+    app_name = app or g_app_name
     print("Packaging {}".format(app_name))
     success = True
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
@@ -192,17 +192,8 @@ def package_all():
     print("Scanning {} for app directories.".format(cwd))
     app_dirs = get_app_list()
 
-    package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     for app in app_dirs:
-        app_path = os.path.join(app)
-        scan_for_cr(app_path)
-        setup_script(app_path)
-        try:
-            print('Build app: {}'.format(app_path))
-            subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
-        except subprocess.CalledProcessError as err:
-            print('Error packaging {}: {}'.format(app_path, err))
-            success = False
+        package(app)
 
     return success
 
