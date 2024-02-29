@@ -62,7 +62,7 @@ def is_NCOS_device_in_DEV_mode():
 
 # Returns the app package name based on the global app name.
 def get_app_pack(app_name=None):
-    package_name = g_app_name + ".tar.gz"
+    package_name = (app_name or g_app_name) + ".tar.gz"
     if app_name is not None:
         package_name = app_name + ".tar.gz"
     return package_name
@@ -121,11 +121,9 @@ def put(value):
 
 # Cleans the SDK directory for a given app by removing files created during packaging.
 def clean(app=None):
-    app_name = g_app_name
-    if app is not None:
-        app_name = app
+    app_name = app or g_app_name
     print("Cleaning {}".format(app_name))
-    app_pack_name = get_app_pack(app_name)
+    app_pack_name = app_name + ".tar.gz"
     try:
         files_to_clean = [app_name + ".tar.gz", app_name + ".tar"]
         for file_name in files_to_clean:
@@ -169,19 +167,19 @@ def scan_for_cr(path):
                     raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
 
 # Package the app files into a tar.gz archive.
-def package():
-    print("Packaging {}".format(g_app_name))
+def package(app=None):
+    app_name = app or g_app_name
+    print("Packaging {}".format(app_name))
     success = True
-    package_dir = os.path.join('tools', 'bin')
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
-    app_path = os.path.join(g_app_name)
+    app_path = os.path.join(app_name)
     scan_for_cr(app_path)
     setup_script(app_path)
 
     try:
         subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
     except subprocess.CalledProcessError as err:
-        print('Error packaging {}: {}'.format(g_app_name, err))
+        print('Error packaging {}: {}'.format(app_name, err))
         success = False
     finally:
         return success
@@ -233,8 +231,8 @@ def status():
     print(response)
 
 # Create new app from app_template using supplied app name
-def create():
-    app_name = option
+def create(app=None):
+    app_name = app or g_app_name
     if not app_name:
         print('Please include new app name.  Example: python make.py create my_new_app')
         return
@@ -261,9 +259,9 @@ def create():
         print(f'Error creating app: {e}')
 
 # Transfer the app tar.gz package to the NCOS device
-def install():
+def install(app=None):
     if is_NCOS_device_in_DEV_mode():
-        app_archive = get_app_pack()
+        app_archive = (app or g_app_name) + ".tar.gz"
 
         # Use sshpass for Linux or OS X
         cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1} {2}@{3}:/app_upload'.format(
@@ -326,8 +324,7 @@ def uninstall():
 # Purge the app from the NCOS device
 def purge():
     if is_NCOS_device_in_DEV_mode():
-        print('Purged application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
-        print('Application UUID is {}.'.format(g_app_uuid))
+        print('Purging applications for NCOS device at {}'.format(g_dev_client_ip))
         response = put('purge')
         print(response)
     else:
@@ -464,33 +461,34 @@ if __name__ == "__main__":
     utility_name = str(sys.argv[1]).lower()
     option = None
     if len(sys.argv) > 2:
-        option = str(sys.argv[2]).lower()
+        option = str(sys.argv[2])
 
     if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'install', 'start', 'stop', 'uninstall', 'purge']:
         # Load the settings from the sdk_settings.ini file.
         if not init():
             sys.exit(0)
 
+    # TODO add option support for: clean, package, create, install
     if utility_name == 'clean':
         if option == 'all':
             clean_all()
         else:
-            clean()
+            clean(option)
 
     elif utility_name in ['package', 'build']:
         if option == 'all':
             package_all()
         else:
-            package()
+            package(option)
 
     elif utility_name == 'create':
-        create()
+        create(option)
 
     elif utility_name == 'status':
         status()
 
     elif utility_name == 'install':
-        install()
+        install(option)
 
     elif utility_name == 'start':
         start()
