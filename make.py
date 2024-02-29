@@ -324,8 +324,7 @@ def uninstall():
 # Purge the app from the NCOS device
 def purge():
     if is_NCOS_device_in_DEV_mode():
-        print('Purged application {} for NCOS device at {}'.format(g_app_name, g_dev_client_ip))
-        print('Application UUID is {}.'.format(g_app_uuid))
+        print('Purging applications for NCOS device at {}'.format(g_dev_client_ip))
         response = put('purge')
         print(response)
     else:
