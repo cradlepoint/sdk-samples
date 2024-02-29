@@ -470,7 +470,6 @@ if __name__ == "__main__":
         if not init(option):
             sys.exit(0)
 
-    # TODO add option support for: clean, package, create, install
     if utility_name == 'clean':
         if option == 'all':
             clean_all()
