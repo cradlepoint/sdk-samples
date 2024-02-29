@@ -8,8 +8,8 @@ The Application Developers Guide is the best document to read first.
 
 ## Documentation
 
-- **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
-    - NCOS SDK Developers Guide
+- **NCOS SDK Developers Guide**
+    - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
 
 ## Files
 
