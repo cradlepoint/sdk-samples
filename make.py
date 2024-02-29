@@ -120,8 +120,8 @@ def put(value):
 
 
 # Cleans the SDK directory for a given app by removing files created during packaging.
-def clean(app=None):
-    app_name = app or g_app_name
+def clean():
+    app_name = g_app_name
     print("Cleaning {}".format(app_name))
     app_pack_name = app_name + ".tar.gz"
     try:
@@ -167,8 +167,8 @@ def scan_for_cr(path):
                     raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
 
 # Package the app files into a tar.gz archive.
-def package(app=None):
-    app_name = app or g_app_name
+def package():
+    app_name = g_app_name
     print("Packaging {}".format(app_name))
     success = True
     package_script_path = os.path.join('tools', 'bin', 'package_application.py')
@@ -231,8 +231,8 @@ def status():
     print(response)
 
 # Create new app from app_template using supplied app name
-def create(app=None):
-    app_name = app or g_app_name
+def create():
+    app_name = g_app_name
     if not app_name:
         print('Please include new app name.  Example: python make.py create my_new_app')
         return
@@ -259,9 +259,9 @@ def create(app=None):
         print(f'Error creating app: {e}')
 
 # Transfer the app tar.gz package to the NCOS device
-def install(app=None):
+def install():
     if is_NCOS_device_in_DEV_mode():
-        app_archive = (app or g_app_name) + ".tar.gz"
+        app_archive = g_app_name + ".tar.gz"
 
         # Use sshpass for Linux or OS X
         cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1} {2}@{3}:/app_upload'.format(
@@ -386,7 +386,7 @@ def get_app_uuid():
 
 
 # Setup all the globals based on the OS and the sdk_settings.ini file.
-def init():
+def init(app=None):
     global g_python_cmd
     global g_app_name
     global g_dev_client_ip
@@ -416,7 +416,9 @@ def init():
 
     # Initialize the globals based on the sdk_settings.ini contents.
     if sdk_key in config:
-        if app_key in config[sdk_key]:
+        if app is not None:
+            g_app_name = app
+        elif app_key in config[sdk_key]:
             g_app_name = config[sdk_key][app_key]
         else:
             success = False
@@ -465,7 +467,7 @@ if __name__ == "__main__":
 
     if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'install', 'start', 'stop', 'uninstall', 'purge']:
         # Load the settings from the sdk_settings.ini file.
-        if not init():
+        if not init(option):
             sys.exit(0)
 
     # TODO add option support for: clean, package, create, install
@@ -473,22 +475,22 @@ if __name__ == "__main__":
         if option == 'all':
             clean_all()
         else:
-            clean(option)
+            clean()
 
     elif utility_name in ['package', 'build']:
         if option == 'all':
             package_all()
         else:
-            package(option)
+            package()
 
     elif utility_name == 'create':
-        create(option)
+        create()
 
     elif utility_name == 'status':
         status()
 
     elif utility_name == 'install':
-        install(option)
+        install()
 
     elif utility_name == 'start':
         start()
