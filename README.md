@@ -6,12 +6,10 @@ This directory contains the NCOS SDK tools and sample applications.
 
 The Application Developers Guide is the best document to read first.
 
-## Documents
+## Documentation
 
-- **README.html**
-    - This README file.
-- **Cradlepoint NCOS SDK v3.1 Application Developers Guide.html**
-    - The main document that describes application development.
+- **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
+    - NCOS SDK Developers Guide
 
 ## Files
 
