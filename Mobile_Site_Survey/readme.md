@@ -19,7 +19,7 @@ External Requirements
 Application Purpose
 ===================
 This app is intended to perform drive testing of cellular networks but also works for testing stationary deployments.
-It will run automatic tests collecting location (GPS), interface diagnostics (including cellular signal)
+It will run automatic tests collecting location (GPS), interface diagnostics (including cellular signal), and speedtests (optional).
 
 The app is configurable through a webUI running on port 8000.  Use NCM Remote Connect to 127.0.0.1 port 8000 HTTP.
 Or locally, forward the Primary LAN Zone to the Router Zone with the Default Allow All policy.
