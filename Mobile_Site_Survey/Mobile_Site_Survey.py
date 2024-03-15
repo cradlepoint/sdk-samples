@@ -257,8 +257,7 @@ class Dispatcher:
                             pretty_lat = '{:.6f}'.format(float(self.lat))
                             pretty_lon = '{:.6f}'.format(float(self.long))
                             title = f' ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' \
-                                    f' ┣┅  {pretty_timestamp}   ⌖{pretty_lat}, {pretty_lon} \n' \
-                                    f' ┃\n'
+                                    f' ┣┅➤  {pretty_timestamp}   ⌖{pretty_lat}, {pretty_lon} \n'
                             self.results = title + self.results
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
@@ -487,8 +486,9 @@ def ping(host, iface):
 def run_tests(sim):
     """Main testing function - multithreaded by Dispatcher"""
     download, upload, latency = 0.0, 0.0, 0.0
-    bytes_sent, bytes_received, packet_loss_percent = 0, 0, 0
+    bytes_sent, bytes_received, total_mb_used, packet_loss_percent = 0, 0, 0, 0
     share = ''
+    server = None
     source_ip = None
     ookla = None
     logs = []
@@ -547,6 +547,9 @@ def run_tests(sim):
     if wan_type == 'mdm':
         diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
         carrier = diagnostics.get('CARRID')
+        homecarrier = diagnostics.get('HOMECARRID')
+        if homecarrier != carrier:
+            carrier = f'{carrier}/{homecarrier}'
         iccid = diagnostics.get('ICCID')
         product = diagnostics.get('PRD')
     elif wan_type == 'wwan':
@@ -612,18 +615,20 @@ def run_tests(sim):
             cp.log(f'Speedtest Complete on {product} {carrier}.')
 
             # Format results
-            if not download:
-                download = 0.0
-            download = round(ookla.results.download / 1000 / 1000, 2)
-            if not upload:
-                upload = 0.0
-            upload = round(ookla.results.upload / 1000 / 1000, 2)
-            latency = round(ookla.results.ping)
-            bytes_sent = ookla.results.bytes_sent or 0
-            bytes_received = ookla.results.bytes_received or 0
-            share = ookla.results.share()
+            try:
+                download = round(ookla.results.download / 1000 / 1000, 2)
+                upload = round(ookla.results.upload / 1000 / 1000, 2)
+                latency = round(ookla.results.ping)
+                bytes_sent = ookla.results.bytes_sent
+                bytes_received = ookla.results.bytes_received
+                server = ookla.results.server["host"]
+                share = ookla.results.share()
+            except Exception as e:
+                cp.logger.exception(f'Exception formatting Ookla results: {e}')
+
             debug_log(f'bytes_sent: {bytes_sent} bytes_received: {bytes_received}')
             dispatcher.total_bytes[sim] += bytes_sent + bytes_received
+            total_mb_used = round(dispatcher.total_bytes[sim] / 1000 / 1000, 2)
         except Exception as e:
             msg = f'Exception running Ookla speedtest for {product} {carrier}: {e}'
             log_all(msg, logs)
@@ -633,7 +638,7 @@ def run_tests(sim):
     post_success = ''
     if dispatcher.config["send_to_server"]:
         try:
-            post_success = '5g-ready:❌'
+            post_success = '⇪ 5g-ready:❌   '
             scell0 = diagnostics.get("BAND_SCELL0")
             scell1 = diagnostics.get("BAND_SCELL1")
             scell2 = diagnostics.get("BAND_SCELL2")
@@ -650,7 +655,7 @@ def run_tests(sim):
                 serdis = diagnostics.get('mode')
                 band = diagnostics.get('channel')
                 rssi = diagnostics.get('signal_strength')
-                pci = ''
+                pci, cur_plmn, lac, tac = None, None, None, None
             else:
                 cell_id = diagnostics.get('CELL_ID')
                 pci = diagnostics.get('PHY_CELL_ID')
@@ -718,7 +723,7 @@ def run_tests(sim):
                 try:
                     req = requests.post(url, headers=headers, json=payload)
                     if req.status_code < 300:
-                        post_success = '5g-ready:✓️'
+                        post_success = '⇪ 5g-ready:✓️   '
                         break
                 except Exception as e:
                     cp.log(f'Exception in POST: {e}')
@@ -765,8 +770,10 @@ def run_tests(sim):
         logs.append(f'{logstamp} Results: {text}')
         cp.log(f'Results: {text}')
         # cp.put('config/system/desc', text[:1000])
-        pretty_results = f' ┣┅┅┅   ☏{carrier}  ⏱{latency}ms   ⇄ {packet_loss_percent}% loss ({tx-rx} of {tx}) {post_success}\n' \
-                         f' ┗┅┅┅   ↓{download}Mbps ↑{upload}Mbps  ⛗{round(dispatcher.total_bytes[sim] / 1000 / 1000)}MB used.'
+        pretty_results = f' ┣┅┅┅  ☏{carrier} {cur_plmn}  ⇄ {packet_loss_percent}% loss ({tx-rx} of {tx})\n' \
+                         f' ┣┅┅┅  ↓{download}Mbps  ↑{upload}Mbps  ⏱{latency}ms\n' \
+                         f' ┣┅┅┅  ⛁ {server}\n' \
+                         f' ┗┅┅┅  {post_success}⛗{total_mb_used}MB used.'
         log_all(pretty_results, logs)
     except Exception as e:
         msg = f'Exception formatting results: {e}'
