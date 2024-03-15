@@ -1,11 +1,11 @@
 Application Name
 ================
-SNCF_MSS
+Mobile Site Survey
 
 
 Application Version
 ===================
-2.5.3
+2.5.8
 
 
 External Requirements
@@ -16,7 +16,7 @@ External Requirements
 
 Application Purpose
 ===================
-This app is intended to perform rail testing of cellular networks but also works for testing stationary deployments.
+This app is intended to perform drive testing of cellular networks but also works for testing stationary deployments.
 It will run automatic tests collecting location (GPS), interface diagnostics (including cellular signal)
 
 The app is configurable through a webUI running on port 8000.  Use NCM Remote Connect to 127.0.0.1 port 8000 HTTP.
@@ -28,14 +28,18 @@ Or locally, forward the Primary LAN Zone to the Router Zone with the Default All
 
 Survey Options:
 
-* Enable Speedtests - Include Ookla TCP upload and download tests
-* Speedtest Timer - Time between speedtests (in seconds)
+* Run Distance based tests - The app will run tests when the router has moved the distance defined
+* Distance Between Tests (meters) - Set the distance for automatic testing
 
-* Enable Metrics - Gather cellular metrics
-* Metrics Timer - Time between metrics (in seconds)
+* Run Time based tests - The app will run tests at the time interval defined
+* Time Between Tests (seconds) - Set the time interval for automatic testing
 
+Both distance and timed tests can be enabled.
 Note: New tests cannot start until all current interface tests complete.
 
+* Test Ethernet and Wifi-as-WAN - Disabled only tests cellular modems
+* Run Speedtests - Include Ookla TCP upload and download tests (if disabled, app will ping 8.8.8.8 to measure latency)
+* Monitor Packet Loss Between Tests - Continuously ping 8.8.8.8 and track tx/rx, packet loss
 * Write to .csv - Write test results to .csv file on router flash (Accessible via FTP server)
 * Debug Logs - Additional debugging logs for application troubleshooting.
 
@@ -67,3 +71,6 @@ Changelog:
 Added "version" to CSV filename, logs, and send-to-server payload.
 Added fields "cur_plmn", "tac", and "lac" to CSV and send-to-server payload.
 Added 5g-ready status indicator to results.
+
+2.5.8:
+Added MVNO support to carrier field to show HOMECARRID if different than CARRID
