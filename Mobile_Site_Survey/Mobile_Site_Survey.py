@@ -259,8 +259,12 @@ class Dispatcher:
                             title = f' ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' \
                                     f' ┣┅➤  {pretty_timestamp}   ⌖{pretty_lat}, {pretty_lon} \n'
                             self.results = title + self.results
+
+                            # Reset routing policies and tables
+                            # Should this be omitted to avoid constant route recreation?
                             cp.put('config/routing/policies', routing_policies)
                             cp.put('config/routing/tables', routing_tables)
+
                         cp.log('---> Survey Complete <---')
                         self.timestamp = None
                         self.manual = False
@@ -429,7 +433,6 @@ def dec(deg, min, sec):
         dec = deg + (min / 60) + (sec / 3600)
     return round(dec, 6)
 
-
 def debug_log(msg):
     """Write log when in debug mode"""
     if dispatcher.config["debug"]:
@@ -481,7 +484,6 @@ def ping(host, iface):
         return pingstats
     except Exception as e:
         cp.log(f'Exception in PING: {e}')
-
 
 def run_tests(sim):
     """Main testing function - multithreaded by Dispatcher"""
@@ -586,7 +588,6 @@ def run_tests(sim):
     except Exception as e:
         cp.log(f'Exception calculating packet loss: {e}')
         tx, rx, packet_loss_percent = 0, 0, 0
-
 
     if dispatcher.config["speedtests"]:
         # Ookla Speedtest
@@ -820,8 +821,6 @@ def run_tests(sim):
         except Exception as e:
             msg = f'Unable to write to {filename}. {e}'
             log_all(msg, logs)
-
-
 
 def manual_test(path, value, *args):
     if not value:
