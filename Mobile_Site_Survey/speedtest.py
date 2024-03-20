@@ -1007,8 +1007,7 @@ class SpeedtestResults(object):
         ]
 
         headers = {'Referer': 'http://c.speedtest.net/flash/speedtest.swf'}
-        from settings import settings
-        request = build_request(f'://{settings["speedtest_url"]}',
+        request = build_request('://www.speedtest.net/api/api.php',
                                 data='&'.join(api_data).encode(),
                                 headers=headers, secure=self._secure)
         f, e = catch_request(request, opener=self._opener)
