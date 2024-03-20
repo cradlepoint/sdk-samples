@@ -1,4 +1,4 @@
-![image](https://github.com/cradlepoint/sdk-samples/assets/7169690/6cd0e6c2-79f8-404d-9862-dc7fa3959904)
+![image](https://github.com/cradlepoint/sdk-samples/assets/7169690/656231d7-7b60-4670-8bd3-c7b66ae0955e)
 
 Application Name
 ================
