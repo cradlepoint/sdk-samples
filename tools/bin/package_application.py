@@ -19,7 +19,7 @@ CONFIG_FILE = 'package.ini'
 SIGNATURE_FILE = 'SIGNATURE.DS'
 MANIFEST_FILE = 'MANIFEST.json'
 
-BYTE_CODE_FILES = re.compile('^.*\.(pyc|pyo|pyd)$')
+BYTE_CODE_FILES =  re.compile(r'^.*/.(pyc|pyo|pyd)$')
 BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
 
 
