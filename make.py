@@ -222,8 +222,7 @@ def status():
     print(response)
 
 # Create new app from app_template using supplied app name
-def create():
-    app_name = g_app_name
+def create(app_name):
     if not app_name:
         print('Please include new app name.  Example: python make.py create my_new_app')
         return
@@ -474,7 +473,7 @@ if __name__ == "__main__":
             package()
 
     elif utility_name == 'create':
-        create()
+        create(option)
 
     elif utility_name == 'status':
         status()
