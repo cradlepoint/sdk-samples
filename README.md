@@ -11,6 +11,11 @@ The Application Developers Guide is the best document to read first.
 - **NCOS SDK Developers Guide**
     - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
 
+## Built Apps
+
+- **Pre-built Ready-to-Use Sample Applications can be downloaded here:**
+    - **https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps**
+
 ## Files
 
 - **make.py**
