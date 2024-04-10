@@ -5,7 +5,7 @@ send_to_server
 
 Application Version
 ===================
-2.0
+2.1
 
 
 NCOS Devices Supported
@@ -20,12 +20,6 @@ This application uses test server http://httpbin.org/post.
 
 Application Purpose
 ===================
-Demonstrates send a post request to a server with some device information
-using python library urllib which is included in NCOS.
-
-
-Expected Output
-===============
-Data should be sent to test server http://httpbin.org/post. It also logs
-the time it took to gather and send the data.
-
+App uses SDK Appdata to store settings for Server URL, Interval, and Payload.
+Payload keys are field names and values are the NCOS path to get the data.
+Data is collected and posted to server url every interval seconds.
