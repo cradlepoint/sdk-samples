@@ -59,5 +59,5 @@ while True:
         if last_test_dates[testing_hour] != datetime.now().today():
             if testing_hour == datetime.now().today().hour:
                 run_speedtest()
-                last_test_dates[testing_hour] = int(datetime.now().today())
+                last_test_dates[testing_hour] = int(datetime.now().today().hour)
     time.sleep(60)
