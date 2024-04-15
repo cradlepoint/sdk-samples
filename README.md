@@ -43,16 +43,16 @@ The Application Developers Guide is the best document to read first.
     - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
 - **app_template_csclient**
     - A template for the creation of a new application utilizing the csclient library.
-- **cp_shell**
-    - Web interface for running linux shell commands.
 - **cli_sample**
     - Includes csterm module that enables access to local CLI to send commands and return output.
-- **ipverify_custom_action**
-    - Create a custom action in a function to be called when an IPverify test status changes.
-- **dynamic_app**
-    - Downloads apps from a self hosted url and install into app_holder app. Overcome limitates with dev_mode and app size limits.
+- **cp_shell**
+    - Web interface for running linux shell commands.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
+- **dynamic_app**
+    - Downloads apps from a self hosted url and install into app_holder app. Overcome limitates with dev_mode and app size limits.
+- **daily_speedtest**
+    - Runs an ookla speedtest daily at configured hours and put results to user defined field (asset_id).
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
@@ -71,6 +71,8 @@ The Application Developers Guide is the best document to read first.
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
+- **ipverify_custom_action**
+    - Create a custom action in a function to be called when an IPverify test status changes.
 - **logfile**
     - Writes router logs to flash available for download via HTTP/LAN Manager.
 - **mosquitto**
