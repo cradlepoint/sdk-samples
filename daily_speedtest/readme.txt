@@ -30,5 +30,5 @@ Testing hours and results field are configurable in SDK Appdata.  Default hours 
 
 Expected Output
 ===============
-Speedtest results in alert
+Speedtest results in asset_id.
 
