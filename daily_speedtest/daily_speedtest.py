@@ -34,7 +34,7 @@ def run_speedtest():
     down = '{:.2f}'.format(speedtest.results.download / 1000 / 1000)
     up = '{:.2f}'.format(speedtest.results.upload / 1000 / 1000)
     latency = int(speedtest.results.ping)
-    results_text = f'{down}Mbps Down / {up}Mbps Up/ {latency}ms'
+    results_text = f'{down}Mbps Down / {up}Mbps Up / {latency}ms'
     cp.log(results_text)
     cp.put(results_field, results_text)
     # Optional Alert
