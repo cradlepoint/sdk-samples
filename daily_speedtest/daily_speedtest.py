@@ -54,8 +54,9 @@ while True:
     config = get_appdata('daily_speedtest')
     testing_hours = config['testing_hours']
     results_field = config['results_field']
-    last_test_dates = {hour: None for hour in testing_hours if not last_test_dates.get(hour)}
     for testing_hour in testing_hours:
+        if not last_test_dates.get(testing_hour):
+            last_test_dates[testing_hour] = None
         if last_test_dates[testing_hour] != datetime.now().today():
             if testing_hour == datetime.now().today().hour:
                 run_speedtest()
