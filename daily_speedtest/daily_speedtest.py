@@ -27,7 +27,7 @@ def run_speedtest():
     cp.log(f'Daily speedtest hours: {testing_hours} -- Running now...')
     wan = cp.get('status/wan/primary_device')
     wan_ip = cp.get(f'status/wan/devices/{wan}/status/ipinfo/ip_address')
-    speedtest = Speedtest(source_address=wan_ip)
+    speedtest = Speedtest()
     speedtest.get_best_server()
     speedtest.download()
     speedtest.upload(pre_allocate=False)
@@ -57,8 +57,8 @@ while True:
     for testing_hour in testing_hours:
         if not last_test_dates.get(testing_hour):
             last_test_dates[testing_hour] = None
-        if last_test_dates[testing_hour] != datetime.now().today():
+        if last_test_dates[testing_hour] != datetime.today().date():
             if testing_hour == datetime.now().today().hour:
                 run_speedtest()
-                last_test_dates[testing_hour] = datetime.now().today()
+                last_test_dates[testing_hour] = datetime.today().date()
     time.sleep(60)
