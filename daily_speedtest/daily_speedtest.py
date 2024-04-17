@@ -27,7 +27,7 @@ def run_speedtest():
     cp.log(f'Daily speedtest hours: {testing_hours} -- Running now...')
     wan = cp.get('status/wan/primary_device')
     wan_ip = cp.get(f'status/wan/devices/{wan}/status/ipinfo/ip_address')
-    speedtest = Speedtest()
+    speedtest = Speedtest(source_address=wan_ip)
     speedtest.get_best_server()
     speedtest.download()
     speedtest.upload(pre_allocate=False)
