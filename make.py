@@ -236,7 +236,7 @@ def create(app_name):
         os.rename(f'{app_name}/app_template.py', f'{app_name}/{app_name}.py')
 
         # Replace app_template with new app name in all files
-        files = [f'{app_name}.py', 'package.ini', 'readme.txt', 'start.sh']
+        files = [f'{app_name}.py', 'package.ini', 'readme.md', 'start.sh']
         for file in files:
             path = f'{app_name}/{file}'
             with open(path, 'r') as in_file:
