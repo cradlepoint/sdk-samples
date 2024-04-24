@@ -109,6 +109,8 @@ The Application Developers Guide is the best document to read first.
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **system_monitor**
     - Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
+- **tailscale**
+    - A 3rd party mesh VPN called  [Tailscale](https://tailscale.com) that makes it easy to connect your devices, wherever they are. This application provides a way to proxy traffic from the LAN to the Tailscale network. See the README.md for more information.
 - **tornado_sample**
 	- A webserver using Tornado with NCM-themed example to set WiFi SSIDs.
 - **throttle_cellular_datacap**
