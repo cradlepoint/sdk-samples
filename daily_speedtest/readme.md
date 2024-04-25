@@ -1,6 +1,6 @@
 daily_speedtest  
 ===============
-[**Download Built App**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.tar.gz)
+**Download Built App:** [**daily_speedtest.tar.gz**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.tar.gz)
 
 This SDK Application runs Ookla speedtests at configurable times (on the hour) each day.  
 
