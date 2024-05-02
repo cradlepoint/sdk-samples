@@ -5,7 +5,7 @@ ipverify_custom_action
 
 Application Version
 ===================
-1.0
+1.1
 
 
 NCOS Devices Supported
