@@ -19,6 +19,9 @@ The app puts the results in the **asset_id** field which is visible in the NCM d
 
 You can change the path (field) that the results go into in the same SDK Data entry.  
 
+**Example NCM Devices Grid:**
+
+![image](https://github.com/cradlepoint/sdk-samples/assets/7169690/83f39f97-6941-4e3f-adfb-ad888fd77030)
 
 **Example log output:**
 
