@@ -89,6 +89,8 @@ The Application Developers Guide is the best document to read first.
     - Contains ping function and example usage.
 - **ports_status**
     - Sets the device description to visually show the LAN/WAN/WWAN/Modem/IP Verify status.
+- **power_alert**
+    - Sends alerts when external power is lost and restored.
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
 - **rproxy**
