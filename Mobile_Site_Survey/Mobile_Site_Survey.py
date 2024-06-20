@@ -739,7 +739,7 @@ def run_tests(sim):
     try:
         row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
                carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
-        if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
+        if wan_type in ['wwan', 'ethernet'] or (wan_type == 'mdm' and dispatcher.config["full_diagnostics"]):
             row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
         elif wan_type == 'mdm' and not dispatcher.config["full_diagnostics"]:
             cell_id = diagnostics.get('CELL_ID')
