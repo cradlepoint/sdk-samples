@@ -36,7 +36,7 @@ download() {
     cmd="cppython ./download.py $tsarch"
     tsversion="$(cppython ./get_tskey.py tsversion)"
     if [ -n "$tsversion" ]; then
-        cmd+=" -v $tsversion"
+        cmd="$cmd -v $tsversion"
     fi
     eval $cmd | logerr
     if [ $? -ne 0 ]; then
