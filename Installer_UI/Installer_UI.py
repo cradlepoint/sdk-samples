@@ -68,6 +68,20 @@ class SpeedtestHandler(tornado.web.RequestHandler):
                 'result': 'Incorrect Password!'
             }))
 
+class SignalHandler(tornado.web.RequestHandler):
+    """Handles signal/ endpoint requests."""
+    def get(self):
+        """Return signal quality levels JSON to UI."""
+        try:
+            rssi, sinr, rsrp, rsrq = get_signal_quality()
+            self.render("signal.html", rssi=rssi, sinr=sinr, rsrp=rsrp, rsrq=rsrq)
+        except Exception as e:
+            cp.logger.exception(e)
+            self.write(json.dumps({
+                'success': False,
+                'result': 'Error getting signal quality'
+            }))
+
 def run_speedtest():
     try:
         cp.log('Starting Speedtest...')
@@ -95,7 +109,7 @@ def run_speedtest():
         cp.logger.exception(e)
 
 def get_ssid():
-    return cp.get('config/wlan/radio/0/bss/0/ssid')
+    return cp.get('config/wlan/radio/1/bss/0/ssid')
 
 def get_config(name):
     appdata = cp.get('config/system/sdk/appdata')
@@ -117,6 +131,20 @@ def open_firewall():
     cp.post('config/security/zfw/forwardings', app_fwd)
     cp.log('Forwarded Primary LAN Zone to Router Zone with Default Allow All policy')
 
+def get_signal_quality():
+    # This is a placeholder function. Replace with actual implementation
+    # to get signal quality from your system.
+    dev = cp.get('status/wan/primary_device')
+    if dev.startswith('mdm-'):
+        diagnostics = cp.get(f'status/wan/devices/{dev}/diagnostics')
+        rssi = diagnostics.get('DBM')
+        sinr = diagnostics.get('SINR')
+        rsrp = diagnostics.get('RSRP')
+        rsrq = diagnostics.get('RSRQ')
+        return rssi, sinr, rsrp, rsrq
+    else:
+        return None, None, None, None
+    
 if __name__ == '__main__':
     cp = EventingCSClient('Installer_UI')
     cp.log('Starting... edit Installer Password under System > SDK Data.')
@@ -125,8 +153,9 @@ if __name__ == '__main__':
     application = tornado.web.Application([
         (r"/save", SaveHandler),
         (r"/speedtest", SpeedtestHandler),
+        (r"/signal", SignalHandler),  # Add this line
         (r"/", MainHandler),
         (r"/(.*)", tornado.web.StaticFileHandler, {"path": "./"})
     ])
-    application.listen(8000)
+    application.listen(8080)
     tornado.ioloop.IOLoop.instance().start()
