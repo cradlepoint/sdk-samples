@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cradlepoint Installer</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="3">
+  <link rel="stylesheet" href="w3.css">
+  <link rel="stylesheet" href="w3-theme-blue-grey.css">
+  <script src="sweetalert2.all.js"></script>
+</head>
+<body class="w3-content" style="max-width:1300px; background-color: #3b4146">
+  <div class="w3-half w3-theme-d3 w3-container" style="height:700px">
+    <div class="w3-padding-32 w3-theme-l3 w3-padding-large">
+      <img src="cp-logo.svg" alt="Logo" style="padding-bottom: 16px" >
+      <form class="w3-container w3-card w3-theme-l4 w3-padding-32" id="main_form" action="/save" method="post">
+        <fieldset>
+        <legend><h3>Cellular Signal Monitor</h3></legend>
+          RSSI: {{rssi}}</br>
+          SINR: {{sinr}}</br>
+          RSRP: {{rsrp}}</br>
+          RSRQ: {{rsrq}}</br>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
