@@ -157,5 +157,5 @@ if __name__ == '__main__':
         (r"/", MainHandler),
         (r"/(.*)", tornado.web.StaticFileHandler, {"path": "./"})
     ])
-    application.listen(8080)
+    application.listen(8000)
     tornado.ioloop.IOLoop.instance().start()
