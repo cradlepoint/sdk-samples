@@ -1,0 +1,31 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2023-04-11T11:15:01.448246",
+        "files": {
+            "5GSPEED_DETAILED_ASSET.py": "25810756c820c1dac38685d41b6c71cd81b89b3551575109449447594f3b1d1d",
+            "README.md": "5813f2c137692d03895573190561e477c385dbe8a9ad0f01f2010966573299b8",
+            "_csv.py": "b778711ec11f2d4e9395436fc369710cdacc49fdbfa762e66443a6e24d542bd1",
+            "csclient.py": "0c6a55c889daf7df554ab1d22e3290cbb45540a081a62b485036d98ef01e681b",
+            "csv.py": "0f46b397bda6998a4b7083478f22cd02bd6454a3dd1219a5874562eb3784244d",
+            "package.ini": "54f211020f9081ef1069ea30ce1280701678c9208f7a36cca701171c350a7698",
+            "speedtest.py": "c9e65ec60ebc450e29a25cee0dfa558c2007922194318cbdb1c9291cffc59cfc",
+            "start.sh": "a2c8596fbf31ac181633d57e0da44a49dc2280b16e5d5010888a962d7e611a0e",
+            "timeit.py": "d0884d28561a0dafce6492e8f526ad53b0ad49f38e9f124573c749a4941447f4"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "5GSPEED_DETAILED_ASSET",
+        "notes": "Ookla speedtest from a Cradlepoint Endpoint. To run, make asset id blank",
+        "reboot": true,
+        "restart": true,
+        "uuid": "a8ac42ec-352d-4320-871c-a81f42b2372f",
+        "vendor": "Cradlepoint",
+        "version_major": 0,
+        "version_minor": 2
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0
+    }
+}
