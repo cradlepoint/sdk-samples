@@ -93,6 +93,8 @@ The Application Developers Guide is the best document to read first.
     - Sends alerts when external power is lost and restored.
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
+- **rate_limit**
+    - Enable QoS rule 1 until datacap alert is met then toggle to rule 2.
 - **rproxy**
     - A reverse proxy similar to port forwarding, except traffic forwarded to a
     udp/tcp target will be sourced from the router's IP. This reverse proxy can
