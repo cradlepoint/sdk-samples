@@ -1,5 +1,6 @@
 rate_limit
 ================
+[**Download Built App**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/rate_limit.tar.gz)
 
 Application Version
 ===================
