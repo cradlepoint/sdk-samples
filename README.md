@@ -71,6 +71,8 @@ The Application Developers Guide is the best document to read first.
     - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
+- **iperf3**
+    - Downloads and runs iPerf3 to a user defined server and puts results in asset_id.  Clear the asset_id to run a new test.
 - **ipverify_custom_action**
     - Create a custom action in a function to be called when an IPverify test status changes.
 - **logfile**
