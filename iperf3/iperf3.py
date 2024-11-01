@@ -79,8 +79,8 @@ def main(path, value, *args):
 
 def download_iperf3():
     try:
-        # Use the first argument as the URL if provided, otherwise use the default URL
-        url = sys.argv[1] if len(sys.argv) > 1 else "https://github.com/userdocs/iperf3-static/releases/download/3.17.1%2B/iperf3-arm64v8"
+        # iperf3 binary URL
+        url = "https://github.com/userdocs/iperf3-static/releases/download/3.17.1%2B/iperf3-arm64v8"
 
         # If file doesn't exist, download it
         filename = url.split("/")[-1]
