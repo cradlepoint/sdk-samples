@@ -4,7 +4,7 @@
 The iPerf3 application is designed to test network performance by measuring the bandwidth between your device and a specified server. This application automates the process of downloading the iPerf3 tool, configuring the server, and running tests. Results are logged, alerted, and stored in the asset identifier for easy access.
 
 ## Initial Setup
-1. **Download iPerf3**: When the application is first executed, it will automatically download the iPerf3 tool if it is not already present on your device.
+1. **Download iPerf3**: When the application is first executed, it will automatically download the iPerf3 tool if it is not already present on your device.  iPerf3 binary download URL: https://github.com/userdocs/iperf3-static/releases/download/3.17.1%2B/iperf3-arm64v8
 2. **Configure Server**: The application will create an entry in the SDK Appdata named `iperf3_server`. You need to enter the server hostname or IP address in this entry to specify where the tests should be directed.
 
 ## Running the Application
