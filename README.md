@@ -45,6 +45,8 @@ The Application Developers Guide is the best document to read first.
     - A template for the creation of a new application utilizing the csclient library.
 - **cli_sample**
     - Includes csterm module that enables access to local CLI to send commands and return output.
+- **client_rssi_monitor**
+    - Gets the mac address and rssi of connected wlan clients and puts them in the asset_id field.
 - **cp_shell**
     - Web interface for running linux shell commands.
 - **cpu_usage**
