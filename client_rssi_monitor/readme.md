@@ -1,7 +1,6 @@
-Application Name
-================
 client_rssi_monitor
-
+================  
+[Download Built App Here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_rssi_monitor.tar.gz)
 
 Application Version
 ===================
