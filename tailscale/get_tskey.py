@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     cs = AppDataCSClient('certificate_data', encrypt_cert_name='ecc')
 
-    if command in ["tskey", "tsversion", "tstags"]:
+    if command in ["tskey", "tsversion", "tstags", "tsserver"]:
         try:
             value = cs.get_appdata(command)
             if value:
