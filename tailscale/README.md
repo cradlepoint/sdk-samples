@@ -35,6 +35,7 @@ For example:
 | ---- | ----- | ----- |
 | tsroutes | 172.16.0.0/12 | Manually add a tailscale routes, comma separated
 | tsversion | 1.60.1 | Use this version of tailscale explicitly
+| tsserver | https://headscale.example.com | Enable use of self-hosted login server such as [Headscale](https://headscale.net/)
 
 ## Overlapping subnets
 You can use tailscales 4via6 feature if you would like to get to devices behind a Cradlepoint routers that might share the same subnet.  First come up with a site id you would like to use (0-65535). Then from a computer with tailscale installed execute: `tailscale debug via [site-id] [subnet]`. For example: `tailscale debug via 1 172.16.0.0/12` should generate a 4via6 subnet of `fd7a:115c:a1e0:b1a:0:1:ac10:0/108`. Add this as a tsroute above and you can access the network via ipv6 or by the domain name following the format `Q-R-S-T-via-X` where Q-R-S-T is the ipv4 address and X is the site id, e.g.: `172-16-0-1-via-1`.
