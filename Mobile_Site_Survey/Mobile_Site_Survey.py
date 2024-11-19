@@ -537,7 +537,8 @@ def run_tests(modem):
                     cp.log(f'Ookla failed to start for source {source_ip} on {modem}.  Trying again...')
                     time.sleep(1)
             else:
-                log_all(f'Ookla startup exceeded retries for source {source_ip} on {modem}', logs)
+                log_all(f'Ookla is not accepting connections at the time.  Please try again later.  Device: {modem}', logs)
+                return
         except Exception as e:
             msg = f'Exception in Ookla startup: {e}'
             log_all(msg, logs)
