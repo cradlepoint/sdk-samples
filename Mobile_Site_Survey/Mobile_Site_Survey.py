@@ -565,6 +565,7 @@ def run_tests(modem):
         carrier = source_ip
         iccid = modem
         product = modem
+        cur_plmn = None
 
     # Latency test:
     pong = ping('8.8.8.8', iface)
