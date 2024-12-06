@@ -16,10 +16,8 @@ for line in iter(tail.stdout.readline, ''):
         if 'speed USB' in line:
             msg = f'USB Connected: {line.split("USB")[1].strip()}'
             cp.alert(msg)
-            cp.log(msg.replace('USB', 'U5B'))
         if 'USB disconnect' in line:
             msg = line.split(":")[2].strip().replace("disconnect", "Disconnected")
             cp.alert(msg)
-            cp.log(msg.replace('USB', 'U5B'))
     except:
         pass
