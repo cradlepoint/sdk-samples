@@ -2,7 +2,7 @@
 set -o pipefail
 set -o errexit
 
-logger -s -t tailscale -p 6 "tailscale istarting up..."
+logger -s -t tailscale -p 6 "tailscale is starting up..."
 
 logerr() {
     if [ "$#" -gt 0 ]; then
@@ -19,6 +19,10 @@ check_tskey() {
 
 get_tsroutes() {
     tsroutes="$(cppython ./get_tskey.py tsroutes)"
+}
+
+get_tsserver() {
+    tsserver="$(cppython ./get_tskey.py tsserver)"
 }
 
 get_tsarch() {
@@ -49,10 +53,12 @@ tskey=""
 tskey_ec=0
 tsroutes=""
 tsarch="arm64"
+tsserver=""
 
 check_tskey
 get_tsroutes
 get_tsarch
+get_tsserver
 download
 
 tsdbinary="tailscaled_$tsarch"
@@ -77,6 +83,8 @@ check_tskey_change() {
     check_tskey
     prev_tsroutes=$tsroutes
     get_tsroutes
+    prev_tsserver=$tsserver
+    get_tsserver
 
     if [ $tskey_ec -ne 0 ] || [ -z "$tskey" ]; then
         logerr "Couldn't get tskey. Exiting..."
@@ -92,13 +100,18 @@ check_tskey_change() {
         logerr "tsroutes has changed. Exiting..."
         exit_safely
     fi
+
+    if [ "$tsserver" != "$prev_tsserver" ]; then
+        logerr "tsserver has changed. Exiting..."
+        exit_safely
+    fi
 }
 
 trap exit_safely SIGINT SIGTERM EXIT
 
 HOME=$(pwd) ./${tsdbinary} --socket=./tailscaled.sock --tun=userspace-networking --socks5-server=localhost:1055 2>&1 | logerr &
 sleep 2
-HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --auth-key="$tskey" --advertise-routes="$tsroutes" 2>&1 | logerr
+HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --auth-key="$tskey" --login-server="$tsserver" --advertise-routes="$tsroutes" 2>&1 | logerr
 
 tsretcode=$?
 if [ $tsretcode -ne 0 ]; then
