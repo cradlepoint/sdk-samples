@@ -1,7 +1,7 @@
-# DR_NMEA Application Documentation
+# dead_reckoning Application Documentation
 
 ## Overview
-The DR_NMEA application is engineered to improve GPS data accuracy by using dead reckoning techniques. It processes and refines NMEA sentences to deliver reliable latitude and longitude readings, even in environments with weak or absent GPS signals.
+The dead_reckoning application is engineered to improve GPS data accuracy by using dead reckoning techniques. It processes and refines NMEA sentences to deliver reliable latitude and longitude readings, even in environments with weak or absent GPS signals.
 
 ## Key Features
 
@@ -23,13 +23,13 @@ The DR_NMEA application is engineered to improve GPS data accuracy by using dead
 
 ### 6. Configuration Management
 - **Settings:** Automatically loads and stores configuration details such as the listening port and server parameters.
-- **Location:** Configuration data is saved under **System > SDK Appdata** in an entry labeled `"DR_NMEA"`, which can be manually edited if necessary.
+- **Location:** Configuration data is saved under **System > SDK Appdata** in an entry labeled `"dead_reckoning"`, which can be manually edited if necessary.
 
 ### 7. Debugging
 - **Logging:** Provides debugging functionality to log messages when debugging mode is enabled.
 
 ## Deployment Instructions
-To deploy the DR_NMEA application using NetCloud Manager, complete the following steps:
+To deploy the dead_reckoning application using NetCloud Manager, complete the following steps:
 
 1. **Login to NetCloud Manager:**
    - Sign in to your NetCloud Manager account.
@@ -37,17 +37,17 @@ To deploy the DR_NMEA application using NetCloud Manager, complete the following
 2. **Upload the SDK App:**
    - Navigate to the **Tools** page.
    - Click **Add** to upload an SDK app.
-   - Select the `.tar.gz` file for the DR_NMEA application.
+   - Select the `.tar.gz` file for the dead_reckoning application.
 
 3. **Manage Install Locations:**
-   - After uploading, choose the DR_NMEA app.
+   - After uploading, choose the dead_reckoning app.
    - Click **Manage Install Locations**.
    - Select the version and click the **+** sign next to any groups to which you want to deploy the application.
 
 4. **SDK Appdata Group-Level Editing:**
-   - If you are editing SDK Appdata at the group level, it is advised to create an entry in SDK Appdata named `"DR_NMEA"` at the group level *before* deploying the app to devices. This ensures that the app does not write default settings to the device configuration, which would override the group settings.
-   - **Example value for "DR_NMEA" in SDK Appdata:**  
+   - If you are editing SDK Appdata at the group level, it is advised to create an entry in SDK Appdata named `"dead_reckoning"` at the group level *before* deploying the app to devices. This ensures that the app does not write default settings to the device configuration, which would override the group settings.
+   - **Example value for "dead_reckoning" in SDK Appdata:**  
      `{"listen_port": 10000, "servers": [{"hostname": "server.example.com", "port": 5005, "protocol": "tcp"}], "add_sentences": [], "debug": false}`
 
 ## Usage
-The DR_NMEA application is ideal for situations where precise GPS data is essential. It offers a robust solution for correcting and transmitting GPS data, ensuring accuracy even in challenging signal conditions.
+The dead_reckoning application is ideal for situations where precise GPS data is essential. It offers a robust solution for correcting and transmitting GPS data, ensuring accuracy even in challenging signal conditions.
