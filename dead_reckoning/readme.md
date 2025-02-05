@@ -1,4 +1,4 @@
-# dead_reckoning Application Documentation
+# dead_reckoning  
 
 ## Overview
 The dead_reckoning application is engineered to improve GPS data accuracy by using dead reckoning techniques. It processes and refines NMEA sentences to deliver reliable latitude and longitude readings, even in environments with weak or absent GPS signals.
