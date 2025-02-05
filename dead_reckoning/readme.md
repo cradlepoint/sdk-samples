@@ -13,7 +13,7 @@ The DR_NMEA application is engineered to improve GPS data accuracy by using dead
 - **Adjustments:** Updates the position mode and quality values in `$GPRMC` and `$GPGGA` sentences based on the extracted data.
 
 ### 3. Additional Sentence Generation
-- **Supplementary Data:** Can add additional NMEA sentences (such as `$GNGSA`, `$GPGSV`, `$GLGSV`, and an additional `$GPGSA`) that are not shown in the user interface. (Optional)
+- **Supplementary Data:** Can add additional NMEA sentences (such as `"$GNGSA"`, `"$GPGSV"`, `"$GLGSV"`, and `"$GPGSA"`) that are not shown in the user interface. (Optional)
 
 ### 4. Data Transmission
 - **Communication:** Sends both corrected and additional NMEA sentences to designated servers using TCP, UDP, or serial communication methods.
