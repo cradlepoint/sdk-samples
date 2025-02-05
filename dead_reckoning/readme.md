@@ -42,8 +42,7 @@ To deploy the DR_NMEA application using NetCloud Manager, complete the following
 3. **Manage Install Locations:**
    - After uploading, choose the DR_NMEA app.
    - Click **Manage Install Locations**.
-   - Select the version you wish to deploy.
-   - Click the **+** sign next to any groups to which you want to deploy the application.
+   - Select the version and click the **+** sign next to any groups to which you want to deploy the application.
 
 4. **SDK Appdata Group-Level Editing:**
    - If you are editing SDK Appdata at the group level, it is advised to create an entry in SDK Appdata named `"DR_NMEA"` at the group level *before* deploying the app to devices. This ensures that the app does not write default settings to the device configuration, which would override the group settings.
