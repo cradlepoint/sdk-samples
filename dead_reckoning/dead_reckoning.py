@@ -113,8 +113,6 @@ def fix_NMEA(data, DR_LAT, DR_LON):
     debug_log(f'After Fix: {message}')
     return fixtimeprecision(message.serialize().decode())
 
-
-# From FTS App
 def fixtimeprecision(nmea):
     """Fix the time precision of GGA/RMC messages.
 
@@ -123,14 +121,10 @@ def fixtimeprecision(nmea):
     prefix, timestamp, rest = nmea.split(',', 2)
     return nmeafixchecksum(','.join([prefix, timestamp[:9], rest]))
 
-
-# From FTS App
 def nmeafixchecksum(nmea):
     nmea = nmea[:-2] + ('%02X' % nmeachecksum(nmea))
     return nmea
 
-
-# From FTS App
 def nmeachecksum(payload):
     # assert payload[0] == '$' and payload[-3] == '*'
     cksum = 0
