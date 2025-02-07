@@ -43,6 +43,8 @@ The Application Developers Guide is the best document to read first.
     - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
 - **app_template_csclient**
     - A template for the creation of a new application utilizing the csclient library.
+- **certificate_sample**
+    - A function to extract certificates to PEM files for use in other applications.
 - **cli_sample**
     - Includes csterm module that enables access to local CLI to send commands and return output.
 - **client_rssi_monitor**
