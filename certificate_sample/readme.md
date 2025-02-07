@@ -6,17 +6,6 @@ Application Version
 ===================
 1.0.0
 
-
-NCOS Devices Supported
-======================
-ALL
-
-
-External Requirements
-=====================
-None
-
-
 Application Purpose
 ===================
 A function to extract certificates to PEM files for use in other applications.  
