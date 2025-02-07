@@ -114,10 +114,7 @@ def fix_NMEA(data, DR_LAT, DR_LON):
     return fixtimeprecision(message.serialize().decode())
 
 def fixtimeprecision(nmea):
-    """Fix the time precision of GGA/RMC messages.
-
-    NCOS reports timestamps with 3 digits after decimal point, but the FDNY MDT expects LAT to start at a certain position, so it NEEDS 2 decimal places.
-    """
+    """Fix the time precision of GGA/RMC messages."""
     prefix, timestamp, rest = nmea.split(',', 2)
     return nmeafixchecksum(','.join([prefix, timestamp[:9], rest]))
 
