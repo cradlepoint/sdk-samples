@@ -12,6 +12,7 @@ import sys
 import uuid
 import tarfile
 import gzip
+import tempfile
 from OpenSSL import crypto
 
 META_DATA_FOLDER = 'METADATA'
@@ -19,7 +20,7 @@ CONFIG_FILE = 'package.ini'
 SIGNATURE_FILE = 'SIGNATURE.DS'
 MANIFEST_FILE = 'MANIFEST.json'
 
-BYTE_CODE_FILES =  re.compile(r'^.*/.(pyc|pyo|pyd)$')
+BYTE_CODE_FILES =  re.compile(r'^.*/.(pyc|pyo|pyd)$')  # Previously: re.compile('^.*\.(pyc|pyo|pyd)$')
 BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
 
 
@@ -52,16 +53,46 @@ def hash_dir(target, hash_func=hashlib.sha256):
     return hashed_files
 
 
+def scan_for_cr(path):
+    scanfiles = ('.py', '.sh')
+    temp_files = []
+    for root, _, files in os.walk(path):
+        for fl in files:
+            if fl.endswith(scanfiles):
+                original_file_path = os.path.join(root, fl)
+                with open(original_file_path, 'rb') as f:
+                    content = f.read()
+                    if b'\r' in content:
+                        content = content.replace(b'\r', b'')
+                        print(f'Removing carriage return(s) from {original_file_path}')
+                        # Create a temporary file
+                        temp_file = tempfile.NamedTemporaryFile(delete=False)
+                        temp_file.write(content)
+                        temp_file.close()
+                        temp_files.append((original_file_path, temp_file.name))
+    return temp_files
+
+
 def pack_package(app_root, app_name):
-    print('app_root: {}'.format(app_root))
-    print('app_name: {}'.format(app_name))
-    print("pack TAR:%s.tar" % app_name)
     tar_name = "{}.tar".format(app_name)
     tar = tarfile.open(tar_name, 'w')
-    tar.add(app_root, arcname=os.path.basename(app_root))
+
+    # Get temporary files without carriage returns
+    temp_files = scan_for_cr(app_root)
+
+    # Add original files to the tar, replacing with temp files if available
+    for path, d, f in os.walk(app_root):
+        for fl in f:
+            file_path = os.path.join(path, fl)
+            # Check if a temp file exists for this file
+            temp_file_path = next((temp for orig, temp in temp_files if orig == file_path), None)
+            if temp_file_path:
+                tar.add(temp_file_path, arcname=os.path.relpath(file_path, app_root))
+            else:
+                tar.add(file_path, arcname=os.path.relpath(file_path, app_root))
+
     tar.close()
 
-    print("gzip archive:%s.tar.gz" % app_name)
     gzip_name = "{}.tar.gz".format(app_name)
     with open(tar_name, 'rb') as f_in:
         with gzip.open(gzip_name, 'wb') as f_out:
@@ -69,6 +100,11 @@ def pack_package(app_root, app_name):
 
     if os.path.isfile(tar_name):
         os.remove(tar_name)
+
+    # Clean up temporary files
+    for _, temp_file in temp_files:
+        os.remove(temp_file)
+
 
 
 def create_signature(meta_data_folder, pkey):
@@ -122,7 +158,6 @@ def package_application(app_root, pkey):
         pmf = {}
         pmf['version_major'] = int(1)
         pmf['version_minor'] = int(0)
-        pmf['version_patch'] = int(0)
 
         app = {}
         app['name'] = str(section)
@@ -137,9 +172,9 @@ def package_application(app_root, pkey):
         app['notes'] = config[section]['notes']
         app['version_major'] = int(config[section]['version_major'])
         app['version_minor'] = int(config[section]['version_minor'])
+        app['version_patch'] = int(config[section].get('version_patch', '0'))
         app['firmware_major'] = int(config[section]['firmware_major'])
         app['firmware_minor'] = int(config[section]['firmware_minor'])
-        app['version_patch'] = int(config[section].get('version_patch', '0'))
         app['restart'] = config[section].getboolean('restart')
         app['reboot'] = config[section].getboolean('reboot')
         app['date'] = datetime.datetime.now().isoformat()
@@ -174,7 +209,6 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         argument_list(sys.argv)
     else:
-
         pkey = None
         if 3 == len(sys.argv):
             with open(sys.argv[2], 'r') as pf:
