@@ -14,6 +14,8 @@ import subprocess
 import configparser
 import unittest
 import urllib3
+from OpenSSL import crypto
+
 urllib3.disable_warnings()
 
 from requests.auth import HTTPDigestAuth
@@ -157,40 +159,23 @@ def clean_all():
     for app in app_dirs:
         clean(app)
 
-
-def scan_for_cr(path):
-    scanfiles = ('.py', '.sh')
-    for root, _, files in os.walk(path):
-        for fl in files:
-            # Check if the file is a .py or .sh file
-            if fl.endswith(scanfiles):
-                with open(os.path.join(root, fl), 'rb') as f:
-                    content = f.read()
-                    # Remove carriage returns from the file
-                    if b'\r' in content:
-                        content = content.replace(b'\r', b'')
-                        print(f'Removing carriage return from {os.path.join(root, fl)}')
-                        with open(os.path.join(root, fl), 'wb') as f:
-                            f.write(content)
-
 # Package the app files into a tar.gz archive.
 def package(app=None):
     app_name = app or g_app_name
     print("Packaging {}".format(app_name))
     success = True
-    package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     app_path = os.path.join(app_name)
-    scan_for_cr(app_path)
     setup_script(app_path)
 
     try:
-        subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
-    except subprocess.CalledProcessError as err:
+        # Import the function from package_application.py
+        from tools.bin.package_application import package_application
+        # Call the function directly
+        package_application(app_path, None)
+    except Exception as err:
         print('Error packaging {}: {}'.format(app_name, err))
         success = False
-    finally:
-        return success
-
+    return success
 
 # Package all the app files in the directory into a tar.gz archives.
 def package_all():
@@ -229,7 +214,8 @@ def status():
     print(response)
 
 # Create new app from app_template using supplied app name
-def create(app_name):
+def create():
+    app_name = g_app_name
     if not app_name:
         print('Please include new app name.  Example: python make.py create my_new_app')
         return
@@ -445,9 +431,6 @@ def init(app=None):
         success = False
         print('ERROR 5: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
-    # This will also create a UUID if needed.
-    get_app_uuid()
-
     return success
 
 
@@ -462,10 +445,13 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         option = str(sys.argv[2])
 
-    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'install', 'start', 'stop', 'uninstall', 'purge']:
-        # Load the settings from the sdk_settings.ini file.
-        if not init(option):
-            sys.exit(0)
+    if not init(app=option):
+        sys.exit(0)
+
+    if utility_name == 'create':
+        create()
+    else:
+        get_app_uuid()  # This will also create a UUID if needed.
 
     if utility_name == 'clean':
         if option == 'all':
@@ -478,9 +464,6 @@ if __name__ == "__main__":
             package_all()
         else:
             package()
-
-    elif utility_name == 'create':
-        create(option)
 
     elif utility_name == 'status':
         status()
@@ -546,8 +529,5 @@ if __name__ == "__main__":
         sys.path.append(os.getcwd())
         # run suite
         unittest.TextTestRunner().run(suite)
-
-    else:
-        output_help()
 
     sys.exit(0)
