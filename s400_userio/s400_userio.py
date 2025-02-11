@@ -1,3 +1,5 @@
+# s400_userio.py - This app is used to control the user IO on the S400.
+
 from csclient import EventingCSClient
 import time
 
