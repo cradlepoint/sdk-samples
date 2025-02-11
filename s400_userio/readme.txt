@@ -19,10 +19,10 @@ None
 
 Application Purpose
 ===================
-This application writes a .csv file of CPU usage
+This app is used to control the user IO on the S400.
 
 
 Expected Output
 ===============
-CSV file
+GPIO output
 
