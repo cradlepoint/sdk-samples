@@ -162,9 +162,16 @@ def scan_for_cr(path):
     scanfiles = ('.py', '.sh')
     for root, _, files in os.walk(path):
         for fl in files:
-            with open(os.path.join(root, fl), 'rb') as f:
-                if b'\r' in f.read() and [x for x in scanfiles if fl.endswith(x)]:
-                    raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
+            # Check if the file is a .py or .sh file
+            if fl.endswith(scanfiles):
+                with open(os.path.join(root, fl), 'rb') as f:
+                    content = f.read()
+                    # Remove carriage returns from the file
+                    if b'\r' in content:
+                        content = content.replace(b'\r', b'')
+                        print(f'Removing carriage return from {os.path.join(root, fl)}')
+                        with open(os.path.join(root, fl), 'wb') as f:
+                            f.write(content)
 
 # Package the app files into a tar.gz archive.
 def package(app=None):
