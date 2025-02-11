@@ -107,6 +107,8 @@ The Application Developers Guide is the best document to read first.
     - A reverse proxy similar to port forwarding, except traffic forwarded to a
     udp/tcp target will be sourced from the router's IP. This reverse proxy can
     be dynamically added to clients as they connect. 
+- **s400_userio**
+    - Provides example how to control the user IO on the S400.
 - **shell_sample**
     - Provides example how to execute commands at OS shell: "ls - al".
 - **send_to_server**
