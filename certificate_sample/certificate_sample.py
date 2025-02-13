@@ -48,4 +48,5 @@ def extract_and_save_cert(cert_name):
     else:
         cp.log(f'Missing certificate or key for "{cert_name}"')
 
-extract_and_save_cert('CP Zscaler')
+if __name__ == '__main__':
+    extract_and_save_cert('CP Zscaler')
