@@ -9,6 +9,13 @@ This template can be used as a starting point for new Cradlepoint SDK Applicatio
 
 ## Class: `CPSDK`
 
+### Quickstart:  
+```python
+from cpsdk import CPSDK
+cp = CPSDK('My_App')
+cp.log('Starting...')
+```
+
 ### Constructor
 
 - **`__init__(self, appname)`**
