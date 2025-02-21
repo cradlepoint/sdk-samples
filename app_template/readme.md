@@ -1,9 +1,11 @@
 # app_template
-This template can be used as a starting point for new Cradlepoint SDK Applications.  
-
-### Python libraries included:  
-- **csclient.py** - this library contains the `EventingCSClient` class, an extension of the `CSClient` class that includes event-driven functionality.  
-- **cpsdk.py** - this library contains the `CPSDK` class, an extension of the `EventingCSClient` that provides easy-to-use methods for common use cases.  
+Template for Ericsson Cradlepoint SDK Applications.  
+- `app_template.py` - main app file, including examples of using the CPSDK library.  
+- `csclient.py` - this library contains the `EventingCSClient` class, an extension of the `CSClient` class that includes event-driven functionality.  
+- `cpsdk.py` - this library contains the `CPSDK` class, an extension of the `EventingCSClient` that provides easy-to-use methods for common use cases.
+- `package.ini` - contains application metadata including vendor, notes, version and start flags.
+- `start.sh` - shell script that starts the application.
+- `readme.md` - detailed information about the application including any requirements or limitations.
 
 ## Documentation
 
