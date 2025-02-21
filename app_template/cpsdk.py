@@ -1,5 +1,6 @@
 from csclient import EventingCSClient
 import time
+import re
 
 class CPSDK(EventingCSClient):
     def __init__(self, appname):
@@ -53,11 +54,12 @@ class CPSDK(EventingCSClient):
                 self.delete(f'config/system/sdk/appdata/{item["_id_"]}')
 
     
-    def extract_and_save_cert(self, cert_name_or_uuid):
-        """Extract and save the certificate and key to the local filesystem. Returns the full path to the certificate and key files."""
+    def extract_cert_and_key(self, cert_name_or_uuid):
+        """Extract and save the certificate and key to the local filesystem. Returns the filenames of the certificate and key files."""
         cert_x509 = None
         cert_key = None
         ca_uuid = None
+        cert_name = None
 
         # Check if cert_name_or_uuid is in UUID format
         uuid_regex = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
@@ -70,6 +72,7 @@ class CPSDK(EventingCSClient):
         # if cert_name is a uuid, find the cert by uuid, otherwise, find the cert by name
         for cert in certs:
             if cert[match_field] == cert_name_or_uuid:
+                cert_name = cert.get('name')
                 cert_x509 = cert.get('x509')
                 cert_key = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
                 ca_uuid = cert.get('ca_uuid')
@@ -87,15 +90,15 @@ class CPSDK(EventingCSClient):
 
         # Write the fullchain and privatekey .pem files
         if cert_x509 and cert_key:
-            with open(f"{cert_name_or_uuid}.pem", "w") as fullchain_file:
+            with open(f"{cert_name}.pem", "w") as fullchain_file:
                 fullchain_file.write(cert_x509)
-            with open(f"{cert_name_or_uuid}_key.pem", "w") as privatekey_file:
+            with open(f"{cert_name}_key.pem", "w") as privatekey_file:
                 privatekey_file.write(cert_key)
-            return f"{cert_name_or_uuid}.pem", f"{cert_name_or_uuid}_key.pem"
+            return f"{cert_name}.pem", f"{cert_name}_key.pem"
         elif cert_x509:
-            with open(f"{cert_name_or_uuid}.pem", "w") as fullchain_file:
+            with open(f"{cert_name}.pem", "w") as fullchain_file:
                 fullchain_file.write(cert_x509)
-            return f"{cert_name_or_uuid}.pem", None
+            return f"{cert_name}.pem", None
         else:
             self.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
             return None, None
