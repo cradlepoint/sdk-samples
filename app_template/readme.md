@@ -101,10 +101,11 @@ cp.log('Starting...')
     - **Parameters:**
         - `name` (str): The name of the app data to delete.
 
-- **`extract_and_save_cert(self, cert_name)`**
-    - **Description:** Extracts and saves the certificate and key to the local filesystem.
+- **`extract_cert_and_key(self, cert_name_or_uuid)`**
+    - **Description:** Extracts and saves the certificate and key to the local filesystem and returns the filenames.
     - **Parameters:**
-        - `cert_name` (str): The name of the certificate to extract and save.
+        - `cert_name_or_uuid` (str): The name or uuid of the certificate to extract and save.
+    - **Returns:** `cert_filename` (str), `pkey_filename` (str) - File names of the x509 and private key files.
 
 - **`get_ipv4_wired_clients(self)`**
     - **Description:** Returns a list of IPv4 wired clients and their details.
