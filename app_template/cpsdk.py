@@ -54,7 +54,7 @@ class CPSDK(EventingCSClient):
 
     
     def extract_and_save_cert(self, cert_name_or_uuid):
-        """Extract and save the certificate and key to the local filesystem."""
+        """Extract and save the certificate and key to the local filesystem. Returns the full path to the certificate and key files."""
         cert_x509 = None
         cert_key = None
         ca_uuid = None
@@ -73,11 +73,10 @@ class CPSDK(EventingCSClient):
                 cert_x509 = cert.get('x509')
                 cert_key = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
                 ca_uuid = cert.get('ca_uuid')
-                self.log(f'Found certificate "{cert_name_or_uuid}" with CA UUID: {ca_uuid}')
                 break
         else:
             self.log(f'No certificate "{cert_name_or_uuid}" found')
-            return
+            return None, None
 
         # Extract the CA certificate(s) if it exists
         while ca_uuid not in ["", "None", None]:
@@ -85,10 +84,6 @@ class CPSDK(EventingCSClient):
                 if cert.get('_id_') == ca_uuid:
                     cert_x509 += "\n" + cert.get('x509')
                     ca_uuid = cert.get('ca_uuid')
-                    msg = f'Found CA certificate "{cert.get("name")}"'
-                    if ca_uuid not in ["", "None", None]:
-                        msg += f' with CA UUID: {ca_uuid}'
-                    self.log(msg)
 
         # Write the fullchain and privatekey .pem files
         if cert_x509 and cert_key:
@@ -96,9 +91,14 @@ class CPSDK(EventingCSClient):
                 fullchain_file.write(cert_x509)
             with open(f"{cert_name_or_uuid}_key.pem", "w") as privatekey_file:
                 privatekey_file.write(cert_key)
-            self.log(f'Certificate "{cert_name_or_uuid}" extracted and saved')
+            return f"{cert_name_or_uuid}.pem", f"{cert_name_or_uuid}_key.pem"
+        elif cert_x509:
+            with open(f"{cert_name_or_uuid}.pem", "w") as fullchain_file:
+                fullchain_file.write(cert_x509)
+            return f"{cert_name_or_uuid}.pem", None
         else:
-            self.log(f'Missing certificate or key for "{cert_name_or_uuid}"')
+            self.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
+            return None, None
 
 
     def get_ipv4_wired_clients(self):
