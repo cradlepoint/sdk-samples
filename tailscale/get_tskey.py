@@ -6,7 +6,7 @@ import sys
 if __name__ == "__main__":
     command = sys.argv[1]
 
-    if command in ["tskey", "tsversion"]:
+    if command in ["tskey", "tsversion", "tsadvertise_tags", "tshostname"]:
         try:
             value = get_appdata(command)
             if value:
