@@ -3,7 +3,8 @@
 ## Overview
 The `encrypt_appdata` application automatically encrypts sdk app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`). It utilizes ECC (Elliptic Curve Cryptography) with the Secp256r1 certificate named `ecc`, which must be added through the certificate manager on your device.
 
-![Encrypt AppData Encryption Screenshot](screenshot.jpg)
+![Encrypt AppData Encryption Screenshot](https://github.com/user-attachments/assets/30a2513d-d5c1-4b1f-9139-249711a3dbb6)
+
 
 ## Encrypting and Decrypting Data manually
 
