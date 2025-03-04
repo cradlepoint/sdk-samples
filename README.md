@@ -59,6 +59,8 @@ The Application Developers Guide is the best document to read first.
     - Downloads apps from a self hosted url and install into app_holder app. Overcome limitates with dev_mode and app size limits.
 - **daily_speedtest**
     - Runs an ookla speedtest daily at configured hours and put results to user defined field (asset_id).
+- **encrypt_appdata**
+    - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
 - **ftp_server**
