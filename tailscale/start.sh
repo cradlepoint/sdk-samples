@@ -22,7 +22,7 @@ get_tsroutes() {
 }
 
 get_tsadvertise_tags() {
-    tsadvertise_tags="$(cppython ./get_tskey.py tsadvertise_tags)"
+    tsadvertise_tags="$(cppython ./get_tskey.py tstags)"
 }
 
 get_tshostname() {
