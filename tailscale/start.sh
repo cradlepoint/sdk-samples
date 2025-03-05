@@ -59,6 +59,7 @@ tsroutes=""
 tsadvertise_tags=""
 tshostname=""
 tsarch="arm64"
+tshostname="$(cppython ./get_tskey.py hostname)"
 
 check_tskey
 get_tsroutes
@@ -124,7 +125,7 @@ trap exit_safely SIGINT SIGTERM EXIT
 
 HOME=$(pwd) ./${tsdbinary} --socket=./tailscaled.sock --tun=userspace-networking --socks5-server=localhost:1055 2>&1 | logerr &
 sleep 2
-HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --auth-key="$tskey" --advertise-routes="$tsroutes" --advertise-tags="$tsadvertise_tags" --hostname="$tshostname"  2>&1 | logerr
+HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --hostname="$tshostname" --auth-key="$tskey" --advertise-routes="$tsroutes" --advertise-tags="$tsadvertise_tags" 2>&1 | logerr
 
 tsretcode=$?
 if [ $tsretcode -ne 0 ]; then
