@@ -2,7 +2,7 @@
 set -o pipefail
 set -o errexit
 
-logger -s -t tailscale -p 6 "tailscale is tarting up..."
+logger -s -t tailscale -p 6 "tailscale is starting up..."
 
 logerr() {
     if [ "$#" -gt 0 ]; then
