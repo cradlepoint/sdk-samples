@@ -89,6 +89,8 @@ The Application Developers Guide is the best document to read first.
     - Demonstrates launching embedded mosquitto server
 - **mqtt_app**
     - Demonstrated MQTT using the paho library
+- **mqtt_app_tls**
+    - MQTT over TLS - extracts certificates from NCOS and uses them for TLS connection.
 - **mqtt_azure_client**
     - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central.
 - **mqtt_azure_tls**
