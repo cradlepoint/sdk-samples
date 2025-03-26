@@ -12,7 +12,7 @@ The following SDK Appdata fields must be configured:
 * `ddns_password`: Your DDNS provider password
 * `ddns_hostname`: The hostname to update (e.g., yourdomain.dyndns.org)
 * `ddns_update_url`: The DDNS provider's update URL
-* `ddns_wan_profile`: The name of your WAN profile as configured in Connection Manager
+* `ddns_wan_profile`: The name of your WAN profile as configured in Connection Manager (e.g. Ethernet)
 
 ## Setup
 
