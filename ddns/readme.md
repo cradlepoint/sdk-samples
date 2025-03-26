@@ -1,4 +1,4 @@
-# DDNS Application Documentation
+# ddns
 
 This application automatically updates a Dynamic DNS (DDNS) record with your router's WAN IP address.  
 
