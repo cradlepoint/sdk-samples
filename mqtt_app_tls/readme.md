@@ -12,13 +12,13 @@ This application demonstrates secure MQTT communication using TLS certificates. 
 - Last Will and Testament (LWT) message support
 
 ## Configuration
-The application uses settings defined in `settings.py` (not shown), which should include:
+The application uses settings defined in `settings.py` (not shown), which includes:
 
 - `MQTT_SERVER`: MQTT broker hostname
 - `MQTT_PORT`: MQTT broker port
-- `MQTT_CA_CERT`: CA certificate path
-- `MQTT_CLIENT_CERT`: Client certificate path
-- `MQTT_CLIENT_KEY`: Client private key path
+- `MQTT_CA_CERT`: Name of CA certificate in NCOS Certificate Manager (Required)
+- `MQTT_CLIENT_CERT`: Name of Client certificate in NCOS Certificate Manager (Optional)
+- `MQTT_CLIENT_KEY`: Name of Client private key in NCOS Certificate Manager (Optional)
 - `PUBLISH_INTERVAL`: Time interval between publications
 - `topics`: Dictionary of topics to subscribe to and publish
 
