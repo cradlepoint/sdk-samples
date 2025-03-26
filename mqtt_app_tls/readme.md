@@ -1,6 +1,5 @@
 # mqtt_app_tls  
 
-## Overview
 This application demonstrates secure MQTT communication using TLS certificates. It connects to an MQTT broker, subscribes to configured topics, and publishes device data at regular intervals.  
 
 [**Download Built App**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/mqtt_app_tls.tar.gz) 
