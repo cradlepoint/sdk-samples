@@ -1,6 +1,6 @@
 # ddns
 
-This application automatically updates a Dynamic DNS (DDNS) record with your router's WAN IP address.  
+This application automatically updates a Dynamic DNS (DDNS) record with the IP address of the specific WAN profile.  
 
 [**Download Built App**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ddns.tar.gz)  
 
