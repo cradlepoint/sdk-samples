@@ -55,6 +55,8 @@ The Application Developers Guide is the best document to read first.
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
 - **dead_reckoning**
     - Enables dead_reckoning for GPS send-to-server.
+- **ddns**
+    - Updates a dynamic DNS hostname with the IP address of the WAN device matching specified WAN profile.
 - **dynamic_app**
     - Downloads apps from a self hosted url and install into app_holder app. Overcome limitates with dev_mode and app size limits.
 - **daily_speedtest**
