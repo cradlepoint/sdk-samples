@@ -6,7 +6,7 @@ This application automatically updates a Dynamic DNS (DDNS) record with the IP a
 
 ## Required Configuration
 
-The following SDK Appdata fields must be configured:
+The following SDK Appdata fields must be added to your router configuration (group or device):
 
 * `ddns_username`: Your DDNS provider username
 * `ddns_password`: Your DDNS provider password
