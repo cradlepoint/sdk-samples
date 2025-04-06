@@ -2,7 +2,7 @@
 set -o pipefail
 set -o errexit
 
-logger -s -t tailscale -p 6 "tailscale istarting up..."
+logger -s -t tailscale -p 6 "tailscale is starting up..."
 
 logerr() {
     if [ "$#" -gt 0 ]; then
@@ -19,6 +19,18 @@ check_tskey() {
 
 get_tsroutes() {
     tsroutes="$(cppython ./get_tskey.py tsroutes)"
+}
+
+get_tsadvertise_tags() {
+    tsadvertise_tags="$(cppython ./get_tskey.py tstags)"
+}
+
+get_tshostname() {
+    tshostname="$(cppython ./get_tskey.py tshostname)"
+}
+
+get_tsserver() {
+    tsserver="$(cppython ./get_tskey.py tsserver)"
 }
 
 get_tsarch() {
@@ -48,10 +60,17 @@ download() {
 tskey=""
 tskey_ec=0
 tsroutes=""
+tsadvertise_tags=""
+tshostname=""
+tsserver=""
 tsarch="arm64"
+tshostname="$(cppython ./get_tskey.py hostname)"
 
 check_tskey
 get_tsroutes
+get_tsadvertise_tags
+get_tshostname
+get_tsserver
 get_tsarch
 download
 
@@ -77,6 +96,12 @@ check_tskey_change() {
     check_tskey
     prev_tsroutes=$tsroutes
     get_tsroutes
+    prev_tsadvertise_tags=$tsadvertise_tags
+    get_tsadvertise_tags
+    prev_tshostname=$tshostname
+    get_tshostname
+    prev_tsserver=$tsserver
+    get_tsserver
 
     if [ $tskey_ec -ne 0 ] || [ -z "$tskey" ]; then
         logerr "Couldn't get tskey. Exiting..."
@@ -92,13 +117,28 @@ check_tskey_change() {
         logerr "tsroutes has changed. Exiting..."
         exit_safely
     fi
+
+    if [ "$tsadvertise_tags" != "$prev_tsadvertise_tags" ]; then
+        logerr "tsadvertise_tags has changed. Exiting..."
+        exit_safely
+    fi
+
+    if [ "$tshostname" != "$prev_tshostname" ]; then
+        logerr "tshostname has changed. Exiting..."
+        exit_safely
+    fi
+
+    if [ "$tsserver" != "$prev_tsserver" ]; then
+        logerr "tsserver has changed. Exiting..."
+        exit_safely
+    fi
 }
 
 trap exit_safely SIGINT SIGTERM EXIT
 
 HOME=$(pwd) ./${tsdbinary} --socket=./tailscaled.sock --tun=userspace-networking --socks5-server=localhost:1055 2>&1 | logerr &
 sleep 2
-HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --auth-key="$tskey" --advertise-routes="$tsroutes" 2>&1 | logerr
+HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --hostname="$tshostname" --auth-key="$tskey" --advertise-routes="$tsroutes" --advertise-tags="$tsadvertise_tags" --login-server="$tsserver" 2>&1 | logerr
 
 tsretcode=$?
 if [ $tsretcode -ne 0 ]; then

@@ -3,7 +3,7 @@ import tarfile
 import os
 import shutil
 
-TSVERSION = "1.74.1"
+TSVERSION = "1.80.2"
 
 def download(url, target_folder):
     try:
