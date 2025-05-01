@@ -59,6 +59,13 @@ def inside_geofence(lat, lon, geofences_list):
             return True, geofence["name"]
     return False, None
 
+def get_geofences():
+    geofences = cp.get_appdata('geofences')
+    if geofences is None:
+        geofences = default_geofences
+        cp.post_appdata('geofences', json.dumps(geofences))
+        cp.log(f'Created default config: {geofences}')
+    return json.loads(geofences)
 
 cp.log('Starting...')
 # Initialize with a default state based on first reading
@@ -69,7 +76,7 @@ current_geofence = None
 
 # Get initial location and set default state
 lat, lon, accuracy = get_location()
-geofences = cp.get_appdata('geofences')
+geofences = get_geofences()
 if lat and lon:
     initial_state, geofence_name = inside_geofence(lat, lon, geofences)
     last_state = initial_state
@@ -84,20 +91,7 @@ if lat and lon:
         cp.put('config/wan/dual_sim_disable_mask', 'int1,1')
 
 while True:
-    geofences = cp.get_appdata('geofences')
-    if geofences is None:
-        geofences = default_geofences
-        cp.post_appdata('geofences', json.dumps(geofences))
-        cp.log(f'Created default config: {geofences}')
-    else:
-        try:
-            geofences = json.loads(geofences)
-        except json.JSONDecodeError as e:
-            cp.log(f'Error parsing geofences config: {str(e)}')
-            geofences = default_geofences
-            cp.post_appdata('geofences', json.dumps(geofences))
-            cp.log(f'Reset to default config: {geofences}')
-    
+    geofences = get_geofences()    
     lat, lon, accuracy = get_location()
     if lat and lon:
         current_state, geofence_name = inside_geofence(lat, lon, geofences)
