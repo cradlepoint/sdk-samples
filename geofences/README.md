@@ -1,4 +1,4 @@
-# Geofencing Application
+# Geofences
 
 A Python application that monitors GPS location and automatically switches between SIM cards based on geofence boundaries. This application is designed to work with Cradlepoint devices.
 
