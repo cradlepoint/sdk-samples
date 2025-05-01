@@ -13,7 +13,7 @@ A Python application that monitors GPS location and automatically switches betwe
 
 ## Configuration
 
-The application uses a default set of geofences that can be modified through the application data. The default geofences are:
+The application uses a default set of geofences that can be modified through SDK Appdata under System in the Cradlepoint configuration. The default geofences are:
 
 ```json
 [
