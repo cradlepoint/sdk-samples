@@ -69,8 +69,9 @@ current_geofence = None
 
 # Get initial location and set default state
 lat, lon, accuracy = get_location()
+geofences = cp.get_appdata('geofences')
 if lat and lon:
-    initial_state, geofence_name = inside_geofence(lat, lon, default_geofences)
+    initial_state, geofence_name = inside_geofence(lat, lon, geofences)
     last_state = initial_state
     in_geofence = initial_state
     current_geofence = geofence_name
