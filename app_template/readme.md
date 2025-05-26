@@ -18,182 +18,246 @@ cp = CPSDK('My_App')
 cp.log('Starting...')
 ```
 
-### Examples:
+# CPSDK Library Documentation
+
+## Overview
+
+The CPSDK (CradlePoint SDK) library is a Python-based SDK designed to interact with CradlePoint routers and network devices. It provides a comprehensive set of methods to manage, monitor, and configure router settings, network clients, certificates, and various system parameters.
+
+### Purpose and Scope
+
+This SDK is intended for developers building applications that need to:
+- Monitor router status and system information
+- Manage network clients (wired and wireless)
+- Handle certificates and security configurations
+- Access GPS location data
+- Manage WAN connections and SIM cards
+- Store and retrieve application-specific data
+
+## Module Structure
+
+The library consists of a single main class `CPSDK` that inherits from `EventingCSClient`, which in turn inherits from `CSClient`. All functionality is encapsulated within this class, providing a unified interface for router interactions.
+
+## Function Details
+
+### Core Functions
+
+#### `__init__(appname)`
+Initializes the CPSDK client.
+- **Parameters:**
+  - `appname` (str): Name of the application using the SDK
+- **Returns:** None
+
+#### `get_uptime()`
+Retrieves the router's uptime.
+- **Parameters:** None
+- **Returns:** int (uptime in seconds)
+
+#### `wait_for_uptime(min_uptime_seconds)`
+Waits for the device to reach a minimum uptime.
+- **Parameters:**
+  - `min_uptime_seconds` (int): Minimum required uptime in seconds
+- **Returns:** None
+- **Side Effects:** May sleep the current thread
+
+### Application Data Management
+
+#### `get_appdata(name)`
+Retrieves application data from NCOS Config.
+- **Parameters:**
+  - `name` (str): Name of the appdata to retrieve
+- **Returns:** Any (value of the appdata) or None if not found
+
+#### `post_appdata(name, value)`
+Creates new appdata in NCOS Config.
+- **Parameters:**
+  - `name` (str): Name of the appdata
+  - `value` (Any): Value to store
+- **Returns:** None
+
+#### `put_appdata(name, value)`
+Updates existing appdata in NCOS Config.
+- **Parameters:**
+  - `name` (str): Name of the appdata
+  - `value` (Any): New value
+- **Returns:** None
+
+#### `delete_appdata(name)`
+Deletes appdata from NCOS Config.
+- **Parameters:**
+  - `name` (str): Name of the appdata to delete
+- **Returns:** None
+
+### Certificate Management
+
+#### `extract_cert_and_key(cert_name_or_uuid)`
+Extracts and saves certificates and keys to the local filesystem.
+- **Parameters:**
+  - `cert_name_or_uuid` (str): Name or UUID of the certificate
+- **Returns:** tuple (str, str) - (certificate filename, key filename) or (None, None) if not found
+
+### Network Client Management
+
+#### `get_ipv4_wired_clients()`
+Retrieves information about wired IPv4 clients.
+- **Parameters:** None
+- **Returns:** list of dicts containing client information
+
+#### `get_ipv4_wifi_clients()`
+Retrieves information about wireless IPv4 clients.
+- **Parameters:** None
+- **Returns:** list of dicts containing client information
+
+#### `get_ipv4_lan_clients()`
+Retrieves all IPv4 clients (both wired and wireless).
+- **Parameters:** None
+- **Returns:** dict containing wired and wireless clients
+
+### Location and WAN Management
+
+#### `get_lat_long()`
+Retrieves GPS coordinates.
+- **Parameters:** None
+- **Returns:** tuple (float, float) - (latitude, longitude) or (None, None) if not available
+
+#### `get_connected_wans()`
+Retrieves list of connected WAN interfaces.
+- **Parameters:** None
+- **Returns:** list of WAN UIDs
+
+#### `get_sims()`
+Retrieves list of modems with active SIM cards.
+- **Parameters:** None
+- **Returns:** list of modem UIDs
+
+### Inherited Methods from CSClient
+
+#### `get(path)`
+Retrieves data from the router's config store.
+- **Parameters:**
+  - `path` (str): Path to the data in the router's config store
+- **Returns:** Any (the requested data)
+
+#### `post(path, data)`
+Posts data to the router's config store.
+- **Parameters:**
+  - `path` (str): Path where to store the data
+  - `data` (Any): Data to store
+- **Returns:** Any (response from the router)
+
+#### `put(path, data)`
+Updates data in the router's config store.
+- **Parameters:**
+  - `path` (str): Path to the data to update
+  - `data` (Any): New data
+- **Returns:** Any (response from the router)
+
+#### `delete(path)`
+Deletes data from the router's config store.
+- **Parameters:**
+  - `path` (str): Path to the data to delete
+- **Returns:** Any (response from the router)
+
+#### `decrypt(path)`
+Decrypts encrypted data from the router's config store.
+- **Parameters:**
+  - `path` (str): Path to the encrypted data
+- **Returns:** str (decrypted data)
+
+#### `log(message)`
+Logs a message to the router's system log.
+- **Parameters:**
+  - `message` (str): Message to log
+- **Returns:** None
+
+#### `alert(message)`
+Constructs and sends a custom alert to NCM for the device. Apps calling this method must be running on the target device to send the alert. If invoked while running on a computer, then only a log is output.
+- **Parameters:**
+  - `message` (str): Text to be displayed in the alert
+- **Returns:** 
+  - Success: None
+  - Failure: An error
+- **Notes:** Only available when running on NCOS (Linux) devices. When running on a computer, it will only print the alert text.
+
+### Inherited Methods from EventingCSClient
+
+#### `start()`
+Starts the event handling thread.
+- **Parameters:** None
+- **Returns:** None
+- **Side Effects:** Starts a background thread for event handling
+
+#### `stop()`
+Stops the event handling thread.
+- **Parameters:** None
+- **Returns:** None
+- **Side Effects:** Stops the background thread for event handling
+
+#### `register(path, callback)`
+Registers a callback function for events on a specific path.
+- **Parameters:**
+  - `path` (str): Path to monitor for events
+  - `callback` (callable): Function to call when events occur
+- **Returns:** None
+
+#### `unregister(path)`
+Unregisters event monitoring for a specific path.
+- **Parameters:**
+  - `path` (str): Path to stop monitoring
+- **Returns:** None
+
+## Usage Examples
+
+### Basic Initialization
 ```python
-# GET Example: Get the WAN connection state and log it
-wan_state = cp.get('status/wan/connection_state')
-cp.log(f'WAN State: {wan_state}')
+from cpsdk import CPSDK
 
+# Initialize the SDK
+cp = CPSDK("MyApp")
 
-# POST Example: Create user and get index from response
-req = cp.post('config/system/users', {'username': 'newuser', 'password': 'secret1234', 'group': 'admin'})
-if req.get('status') == 'ok':
-    index = req.get('data')
-    cp.log(f'User created with index: {index}')
-else:
-    cp.log(f'Error creating user: {req.get("data")}')
-
-    
-# PUT Example: Update user
-req = cp.put(f'config/system/users/{index}', {'password': 'newsecret1234'})
-if req.get('status') == 'ok':
-    cp.log(f'User updated with index: {index}')
-else:
-    cp.log(f'Error updating user: {req.get("data")}')
-
-    
-# DELETE Example: Delete user
-req = cp.delete(f'config/system/users/{index}')
-if req.get('status') == 'ok':
-    cp.log(f'User deleted with index: {index}')
-else:
-    cp.log(f'Error deleting user: {req.get("data")}')
-
-    
-# Example: Get appdata value
-appdata_value = cp.get_appdata('server')
-cp.log(f'Appdata "server" value: {appdata_value}')
-
-
-# Example:If appdata does not exist, create it
-if not appdata_value:
-    cp.post_appdata('server', '192.168.0.1')
-    cp.log('Appdata "server" created')
-
-    
-# Example: Update appdata
-cp.put_appdata('server', '192.168.0.2')
-cp.log('Appdata "server" updated')
-
-
-# Exampe: Get updated appdata value
-appdata_value = cp.get_appdata('server')
-cp.log(f'Appdata "server" value: {appdata_value}')
-
-
-# Example: Delete appdata
-cp.delete_appdata('server')
-cp.log('Appdata "server" deleted')
-
-
-# Example: Get list of clients and put in description (Max 1024 characters)
-clients = cp.get_ipv4_lan_clients()
-cp.log(f'CLIENTS: {clients}')
-cp.put('config/system/desc', json.dumps(clients))
-
-
-# Example: Extract and save certificate
-cert_file, pkey_file = cp.extract_cert_and_key('CP Zscaler')
-cp.log(f'Certificate File: {cert_file}')
-cp.log(f'Private Key File: {pkey_file}')
+# Get router uptime
+uptime = cp.get_uptime()
+cp.log(f"Router uptime: {uptime} seconds")
 ```
 
-## Documentation
+### Managing Application Data
+```python
+# Store application data
+cp.post_appdata("my_setting", "value")
 
-## Class: `CPSDK`
+# Retrieve application data
+value = cp.get_appdata("my_setting")
+cp.log(f"Retrieved value: {value}")
+```
 
-### Constructor
+### Network Client Monitoring
+```python
+# Get all network clients
+clients = cp.get_ipv4_lan_clients()
 
-- **`__init__(self, appname)`**
-  - Initializes the CPSDK instance with the given application name.
-  - **Parameters:**
-    - `appname` (str): The name of the application.
+# Log wired clients
+for client in clients["wired_clients"]:
+    cp.log(f"Wired client: {client['hostname']} ({client['ip']})")
 
-**Methods inherited from EventingCSClient:**
+# Log wireless clients
+for client in clients["wifi_clients"]:
+    cp.log(f"Wireless client: {client['hostname']} on {client['ssid']}")
+```
 
-- **`get(self, path)`**
-  - **Description:** Sends a GET request to the specified path.
-  - **Parameters:**
-    - `path` (str): The API endpoint path.
-  - **Returns:** The response data from the GET request.
+### Certificate Management
+```python
+# Extract certificate and key
+cert_file, key_file = cp.extract_cert_and_key("my_cert")
+if cert_file and key_file:
+    cp.log(f"Certificate saved as: {cert_file}")
+    cp.log(f"Key saved as: {key_file}")
+```
 
-- **`post(self, path, data)`**
-  - **Description:** Sends a POST request to the specified path with the given data.
-  - **Parameters:**
-    - `path` (str): The API endpoint path.
-    - `data` (dict): The data to send in the POST request.
+### Alert Example
+```python
+# Send an alert to NCM
+cp.alert("Critical: System temperature exceeded threshold")
 
-- **`put(self, path, data)`**
-  - **Description:** Sends a PUT request to the specified path with the given data.
-  - **Parameters:**
-    - `path` (str): The API endpoint path.
-    - `data` (dict): The data to send in the PUT request.
-
-- **`delete(self, path)`**
-  - **Description:** Sends a DELETE request to the specified path.
-  - **Parameters:**
-    - `path` (str): The API endpoint path.
-
-- **`log(self, message)`**
-  - **Description:** Logs a message.
-  - **Parameters:**
-    - `message` (str): The message to log.
-
-- **`logger.exception(self, message)`**
-  - **Description:** Logs an exception message.
-  - **Parameters:**
-    - `message` (str): The exception message to log.
-
-- **`register(self, event_name, callback)`**
-  - **Description:** Registers a callback function to be executed when a specific event occurs.
-  - **Parameters:**
-    - `event_name` (str): The name of the event to listen for.
-    - `callback` (function): The function to call when the event occurs.
-  - **Returns:** None
-
-### Methods in CPSDK:
-
-- **`get_uptime(self)`**
-  - **Description:** Returns the router uptime in seconds.
-  - **Returns:** `int` - The uptime in seconds.
-
-- **`wait_for_uptime(self, min_uptime_seconds)`**
-    - **Description:** Waits for the device uptime to be greater than the specified uptime and sleeps if it is less than the specified uptime.
-    - **Parameters:**
-        - `min_uptime_seconds` (int): The minimum uptime in seconds to wait for.
-
-- **`get_appdata(self, name)`**
-    - **Description:** Retrieves the value of app data from NCOS Config by name.
-    - **Parameters:**
-        - `name` (str): The name of the app data to retrieve.
-    - **Returns:** The value of the app data or `None` if not found.
-
-- **`post_appdata(self, name, value)`**
-    - **Description:** Creates app data in NCOS Config by name.
-    - **Parameters:**
-        - `name` (str): The name of the app data to create.
-        - `value` (str): The value of the app data to set.
-
-- **`put_appdata(self, name, value)`**
-    - **Description:** Sets the value of app data in NCOS Config by name.
-    - **Parameters:**
-        - `name` (str): The name of the app data to update.
-        - `value` (str): The new value of the app data.
-
-- **`delete_appdata(self, name)`**
-    - **Description:** Deletes app data in NCOS Config by name.
-    - **Parameters:**
-        - `name` (str): The name of the app data to delete.
-
-- **`extract_cert_and_key(self, cert_name_or_uuid)`**
-    - **Description:** Extracts and saves the certificate and key to the local filesystem and returns the filenames.
-    - **Parameters:**
-        - `cert_name_or_uuid` (str): The name or uuid of the certificate to extract and save.
-    - **Returns:** `cert_filename` (str), `pkey_filename` (str) - File names of the x509 and private key files.
-
-- **`get_ipv4_wired_clients(self)`**
-    - **Description:** Returns a list of IPv4 wired clients and their details.
-    - **Returns:** `list` - A list of dictionaries containing client details.
-
-- **`get_ipv4_wifi_clients(self)`**
-    - **Description:** Returns a list of IPv4 Wi-Fi clients and their details.
-    - **Returns:** `list` - A list of dictionaries containing client details.
-
-- **`get_ipv4_lan_clients(self)`**
-    - **Description:** Returns a dictionary containing all IPv4 clients, both wired and Wi-Fi.
-    - **Returns:** `dict` - A dictionary with keys `wired_clients` and `wifi_clients`, each containing a list of client details.
-
-## Dependencies
-
-- The `CPSDK` class depends on the `EventingCSClient` class from the `csclient` module.
-- The `time` module is used for sleeping operations.
+# The alert will only be sent when running on NCOS
+# When running on a computer, it will only log the alert text
+```
