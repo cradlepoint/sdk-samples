@@ -184,4 +184,68 @@ class CPSDK(EventingCSClient):
             return lan_clients
         except Exception as e:
             self.logger.exception(f"Error retrieving clients: {e}")
+
+    def get_lat_long(self):
+        """Return latitude and longitude as floats"""
+        fix = self.get('status/gps/fix')
+        retries = 0
+        while not fix and retries < 5:
+            time.sleep(0.1)
+            fix = self.get('status/gps/fix')
+            retries += 1
+
+        if not fix:
+            return None, None
+
+        try:
+            lat_deg = fix['latitude']['degree']
+            lat_min = fix['latitude']['minute']
+            lat_sec = fix['latitude']['second']
+            long_deg = fix['longitude']['degree']
+            long_min = fix['longitude']['minute']
+            long_sec = fix['longitude']['second']
+            lat = self.dec(lat_deg, lat_min, lat_sec)
+            long = self.dec(long_deg, long_min, long_sec)
+            lat = float(f"{float(lat):.6f}")
+            long = float(f"{float(long):.6f}")
+            return lat, long
+        except:
+            return None, None
             
+    def dec(self, deg, min, sec):
+        """Return decimal version of lat or long from deg, min, sec"""
+        if str(deg)[0] == '-':
+            dec = deg - (min / 60) - (sec / 3600)
+        else:
+            dec = deg + (min / 60) + (sec / 3600)
+        return round(dec, 6)
+    
+    def get_connected_wans(self):
+        """Return list of connected WAN UIDs"""
+        wans = []
+        devices = None
+        while not devices:
+            devices = self.get('status/wan/devices')
+        devices = [x for x in devices if x.startswith('mdm')]
+        for device in devices:
+            if self.get(f'status/wan/devices/{device}/status/connection_state') == 'connected':
+                wans.append(device)
+        if not wans:
+            self.log('No WANs connected!')
+        return wans
+
+    def get_sims(self):
+        """Return list of modem UIDs with SIMs"""
+        SIMs = []
+        devices = None
+        while not devices:
+            devices = self.get('status/wan/devices')
+        for uid, status in devices.items():
+            if uid.startswith('mdm-'):
+                error_text = status.get('status', {}).get('error_text', '')
+                if error_text:
+                    if 'NOSIM' in error_text:
+                        continue
+                SIMs.append(uid)
+        return SIMs
+    
