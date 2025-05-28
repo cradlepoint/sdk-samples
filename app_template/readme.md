@@ -7,11 +7,9 @@ Template for Ericsson Cradlepoint SDK Applications.
 - `start.sh` - shell script that starts the application.
 - `readme.md` - detailed information about the application including any requirements or limitations.
 
-## Usage
-
-To use the `CPSDK` class, instantiate it with the application name and call the desired methods to interact with the router's configuration and status.  
-
 ## Usage Examples
+
+To use the `CPSDK` class, initialize it with the application name and call the desired methods to interact with the router's configuration and status.  
 
 ### Basic Initialization
 ```python
