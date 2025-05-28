@@ -11,11 +11,60 @@ Template for Ericsson Cradlepoint SDK Applications.
 
 To use the `CPSDK` class, instantiate it with the application name and call the desired methods to interact with the router's configuration and status.  
 
-### Quickstart:  
+## Usage Examples
+
+### Basic Initialization
 ```python
 from cpsdk import CPSDK
-cp = CPSDK('My_App')
-cp.log('Starting...')
+
+# Initialize the SDK
+cp = CPSDK("MyApp")
+
+# Get router uptime
+uptime = cp.get_uptime()
+cp.log(f"Router uptime: {uptime} seconds")
+```
+
+### Managing Application Data
+```python
+# Store application data
+cp.post_appdata("my_setting", "value")
+
+# Retrieve application data
+value = cp.get_appdata("my_setting")
+cp.log(f"Retrieved value: {value}")
+```
+
+### Network Client Monitoring
+```python
+# Get all network clients
+clients = cp.get_ipv4_lan_clients()
+
+# Log wired clients
+for client in clients["wired_clients"]:
+    cp.log(f"Wired client: {client['hostname']} ({client['ip']})")
+
+# Log wireless clients
+for client in clients["wifi_clients"]:
+    cp.log(f"Wireless client: {client['hostname']} on {client['ssid']}")
+```
+
+### Certificate Management
+```python
+# Extract certificate and key
+cert_file, key_file = cp.extract_cert_and_key("my_cert")
+if cert_file and key_file:
+    cp.log(f"Certificate saved as: {cert_file}")
+    cp.log(f"Key saved as: {key_file}")
+```
+
+### Alert Example
+```python
+# Send an alert to NCM
+cp.alert("Critical: System temperature exceeded threshold")
+
+# The alert will only be sent when running on NCOS
+# When running on a computer, it will only log the alert text
 ```
 
 # CPSDK Library Documentation
@@ -185,59 +234,3 @@ Registers a callback function for events on a specific path.
   - `path` (str): Path to monitor for events
   - `callback` (callable): Function to call when events occur
 - **Returns:** None
-
-## Usage Examples
-
-### Basic Initialization
-```python
-from cpsdk import CPSDK
-
-# Initialize the SDK
-cp = CPSDK("MyApp")
-
-# Get router uptime
-uptime = cp.get_uptime()
-cp.log(f"Router uptime: {uptime} seconds")
-```
-
-### Managing Application Data
-```python
-# Store application data
-cp.post_appdata("my_setting", "value")
-
-# Retrieve application data
-value = cp.get_appdata("my_setting")
-cp.log(f"Retrieved value: {value}")
-```
-
-### Network Client Monitoring
-```python
-# Get all network clients
-clients = cp.get_ipv4_lan_clients()
-
-# Log wired clients
-for client in clients["wired_clients"]:
-    cp.log(f"Wired client: {client['hostname']} ({client['ip']})")
-
-# Log wireless clients
-for client in clients["wifi_clients"]:
-    cp.log(f"Wireless client: {client['hostname']} on {client['ssid']}")
-```
-
-### Certificate Management
-```python
-# Extract certificate and key
-cert_file, key_file = cp.extract_cert_and_key("my_cert")
-if cert_file and key_file:
-    cp.log(f"Certificate saved as: {cert_file}")
-    cp.log(f"Key saved as: {key_file}")
-```
-
-### Alert Example
-```python
-# Send an alert to NCM
-cp.alert("Critical: System temperature exceeded threshold")
-
-# The alert will only be sent when running on NCOS
-# When running on a computer, it will only log the alert text
-```
