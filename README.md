@@ -29,22 +29,16 @@ The Application Developers Guide is the best document to read first.
 
 - **5GSpeed**
     - Run Ookla speedtests via NCM API.  Results are put in asset_id field (configurable in SDK Data).  Clearing the results starts a new test.  This can be done easily via NCM API v2 /routers/ endpoint.
-- **app_template**
-    - A template for the creation of a new application utilizing the csclient library.
-- **app_holder**
-    - Just a holder for dynamic_app. See dynamic_app.
-- **appdata_sample**
-    - Store and retrieve settings in SDK Appdata in configuration.
 - **Autoinstall**
     - Automatically choose fastest SIM on install.  On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed.  Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.  
 - **Installer_UI**
     - Provide a web interface for installers to configure WiFi and run speedtests.
 - **Mobile_Site_Survey**
     - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
-- **app_template_csclient**
+- **app_template**
     - A template for the creation of a new application utilizing the csclient library.
-- **certificate_sample**
-    - A function to extract certificates to PEM files for use in other applications.
+- **app_holder**
+    - Just a holder for dynamic_app. See dynamic_app.
 - **cli_sample**
     - Includes csterm module that enables access to local CLI to send commands and return output.
 - **clients**
