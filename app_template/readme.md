@@ -179,31 +179,11 @@ Constructs and sends a custom alert to NCM for the device. Apps calling this met
   - Failure: An error
 - **Notes:** Only available when running on NCOS (Linux) devices. When running on a computer, it will only print the alert text.
 
-### Inherited Methods from EventingCSClient
-
-#### `start()`
-Starts the event handling thread.
-- **Parameters:** None
-- **Returns:** None
-- **Side Effects:** Starts a background thread for event handling
-
-#### `stop()`
-Stops the event handling thread.
-- **Parameters:** None
-- **Returns:** None
-- **Side Effects:** Stops the background thread for event handling
-
 #### `register(path, callback)`
 Registers a callback function for events on a specific path.
 - **Parameters:**
   - `path` (str): Path to monitor for events
   - `callback` (callable): Function to call when events occur
-- **Returns:** None
-
-#### `unregister(path)`
-Unregisters event monitoring for a specific path.
-- **Parameters:**
-  - `path` (str): Path to stop monitoring
 - **Returns:** None
 
 ## Usage Examples
