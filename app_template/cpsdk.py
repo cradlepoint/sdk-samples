@@ -53,7 +53,37 @@ class CPSDK(EventingCSClient):
             if item["name"] == name:
                 self.delete(f'config/system/sdk/appdata/{item["_id_"]}')
 
-    
+
+    def get_ncm_api_keys(self):
+        """Get NCM API keys from the router's certificate management configuration."""
+        certs = self.get('config/certmgmt/certs')
+
+        # Initialize API keys dictionary
+        api_keys = {
+            'X-ECM-API-ID': None,
+            'X-ECM-API-KEY': None,
+            'X-CP-API-ID': None,
+            'X-CP-API-KEY': None,
+            'Bearer Token': None
+        }
+
+        # Look for certificates with matching names
+        for cert in certs:
+            cert_name = cert.get('name', '')
+            if 'X-ECM-API-ID' in cert_name:
+                api_keys['X-ECM-API-ID'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
+            elif 'X-ECM-API-KEY' in cert_name:
+                api_keys['X-ECM-API-KEY'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
+            elif 'X-CP-API-ID' in cert_name:
+                api_keys['X-CP-API-ID'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
+            elif 'X-CP-API-KEY' in cert_name:
+                api_keys['X-CP-API-KEY'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
+            elif 'Bearer Token' in cert_name:
+                api_keys['Bearer Token'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
+
+        return api_keys
+
+
     def extract_cert_and_key(self, cert_name_or_uuid):
         """Extract and save the certificate and key to the local filesystem. Returns the filenames of the certificate and key files."""
         cert_x509 = None
