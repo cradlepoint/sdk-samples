@@ -55,33 +55,37 @@ class CPSDK(EventingCSClient):
 
 
     def get_ncm_api_keys(self):
-        """Get NCM API keys from the router's certificate management configuration."""
-        certs = self.get('config/certmgmt/certs')
+        """Get NCM API keys from the router's certificate management configuration.
+        Returns:
+            dict: Dictionary containing all API keys, with None for any missing keys
+        """
+        try:
+            certs = self.get('config/certmgmt/certs')
+            
+            api_keys = {
+                'X-ECM-API-ID': None,
+                'X-ECM-API-KEY': None,
+                'X-CP-API-ID': None,
+                'X-CP-API-KEY': None,
+                'Bearer Token': None
+            }
 
-        # Initialize API keys dictionary
-        api_keys = {
-            'X-ECM-API-ID': None,
-            'X-ECM-API-KEY': None,
-            'X-CP-API-ID': None,
-            'X-CP-API-KEY': None,
-            'Bearer Token': None
-        }
+            for cert in certs:
+                cert_name = cert.get('name', '')
+                for key in api_keys:
+                    if key in cert_name:
+                        api_keys[key] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
 
-        # Look for certificates with matching names
-        for cert in certs:
-            cert_name = cert.get('name', '')
-            if 'X-ECM-API-ID' in cert_name:
-                api_keys['X-ECM-API-ID'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
-            elif 'X-ECM-API-KEY' in cert_name:
-                api_keys['X-ECM-API-KEY'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
-            elif 'X-CP-API-ID' in cert_name:
-                api_keys['X-CP-API-ID'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
-            elif 'X-CP-API-KEY' in cert_name:
-                api_keys['X-CP-API-KEY'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
-            elif 'Bearer Token' in cert_name:
-                api_keys['Bearer Token'] = self.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
+            # Log warning for any missing keys
+            missing = [k for k, v in api_keys.items() if v is None]
+            if missing:
+                self.logger.warning(f"Missing API keys: {', '.join(missing)}")
 
-        return api_keys
+            return api_keys
+            
+        except Exception as e:
+            self.logger.exception(f"Error retrieving NCM API keys: {e}")
+            raise
 
 
     def extract_cert_and_key(self, cert_name_or_uuid):
