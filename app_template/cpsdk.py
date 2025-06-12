@@ -170,6 +170,7 @@ class CPSDK(EventingCSClient):
         """Return a list of IPv4 Wi-Fi clients and their details."""
         wifi_clients = []
         wlan_clients = self.get('status/wlan/clients') or []
+        leases = self.get('status/dhcpd/leases') or []
         bw_modes = {0: "20 MHz", 1: "40 MHz", 2: "80 MHz", 3: "80+80 MHz", 4: "160 MHz"}
         wlan_modes = {0: "802.11b", 1: "802.11g", 2: "802.11n", 3: "802.11n-only", 4: "802.11ac", 5: "802.11ax"}
         wlan_band = {0: "2.4", 1: "5"}
@@ -180,7 +181,11 @@ class CPSDK(EventingCSClient):
             ssid = self.get(f'config/wlan/radio/{radio}/bss/{bss}/ssid')
 
             mac_upper = wlan_client.get("mac", "").upper()
-            hostname = wlan_client.get("hostname")
+            
+            # Get DHCP lease information
+            lease = next((x for x in leases if x.get("mac", "").upper() == mac_upper), None)
+            hostname = lease.get("hostname") if lease else wlan_client.get("hostname")
+            network = lease.get("network") if lease else None
 
             # Set hostname to None if it matches the MAC address with hyphens or is "*"
             if hostname and (hostname.upper() == mac_upper.replace(":", "-") or hostname == "*"):
@@ -189,10 +194,11 @@ class CPSDK(EventingCSClient):
             wifi_clients.append({
                 "mac": wlan_client.get("mac"),
                 "hostname": hostname,
-                "ip_address": wlan_client.get("ip_address"),
+                "ip_address": lease.get("ip_address"),
                 "radio": radio,
                 "bss": bss,
                 "ssid": ssid,
+                "network": network,
                 "band": wlan_band.get(radio, "Unknown"),
                 "mode": wlan_modes.get(wlan_client.get("mode"), "Unknown"),
                 "bw": bw_modes.get(wlan_client.get("bw"), "Unknown"),
