@@ -160,7 +160,7 @@ class CPSDK(EventingCSClient):
             wired_clients.append({
                 "mac": lan_client.get("mac"),
                 "hostname": hostname,
-                "ip": lan_client.get("ip_address"),
+                "ip_address": lan_client.get("ip_address"),
                 "network": network
             })
         return wired_clients
@@ -189,7 +189,7 @@ class CPSDK(EventingCSClient):
             wifi_clients.append({
                 "mac": wlan_client.get("mac"),
                 "hostname": hostname,
-                "ip": wlan_client.get("ip_address"),
+                "ip_address": wlan_client.get("ip_address"),
                 "radio": radio,
                 "bss": bss,
                 "ssid": ssid,
