@@ -6,12 +6,10 @@ class CPSDK(EventingCSClient):
     def __init__(self, appname):
         super().__init__(appname)
 
-
     def get_uptime(self):
         """Return the router uptime in seconds."""
-        uptime = int(self.get('status/system/uptime'))
+        return int(self.get('status/system/uptime'))
         return uptime
-
 
     def wait_for_uptime(self, min_uptime_seconds):
         """Wait for the device uptime to be greater than the specified uptime and sleep if it is less than the specified uptime."""
@@ -26,17 +24,25 @@ class CPSDK(EventingCSClient):
         except Exception as e:
             self.logger.exception(f"Error validating uptime: {e}")
     
-    
+    def wait_for_wan_connection(self):
+        """Wait for a WAN connection to be established."""
+        while True:
+            if self.get('status/wan/connection_state') == 'connected':
+                return
+            time.sleep(1)
+
+    def get_router_id(self):
+        """Return the router ID."""
+        return self.get('status/ecm/client_id')
+
     def get_appdata(self, name):
         """Get value of appdata from NCOS Config by name."""
         appdata = self.get('config/system/sdk/appdata')
         return next(iter(x["value"] for x in appdata if x["name"] == name), None)
-
     
     def post_appdata(self, name, value):
         """Create appdata in NCOS Config by name."""
         self.post('config/system/sdk/appdata', {"name": name, "value": value})
-
     
     def put_appdata(self, name, value):
         """Set value of appdata in NCOS Config by name."""
@@ -44,7 +50,6 @@ class CPSDK(EventingCSClient):
         for item in appdata:
             if item["name"] == name:
                 self.put(f'config/system/sdk/appdata/{item["_id_"]}/value', value)
-
     
     def delete_appdata(self, name):
         """Delete appdata in NCOS Config by name."""
@@ -52,7 +57,6 @@ class CPSDK(EventingCSClient):
         for item in appdata:
             if item["name"] == name:
                 self.delete(f'config/system/sdk/appdata/{item["_id_"]}')
-
 
     def get_ncm_api_keys(self):
         """Get NCM API keys from the router's certificate management configuration.
@@ -86,7 +90,6 @@ class CPSDK(EventingCSClient):
         except Exception as e:
             self.logger.exception(f"Error retrieving NCM API keys: {e}")
             raise
-
 
     def extract_cert_and_key(self, cert_name_or_uuid):
         """Extract and save the certificate and key to the local filesystem. Returns the filenames of the certificate and key files."""
@@ -137,7 +140,6 @@ class CPSDK(EventingCSClient):
             self.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
             return None, None
 
-
     def get_ipv4_wired_clients(self):
         """Return a list of IPv4 wired clients and their details."""
         wired_clients = []
@@ -164,7 +166,6 @@ class CPSDK(EventingCSClient):
                 "network": network
             })
         return wired_clients
-
 
     def get_ipv4_wifi_clients(self):
         """Return a list of IPv4 Wi-Fi clients and their details."""
@@ -207,7 +208,6 @@ class CPSDK(EventingCSClient):
                 "time": wlan_client.get("time", 0)
             })
         return wifi_clients
-
 
     def get_ipv4_lan_clients(self):
         """Return a dictionary containing all IPv4 clients, both wired and Wi-Fi."""
@@ -263,13 +263,10 @@ class CPSDK(EventingCSClient):
     def get_connected_wans(self):
         """Return list of connected WAN UIDs"""
         wans = []
-        devices = None
-        while not devices:
-            devices = self.get('status/wan/devices')
-        devices = [x for x in devices if x.startswith('mdm')]
-        for device in devices:
-            if self.get(f'status/wan/devices/{device}/status/connection_state') == 'connected':
-                wans.append(device)
+        while not wans:
+            wans = self.get('status/wan/devices')
+        # get the wans that are connected
+        wans = [k for k, v in wans.items() if v['status']['connection_state'] == 'connected']
         if not wans:
             self.log('No WANs connected!')
         return wans
@@ -288,4 +285,56 @@ class CPSDK(EventingCSClient):
                         continue
                 SIMs.append(uid)
         return SIMs
+
+    def get_wan_connection_state(self):
+        """Return the connection state of the WAN."""
+        return self.get('status/wan/connection_state')
     
+    def get_wan_devices(self):
+        """Return the list of WAN devices."""
+        return self.get('status/wan/devices')
+    
+    def get_wan_device_status(self, device_id):
+        """Return the status of a WAN device."""
+        return self.get(f'status/wan/devices/{device_id}/status')
+    
+    def get_wan_device_connection_state(self, device_id):
+        """Return the connection state of a WAN device."""
+        return self.get(f'status/wan/devices/{device_id}/status/connection_state')
+    
+    def get_wan_device_profile_id(self, device_id):
+        """Return the profile ID of a WAN device."""
+        return self.get(f'status/wan/devices/{device_id}/config/_id_')
+    
+    def get_ipverify_id_by_name(self, name):
+        """Return the IPVerify ID of a WAN device by name."""
+        ipverifies = self.get('config/identities/ipverify')
+        return next(iter(x['_id_'] for x in ipverifies if x['name'] == name), None)
+    
+    def register_ipverify_function(self, ipverify_id, function):
+        """Register a function to be called when the IPVerify test state changes."""
+        self.register('put', f'status/ipverify/{ipverify_id}/pass', function)
+
+    def get_wan_profiles(self):
+        """Return the list of WAN profiles."""
+        return self.get('config/wan/rules2')
+    
+    def get_wan_profile_by_id(self, id):
+        """Return the WAN profile by ID."""
+        return next(iter(x for x in self.get('config/wan/rules2') if x['_id_'] == id), None)
+    
+    def get_wan_profile_by_name(self, name):
+        """Return the WAN profile by name."""
+        return next(iter(x for x in self.get('config/wan/rules2') if x['name'] == name), None)
+    
+    def get_custom_apns(self):
+        """Return the list of custom APNs."""
+        return self.get('config/wan/custom_apns')
+    
+    def add_custom_apn(self, carrier, apn):
+        """Add a custom APN to the config"""
+        self.post('config/wan/custom_apns', {'carrier': carrier, 'apn': apn})
+
+    def delete_custom_apn(self, apn):
+        """Delete a custom APN from the config"""
+        self.delete(f'config/wan/custom_apns/{apn}')
