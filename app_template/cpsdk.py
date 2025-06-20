@@ -337,4 +337,8 @@ class CPSDK(EventingCSClient):
 
     def delete_custom_apn(self, apn):
         """Delete a custom APN from the config"""
-        self.delete(f'config/wan/custom_apns/{apn}')
+        custom_apns = self.get('config/wan/custom_apns')
+        for i, custom_apn in enumerate(custom_apns):
+            if custom_apn['apn'] == apn:
+                self.delete(f'config/wan/custom_apns/{i}')
+                return
