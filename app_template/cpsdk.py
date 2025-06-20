@@ -301,6 +301,10 @@ class CPSDK(EventingCSClient):
     def get_wan_device_connection_state(self, device_id):
         """Return the connection state of a WAN device."""
         return self.get(f'status/wan/devices/{device_id}/status/connection_state')
+
+    def get_wan_device_diagnostics(self, device_id):
+        """Return the diagnostics of a WAN device."""
+        return self.get(f'status/wan/devices/{device_id}/diagnostics')
     
     def get_wan_device_profile_id(self, device_id):
         """Return the profile ID of a WAN device."""
