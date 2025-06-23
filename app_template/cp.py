@@ -988,6 +988,10 @@ def get_logger():
     """Get the logger instance for advanced logging control."""
     return _cs_client.logger
 
+# Monkay patch for cp.uptime()
+def uptime():
+    return time.time()
+    
 def clean_up_reg(signal, frame):
     """
     When 'cppython remote_port_forward.py' gets a SIGTERM, config_store_receiver.py doesn't
