@@ -1,6 +1,7 @@
 > # Update your app_template!
 > ### Download [app_template.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/app_template.tar.gz)
 > ### Extract it over the top of your existing app_template/ in your sdk-samples folder.
+> ### Get all the latest functionality!
 
 # Documentation
 
