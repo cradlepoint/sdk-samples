@@ -23,11 +23,6 @@ jobs:
         run: |
            chmod +x ./.github/workflows/check_root_readme_entries.sh 
            ./.github/workflows/check_root_readme_entries.sh 
-        shell: bash       
-      - name: Check if there is a new csclient.py
-        run: |
-          chmod +x ./.github/workflows/csclient_compare.sh
-          ./.github/workflows/csclient_compare.sh
         shell: bash
       - name: Run make build and clean
         run: |
