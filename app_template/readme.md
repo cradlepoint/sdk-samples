@@ -2,6 +2,10 @@
 
 Template for creating Ericsson Cradlepoint SDK Applications
 
+> ### *Update your app_template!*
+> ### Download [app_template.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/app_template.tar.gz)
+> ### Extract it over the top of your existing app_template/ in your sdk-samples folder.
+
 ## File Descriptions
 
 *   **`app_template.py`**: The main application file. This is where you will write the primary logic for your SDK application. It utilizes the `cp.py` library to interact with the router.
