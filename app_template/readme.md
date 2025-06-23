@@ -20,15 +20,32 @@
 To use the library, import the `cp` module and call the desired functions.
 
 ```python
+# import the SDK library
 import cp
 
 # Get router uptime
 uptime = cp.get_uptime()
 cp.log(f"Router uptime: {uptime} seconds")
 
-# Get all network clients
+# Get connected clients
 clients = cp.get_ipv4_lan_clients()
-cp.log(clients)
+cp.log(f"Total clients: {len(clients)}")
+cp.log(f"Client details: {clients}")
+
+# Get device location
+lat_long = cp.get_lat_long()
+if lat_long:
+    cp.log(f"Device location: {lat_long}")
+
+# Get connected WANs
+wans = cp.get_connected_wans()
+cp.log(f"Connected WANs: {len(wans)}")
+cp.log(f"WAN details: {wans}")
+
+# Get SIM information
+sims = cp.get_sims()
+cp.log(f"SIM cards: {len(sims)}")
+cp.log(f"SIM details: {sims}")
 ```
 
 ## Function Reference
