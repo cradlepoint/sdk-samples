@@ -1,10 +1,10 @@
-# `app_template` Documentation
-
-Template for creating Ericsson Cradlepoint SDK Applications
-
-> ### *Update your app_template!*
+> # Update your app_template!
 > ### Download [app_template.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/app_template.tar.gz)
 > ### Extract it over the top of your existing app_template/ in your sdk-samples folder.
+
+# Documentation
+
+`app_template` is a template for creating Ericsson Cradlepoint SDK Applications
 
 ## File Descriptions
 
