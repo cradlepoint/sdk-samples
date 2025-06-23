@@ -1,13 +1,10 @@
-# NCOS SDK and Sample Applications.
-
-----------
-
-This directory contains the NCOS SDK tools and sample applications. 
-
-The Application Developers Guide is the best document to read first.
+# Ericsson Cradlepoint NCOS SDK and Sample Applications.
 
 ## Documentation
 
+- **Quickstart: Get the latest updates from app_template:**
+    - **https://github.com/cradlepoint/sdk-samples/blob/master/app_template/readme.md**
+      
 - **NCOS SDK Developers Guide**
     - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
 
