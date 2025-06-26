@@ -1,6 +1,8 @@
 # splunk_log_filter
  
-Splunk Log Filtering Application
+Ericsson Cradlepoint -> Splunk Log Filtering Application
+
+![image](https://github.com/user-attachments/assets/353000e8-607f-4782-93b8-42e837236ff3)
 
 ## Overview
 
