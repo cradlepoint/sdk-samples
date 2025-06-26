@@ -120,6 +120,10 @@
     - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
 - **simple_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
+- **splunk_conntrack**
+    - This app tails the conntrack table and sends new connections to Splunk.
+- **splunk_log_filter**
+    - This app tails /var/log/messages and sends filtered lines to Splunk.
 - **system_monitor**
     - Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
 - **tailscale**
