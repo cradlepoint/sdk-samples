@@ -90,6 +90,8 @@
     - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central.
 - **mqtt_azure_tls**
     - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central over TLS connection.
+- **ncx_self_provision**
+    - Script and accompanying SDK application to allow devices to 'sef-provision' to an NCX/SASE network.
 - **OBDII_monitor**
     - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
 - **ping_sample**
