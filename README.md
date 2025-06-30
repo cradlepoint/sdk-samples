@@ -138,6 +138,8 @@
 	-  Upon *any* Modem interface reaching 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit (minbwup and minbwdown variables).
 - **throttle_cellular_datacap_rate_tiered**
 	-  Upon *any* Modem interface reaching 70, 80, 90 or 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit as set by the rate tier (minbwup and minbwdown variables).
+- **tunnel_modem_reset**
+	- Monitor tunnels and if down, reset modem it egresses from.
 - **usb_alerts**
 	- Send alerts when USB devices are connected or disconnected.  
 ----------
