@@ -1,6 +1,6 @@
 # NCX Self-Provisioning SDK Application
 
-This SDK application enables Ericsson routers to automatically self-provision themselves to an NCX (Network Cloud Exchange) or SASE (Secure Access Service Edge) network when moved into a staging group. The application handles license application, exchange site creation, resource provisioning, and group re-assignment automatically.
+This SDK application enables Ericsson routers to automatically self-provision themselves to an NCX or SASE network when moved into a staging group. The application handles license application, exchange site creation, resource provisioning, and group re-assignment automatically.
 
 ## Overview
 
