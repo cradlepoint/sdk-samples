@@ -14,8 +14,20 @@ def build_keys():
 def apply_license():
     secure_connect_lic = cp.get_appdata('secure_connect_lic')
     mac = cp.get('status/product_info/mac0')
-    cp.log(f"Applying license {secure_connect_lic} to {mac}")
+    cp.log(f"Applying Secure Conenct license {secure_connect_lic} to {mac}")
     n3.regrade(mac=mac, subscription_id=secure_connect_lic)
+
+    time.sleep(1)
+    sdwan_lic = cp.get_appdata('sdwan_lic')
+    if sdwan_lic != 'None':
+        cp.log(f"Applying SD-WAN license {sdwan_lic} to {mac}")
+        n3.regrade(mac=mac, subscription_id=sdwan_lic)
+
+    time.sleep(1)
+    hmf_lic = cp.get_appdata('hmf_lic')
+    if hmf_lic != 'None':
+        cp.log(f"Applying HMF license {hmf_lic} to {mac}")
+        n3.regrade(mac=mac, subscription_id=hmf_lic)
 
 
 # Create exchange site
