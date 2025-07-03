@@ -30,6 +30,8 @@ create_lan_resource = 'True' # 'True' if an ip subnet resource is to be created 
 create_cp_host_resource = 'True' # 'True' if an FQDN resource is to be created for the default 'cp' hostname. Will be appended by the local domain
 create_wildcard_resource = 'True' # 'True' if a wildcard FQDN resource is to be created for the site
 secure_connect_lic = 'NCX-SCIOT' # Secure Connect license typeto apply to the router. Obtain from APIv3 'regrades' endpoint docs
+sdwan_lic = 'None' # SD-WAN license type to apply to the router. Obtain from APIv3 'regrades' endpoint docs or 'None' if not applicable
+hmf_lic = 'None' # HMF license type to apply to the router. Obtain from APIv3 'regrades' endpoint docs or 'None' if not applicable
 
 # Build config_json to apply to staging group
 config_json = {
@@ -77,6 +79,16 @@ config_json = {
                             "name": "secure_connect_lic",
                             "value": f'{secure_connect_lic}',
                             "_id_": "00000007-8e48-3903-ad8c-538bad254b4c"
+                        },
+                        "00000008-8e48-3903-ad8c-538bad254b4c": {
+                            "name": "sdwan_lic",
+                            "value": f'{sdwan_lic}',
+                            "_id_": "00000008-8e48-3903-ad8c-538bad254b4c"
+                        },
+                        "00000009-8e48-3903-ad8c-538bad254b4c": {
+                            "name": "hmf_lic",
+                            "value": f'{hmf_lic}',
+                            "_id_": "00000009-8e48-3903-ad8c-538bad254b4c"
                         }
                     }
                 }
