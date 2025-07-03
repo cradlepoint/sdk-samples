@@ -50,9 +50,11 @@ Before deploying, you need to update the `ncx_staging.py` script with your speci
    create_wildcard_resource = 'True' # Create wildcard FQDN resource
    ```
 
-6. **License Configuration** - Set the Secure Connect license type:
+6. **License Configuration** - Set the Secure Connect, SD-WAN and HMF license type:
    ```python
    secure_connect_lic = 'NCX-SCIOT'  # Your license type
+   sdwan_lic = 'None' # None or your license type
+   hmf_lic = 'None' # None or your license type
    ```
 
 ### Step 2: Configure the Staging Group
@@ -84,7 +86,7 @@ When devices are moved into the staging group, they will automatically:
 
 1. **Wait for System Readiness** - Wait for router uptime and WAN connection
 2. **Build API Keys** - Retrieve and decrypt API credentials from device certificates
-3. **Apply License** - Apply the configured Secure Connect license to the router
+3. **Apply Licenses** - Apply the configured Secure Connect, SD-WAN and HMF licenses to the router
 4. **Create Exchange Site** - Create an exchange site in the specified network
 5. **Create Resources** - Create configured resources (LAN subnet, FQDN, wildcard)
 6. **Move to Production group** - Move the router to the production group
@@ -113,6 +115,9 @@ The following parameters are configured via the staging script and used by the s
 | `create_cp_host_resource` | Create FQDN resource for router hostname | `'True'` or `'False'` |
 | `create_wildcard_resource` | Create wildcard FQDN resource | `'True'` or `'False'` |
 | `secure_connect_lic` | Secure Connect license type to apply | `'NCX-SCIOT'` |
+| `sdwan_lic` | SD-WAN license type to apply | `'None'` |
+| `hmf_lic` | HMF license type to apply | `'None'` |
+
 
 ## Prerequisites
 
