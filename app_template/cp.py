@@ -982,6 +982,14 @@ def get_system_resources(cpu=True, memory=True):
 
     return system_resources
 
+def get_ncm_status():
+    """Return the NCM status"""
+    return _cs_client.get('status/ecm/state')
+
+def reboot_device():
+    """Reboot the device"""
+    _cs_client.put('control/system/reboot', 'reboot hypmgr')
+    
 # Direct access to the underlying EventingCSClient methods
 def get(base, query='', tree=0):
     """Direct access to the underlying get method."""
