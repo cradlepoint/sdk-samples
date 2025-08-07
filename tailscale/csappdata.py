@@ -10,12 +10,16 @@ class AppDataCSClient(EventingCSClient):
         self.eccappdata = None
         
         if encrypt_cert_name:
-            encrypt_cert_uuid = self.find_cert_id_by_name(encrypt_cert_name)
-            if not encrypt_cert_uuid:
-                raise ValueError(f"Encryption requested but certificate '{encrypt_cert_name}' not found.")
-            cert, key = self.get_cert_and_private_key(uuid=encrypt_cert_uuid)
-            self.eccappdata = ECCEncryptor(cert_pem=cert, private_key_pem=key)
+            self.enable_encryption(encrypt_cert_name)
         self.change_listeners = {}
+
+    def enable_encryption(self, encrypt_cert_name):
+        encrypt_cert_uuid = self.find_cert_id_by_name(encrypt_cert_name)
+        if not encrypt_cert_uuid:
+            self.log(f"Encryption requested but certificate '{encrypt_cert_name}' not found.")
+            return
+        cert, key = self.get_cert_and_private_key(uuid=encrypt_cert_uuid)
+        self.eccappdata = ECCEncryptor(cert_pem=cert, private_key_pem=key)
 
     def on_appdata_change(self, key, callback):
         if len(self.change_listeners) == 0:
