@@ -1,0 +1,36 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2025-08-07T10:07:16.389572",
+        "files": {
+            "cp.py": "a68ca6341110f24f54d0b47ac4c84d30c4a7789682fa8b7520b512c06df16a30",
+            "cs_explorer.py": "5d6d8836661929794df19486c4d55559f1c2bd1c974b53010f68063748ebe7d6",
+            "fontawesome.css": "8d321d88cb97fdedc3189506c25de9292c6e73a60ebaab496243346c6404480e",
+            "index.html": "1781893573cd8a4ea4d19b55fb0c935c20cc9299d22bd5883cbf732ada7846f1",
+            "package.ini": "06b4bcbf1307b48bd81bcb2428f39ef97b464b86a9d41d9480ad195e05366afe",
+            "readme.md": "6061d91d90d757f6b00f227aa1f964682cfc1b525eee7b3322a909185f18f986",
+            "script.js": "e1ae48c9ee68646d625eb41b351e65720392b382ad64060feb444b8dffb35587",
+            "start.sh": "db35bd70f70f775bf2945e24db8877cd9bc23538bd1704d422979ac96ecede76",
+            "style.css": "511ae262a337b6e0804d9cbc23c83b39abb48c3c8464a7109e3c02332b12d7e3",
+            "webfonts/fa-brands-400.woff2": "29bc44694c394921d1f00271128a2e4cd8293516216e24eac07a73fa821fc1f5",
+            "webfonts/fa-regular-400.woff2": "fa79fc4f2559112ff3dd27cf5be216d9b5f88066ceef728264f5a3a1a195fc1e",
+            "webfonts/fa-solid-900.woff2": "1b099f88c06ed0869872561c157f0ec9cbe133a0939d9ece4ee1e1f54bd4683d"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 25,
+        "name": "cs_explorer",
+        "notes": "Config Store Explorer",
+        "reboot": true,
+        "restart": true,
+        "uuid": "988d6cf2-9a5a-4875-a77e-51bf59c0d3ab",
+        "vendor": "Ericsson/Cradlepoint",
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    }
+}
