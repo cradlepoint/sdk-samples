@@ -46,6 +46,8 @@
     - Web interface for running linux shell commands.
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
+- **cs_explorer**
+    - A web based application for exploring config store (CS) data. Runs on http://ROUTER_IP:9002 by default.
 - **dead_reckoning**
     - Enables dead_reckoning for GPS send-to-server.
 - **ddns**

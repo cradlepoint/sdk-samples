@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Store Explorer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="fontawesome.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="sidebar-title-header">
+                    <h1><i class="fas fa-database"></i> Config Store Explorer</h1>
+                </div>
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search config store..." />
+                    <button id="searchBtn"><i class="fas fa-search"></i></button>
+                    <button id="darkModeToggle" class="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar with Tree -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h3><i class="fas fa-folder-tree"></i> Config Store</h3>
+                    <div class="toolbar">
+                        <button id="refreshBtn" title="Refresh"><i class="fas fa-refresh"></i></button>
+                        <button id="expandAllBtn" title="Expand All"><i class="fas fa-expand-arrows-alt"></i></button>
+                        <button id="collapseAllBtn" title="Collapse All"><i class="fas fa-compress-arrows-alt"></i></button>
+                    </div>
+                </div>
+                <div class="tree-container">
+                    <div id="treeView" class="tree-view">
+                        <!-- Tree will be populated here -->
+                    </div>
+                </div>
+                <div class="sidebar-resizer" id="sidebarResizer"></div>
+            </aside>
+
+            <!-- Content Area -->
+            <main class="content-area">
+                <!-- Breadcrumb -->
+                <div class="breadcrumb-container">
+                    <nav class="breadcrumb" id="breadcrumb">
+                        <span class="breadcrumb-item active"><i class="fas fa-home"></i> Root</span>
+                    </nav>
+                </div>
+
+                <!-- Content Display -->
+                <div class="content-display">
+                    <div id="welcomeScreen" class="welcome-screen">
+                        <div class="welcome-content">
+                            <i class="fas fa-router welcome-icon"></i>
+                            <h1>Welcome to Config Store Explorer!</h1>
+                            <p>Dynamically explore your router using an intuitive interface</p>
+                            <div class="quick-actions">
+                                <h3>Quick Start:</h3>
+                                <ul>
+                                    <li><i class="fas fa-folder"></i> Expand folders to discover available data paths</li>
+                                    <li><i class="fas fa-search"></i> Search across all router data paths and content</li>
+                                    <li><i class="fas fa-magic"></i> Data structure is discovered dynamically from your router</li>
+                                    <li><i class="fas fa-refresh"></i> Refresh to get the latest router information</li>
+                                </ul>
+                            </div>
+                            <div class="data-branches">
+                                <h3>Root Data Structure:</h3>
+                                <div class="branch-list">
+                                    <span class="branch-item"><i class="fas fa-cog"></i> config - Router configuration</span>
+                                    <span class="branch-item"><i class="fas fa-info-circle"></i> status - Live router values</span>
+                                    <span class="branch-item"><i class="fas fa-sliders-h"></i> control - Router controls (GPIO, etc.)</span>
+                                    <span class="branch-item"><i class="fas fa-database"></i> state - Router state data</span>
+                                </div>
+                            </div>
+                            <div class="color-legend">
+                                <h3>Data Type Legend:</h3>
+                                <div class="legend-grid">
+                                    <div class="legend-item">
+                                        <span class="legend-color json-key">Property</span>
+                                        <span class="legend-description">Object keys / properties</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color json-string">String</span>
+                                        <span class="legend-description">Text values</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color json-number">Number</span>
+                                        <span class="legend-description">Numeric values</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color json-boolean">Boolean</span>
+                                        <span class="legend-description">True / false values</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color json-null">null</span>
+                                        <span class="legend-description">Empty / null values</span>
+                                    </div>
+                                    <div class="legend-item legend-decrypt-item">
+                                        <button class="legend-decrypt-btn">Decrypt</button>
+                                        <span class="legend-description">Decrypt encrypted values</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="contentDisplay" class="content-display-area" style="display: none;">
+                        <!-- File/Data Content -->
+                        <div class="content-header">
+                            <div class="content-title">
+                                <i id="contentIcon" class="fas fa-file"></i>
+                                <span id="contentName">File Name</span>
+                            </div>
+                            <div class="content-meta">
+                                <span id="contentType" class="meta-badge">Type</span>
+                                <span id="contentSize" class="meta-badge">Size</span>
+                                <span id="lastUpdated" class="meta-badge">Updated</span>
+                            </div>
+                        </div>
+                        
+                        <div class="content-body">
+                            <div class="content-toolbar">
+                                <button id="copyDataBtn" title="Copy Data"><i class="fas fa-copy"></i> Copy</button>
+                                <button id="downloadBtn" title="Download JSON"><i class="fas fa-download"></i> Download</button>
+                                <button id="rawViewBtn" title="Raw View"><i class="fas fa-code"></i> Raw</button>
+                                <button id="prettyViewBtn" title="Pretty View" class="active"><i class="fas fa-eye"></i> Pretty</button>
+                                <button id="legendToggleBtn" title="Toggle Color Legend"><i class="fas fa-palette"></i> Legend</button>
+                            </div>
+                            
+                            <div id="dataContainer" class="data-container">
+                                <!-- Data will be displayed here -->
+                            </div>
+                            
+                            <!-- Floating Color Legend for Data View -->
+                            <div id="floatingLegend" class="floating-legend" style="display: none;">
+                                <div class="floating-legend-header">
+                                    <h4><i class="fas fa-palette"></i> Color Guide</h4>
+                                    <button id="closeLegendBtn" class="close-legend-btn"><i class="fas fa-times"></i></button>
+                                </div>
+                                <div class="floating-legend-content">
+                                    <div class="legend-row">
+                                        <span class="legend-color json-key">Property</span>
+                                        <span class="legend-color json-string">String</span>
+                                        <span class="legend-color json-number">Number</span>
+                                    </div>
+                                    <div class="legend-row">
+                                        <span class="legend-color json-boolean">Boolean</span>
+                                        <span class="legend-color json-null">null</span>
+                                        <button class="legend-decrypt-btn-floating">Decrypt</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search Results -->
+                    <div id="searchResults" class="search-results" style="display: none;">
+                        <div class="search-header">
+                            <h3><i class="fas fa-search"></i> Search Results</h3>
+                            <span id="searchQuery" class="search-query"></span>
+                        </div>
+                        <div id="searchResultsList" class="search-results-list">
+                            <!-- Search results will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner">
+                <i class="fas fa-router fa-spin"></i>
+                <p>Loading router data...</p>
+            </div>
+        </div>
+
+        <!-- Error Modal -->
+        <div id="errorModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+                    <button id="closeErrorModal" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="errorMessage">An error occurred.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=2"></script>
+</body>
+</html>
