@@ -6,7 +6,7 @@ import sys
 if __name__ == "__main__":
     command = sys.argv[1]
 
-    cs = AppDataCSClient('certificate_data', encrypt_cert_name='ecc')
+    cs = AppDataCSClient('tailscale', encrypt_cert_name='ecc')
 
     if command in ["tskey", "tsversion", "tstags", "tsserver"]:
         try:
