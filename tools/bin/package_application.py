@@ -53,15 +53,10 @@ def hash_dir(target, hash_func=hashlib.sha256):
 
 
 def pack_package(app_root, app_name):
-    print('app_root: {}'.format(app_root))
-    print('app_name: {}'.format(app_name))
-    print("pack TAR:%s.tar" % app_name)
     tar_name = "{}.tar".format(app_name)
     tar = tarfile.open(tar_name, 'w')
     tar.add(app_root, arcname=os.path.basename(app_root))
     tar.close()
-
-    print("gzip archive:%s.tar.gz" % app_name)
     gzip_name = "{}.tar.gz".format(app_name)
     with open(tar_name, 'rb') as f_in:
         with gzip.open(gzip_name, 'wb') as f_out:
@@ -125,7 +120,7 @@ def package_application(app_root, pkey):
         pmf['version_patch'] = int(0)
 
         app = {}
-        app['name'] = str(section)
+        app['name'] = app_name
         try:
             app['uuid'] = config[section]['uuid']
         except KeyError:
@@ -160,10 +155,10 @@ def package_application(app_root, pkey):
 
         create_signature(app_metadata_folder, pkey)
 
-        app_name_version = f"{section} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
+        app_name_version = f"{app_name} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
         pack_package(app_root, app_name_version)
 
-        print('Package {}.tar.gz created'.format(section))
+        print('Package {}.tar.gz created'.format(app_name_version))
 
 
 def argument_list(args):
