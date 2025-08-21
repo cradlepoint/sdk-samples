@@ -185,7 +185,14 @@ def package(app=None):
     setup_script(app_path)
 
     try:
-        subprocess.check_output('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True)
+        result = subprocess.run('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True, capture_output=True, text=True)
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr)
+        if result.returncode != 0:
+            print('Error packaging {}: {}'.format(app_name, result.stderr))
+            success = False
     except subprocess.CalledProcessError as err:
         print('Error packaging {}: {}'.format(app_name, err))
         success = False
