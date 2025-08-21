@@ -282,6 +282,9 @@ def install():
         except Exception as e:
             app_archive = f"{g_app_name}.tar.gz"
 
+        if not os.path.exists(app_archive):
+            print(f'ERROR: File {app_archive} does not exist. Cannot install.')
+            return
         # Use sshpass for Linux or OS X
         cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
                g_dev_client_password, app_archive,
