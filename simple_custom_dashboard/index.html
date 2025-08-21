@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" type="text/css" href="index.css">
+    <title>Simple Custom Dashboard</title>
+</head>
+
+<script src="index.js"></script>
+
+<body onload="get_data()">
+
+<center><img src="cp_logo.png" alt="Cradlepoint"></center>
+
+<center><h1 id="router data"></h1></center>
+<center><h1 id="host os"></h1></center>
+<center><h1 id="system id"></h1></center>
+<center><h1 id="modem temp"></h1></center>
+
+<div id="default config">
+    <p>
+        <button name="default config button" onclick="show_buttons()">Show more buttons</button>
+    </p>
+</div>
+
+<div id="main page" style="display:none;">
+    <p>Click another button:</p>
+
+    <div id="config buttons">
+        <p>
+            <button id="menu button" name="menu" onclick="headerSelect(this.name)" value="Menu">Menu</button>&nbsp;
+            <button id="upload button" name="upload" onclick="headerSelect(this.name)" value="UPLOAD FILE">Upload File</button>&nbsp;&nbsp;
+        </p>
+    </div>
+
+    <div id="menu" style="background:#eee;border:1px solid #ccc;padding:5px 10px;display:none;">
+        <p>A Menu of more Buttons</p>
+        <p>Select a button:</p>
+
+        <div style="text-align: center;">
+                <form method="post">
+                    <button name="Button One" value="button_one_click">Send button_one_click to Router</button>
+                    <button name="Button Two" value="button_two_click">Send button_two_click to Router</button>&nbsp;
+                </form>
+        </div>
+    </div>
+
+    <div id="upload" style="background:#eee;border:1px solid #ccc;padding:5px 10px;display:none;">
+        <p style="text-align: center;">Upload a file to the router:</p>
+        <form enctype="multipart/form-data" id="config file" method="post" name="send_config file">
+            <p>
+                <input type="file" id="file1" name="file" accept=".txt"><br><br>
+                <button>Upload</button>
+            </p>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>
