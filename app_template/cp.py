@@ -1023,6 +1023,9 @@ def register(action, path, callback, *args):
     """Registers a callback for a config store event."""
     return _cs_client.register(action, path, callback, *args)
 
+# Alias for register function
+on = register
+
 def unregister(eid):
     """Unregisters a callback by its event ID."""
     return _cs_client.unregister(eid)
