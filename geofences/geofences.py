@@ -6,9 +6,7 @@
 from geopy import distance
 import time
 import json
-from cpsdk import CPSDK
-
-cp = CPSDK('geofences')
+import cp
 
 # Default geofences list
 default_geofences = [

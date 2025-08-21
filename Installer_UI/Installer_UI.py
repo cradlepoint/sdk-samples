@@ -1,6 +1,6 @@
 # Installer_UI - Web UI for installers to configure WiFi and run speedtests.
 
-from csclient import EventingCSClient
+import cp
 import tornado.web
 import json
 from speedtest import Speedtest
@@ -146,7 +146,6 @@ def get_signal_quality():
         return None, None, None, None
     
 if __name__ == '__main__':
-    cp = EventingCSClient('Installer_UI')
     cp.log('Starting... edit Installer Password under System > SDK Data.')
     get_config('installer_password')
     open_firewall()

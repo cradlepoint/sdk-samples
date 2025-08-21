@@ -1,9 +1,7 @@
 # ddns.py
 # Update the ddns_hostname with the IP address of the WAN device matching the ddns_wan_profile
 
-# Initialize the CPSDK
-from cpsdk import CPSDK
-cp = CPSDK('ddns')
+import cp
 
 import requests
 import base64
@@ -22,6 +20,8 @@ def update_ddns(username, password, hostname, ip):
     }
     response = requests.get(ddns_update_url, headers=headers, params=params)
     return response.text
+
+cp.log('Starting...')
 
 previous_ip = ''
 while True:

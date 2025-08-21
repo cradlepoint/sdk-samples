@@ -3,13 +3,12 @@ This app will create a file and then upload it to an FTP server.
 The file will be deleted when the app is stopped.
 """
 
-from csclient import EventingCSClient
+import cp
 from ftplib import FTP
 
-cp = EventingCSClient('ftp_client')
 TEMP_FILE = 'my_file.txt'
 
-cp.log('ftp_client send_ftp_file()...')
+cp.log('Starting...')
 # Create a temporary file to upload to an FTP server
 try:
     f = open(TEMP_FILE, 'w')

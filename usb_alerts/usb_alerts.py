@@ -1,9 +1,8 @@
 # usb_alerts - send alerts when USB devices are connected or disconnected
 
-from csclient import EventingCSClient
+import cp
 from subprocess import Popen, PIPE
 
-cp = EventingCSClient('usb_alerts')
 cp.log('Starting...')
 
 cmd = ['/usr/bin/tail', '/var/log/messages', '-F']

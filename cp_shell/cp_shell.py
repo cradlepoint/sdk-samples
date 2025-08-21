@@ -7,7 +7,7 @@ import time
 from select import select
 import tornado.web
 from functools import partial
-from csclient import EventingCSClient
+import cp
 
 server_port = 8022
 
@@ -51,7 +51,6 @@ class ShellHandler(tornado.web.RequestHandler):
 
 
 if __name__ == "__main__":
-    cp = EventingCSClient('cp_shell')
     cp.log(f'Starting webserver on port {server_port}...')
     application = tornado.web.Application([
         (r"/shell", ShellHandler),

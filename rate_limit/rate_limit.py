@@ -1,7 +1,6 @@
 # rate_limit - enable QoS rule 1 until datacap alert is met then toggle to rule 2
-from csclient import EventingCSClient
+import cp
 import time
-cp = EventingCSClient('rate_limit')
 cp.log('Starting...')
 limited = False
 while True:

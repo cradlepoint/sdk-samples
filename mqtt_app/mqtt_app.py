@@ -16,11 +16,9 @@ import paho.mqtt.client as mqtt
 import paho.mqtt.publish as publish
 
 from threading import Thread
-from csclient import EventingCSClient
+import cp
 
-cp = EventingCSClient('mqtt_app')
 mqtt_client = None
-
 
 # Called when the broker responds to our connection request.
 def on_connect(client, userdata, flags, rc):

@@ -1,6 +1,6 @@
 # iperf3 - run iperf3 to user defined server and update asset_id
 
-from csclient import EventingCSClient
+import cp
 import subprocess
 import json
 import time
@@ -107,7 +107,6 @@ def download_iperf3():
         cp.log(f"An error occurred: {e}")
         return False
 
-cp = EventingCSClient('iPerf3')
 cp.log('Starting...')
 if download_iperf3():
     cp.log('Set iPerf3 server in System > SDK Appdata.  Clear asset_id to run iPerf3.')

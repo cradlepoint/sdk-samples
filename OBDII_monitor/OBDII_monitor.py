@@ -16,7 +16,7 @@
 # "FUEL_SYSTEM_MONITOR": {"condition": "!=", "value": "COMPLETE"}
 
 
-from csclient import EventingCSClient
+import cp
 import time
 import json
 
@@ -28,8 +28,6 @@ defaults = {
     "ENGINE_OIL_TEMPERATURE": {"condition": ">", "value": 260},  # degrees fahrenheit
     "ENGINE_OIL_PRESSURE": {"condition": "<", "value": 25}  # PSI
 }
-
-cp = EventingCSClient('OBDII_monitor')
 
 def get_config(name):
     try:

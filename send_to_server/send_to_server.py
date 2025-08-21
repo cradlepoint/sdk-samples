@@ -1,7 +1,7 @@
 # send_to_server - get data from user defined paths and POST to user defined server at user defined interval.
 # Settings are stored in SDK Appdata.
 
-from csclient import EventingCSClient
+import cp
 import json
 import time
 import requests
@@ -33,7 +33,6 @@ def get_appdata(name):
         cp.log(f'No appdata found - Saved default: {data}')
     return data
 
-cp = EventingCSClient('send_to_server')
 cp.log('Starting...')
 
 while True:

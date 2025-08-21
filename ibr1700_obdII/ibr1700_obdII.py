@@ -9,11 +9,9 @@ This app does the following:
 
 """
 import settings
-from csclient import EventingCSClient
+import cp
 import paho.mqtt.client as mqtt
 
-
-cp = EventingCSClient('ibr1700_obdii')
 
 mqtt_client = None
 

@@ -24,10 +24,7 @@ import platform
 import collections
 
 from importlib import util
-from csclient import EventingCSClient
-
-cp = EventingCSClient('python_module_list')
-
+import cp
 
 def log_module_list():
     # name this file (module)

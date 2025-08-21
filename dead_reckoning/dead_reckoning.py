@@ -9,7 +9,7 @@ import socket
 import socketserver
 import serial
 import time
-from csclient import EventingCSClient
+import cp
 from pynmeagps import NMEAReader, NMEAMessage
 
 class handler(socketserver.BaseRequestHandler):
@@ -246,7 +246,6 @@ def debug_log(msg):
         cp.log(msg)
 
 if __name__ == '__main__':
-    cp = EventingCSClient('dead_reckoning')
     cp.log(f'Starting...')
     enable_GPS_send_to_server()
     get_config('dead_reckoning')

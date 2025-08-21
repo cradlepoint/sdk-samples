@@ -2,7 +2,7 @@
 A Simple Web server
 """
 
-from csclient import EventingCSClient
+import cp
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
@@ -24,8 +24,6 @@ class WebServerRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(bytes(WEB_MESSAGE, "utf8"))
         return
 
-
-cp = EventingCSClient('simple_web_server')
 
 WEB_MESSAGE = "Hello World from Cradlepoint router!"
 

@@ -1,0 +1,29 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2025-08-21T20:44:01.931537",
+        "files": {
+            "csclient.py": "d854270f11d142bdc645517f5d76fced9ed670a8c2bbab038bc9692f7ee50baa",
+            "package.ini": "774ec66eb5c9afed11594eb7a33e05f6986472830d7d3ae9148944d79db10d31",
+            "ports_status.py": "d8aabf22c70921af3be8bcfb2522a2eb10c8b3304d438624f008be835bf4ab1a",
+            "readme.txt": "d4c33ebe3acf2483658fdefbc15a9221cb7ce66b90d4382359b42e505561ead7",
+            "start.sh": "320bb13a734a6a4af34e4a830b571c2088b40618dc7c9a9a3690a983eef457f9"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 2,
+        "name": "ports_status",
+        "notes": "Sets description field to reflect LAN/WAN/WWAN/Modem/IP Verify status",
+        "reboot": true,
+        "restart": true,
+        "uuid": "7af63d02-547e-4235-adbe-48ad427d1e18",
+        "vendor": "Ericsson Cradlepoint",
+        "version_major": 1,
+        "version_minor": 31,
+        "version_patch": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2025-08-21T20:43:57.674372",
+        "files": {
+            "cpsdk.py": "9a358bf7b96904606a9df74af3c023fc19c22a1891d4d0f4416ba978455f8cfa",
+            "csclient.py": "d854270f11d142bdc645517f5d76fced9ed670a8c2bbab038bc9692f7ee50baa",
+            "ddns.py": "b5500ce24762e8d4b043c7161c5212a1da2ff05ee27cb15895e0d06063133fb1",
+            "package.ini": "44370cfa9628d21a25dbf12ffb6c7731e5b36134ef69db1b2f459b9ace24e31d",
+            "readme.md": "921bcef6b7172ebb75bc49fdab40b5e2cdaf9cb8206a341473d64fd75eb43ff9",
+            "start.sh": "c2e2184a83a65875622e8dc39fcb526503865093d952260743ac65422d0f2c04"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 25,
+        "name": "ddns",
+        "notes": "SDK Application",
+        "reboot": true,
+        "restart": true,
+        "uuid": "760f36a2-2766-4ebe-aab3-609305ddaae0",
+        "vendor": "Ericsson",
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    }
+}

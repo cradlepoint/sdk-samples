@@ -15,12 +15,13 @@
 """
 
 import time
-from csclient import EventingCSClient
-cp = EventingCSClient('ports-status')
+import cp
 
 APP_NAME = 'PORTS_STATUS'
 DEBUG = False
 MODELS_WITHOUT_WAN = ['CBA', 'W18', 'W200', 'W400', 'L950', 'IBR200', '4250']
+
+cp.log('Starting...')
 
 if DEBUG:
     cp.log("DEBUG ENABLED")

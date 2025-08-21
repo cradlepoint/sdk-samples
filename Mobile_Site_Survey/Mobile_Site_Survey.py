@@ -1,4 +1,4 @@
-from csclient import EventingCSClient
+import cp
 from threading import Thread
 import concurrent.futures
 from speedtest import Speedtest
@@ -835,7 +835,6 @@ def manual_test(path, value, *args):
 
 
 if __name__ == "__main__":
-    cp = EventingCSClient('Mobile Site Survey')
     cp.log('Starting...')
 
     # Wait for WAN connection
@@ -845,7 +844,7 @@ if __name__ == "__main__":
 
     dispatcher = Dispatcher()
     Thread(target=dispatcher.loop, daemon=True).start()
-    cp.on('put', 'config/system/desc', manual_test)
+    cp.register('put', 'config/system/desc', manual_test)
     application = tornado.web.Application([
         (r"/config", ConfigHandler),
         (r"/submit", SubmitHandler),

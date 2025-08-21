@@ -1,10 +1,9 @@
 # power_alert - Send alert when external power is lost and restored.
 # only works on devices with battery (E100, x10).
 
-from csclient import EventingCSClient
+import cp
 import time
 
-cp = EventingCSClient('power_alert')
 cp.log('Starting...')
 previous_power = cp.get('status/system/battery/ext_power')
 while True:

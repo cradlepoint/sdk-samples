@@ -3,7 +3,7 @@
 import time
 import json
 from datetime import datetime
-from csclient import EventingCSClient
+import cp
 from speedtest import Speedtest
 
 # Hours of day to run speedtests. 24-hour format.  Default is 8am, 12pm, 4pm.
@@ -42,7 +42,6 @@ def run_speedtest():
 
 
 # Start App
-cp = EventingCSClient('daily_speedtest')
 cp.log('Starting...')
 
 # Wait for NCM connection

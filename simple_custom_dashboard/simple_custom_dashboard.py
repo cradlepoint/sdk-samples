@@ -7,7 +7,7 @@ import json
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from http import HTTPStatus
-from csclient import EventingCSClient
+import cp
 
 
 def get_router_data():
@@ -109,7 +109,7 @@ class WebServerRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(bytes('<html><body><h1>Server Received: {}</h1></body></html>'.format(value), 'utf-8'))
 
 
-cp = EventingCSClient('simple_custom_dashboard')
+cp.log('Starting...')
 server_address = ('', 9001)
 cp.log('Starting Server: {}'.format(server_address))
 httpd = HTTPServer(server_address, WebServerRequestHandler)

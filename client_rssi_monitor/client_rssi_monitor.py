@@ -1,17 +1,16 @@
 # client_rssi_monitor will get the mac address and rssi of connected wlan clients and put them in the asset_id field.
 
-from csclient import EventingCSClient
+import cp
 import time
 import datetime
 
 interval = 30  # Seconds between monitoring polls
 
-cp = EventingCSClient('client_rssi_monitor')
-cp.log('Starting...')
-
 bw_modes = {0:"20 MHz",1:"40 MHz",2:"80 Mhz",3:"80+80 Mhz",4:"160 Mhz"}
 wlan_modes = {0:"802.11b",1:"802.11g",2:"802.11n",3:"802.11n-only",4:"802.11ac",5:"802.11ax"}
 wlan_band = {0:"2.4",1:"5"}
+
+cp.log('Starting...')
 
 while True:
     try:

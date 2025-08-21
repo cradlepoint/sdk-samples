@@ -2,9 +2,8 @@ import time
 import serial
 import paho.mqtt.client as mqtt
 import json
-from csclient import EventingCSClient
+import cp
 
-cp = EventingCSClient('serial_temp')
 broker_address = '127.0.0.01'
 port = '/dev/ttyUSB0'
 speed = 9600
