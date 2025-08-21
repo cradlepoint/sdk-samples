@@ -302,6 +302,7 @@ def install():
         except subprocess.CalledProcessError as err:
             # There is always an error because the NCOS device will drop the connection.
             # print('Error installing: {}'.format(err))
+            print('Successfully Installed {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
             return 0
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
