@@ -135,11 +135,11 @@ def package_application(app_root, pkey):
                 raise
         app['vendor'] = config[section]['vendor']
         app['notes'] = config[section]['notes']
-        app['version_major'] = int(config[section]['version_major'])
-        app['version_minor'] = int(config[section]['version_minor'])
-        app['firmware_major'] = int(config[section]['firmware_major'])
-        app['firmware_minor'] = int(config[section]['firmware_minor'])
+        app['version_major'] = int(config[section].get('version_major', '0'))
+        app['version_minor'] = int(config[section].get('version_minor', '0'))
         app['version_patch'] = int(config[section].get('version_patch', '0'))
+        app['firmware_major'] = int(config[section].get('firmware_major', '0'))
+        app['firmware_minor'] = int(config[section].get('firmware_minor', '0'))
         app['restart'] = config[section].getboolean('restart')
         app['reboot'] = config[section].getboolean('reboot')
         app['date'] = datetime.datetime.now().isoformat()
@@ -160,7 +160,8 @@ def package_application(app_root, pkey):
 
         create_signature(app_metadata_folder, pkey)
 
-        pack_package(app_root, section)
+        app_name_version = f"{section} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
+        pack_package(app_root, app_name_version)
 
         print('Package {}.tar.gz created'.format(section))
 
