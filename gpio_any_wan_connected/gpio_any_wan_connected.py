@@ -1,7 +1,6 @@
 # gpio_any_wan_connected - if any wan is connected (not just modems) set GPIO output to high
-from csclient import EventingCSClient
+import cp
 import time
-cp = EventingCSClient('gpio_any_wan_connected')
 cp.log('Starting...')
 previous_state = None
 while True:

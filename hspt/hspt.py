@@ -9,15 +9,13 @@ file is subject to civil and criminal penalties.
 """
 import os
 import sys
-from csclient import EventingCSClient
+import cp
 
 
 def mkroutes(route, directory):
     location = "%s/%s" % (os.getcwd(), directory)
     route_map.append((route, location))
 
-
-cp = EventingCSClient('hspt')
 
 # Build route maps for / and /resources
 route_map = []
@@ -31,3 +29,4 @@ value = {
     'server': 'hotspotServer'
 }
 cp.put('/control/system/httpserver', value)
+cp.log('Started Hotspot Server')

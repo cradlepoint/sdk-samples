@@ -34,10 +34,9 @@ Body contains blank field defined in SDK Data (default is asset_id):
 In a few minutes, new results should populate.
 """
 
-from csclient import EventingCSClient
+import cp
 from speedtest import Speedtest
 import time
-import json
 
 default_results_path = "config/system/asset_id"
 
@@ -86,7 +85,6 @@ def speedtest():
     except Exception as e:
         cp.logger.exception(e)
 
-cp = EventingCSClient('5GSpeed')
 try:
     cp.log('Starting...')
     while not cp.get('status/wan/connection_state') == 'connected':
@@ -95,6 +93,7 @@ try:
     cp.on('put', results_path, results_field_check)
     boot_results = cp.get(results_path)
     results_field_check(None, boot_results, None)
-    time.sleep(999999)
+    while True:
+        time.sleep(60)
 except Exception as e:
     cp.logger.exception(e)

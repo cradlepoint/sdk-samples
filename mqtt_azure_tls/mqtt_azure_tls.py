@@ -10,11 +10,8 @@ import os
 import ssl
 import urllib.parse
 
-from csclient import EventingCSClient
+import cp
 from paho.mqtt import client as mqtt
-
-
-cp = EventingCSClient('mqtt_azure_tls')
 
 # Path to the TLS certificates file. The certificates were copied from the certs.c file
 # located here: https://github.com/Azure/azure-iot-sdk-c/blob/master/certs/certs.c

@@ -1,7 +1,7 @@
 # system_monitor will get various system diagnostics, alert on thresholds, and put current status in asset_id field.
 # use sample code blocks at the bottom or build your own.
 
-from csclient import EventingCSClient
+import cp
 import time
 import json
 
@@ -9,7 +9,6 @@ interval = 60  # Seconds between monitoring polls
 cpu_threshold = 80  # Send alert when CPU utilization reaches threshold
 mem_threshold = 80  # Send alert when memory utilization reaches threshold
 
-cp = EventingCSClient('system_monitor')
 cp.log('Starting...')
 previous_ethernet = None
 

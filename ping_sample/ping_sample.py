@@ -1,6 +1,6 @@
 # ping_sample - sample using "ping" SDK Code Snippet
 
-from csclient import EventingCSClient
+import cp
 import json
 
 
@@ -56,7 +56,5 @@ def ping(host, **kwargs):
         pingstats['max'] = float(parsedresults[index + 1].split(' ')[5].split('/')[2])
     return pingstats
 
-
-cp = EventingCSClient('ping_sample')
 cp.log('Starting...')
 cp.log('Output:\n' + json.dumps(ping('8.8.8.8')))

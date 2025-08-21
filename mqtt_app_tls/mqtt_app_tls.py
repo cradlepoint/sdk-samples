@@ -16,9 +16,8 @@ import paho.mqtt.client as mqtt
 import paho.mqtt.publish as publish
 
 from threading import Thread
-from cpsdk import CPSDK
+import cp
 
-cp = CPSDK('mqtt_app_tls')
 mqtt_client = None
 
 

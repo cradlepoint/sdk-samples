@@ -1,9 +1,7 @@
-from cpsdk import CPSDK
+import cp
 import requests
 import time
 from typing import Union, Dict
-
-cp = CPSDK('timezone_via_gnss')
 
 
 def get_timezone_offset(lat: float, lon: float, api_key: str) -> Dict[str, Union[bool, str]]:
@@ -135,6 +133,7 @@ def get_gnss_data() -> Dict[str, Union[bool, Dict[str, float]]]:
 
 # Example usage
 if __name__ == "__main__":
+    cp.log("Starting...")
     cp.wait_for_uptime(120)
     retry_delay = 60
 

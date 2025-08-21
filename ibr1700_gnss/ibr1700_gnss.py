@@ -8,13 +8,13 @@ import time
 import socket
 
 from inetline import ReadLine
-from csclient import EventingCSClient
-
-cp = EventingCSClient('ibr1700_gnss')
-gnssd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+import cp
 
 try:
     cp.log('Starting...')
+
+    # Connect to the GNSS daemon
+    gnssd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     gnss_addr = ("127.0.0.1", 17488)
 
     cp.log("Attempting sock.connect({})".format(gnss_addr))

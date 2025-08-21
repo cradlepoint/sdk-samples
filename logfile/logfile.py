@@ -15,7 +15,7 @@ Or forward the LAN zone to the ROUTER zone for local access on http://{ROUTER IP
 
 """
 
-from csclient import EventingCSClient
+import cp
 from subprocess import Popen, PIPE
 import datetime
 import time
@@ -71,7 +71,6 @@ def rotate_files():
     if len(logfiles) == backup_count:
         os.remove(f'logs/{logfiles[-1]}')
 
-cp = EventingCSClient('logfile')
 cp.log(f'Download logs via NCM LAN Manager - HTTP 127.0.0.1 port 8000')
 mac = cp.get('status/product_info/mac0').replace(':', '').upper()
 

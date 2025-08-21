@@ -6,14 +6,12 @@ information about pyftplib, see https://pythonhosted.org/pyftpdlib/.
 
 import os
 import sys
-from csclient import EventingCSClient
+import cp
 
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
 
-
-cp = EventingCSClient('ftp_server')
 
 # This requires a USB compatible storage device plugged into
 # the router. It will mount to /var/media.
@@ -23,7 +21,7 @@ if sys.platform == 'linux2':
 else:
     FTP_DIR = os.getcwd()
 
-cp.log('start_ftp_server()...')
+cp.log('Starting FTP server...')
 try:
     authorizer = DummyAuthorizer()
     # Define a new user having full r/w permissions and a read-only

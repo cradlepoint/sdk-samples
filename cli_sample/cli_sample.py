@@ -2,10 +2,9 @@
 
 import time
 
-from csclient import EventingCSClient
+import cp
 from csterm import CSTerm
 
-cp = EventingCSClient('cli_sample')
 ct = CSTerm(cp)
 cp.log('Starting...')
 while True:

@@ -13,20 +13,8 @@ Prerequisites:
 - Enable "Alert on Cap" on the appropriate cellular interface profile(s)
 """
 
-app_name = 'throttle_cellular_datacap'
-
-try:
-    from csclient import EventingCSClient
-    import sys
-    import time
-    import json
-    import traceback
-    import logging.handlers
-except Exception as ex:
-    EventingCSClient().log(f'Import failure: {ex}')
-    EventingCSClient().log(f'Traceback: {traceback.format_exc()}')
-    sys.exit(-1)
-
+import cp
+import time
 
 class DataUsageCheck(object):
     """
@@ -46,46 +34,43 @@ class DataUsageCheck(object):
     STATUS_DATACAP_PATH = '/status/wan/datacap'
     CFG_RULES2_PATH = '/config/wan/rules2'
 
-    def __init__(self):
-        self.cp = EventingCSClient(app_name)
-
     def find_modems(self):
         while True:
-            devs = self.cp.get(self.STATUS_DEVS_PATH)
+            devs = cp.get(self.STATUS_DEVS_PATH)
             modems_list = [x for x in devs if x.startswith('mdm-')]
-            self.cp.log(f'modems_list: {modems_list}')
+            cp.log(f'modems_list: {modems_list}')
             num_modems = len(modems_list)
             if not num_modems:
-                self.cp.log('No Modems found at all yet')
+                cp.log('No Modems found at all yet')
                 time.sleep(10)
                 continue
             else:
                 return modems_list
 
     def find_modem_profiles(self):
-        wan_ifcs = self.cp.get(self.CFG_RULES2_PATH)
+        wan_ifcs = cp.get(self.CFG_RULES2_PATH)
         modem_profiles_list = [x['_id_'] for x in wan_ifcs
             if x['trigger_string'].startswith('type|is|mdm')]
-        self.cp.log(f'modem_profiles_list: {modem_profiles_list}')
+        cp.log(f'modem_profiles_list: {modem_profiles_list}')
         return modem_profiles_list
 
     def reset_throttle(self, modem_profiles_list, monthlyreset):
         for mdm in modem_profiles_list:
             if monthlyreset:
-                self.cp.delete(self.CFG_RULES2_PATH + '/' + mdm
+                cp.delete(self.CFG_RULES2_PATH + '/' + mdm
                                + '/bandwidth_egress')
-                self.cp.delete(self.CFG_RULES2_PATH + '/' + mdm
+                cp.delete(self.CFG_RULES2_PATH + '/' + mdm
                                + '/bandwidth_ingress')
             else:
-                if 'bandwidth_egress' in self.cp.get(self.CFG_RULES2_PATH + '/' + mdm):
-                    self.cp.delete(self.CFG_RULES2_PATH + '/' + mdm
+                if 'bandwidth_egress' in cp.get(self.CFG_RULES2_PATH + '/' + mdm):
+                    cp.delete(self.CFG_RULES2_PATH + '/' + mdm
                                    + '/bandwidth_egress')
-                if 'bandwidth_ingress' in self.cp.get(self.CFG_RULES2_PATH + '/' + mdm):
-                    self.cp.delete(self.CFG_RULES2_PATH + '/' + mdm
+                if 'bandwidth_ingress' in cp.get(self.CFG_RULES2_PATH + '/' + mdm):
+                    cp.delete(self.CFG_RULES2_PATH + '/' + mdm
                                    + '/bandwidth_ingress')
-        self.cp.put('config/qos/enabled', False)
+        cp.put('config/qos/enabled', False)
         if monthlyreset:
-            self.cp.log(
+            cp.log(
                 'Monthly data usage reset - disabling reduced LTE data rate'
             )
             message = (
@@ -93,17 +78,17 @@ class DataUsageCheck(object):
                 f'for {self.system_id} - {self.product_name} - Router ID: '
                 f'{self.router_id}'
             )
-            self.cp.alert(message)
+            cp.alert(message)
             self.capreached = 0
 
     def set_throttle(self, modem_profiles_list):
         for mdm in modem_profiles_list:
-            self.cp.put(self.CFG_RULES2_PATH + '/' + mdm
+            cp.put(self.CFG_RULES2_PATH + '/' + mdm
                         + '/bandwidth_egress', self.minbwup)
-            self.cp.put(self.CFG_RULES2_PATH + '/' + mdm
+            cp.put(self.CFG_RULES2_PATH + '/' + mdm
                         + '/bandwidth_ingress', self.minbwdown)
-        self.cp.put('config/qos/enabled', True)
-        self.cp.log(
+        cp.put('config/qos/enabled', True)
+        cp.log(
             'Exceeded monthly data usage threshold - reducing LTE data rate'
         )
         message = (
@@ -111,15 +96,15 @@ class DataUsageCheck(object):
             f'for {self.system_id} - {self.product_name} - Router ID: '
             f'{self.router_id}'
         )
-        self.cp.alert(message)
+        cp.alert(message)
         self.capreached = 1
 
     def run(self):
         # Get info from router to populate description field in NCM
         # alert message
-        self.product_name = self.cp.get('/status/product_info/product_name')
-        self.system_id = self.cp.get('/config/system/system_id')
-        self.router_id = self.cp.get('status/ecm/client_id')
+        self.product_name = cp.get('/status/product_info/product_name')
+        self.system_id = cp.get('/config/system/system_id')
+        self.router_id = cp.get('status/ecm/client_id')
         # Retrieve list of modems and their profiles
         modems_list = [str(x.split('-')[1]) for x in self.find_modems()]
         modem_profiles_list = self.find_modem_profiles()
@@ -131,8 +116,8 @@ class DataUsageCheck(object):
         time.sleep(5)
 
         while True:
-            if self.cp.get(self.STATUS_DATACAP_PATH + '/completed_alerts/'):
-                alerts = self.cp.get(self.STATUS_DATACAP_PATH
+            if cp.get(self.STATUS_DATACAP_PATH + '/completed_alerts/'):
+                alerts = cp.get(self.STATUS_DATACAP_PATH
                     + '/completed_alerts/')
                 limitreached = 0
                 for modem in modems_list:

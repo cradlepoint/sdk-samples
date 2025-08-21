@@ -1,7 +1,5 @@
 # shell_sample - execute linux shell_sample command and return output
-
-from csclient import EventingCSClient
-
+import cp
 
 def shell(cmd):
     """
@@ -22,7 +20,5 @@ def shell(cmd):
             output += line
     return output
 
-
-cp = EventingCSClient('shell_sample')
 cp.log('Starting...')
 cp.log('Output:\n' + shell('ls -al'))
