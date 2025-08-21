@@ -162,9 +162,17 @@ def scan_for_cr(path):
     scanfiles = ('.py', '.sh')
     for root, _, files in os.walk(path):
         for fl in files:
-            with open(os.path.join(root, fl), 'rb') as f:
-                if b'\r' in f.read() and [x for x in scanfiles if fl.endswith(x)]:
-                    raise Exception('Carriage return (\\r) found in file %s' % (os.path.join(root, fl)))
+            # Only process files with the specified extensions
+            if any(fl.endswith(ext) for ext in scanfiles):
+                file_path = os.path.join(root, fl)
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                if b'\r' in content:
+                    # Remove carriage returns and write back to the file
+                    new_content = content.replace(b'\r', b'')
+                    with open(file_path, 'wb') as f:
+                        f.write(new_content)
+                    print(f'Removed carriage return (\\r) from file {file_path}')
 
 # Package the app files into a tar.gz archive.
 def package(app=None):
@@ -222,9 +230,9 @@ def status():
     print(response)
 
 # Create new app from app_template using supplied app name
-def create(app_name):
+def create(app_name=None):
     if not app_name:
-        print('Please include new app name.  Example: python make.py create my_new_app')
+        print('ERROR: No app name provided. Please provide a name. If you are using Cursor AI, it will generate a name for you based on your requested functionality.')
         return
     if os.path.exists(app_name):
         print('App already exists.  Please choose a different name.')
@@ -251,7 +259,21 @@ def create(app_name):
 # Transfer the app tar.gz package to the NCOS device
 def install():
     if is_NCOS_device_in_DEV_mode():
-        app_archive = g_app_name + ".tar.gz"
+        # Try to read version from package.ini in the app folder
+        try:
+            package_ini_path = os.path.join(g_app_name, 'package.ini')
+            config = configparser.ConfigParser()
+            config.read(package_ini_path)
+            
+            version_major = config[g_app_name].get('version_major', '0')
+            version_minor = config[g_app_name].get('version_minor', '0') 
+            version_patch = config[g_app_name].get('version_patch', '0')
+            
+            app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
+            if not os.path.exists(app_archive):
+                app_archive = f"{g_app_name}.tar.gz"
+        except Exception as e:
+            app_archive = f"{g_app_name}.tar.gz"
 
         # Use sshpass for Linux or OS X
         cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
@@ -327,7 +349,8 @@ def output_help():
     print('Actions include:')
     print('================')
     print('create: Create a new app from the app_template folder.')
-    print(f'\tInclude new app name.  Example: {g_python_cmd} make.py create my_new_app.\n')
+    print(f'\tYou must provide a new app name. Example: {g_python_cmd} make.py create my_new_app')
+    print(f'\tIf you do not provide a name, Cursor AI will generate one for you based on your requested functionality.\n')
     print('clean: Clean all project artifacts.')
     print('\tTo clean all the apps, add the option "all" (i.e. clean all).\n')
     print('build or package: Create the app archive tar.gz file.')
@@ -438,9 +461,6 @@ def init(app=None):
         success = False
         print('ERROR 5: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
-    # This will also create a UUID if needed.
-    get_app_uuid()
-
     return success
 
 
@@ -455,10 +475,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         option = str(sys.argv[2])
 
-    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'install', 'start', 'stop', 'uninstall', 'purge']:
+    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge']:
         # Load the settings from the sdk_settings.ini file.
         if not init(option):
             sys.exit(0)
+        if utility_name != 'install':
+            get_app_uuid()
 
     if utility_name == 'clean':
         if option == 'all':
