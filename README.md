@@ -2,9 +2,6 @@
 
 ## Documentation
 
-- **Quickstart: Get the latest updates from app_template:**
-    - **https://github.com/cradlepoint/sdk-samples/blob/master/app_template/readme.md**
-      
 - **NCOS SDK Developers Guide**
     - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
 
