@@ -72,7 +72,7 @@ class CSClient(object):
         self.app_name = app_name
         self.ncos = '/var/mnt/sdk' in os.getcwd()  # Running in NCOS
         handlers = [logging.StreamHandler()]
-        if 'linux' in sys.platform:
+        if self.ncos:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
                             handlers=handlers)
@@ -946,6 +946,50 @@ def get_sims():
             SIMs.append(uid)
     return SIMs
 
+def get_device_mac():
+    """Return the device MAC address"""
+    return _cs_client.get('status/product_info/mac0')
+
+def get_device_serial_num():
+    """Return the device serial number"""
+    return _cs_client.get('status/product_info/manufacturing/serial_num')
+
+def get_device_product_type():
+    """Return the device product type"""
+    return _cs_client.get('status/product_info/manufacturing/product_name')
+
+def get_device_name():
+    """Return the device name"""
+    return _cs_client.get('config/system/system_id')
+
+def get_device_firmware():
+    """Return the device firmware information"""
+    fw_info = _cs_client.get('status/fw_info')
+    firmware = f"{fw_info.get('major')}.{fw_info.get('minor')}.{fw_info.get('patch')}-{fw_info.get('fw_release_tag')}"
+    return firmware
+
+def get_system_resources(cpu=True, memory=True):
+    """Return a dictionary containing the system resources"""
+    system_resources = {}
+    
+    if cpu:
+        cpu = _cs_client.get('status/system/cpu')
+        system_resources['cpu'] = f"CPU Usage: {round(float(cpu['nice']) + float(cpu['system']) + float(cpu['user']) * 100)}%"
+    if memory:
+        memory = _cs_client.get('status/system/memory')
+        system_resources['avail_mem'] = f"Available Memory: {memory['memavailable'] / float(1 << 20):,.0f} MB"
+        system_resources['total_mem'] = f"Total Memory: {memory['memtotal'] / float(1 << 20):,.0f} MB"
+
+    return system_resources
+
+def get_ncm_status():
+    """Return the NCM status"""
+    return _cs_client.get('status/ecm/state')
+
+def reboot_device():
+    """Reboot the device"""
+    _cs_client.put('control/system/reboot', 'reboot hypmgr')
+    
 # Direct access to the underlying EventingCSClient methods
 def get(base, query='', tree=0):
     """Direct access to the underlying get method."""
@@ -979,6 +1023,9 @@ def register(action, path, callback, *args):
     """Registers a callback for a config store event."""
     return _cs_client.register(action, path, callback, *args)
 
+# Alias for register function
+on = register
+
 def unregister(eid):
     """Unregisters a callback by its event ID."""
     return _cs_client.unregister(eid)
@@ -988,6 +1035,10 @@ def get_logger():
     """Get the logger instance for advanced logging control."""
     return _cs_client.logger
 
+# Monkay patch for cp.uptime()
+def uptime():
+    return time.time()
+    
 def clean_up_reg(signal, frame):
     """
     When 'cppython remote_port_forward.py' gets a SIGTERM, config_store_receiver.py doesn't

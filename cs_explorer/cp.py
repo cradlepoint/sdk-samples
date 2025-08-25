@@ -72,7 +72,7 @@ class CSClient(object):
         self.app_name = app_name
         self.ncos = '/var/mnt/sdk' in os.getcwd()  # Running in NCOS
         handlers = [logging.StreamHandler()]
-        if 'linux' in sys.platform:
+        if self.ncos:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
                             handlers=handlers)
@@ -1022,6 +1022,9 @@ def alert(value=''):
 def register(action, path, callback, *args):
     """Registers a callback for a config store event."""
     return _cs_client.register(action, path, callback, *args)
+
+# Alias for register function
+on = register
 
 def unregister(eid):
     """Unregisters a callback by its event ID."""
