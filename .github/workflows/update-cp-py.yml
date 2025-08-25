@@ -1,0 +1,118 @@
+name: Update cp.py files
+
+on:
+  schedule:
+    # Run every day at 9 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  update-cp-py:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Find and update cp.py files
+      run: |
+        # Create a script to find and update cp.py files
+        cat > update_cp_py.py << 'PYTHON_EOF'
+        #!/usr/bin/env python3
+        import os
+        import shutil
+        import subprocess
+        from pathlib import Path
+        
+        def find_cp_py_files():
+            """Find all cp.py files in the repository"""
+            cp_files = []
+            for root, dirs, files in os.walk('.'):
+                # Skip .git directory
+                if '.git' in root:
+                    continue
+                if 'cp.py' in files:
+                    cp_files.append(os.path.join(root, 'cp.py'))
+            return cp_files
+        
+        def get_reference_cp_py():
+            """Get the reference cp.py from app_template"""
+            reference_path = './app_template/cp.py'
+            if os.path.exists(reference_path):
+                return reference_path
+            else:
+                print(f"Error: Reference file {reference_path} not found")
+                return None
+        
+        def update_cp_py_files():
+            """Update all cp.py files with the reference version"""
+            cp_files = find_cp_py_files()
+            print(f"Found {len(cp_files)} cp.py files")
+            
+            # Get the reference cp.py
+            reference_cp = get_reference_cp_py()
+            if not reference_cp:
+                print("Reference cp.py not found. Exiting.")
+                exit(1)
+            
+            print(f"Using reference: {reference_cp}")
+            with open(reference_cp, 'r') as f:
+                reference_content = f.read()
+            
+            updated_count = 0
+            for cp_file in cp_files:
+                try:
+                    # Skip the reference file itself
+                    if cp_file == reference_cp:
+                        print(f"Skipping reference file: {cp_file}")
+                        continue
+                    
+                    with open(cp_file, 'r') as f:
+                        current_content = f.read()
+                    
+                    # Only update if content is different
+                    if current_content != reference_content:
+                        with open(cp_file, 'w') as f:
+                            f.write(reference_content)
+                        print(f"Updated: {cp_file}")
+                        updated_count += 1
+                    else:
+                        print(f"No changes needed: {cp_file}")
+                        
+                except Exception as e:
+                    print(f"Error updating {cp_file}: {e}")
+            
+            return updated_count
+        
+        if __name__ == "__main__":
+            updated = update_cp_py_files()
+            print(f"Updated {updated} cp.py files")
+            # Exit with code 1 if files were updated (to trigger commit)
+            exit(1 if updated > 0 else 0)
+        PYTHON_EOF
+        
+        python update_cp_py.py
+        UPDATED=$?
+        
+        if [ $UPDATED -eq 1 ]; then
+          echo "Files were updated, proceeding with commit"
+        else
+          echo "No files were updated"
+          exit 0
+        fi
+    
+    - name: Commit and push changes
+      if: success()
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update cp.py files across all samples"
+        git push
