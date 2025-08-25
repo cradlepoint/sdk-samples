@@ -1,7 +1,7 @@
 """
 NCOS communication module for SDK applications.
 
-Copyright (c) 2022 Cradlepoint, Inc. <www.cradlepoint.com>.  All rights reserved.
+Copyright (c) 2025 Cradlepoint, Inc. <www.cradlepoint.com>.  All rights reserved.
 
 This file contains confidential information of CradlePoint, Inc. and your use of
 this file is subject to the CradlePoint Software License Agreement distributed with
