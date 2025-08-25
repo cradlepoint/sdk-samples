@@ -95,7 +95,7 @@ jobs:
             updated = update_cp_py_files()
             print(f"Updated {updated} cp.py files")
             # Exit with code 1 if files were updated (to trigger commit)
-            exit(1 if updated > 0 else 0)
+            exit(0)
         PYTHON_EOF
         
         python update_cp_py.py
