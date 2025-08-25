@@ -674,6 +674,31 @@ def wait_for_uptime(min_uptime_seconds):
     except Exception as e:
         _cs_client.logger.exception(f"Error validating uptime: {e}")
 
+def wait_for_ntp(timeout=300, check_interval=1):
+    """
+    Wait until NTP sync age is not null, indicating NTP synchronization.
+    
+    Args:
+        timeout (int): Maximum time to wait in seconds (default: 300)
+        check_interval (int): Time between checks in seconds (default: 1)
+    
+    Returns:
+        bool: True if NTP sync was achieved within timeout, False otherwise
+    """
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout:
+        sync_age = _cs_client.get('status/system/ntp/sync_age')
+        
+        if sync_age is not None:
+            _cs_client.log(f'NTP sync achieved, sync_age: {sync_age}')
+            return True
+            
+        time.sleep(check_interval)
+    
+    _cs_client.log(f'NTP sync timeout after {timeout} seconds')
+    return False
+
 def wait_for_wan_connection(timeout=300):
     """Waits for at least one WAN connection to be 'connected'.
     Returns True if a connection is established within the timeout, otherwise False."""
