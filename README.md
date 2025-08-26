@@ -125,6 +125,8 @@
     - This app tails /var/log/messages and sends filtered lines to Splunk.
 - **system_monitor**
     - Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
+- **system_monitor_web**
+    - A comprehensive real-time system monitoring application for Cradlepoint routers that tracks both memory and CPU usage with customizable alert thresholds and a professional web interface.
 - **tailscale**
     - A 3rd party mesh VPN called  [Tailscale](https://tailscale.com) that makes it easy to connect your devices, wherever they are. This application provides a way to proxy traffic from the LAN to the Tailscale network. See the README.md for more information.
 - **timezone_via_gnss**
