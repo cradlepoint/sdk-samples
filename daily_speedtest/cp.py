@@ -511,9 +511,9 @@ class EventingCSClient(CSClient):
     registry = {}
     eids = 1
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, app_name, init=True):
         """Initializes the EventingCSClient and sets up aliases for register/unregister."""
-        super().__init__(*args, **kwargs)
+        super().__init__(app_name, init)
         self.on = self.register
         self.un = self.unregister
 
