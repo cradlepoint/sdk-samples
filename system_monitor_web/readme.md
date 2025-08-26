@@ -2,6 +2,10 @@
 
 A comprehensive real-time system monitoring application for Cradlepoint routers that tracks both memory and CPU usage with customizable alert thresholds and a professional web interface.
 
+<img width="834" height="849" alt="image" src="https://github.com/user-attachments/assets/0d27b139-5550-4c57-a204-d65f78327ec3" />
+<img width="834" height="913" alt="image" src="https://github.com/user-attachments/assets/3f7db1ce-1139-47e5-80f0-0981dd3fc351" />
+<img width="834" height="502" alt="image" src="https://github.com/user-attachments/assets/3cab8d51-0ead-499d-b5e4-f736fa8b7b81" />
+
 ## Features
 
 ### 📊 **Real-time Monitoring**
