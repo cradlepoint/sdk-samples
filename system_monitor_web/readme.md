@@ -20,6 +20,7 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 - **CPU Usage**: Total, user, system, and nice process CPU utilization
 - **Historical Data**: Min/max values with timestamps
 - **Data Visualization**: Interactive charts with time-based axes
+- **Data Retention**: 24 hours in memory, 30 days on disk
 
 ### 🚨 **Alert System**
 - **Customizable Thresholds**: Set memory and CPU alert levels
@@ -71,11 +72,13 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 - **Memory Usage Chart**: Blue-themed line chart showing memory usage over time
 - **CPU Usage Chart**: Red-themed line chart showing CPU usage over time
 - **Time-based Axes**: Proper time formatting with hover tooltips
+- **Data Range**: 24 hours of data displayed with smooth scrolling
 
 ### 📋 **Data Table**
 - **Recent Measurements**: Last 10 data points
 - **Combined View**: Memory and CPU data in one table
 - **Detailed Metrics**: Memory usage, CPU breakdown, timestamps
+- **Data Coverage**: 24 hours of data available instantly in memory
 
 ## Configuration
 
@@ -85,6 +88,9 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 - **Anti-spam Logic**: Alerts reset when usage drops below 90% of threshold
 
 ### Data Collection
-- **Collection Interval**: 30 seconds between measurements
-- **Data Retention**: Last 100 data points (prevents memory bloat)
+- **Collection Interval**: 60 seconds (1 minute) between measurements
+- **In-Memory Data**: Last 24 hours (1,440 data points) kept in memory for fast access
+- **File Storage**: 30 days (43,200 data points) stored on disk for long-term analysis
 - **Initial Delay**: First 2 measurements discarded for accurate baseline
+- **File Writes**: Data saved to disk every 10 minutes (10 measurements)
+
