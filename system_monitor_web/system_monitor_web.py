@@ -8,6 +8,7 @@ import cp
 import time
 import json
 import threading
+import os
 from datetime import datetime
 import http.server
 import socketserver
@@ -16,6 +17,16 @@ import socketserver
 memory_data = []
 cpu_data = []
 data_lock = threading.Lock()
+
+# File storage configuration
+DATA_DIR = "/tmp/system_monitor_data"
+MEMORY_FILE = f"{DATA_DIR}/memory_data.json"
+CPU_FILE = f"{DATA_DIR}/cpu_data.json"
+STATS_FILE = f"{DATA_DIR}/stats.json"
+
+# Data retention settings
+MAX_DATA_POINTS = 43200  # 30 days worth of data (43200 = 30 days * 24 hours * 60 measurements per hour)
+IN_MEMORY_POINTS = 1440  # Keep last 24 hours worth of data in memory (1440 = 24 hours * 60 minutes)
 
 # Global variables for min/max memory tracking
 min_memory_usage = None
@@ -89,6 +100,73 @@ def get_cpu_info():
         cp.log(f"Error getting CPU info: {e}")
         return None
 
+def ensure_data_directory():
+    """Ensure the data directory exists"""
+    try:
+        import os
+        if not os.path.exists(DATA_DIR):
+            os.makedirs(DATA_DIR)
+            cp.log(f"Created data directory: {DATA_DIR}")
+    except Exception as e:
+        cp.log(f"Error creating data directory: {e}")
+
+def load_data_from_file(filename):
+    """Load data from JSON file"""
+    try:
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        cp.log(f"Error loading data from {filename}: {e}")
+        return []
+
+def save_data_to_file(data, filename):
+    """Save data to JSON file"""
+    try:
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        cp.log(f"Error saving data to {filename}: {e}")
+
+def load_stats_from_file():
+    """Load min/max stats from file"""
+    global min_memory_usage, max_memory_usage, min_memory_timestamp, max_memory_timestamp
+    global min_cpu_usage, max_cpu_usage, min_cpu_timestamp, max_cpu_timestamp
+    
+    try:
+        if os.path.exists(STATS_FILE):
+            with open(STATS_FILE, 'r') as f:
+                stats = json.load(f)
+                min_memory_usage = stats.get('min_memory_usage')
+                max_memory_usage = stats.get('max_memory_usage')
+                min_memory_timestamp = stats.get('min_memory_timestamp')
+                max_memory_timestamp = stats.get('max_memory_timestamp')
+                min_cpu_usage = stats.get('min_cpu_usage')
+                max_cpu_usage = stats.get('max_cpu_usage')
+                min_cpu_timestamp = stats.get('min_cpu_timestamp')
+                max_cpu_timestamp = stats.get('max_cpu_timestamp')
+                cp.log("Loaded stats from file")
+    except Exception as e:
+        cp.log(f"Error loading stats from file: {e}")
+
+def save_stats_to_file():
+    """Save min/max stats to file"""
+    try:
+        stats = {
+            'min_memory_usage': min_memory_usage,
+            'max_memory_usage': max_memory_usage,
+            'min_memory_timestamp': min_memory_timestamp,
+            'max_memory_timestamp': max_memory_timestamp,
+            'min_cpu_usage': min_cpu_usage,
+            'max_cpu_usage': max_cpu_usage,
+            'min_cpu_timestamp': min_cpu_timestamp,
+            'max_cpu_timestamp': max_cpu_timestamp
+        }
+        save_data_to_file(stats, STATS_FILE)
+    except Exception as e:
+        cp.log(f"Error saving stats to file: {e}")
+
 def check_and_send_alerts(memory_info, cpu_info):
     """Check thresholds and send alerts if needed"""
     global memory_alert_sent, cpu_alert_sent
@@ -119,7 +197,19 @@ def system_monitor():
     """Background thread to monitor memory and CPU usage"""
     global min_memory_usage, max_memory_usage, min_memory_timestamp, max_memory_timestamp
     global min_cpu_usage, max_cpu_usage, min_cpu_timestamp, max_cpu_timestamp, measurements_discarded
+    global memory_data, cpu_data
+    
     cp.log("Starting system monitoring thread...")
+    
+    # Ensure data directory exists
+    ensure_data_directory()
+    
+    # Load existing data and stats
+    memory_data = load_data_from_file(MEMORY_FILE)
+    cpu_data = load_data_from_file(CPU_FILE)
+    load_stats_from_file()
+    
+    cp.log(f"Loaded {len(memory_data)} memory data points and {len(cpu_data)} CPU data points")
     
     while True:
         try:
@@ -132,18 +222,42 @@ def system_monitor():
                     if measurements_discarded < 2:
                         measurements_discarded += 1
                         cp.log(f"Discarding measurement {measurements_discarded}/2 (before app resource consumption)")
-                        time.sleep(30)  # Wait for next measurement
+                        time.sleep(60)  # Wait for next measurement
                         continue
                     
                     # Store memory data
                     memory_data.append(memory_info)
-                    if len(memory_data) > 100:
-                        memory_data.pop(0)
                     
                     # Store CPU data
                     cpu_data.append(cpu_info)
-                    if len(cpu_data) > 100:
-                        cpu_data.pop(0)
+                    
+                    # Keep only recent data in memory for fast access
+                    if len(memory_data) > IN_MEMORY_POINTS:
+                        memory_data = memory_data[-IN_MEMORY_POINTS:]
+                    
+                    if len(cpu_data) > IN_MEMORY_POINTS:
+                        cpu_data = cpu_data[-IN_MEMORY_POINTS:]
+                    
+                    # Save all data to files periodically (every 10 measurements = 10 minutes)
+                    if len(memory_data) % 10 == 0:
+                        # Load full data from files
+                        full_memory_data = load_data_from_file(MEMORY_FILE)
+                        full_cpu_data = load_data_from_file(CPU_FILE)
+                        
+                        # Add new data
+                        full_memory_data.append(memory_info)
+                        full_cpu_data.append(cpu_info)
+                        
+                        # Limit to MAX_DATA_POINTS (30 days worth)
+                        if len(full_memory_data) > MAX_DATA_POINTS:
+                            full_memory_data = full_memory_data[-MAX_DATA_POINTS:]
+                        if len(full_cpu_data) > MAX_DATA_POINTS:
+                            full_cpu_data = full_cpu_data[-MAX_DATA_POINTS:]
+                        
+                        # Save to files
+                        save_data_to_file(full_memory_data, MEMORY_FILE)
+                        save_data_to_file(full_cpu_data, CPU_FILE)
+                        cp.log(f"Saved data to files. Memory: {len(full_memory_data)} points, CPU: {len(full_cpu_data)} points")
                     
                     # Update memory min/max tracking
                     current_memory_usage = memory_info['usage_percent']
@@ -152,10 +266,12 @@ def system_monitor():
                     if min_memory_usage is None or current_memory_usage < min_memory_usage:
                         min_memory_usage = current_memory_usage
                         min_memory_timestamp = current_timestamp
+                        save_stats_to_file()
                     
                     if max_memory_usage is None or current_memory_usage > max_memory_usage:
                         max_memory_usage = current_memory_usage
                         max_memory_timestamp = current_timestamp
+                        save_stats_to_file()
                     
                     # Update CPU min/max tracking
                     current_cpu_usage = cpu_info['total_percent']
@@ -163,10 +279,12 @@ def system_monitor():
                     if min_cpu_usage is None or current_cpu_usage < min_cpu_usage:
                         min_cpu_usage = current_cpu_usage
                         min_cpu_timestamp = current_timestamp
+                        save_stats_to_file()
                     
                     if max_cpu_usage is None or current_cpu_usage > max_cpu_usage:
                         max_cpu_usage = current_cpu_usage
                         max_cpu_timestamp = current_timestamp
+                        save_stats_to_file()
                 
                 cp.log(f"Memory: {memory_info['usage_percent']:.1f}% used ({memory_info['used_mb']:.1f}MB / {memory_info['total_mb']:.1f}MB)")
                 cp.log(f"CPU: {cpu_info['total_percent']:.1f}% total (User: {cpu_info['user_percent']:.1f}%, System: {cpu_info['system_percent']:.1f}%, Nice: {cpu_info['nice_percent']:.1f}%)")
@@ -174,11 +292,11 @@ def system_monitor():
                 # Check and send alerts
                 check_and_send_alerts(memory_info, cpu_info)
             
-            time.sleep(30)  # Check every 30 seconds
+            time.sleep(60)  # Check every 60 seconds (1 minute)
             
         except Exception as e:
             cp.log(f"Error in system monitor: {e}")
-            time.sleep(30)
+            time.sleep(60)
 
 def create_html_page():
     """Create the HTML page for the web interface"""
@@ -370,7 +488,7 @@ def create_html_page():
     <div class="container">
         <div class="header">
             <h1>System Monitor</h1>
-            <p>Real-time memory and CPU monitoring on Cradlepoint Router</p>
+            <p>Real-time memory and CPU monitoring on Cradlepoint Routers</p>
             <div class="current-time" id="current-time">--</div>
         </div>
         
@@ -876,8 +994,8 @@ def create_html_page():
                 timeAdapterScript.onload = function() {
                     initMemoryChart();
                     initCpuChart();
-                    // Auto-refresh every 10 seconds
-                    setInterval(fetchData, 10000);
+                    // Auto-refresh every 60 seconds (1 minute)
+                    setInterval(fetchData, 60000);
                 };
                 document.head.appendChild(timeAdapterScript);
             };
