@@ -17,7 +17,7 @@ def find_cp_py_files():
 
 def get_reference_cp_py():
     """Get the reference cp.py from app_template"""
-    reference_path = './app_template/cp.py'
+    reference_path = './cp.py'
     if os.path.exists(reference_path):
         return reference_path
     else:
