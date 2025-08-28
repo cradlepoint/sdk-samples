@@ -19,6 +19,7 @@ import signal
 import sys
 import time
 import configparser
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 
 try:
     import traceback
@@ -27,6 +28,7 @@ except ImportError:
 
 
 class SdkCSException(Exception):
+    """Custom exception for SDK communication errors."""
     pass
 
 
@@ -51,17 +53,17 @@ class CSClient(object):
     _instances = {}
 
     @classmethod
-    def is_initialized(cls):
+    def is_initialized(cls) -> bool:
         """Checks if the singleton instance has been created."""
         return cls in cls._instances
 
-    def __new__(cls, *na, **kwna):
+    def __new__(cls, *na: Any, **kwna: Any) -> 'CSClient':
         """Singleton factory (with subclassing support)."""
         if not cls.is_initialized():
             cls._instances[cls] = super().__new__(cls)
         return cls._instances[cls]
 
-    def __init__(self, app_name, init=False):
+    def __init__(self, app_name: str, init: bool = False) -> None:
         """
         Initializes the CSClient.
 
@@ -91,7 +93,7 @@ class CSClient(object):
                             handlers=handlers)
         self.logger = logging.getLogger(app_name)
 
-    def get(self, base, query='', tree=0):
+    def get(self, base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a get request to retrieve specified data from a device.
 
@@ -130,7 +132,7 @@ class CSClient(object):
 
             return json.loads(response.text).get('data')
 
-    def decrypt(self, base, query='', tree=0):
+    def decrypt(self, base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a decrypt/get request to retrieve specified data from a device.
 
@@ -157,7 +159,7 @@ class CSClient(object):
             # Running in a computer and can't actually send the alert.
             print('Decrypt is only available when running the app in NCOS.')
 
-    def put(self, base, value='', query='', tree=0):
+    def put(self, base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a put request to update or add specified data to the device router tree.
 
@@ -200,7 +202,7 @@ class CSClient(object):
 
             return json.loads(response.text)
 
-    def post(self, base, value='', query=''):
+    def post(self, base: str, value: Any = '', query: str = '') -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a post request to update or add specified data to the device router tree.
 
@@ -242,7 +244,7 @@ class CSClient(object):
 
             return json.loads(response.text)
 
-    def patch(self, value):
+    def patch(self, value: List[Any]) -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a patch request to update or add specified data to the device router tree.
 
@@ -286,7 +288,7 @@ class CSClient(object):
 
             return json.loads(response.text)
 
-    def delete(self, base, query=''):
+    def delete(self, base: str, query: str = '') -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a delete request to delete specified data to the device router tree.
 
@@ -326,7 +328,7 @@ class CSClient(object):
 
             return json.loads(response.text)
 
-    def alert(self, value=''):
+    def alert(self, value: str = '') -> Optional[Dict[str, Any]]:
         """
         Constructs and sends a custom alert to NCM for the device. Apps calling this method must be running
         on the target device to send the alert. If invoked while running on a computer, then only a log is output.
@@ -348,7 +350,7 @@ class CSClient(object):
             print('Alert is only available when running the app in NCOS.')
             print('Alert Text: {}'.format(value))
 
-    def log(self, value=''):
+    def log(self, value: str = '') -> None:
         """
         Adds an INFO log to the device SYSLOG.
 
@@ -370,7 +372,7 @@ class CSClient(object):
             print(value)
 
 
-    def _get_auth(self, device_ip, username, password):
+    def _get_auth(self, device_ip: str, username: str, password: str) -> Any:
         """
         Returns the proper HTTP Auth for the NCOS version.
         
@@ -398,58 +400,66 @@ class CSClient(object):
             return requests.auth.HTTPDigestAuth(username, password)
 
     @staticmethod
-    def _get_device_access_info():
+    def _get_device_access_info() -> Tuple[str, str, str]:
         """
         Returns device access info from the sdk_settings.ini file.
         
         This should only be called when running on a computer.
         """
-        device_ip = ''
-        device_username = ''
-        device_password = ''
+        try:
+            device_ip = ''
+            device_username = ''
+            device_password = ''
 
-        if 'linux' not in sys.platform:
-            import os
-            import configparser
+            if 'linux' not in sys.platform:
+                import os
+                import configparser
 
-            settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
-            config = configparser.ConfigParser()
-            config.read(settings_file)
+                settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
+                config = configparser.ConfigParser()
+                config.read(settings_file)
 
-            # Keys in sdk_settings.ini
-            sdk_key = 'sdk'
-            ip_key = 'dev_client_ip'
-            username_key = 'dev_client_username'
-            password_key = 'dev_client_password'
+                # Keys in sdk_settings.ini
+                sdk_key = 'sdk'
+                ip_key = 'dev_client_ip'
+                username_key = 'dev_client_username'
+                password_key = 'dev_client_password'
 
-            if sdk_key in config:
-                if ip_key in config[sdk_key]:
-                    device_ip = config[sdk_key][ip_key]
+                if sdk_key in config:
+                    if ip_key in config[sdk_key]:
+                        device_ip = config[sdk_key][ip_key]
+                    else:
+                        print('ERROR 1: The {} key does not exist in {}'.format(ip_key, settings_file))
+
+                    if username_key in config[sdk_key]:
+                        device_username = config[sdk_key][username_key]
+                    else:
+                        print('ERROR 2: The {} key does not exist in {}'.format(username_key, settings_file))
+
+                    if password_key in config[sdk_key]:
+                        device_password = config[sdk_key][password_key]
+                    else:
+                        print('ERROR 3: The {} key does not exist in {}'.format(password_key, settings_file))
                 else:
-                    print('ERROR 1: The {} key does not exist in {}'.format(ip_key, settings_file))
+                    print('ERROR 4: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
-                if username_key in config[sdk_key]:
-                    device_username = config[sdk_key][username_key]
-                else:
-                    print('ERROR 2: The {} key does not exist in {}'.format(username_key, settings_file))
+            return device_ip, device_username, device_password
+        except Exception as e:
+            print(f"Error getting device access info: {e}")
+            return '', '', ''
 
-                if password_key in config[sdk_key]:
-                    device_password = config[sdk_key][password_key]
-                else:
-                    print('ERROR 3: The {} key does not exist in {}'.format(password_key, settings_file))
-            else:
-                print('ERROR 4: The {} section does not exist in {}'.format(sdk_key, settings_file))
-
-        return device_ip, device_username, device_password
-
-    def _safe_dispatch(self, cmd):
+    def _safe_dispatch(self, cmd: str) -> Dict[str, Any]:
         """Send the command and return the response."""
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.connect('/var/tmp/cs.sock')
-            sock.sendall(bytes(cmd, 'ascii'))
-            return self._receive(sock)
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+                sock.connect('/var/tmp/cs.sock')
+                sock.sendall(bytes(cmd, 'ascii'))
+                return self._receive(sock)
+        except Exception as e:
+            self.log(f"Error in safe dispatch: {e}")
+            return {"status": "error", "data": str(e)}
 
-    def _dispatch(self, cmd):
+    def _dispatch(self, cmd: str) -> Dict[str, Any]:
         """Safely dispatches a command to the router."""
         errmsg = None
         result = ""
@@ -463,7 +473,7 @@ class CSClient(object):
             pass
         return result
 
-    def _safe_receive(self, sock):
+    def _safe_receive(self, sock: socket.socket) -> Dict[str, Any]:
         """Safely receives data from a socket."""
         sock.settimeout(self.RECV_TIMEOUT)
         data = b""
@@ -503,7 +513,7 @@ class CSClient(object):
             result = body.strip()
         return {"status": status_hdr.decode(), "data": result}
 
-    def _receive(self, sock):
+    def _receive(self, sock: socket.socket) -> Dict[str, Any]:
         """Receives data from a socket with error handling."""
         errmsg = None
         result = ""
@@ -522,43 +532,51 @@ class EventingCSClient(CSClient):
     registry = {}
     eids = 1
 
-    def __init__(self, app_name, init=True):
+    def __init__(self, app_name: str, init: bool = True) -> None:
         """Initializes the EventingCSClient and sets up aliases for register/unregister."""
         super().__init__(app_name, init)
         self.on = self.register
         self.un = self.unregister
 
-    def start(self):
+    def start(self) -> None:
         """Starts the event handling loop in a separate thread."""
-        if self.running:
-            self.log(f"Eventing Config Store {self.pid} already running")
-            return
-        self.running = True
-        self.pid = os.getpid()
-        self.f = '/var/tmp/csevent_%d.sock' % self.pid
         try:
-            os.unlink(self.f)
-        except FileNotFoundError:
-            pass
-        self.event_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.event_sock.bind(self.f)
-        self.event_sock.listen()  # backlog is optional. already set on value found in /proc
-        self.event_sock.setblocking(False)
-        self.eloop = threading.Thread(target=self._handle_events)
-        self.eloop.start()
+            if self.running:
+                self.log(f"Eventing Config Store {self.pid} already running")
+                return
+            self.running = True
+            self.pid = os.getpid()
+            self.f = '/var/tmp/csevent_%d.sock' % self.pid
+            try:
+                os.unlink(self.f)
+            except FileNotFoundError:
+                pass
+            self.event_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.event_sock.bind(self.f)
+            self.event_sock.listen()  # backlog is optional. already set on value found in /proc
+            self.event_sock.setblocking(False)
+            self.eloop = threading.Thread(target=self._handle_events)
+            self.eloop.start()
+        except Exception as e:
+            self.log(f"Error starting event handling loop: {e}")
+            self.running = False
 
-    def stop(self):
+    def stop(self) -> None:
         """Stops the event handling loop and cleans up resources."""
-        if not self.running:
-            return
-        self.log(f"Stopping")
-        for k in list(self.registry.keys()):
-            self.unregister(k)
-        self.event_sock.close()
-        os.unlink(self.f)
-        self.running = False
+        try:
+            if not self.running:
+                return
+            self.log(f"Stopping")
+            for k in list(self.registry.keys()):
+                self.unregister(k)
+            self.event_sock.close()
+            os.unlink(self.f)
+            self.running = False
+        except Exception as e:
+            self.log(f"Error stopping event handling loop: {e}")
+            self.running = False
 
-    def _handle_events(self):
+    def _handle_events(self) -> None:
         """The main event loop for handling config store events."""
         poller = select.poll()
         poller.register(self.event_sock,
@@ -602,7 +620,7 @@ class EventingCSClient(CSClient):
                 self.log(f"OSError: {e}")
                 raise
 
-    def register(self, action: object, path: object, callback: object, *args: object) -> object:
+    def register(self, action: str = 'set', path: str = '', callback: Callable = None, *args: Any) -> Dict[str, Any]:
         """
         Registers a callback for a config store event.
 
@@ -615,16 +633,20 @@ class EventingCSClient(CSClient):
         Returns:
             The result of the registration command.
         """
-        if not self.running:
-            self.start()
-        # what about multiple registration?
-        eid = self.eids
-        self.eids += 1
-        self.registry[eid] = {'cb': callback, 'action': action, 'path': path, 'args': args}
-        cmd = "register\n{}\n{}\n{}\n{}\n".format(self.pid, eid, action, path)
-        return self._dispatch(cmd)
+        try:
+            if not self.running:
+                self.start()
+            # what about multiple registration?
+            eid = self.eids
+            self.eids += 1
+            self.registry[eid] = {'cb': callback, 'action': action, 'path': path, 'args': args}
+            cmd = "register\n{}\n{}\n{}\n{}\n".format(self.pid, eid, action, path)
+            return self._dispatch(cmd)
+        except Exception as e:
+            self.log(f"Error registering callback for {path}: {e}")
+            return {}
 
-    def unregister(self, eid):
+    def unregister(self, eid: int = 0) -> Dict[str, Any]:
         """
         Unregisters a callback by its event ID.
 
@@ -650,7 +672,7 @@ class EventingCSClient(CSClient):
     # GRANULAR STATUS GET METHODS
     # ============================================================================
     
-    def get_gps_status(self):
+    def get_gps_status(self) -> Dict[str, Any]:
         """Get GPS status and return detailed information with decimal coordinates"""
         try:
             gps_data = self.get('status/gps')
@@ -713,7 +735,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing GPS status: {e}")
             return {"has_gps_data": False, "error": str(e)}
 
-    def get_system_status(self):
+    def get_system_status(self) -> Dict[str, Any]:
         """Get system status and return detailed information"""
         try:
             system_data = self.get('status/system')
@@ -747,7 +769,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing system status: {e}")
             return {"has_system_data": False, "error": str(e)}
 
-    def get_wlan_status(self):
+    def get_wlan_status(self) -> Dict[str, Any]:
         """Get WLAN status and return detailed information"""
         try:
             wlan_data = self.get('status/wlan')
@@ -776,7 +798,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing WLAN status: {e}")
             return {"has_wlan_data": False, "error": str(e)}
 
-    def get_wan_status(self):
+    def get_wan_status(self) -> Dict[str, Any]:
         """Get WAN status and return detailed information"""
         try:
             wan_data = self.get('status/wan')
@@ -810,7 +832,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing WAN status: {e}")
             return {"has_wan_data": False, "error": str(e)}
 
-    def get_lan_status(self):
+    def get_lan_status(self) -> Dict[str, Any]:
         """Get LAN status and return detailed information"""
         try:
             lan_data = self.get('status/lan')
@@ -849,7 +871,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing LAN status: {e}")
             return {"has_lan_data": False, "error": str(e)}
 
-    def get_openvpn_status(self):
+    def get_openvpn_status(self) -> Dict[str, Any]:
         """Get OpenVPN status and return detailed information"""
         try:
             openvpn_data = self.get('status/openvpn')
@@ -868,7 +890,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing OpenVPN status: {e}")
             return {"has_openvpn_data": False, "error": str(e)}
 
-    def get_hotspot_status(self):
+    def get_hotspot_status(self) -> Dict[str, Any]:
         """Get hotspot status and return detailed information"""
         try:
             hotspot_data = self.get('status/hotspot')
@@ -889,7 +911,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing hotspot status: {e}")
             return {"has_hotspot_data": False, "error": str(e)}
 
-    def get_obd_status(self):
+    def get_obd_status(self) -> Dict[str, Any]:
         """Get OBD status and return detailed information"""
         try:
             obd_data = self.get('status/obd')
@@ -914,7 +936,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing OBD status: {e}")
             return {"has_obd_data": False, "error": str(e)}
 
-    def get_qos_status(self):
+    def get_qos_status(self) -> Dict[str, Any]:
         """Get QoS status and return detailed information"""
         try:
             qos_data = self.get('status/qos')
@@ -935,7 +957,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing QoS status: {e}")
             return {"has_qos_data": False, "error": str(e)}
 
-    def get_firewall_status(self):
+    def get_firewall_status(self) -> Dict[str, Any]:
         """Get firewall status and return detailed information"""
         try:
             firewall_data = self.get('status/firewall')
@@ -966,7 +988,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing firewall status: {e}")
             return {"has_firewall_data": False, "error": str(e)}
 
-    def get_dns_status(self):
+    def get_dns_status(self) -> Dict[str, Any]:
         """Get DNS status and return detailed information"""
         try:
             dns_data = self.get('status/dns')
@@ -989,7 +1011,7 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing DNS status: {e}")
             return {"has_dns_data": False, "error": str(e)}
 
-    def get_dhcp_status(self):
+    def get_dhcp_status(self) -> Dict[str, Any]:
         """Get DHCP status and return detailed information"""
         try:
             dhcp_data = self.get('status/dhcp')
@@ -1010,7 +1032,7 @@ class EventingCSClient(CSClient):
 
 
 
-def _get_app_name():
+def _get_app_name() -> str:
     """Get the app name from the first section of package.ini"""
     try:
         # Get the directory where this script is located
@@ -1025,18 +1047,23 @@ def _get_app_name():
             return first_section
         else:
             return 'SDK'
-    except Exception:
+    except Exception as e:
+        print(f"Error getting app name from package.ini: {e}")
         return 'SDK'
 
 # Create a single EventingCSClient instance with name from package.ini
 _cs_client = EventingCSClient(_get_app_name())
 
-def get_uptime():
+def get_uptime() -> int:
     """Return the router uptime in seconds."""
-    uptime = int(_cs_client.get('status/system/uptime'))
-    return uptime
+    try:
+        uptime = int(_cs_client.get('status/system/uptime'))
+        return uptime
+    except Exception as e:
+        _cs_client.log(f"Error getting uptime: {e}")
+        return 0
 
-def wait_for_uptime(min_uptime_seconds):
+def wait_for_uptime(min_uptime_seconds: int = 60) -> None:
     """Wait for the device uptime to be greater than the specified uptime and sleep if it is less than the specified uptime."""
     try:
         current_uptime = get_uptime()
@@ -1049,7 +1076,7 @@ def wait_for_uptime(min_uptime_seconds):
     except Exception as e:
         _cs_client.logger.exception(f"Error validating uptime: {e}")
 
-def wait_for_ntp(timeout=300, check_interval=1):
+def wait_for_ntp(timeout: int = 300, check_interval: int = 1) -> bool:
     """
     Wait until NTP sync age is not null, indicating NTP synchronization.
     
@@ -1060,65 +1087,86 @@ def wait_for_ntp(timeout=300, check_interval=1):
     Returns:
         bool: True if NTP sync was achieved within timeout, False otherwise
     """
-    start_time = time.time()
-    
-    while time.time() - start_time < timeout:
-        sync_age = _cs_client.get('status/system/ntp/sync_age')
+    try:
+        start_time = time.time()
         
-        if sync_age is not None:
-            _cs_client.log(f'NTP sync achieved, sync_age: {sync_age}')
-            return True
+        while time.time() - start_time < timeout:
+            sync_age = _cs_client.get('status/system/ntp/sync_age')
             
-        time.sleep(check_interval)
-    
-    _cs_client.log(f'NTP sync timeout after {timeout} seconds')
-    return False
+            if sync_age is not None:
+                _cs_client.log(f'NTP sync achieved, sync_age: {sync_age}')
+                return True
+                
+            time.sleep(check_interval)
+        
+        _cs_client.log(f'NTP sync timeout after {timeout} seconds')
+        return False
+    except Exception as e:
+        _cs_client.log(f"Error waiting for NTP sync: {e}")
+        return False
 
-def wait_for_wan_connection(timeout=300):
+def wait_for_wan_connection(timeout: int = 300) -> bool:
     """Waits for at least one WAN connection to be 'connected'.
     Returns True if a connection is established within the timeout, otherwise False."""
-    # First check if WAN is already connected
-    connection_state = _cs_client.get('status/wan/connection_state')
-    if connection_state == 'connected':
-        return True
-    
-    _cs_client.log("Waiting for a WAN connection...")
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        # Check for a global connection state
+    try:
+        # First check if WAN is already connected
         connection_state = _cs_client.get('status/wan/connection_state')
         if connection_state == 'connected':
-            _cs_client.log("WAN is connected.")
             return True
+        
+        _cs_client.log("Waiting for a WAN connection...")
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            # Check for a global connection state
+            connection_state = _cs_client.get('status/wan/connection_state')
+            if connection_state == 'connected':
+                _cs_client.log("WAN is connected.")
+                return True
 
-        time.sleep(1)
-    _cs_client.log(f"Timeout waiting for WAN connection after {timeout} seconds.")
-    return False
+            time.sleep(1)
+        _cs_client.log(f"Timeout waiting for WAN connection after {timeout} seconds.")
+        return False
+    except Exception as e:
+        _cs_client.log(f"Error waiting for WAN connection: {e}")
+        return False
 
-def get_appdata(name):
+def get_appdata(name: str = '') -> Optional[str]:
     """Get value of appdata from NCOS Config by name."""
-    appdata = _cs_client.get('config/system/sdk/appdata')
-    return next(iter(x["value"] for x in appdata if x["name"] == name), None)
+    try:
+        appdata = _cs_client.get('config/system/sdk/appdata')
+        return next(iter(x["value"] for x in appdata if x["name"] == name), None)
+    except Exception as e:
+        _cs_client.log(f"Error getting appdata for {name}: {e}")
+        return None
 
-def post_appdata(name, value):
+def post_appdata(name: str = '', value: str = '') -> None:
     """Create appdata in NCOS Config by name."""
-    _cs_client.post('config/system/sdk/appdata', {"name": name, "value": value})
+    try:
+        _cs_client.post('config/system/sdk/appdata', {"name": name, "value": value})
+    except Exception as e:
+        _cs_client.log(f"Error posting appdata for {name}: {e}")
 
-def put_appdata(name, value):
+def put_appdata(name: str = '', value: str = '') -> None:
     """Set value of appdata in NCOS Config by name."""
-    appdata = _cs_client.get('config/system/sdk/appdata')
-    for item in appdata:
-        if item["name"] == name:
-            _cs_client.put(f'config/system/sdk/appdata/{item["_id_"]}/value', value)
+    try:
+        appdata = _cs_client.get('config/system/sdk/appdata')
+        for item in appdata:
+            if item["name"] == name:
+                _cs_client.put(f'config/system/sdk/appdata/{item["_id_"]}/value', value)
+    except Exception as e:
+        _cs_client.log(f"Error putting appdata for {name}: {e}")
 
-def delete_appdata(name):
+def delete_appdata(name: str = '') -> None:
     """Delete appdata in NCOS Config by name."""
-    appdata = _cs_client.get('config/system/sdk/appdata')
-    for item in appdata:
-        if item["name"] == name:
-            _cs_client.delete(f'config/system/sdk/appdata/{item["_id_"]}')
+    try:
+        appdata = _cs_client.get('config/system/sdk/appdata')
+        for item in appdata:
+            if item["name"] == name:
+                _cs_client.delete(f'config/system/sdk/appdata/{item["_id_"]}')
+    except Exception as e:
+        _cs_client.log(f"Error deleting appdata for {name}: {e}")
 
-def get_ncm_api_keys():
+def get_ncm_api_keys() -> Dict[str, Optional[str]]:
     """Get NCM API keys from the router's certificate management configuration.
     Returns:
         dict: Dictionary containing all API keys, with None for any missing keys
@@ -1151,125 +1199,137 @@ def get_ncm_api_keys():
         _cs_client.logger.exception(f"Error retrieving NCM API keys: {e}")
         raise
 
-def extract_cert_and_key(cert_name_or_uuid):
+def extract_cert_and_key(cert_name_or_uuid: str = '') -> Tuple[Optional[str], Optional[str]]:
     """Extract and save the certificate and key to the local filesystem. Returns the filenames of the certificate and key files."""
-    cert_x509 = None
-    cert_key = None
-    ca_uuid = None
-    cert_name = None
+    try:
+        cert_x509 = None
+        cert_key = None
+        ca_uuid = None
+        cert_name = None
 
-    # Check if cert_name_or_uuid is in UUID format
-    uuid_regex = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
-    is_uuid = bool(uuid_regex.match(cert_name_or_uuid))
-    match_field = '_id_' if is_uuid else 'name'
+        # Check if cert_name_or_uuid is in UUID format
+        uuid_regex = re.compile(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+        is_uuid = bool(uuid_regex.match(cert_name_or_uuid))
+        match_field = '_id_' if is_uuid else 'name'
 
-    # Get the list of certificates
-    certs = _cs_client.get('config/certmgmt/certs')
+        # Get the list of certificates
+        certs = _cs_client.get('config/certmgmt/certs')
 
-    # if cert_name is a uuid, find the cert by uuid, otherwise, find the cert by name
-    for cert in certs:
-        if cert[match_field] == cert_name_or_uuid:
-            cert_name = cert.get('name')
-            cert_x509 = cert.get('x509')
-            cert_key = _cs_client.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
-            ca_uuid = cert.get('ca_uuid')
-            break
-    else:
-        _cs_client.log(f'No certificate "{cert_name_or_uuid}" found')
-        return None, None
-
-    # Extract the CA certificate(s) if it exists
-    while ca_uuid not in ["", "None", None]:
+        # if cert_name is a uuid, find the cert by uuid, otherwise, find the cert by name
         for cert in certs:
-            if cert.get('_id_') == ca_uuid:
-                cert_x509 += "\n" + cert.get('x509')
+            if cert[match_field] == cert_name_or_uuid:
+                cert_name = cert.get('name')
+                cert_x509 = cert.get('x509')
+                cert_key = _cs_client.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
                 ca_uuid = cert.get('ca_uuid')
+                break
+        else:
+            _cs_client.log(f'No certificate "{cert_name_or_uuid}" found')
+            return None, None
 
-    # Write the fullchain and privatekey .pem files
-    if cert_x509 and cert_key:
-        with open(f"{cert_name}.pem", "w") as fullchain_file:
-            fullchain_file.write(cert_x509)
-        with open(f"{cert_name}_key.pem", "w") as privatekey_file:
-            privatekey_file.write(cert_key)
-        return f"{cert_name}.pem", f"{cert_name}_key.pem"
-    elif cert_x509:
-        with open(f"{cert_name}.pem", "w") as fullchain_file:
-            fullchain_file.write(cert_x509)
-        return f"{cert_name}.pem", None
-    else:
-        _cs_client.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
+        # Extract the CA certificate(s) if it exists
+        while ca_uuid not in ["", "None", None]:
+            for cert in certs:
+                if cert.get('_id_') == ca_uuid:
+                    cert_x509 += "\n" + cert.get('x509')
+                    ca_uuid = cert.get('ca_uuid')
+
+        # Write the fullchain and privatekey .pem files
+        if cert_x509 and cert_key:
+            with open(f"{cert_name}.pem", "w") as fullchain_file:
+                fullchain_file.write(cert_x509)
+            with open(f"{cert_name}_key.pem", "w") as privatekey_file:
+                privatekey_file.write(cert_key)
+            return f"{cert_name}.pem", f"{cert_name}_key.pem"
+        elif cert_x509:
+            with open(f"{cert_name}.pem", "w") as fullchain_file:
+                fullchain_file.write(cert_x509)
+            return f"{cert_name}.pem", None
+        else:
+            _cs_client.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
+            return None, None
+    except Exception as e:
+        _cs_client.log(f"Error extracting certificate and key for {cert_name_or_uuid}: {e}")
         return None, None
 
-def get_ipv4_wired_clients():
+def get_ipv4_wired_clients() -> List[Dict[str, Any]]:
     """Return a list of IPv4 wired clients and their details."""
-    wired_clients = []
-    lan_clients = _cs_client.get('status/lan/clients') or []
-    leases = _cs_client.get('status/dhcpd/leases') or []
+    try:
+        wired_clients = []
+        lan_clients = _cs_client.get('status/lan/clients') or []
+        leases = _cs_client.get('status/dhcpd/leases') or []
 
-    # Filter out IPv6 clients
-    lan_clients = [client for client in lan_clients if ":" not in client.get("ip_address", "")]
+        # Filter out IPv6 clients
+        lan_clients = [client for client in lan_clients if ":" not in client.get("ip_address", "")]
 
-    for lan_client in lan_clients:
-        mac_upper = lan_client.get("mac", "").upper()
-        lease = next((x for x in leases if x.get("mac", "").upper() == mac_upper), None)
-        hostname = lease.get("hostname") if lease else None
-        network = lease.get("network") if lease else None
+        for lan_client in lan_clients:
+            mac_upper = lan_client.get("mac", "").upper()
+            lease = next((x for x in leases if x.get("mac", "").upper() == mac_upper), None)
+            hostname = lease.get("hostname") if lease else None
+            network = lease.get("network") if lease else None
 
-        # Set hostname to None if it matches the MAC address with hyphens or is "*"
-        if hostname and (hostname.upper() == mac_upper.replace(":", "-") or hostname == "*"):
-            hostname = None
+            # Set hostname to None if it matches the MAC address with hyphens or is "*"
+            if hostname and (hostname.upper() == mac_upper.replace(":", "-") or hostname == "*"):
+                hostname = None
 
-        wired_clients.append({
-            "mac": lan_client.get("mac"),
-            "hostname": hostname,
-            "ip_address": lan_client.get("ip_address"),
-            "network": network
-        })
-    return wired_clients
+            wired_clients.append({
+                "mac": lan_client.get("mac"),
+                "hostname": hostname,
+                "ip_address": lan_client.get("ip_address"),
+                "network": network
+            })
+        return wired_clients
+    except Exception as e:
+        _cs_client.log(f"Error getting IPv4 wired clients: {e}")
+        return []
 
-def get_ipv4_wifi_clients():
+def get_ipv4_wifi_clients() -> List[Dict[str, Any]]:
     """Return a list of IPv4 Wi-Fi clients and their details."""
-    wifi_clients = []
-    wlan_clients = _cs_client.get('status/wlan/clients') or []
-    leases = _cs_client.get('status/dhcpd/leases') or []
-    bw_modes = {0: "20 MHz", 1: "40 MHz", 2: "80 MHz", 3: "80+80 MHz", 4: "160 MHz"}
-    wlan_modes = {0: "802.11b", 1: "802.11g", 2: "802.11n", 3: "802.11n-only", 4: "802.11ac", 5: "802.11ax"}
-    wlan_band = {0: "2.4", 1: "5"}
+    try:
+        wifi_clients = []
+        wlan_clients = _cs_client.get('status/wlan/clients') or []
+        leases = _cs_client.get('status/dhcpd/leases') or []
+        bw_modes = {0: "20 MHz", 1: "40 MHz", 2: "80 MHz", 3: "80+80 MHz", 4: "160 MHz"}
+        wlan_modes = {0: "802.11b", 1: "802.11g", 2: "802.11n", 3: "802.11n-only", 4: "802.11ac", 5: "802.11ax"}
+        wlan_band = {0: "2.4", 1: "5"}
 
-    for wlan_client in wlan_clients:
-        radio = wlan_client.get("radio")
-        bss = wlan_client.get("bss")
-        ssid = _cs_client.get(f'config/wlan/radio/{radio}/bss/{bss}/ssid')
+        for wlan_client in wlan_clients:
+            radio = wlan_client.get("radio")
+            bss = wlan_client.get("bss")
+            ssid = _cs_client.get(f'config/wlan/radio/{radio}/bss/{bss}/ssid')
 
-        mac_upper = wlan_client.get("mac", "").upper()
-        
-        # Get DHCP lease information
-        lease = next((x for x in leases if x.get("mac", "").upper() == mac_upper), None)
-        hostname = lease.get("hostname") if lease else wlan_client.get("hostname")
-        network = lease.get("network") if lease else None
+            mac_upper = wlan_client.get("mac", "").upper()
+            
+            # Get DHCP lease information
+            lease = next((x for x in leases if x.get("mac", "").upper() == mac_upper), None)
+            hostname = lease.get("hostname") if lease else wlan_client.get("hostname")
+            network = lease.get("network") if lease else None
 
-        # Set hostname to None if it matches the MAC address with hyphens or is "*"
-        if hostname and (hostname.upper() == mac_upper.replace(":", "-") or hostname == "*"):
-            hostname = None
+            # Set hostname to None if it matches the MAC address with hyphens or is "*"
+            if hostname and (hostname.upper() == mac_upper.replace(":", "-") or hostname == "*"):
+                hostname = None
 
-        wifi_clients.append({
-            "mac": wlan_client.get("mac"),
-            "hostname": hostname,
-            "ip_address": lease.get("ip_address"),
-            "radio": radio,
-            "bss": bss,
-            "ssid": ssid,
-            "network": network,
-            "band": wlan_band.get(radio, "Unknown"),
-            "mode": wlan_modes.get(wlan_client.get("mode"), "Unknown"),
-            "bw": bw_modes.get(wlan_client.get("bw"), "Unknown"),
-            "txrate": wlan_client.get("txrate"),
-            "rssi": wlan_client.get("rssi0"),
-            "time": wlan_client.get("time", 0)
-        })
-    return wifi_clients
+            wifi_clients.append({
+                "mac": wlan_client.get("mac"),
+                "hostname": hostname,
+                "ip_address": lease.get("ip_address"),
+                "radio": radio,
+                "bss": bss,
+                "ssid": ssid,
+                "network": network,
+                "band": wlan_band.get(radio, "Unknown"),
+                "mode": wlan_modes.get(wlan_client.get("mode"), "Unknown"),
+                "bw": bw_modes.get(wlan_client.get("bw"), "Unknown"),
+                "txrate": wlan_client.get("txrate"),
+                "rssi": wlan_client.get("rssi0"),
+                "time": wlan_client.get("time", 0)
+            })
+        return wifi_clients
+    except Exception as e:
+        _cs_client.log(f"Error getting IPv4 WiFi clients: {e}")
+        return []
 
-def get_ipv4_lan_clients():
+def get_ipv4_lan_clients() -> Dict[str, List[Dict[str, Any]]]:
     """Return a dictionary containing all IPv4 clients, both wired and Wi-Fi."""
     try:
         wired_clients = get_ipv4_wired_clients()
@@ -1284,171 +1344,287 @@ def get_ipv4_lan_clients():
         return lan_clients
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving clients: {e}")
+        return {"wired_clients": [], "wifi_clients": []}
 
-def dec(deg, min, sec):
+def dec(deg: float, min: float = 0.0, sec: float = 0.0) -> float:
     """Return decimal version of lat or long from deg, min, sec"""
-    if str(deg)[0] == '-':
-        dec_val = deg - (min / 60) - (sec / 3600)
-    else:
-        dec_val = deg + (min / 60) + (sec / 3600)
-    return round(dec_val, 6)
-
-def get_lat_long():
-    """Return latitude and longitude as floats"""
-    fix = _cs_client.get('status/gps/fix')
-    retries = 0
-    while not fix and retries < 5:
-        time.sleep(0.1)
-        fix = _cs_client.get('status/gps/fix')
-        retries += 1
-
-    if not fix:
-        return None, None
-
     try:
-        lat_deg = fix['latitude']['degree']
-        lat_min = fix['latitude']['minute']
-        lat_sec = fix['latitude']['second']
-        long_deg = fix['longitude']['degree']
-        long_min = fix['longitude']['minute']
-        long_sec = fix['longitude']['second']
-        lat = dec(lat_deg, lat_min, lat_sec)
-        long = dec(long_deg, long_min, long_sec)
-        lat = float(f"{float(lat):.6f}")
-        long = float(f"{float(long):.6f}")
-        return lat, long
-    except:
+        if str(deg)[0] == '-':
+            dec_val = deg - (min / 60) - (sec / 3600)
+        else:
+            dec_val = deg + (min / 60) + (sec / 3600)
+        return round(dec_val, 6)
+    except Exception as e:
+        _cs_client.log(f"Error converting coordinates to decimal: {e}")
+        return 0.0
+
+def get_lat_long(max_retries: int = 5, retry_delay: float = 0.1) -> Tuple[Optional[float], Optional[float]]:
+    """Return latitude and longitude as floats"""
+    try:
+        fix = _cs_client.get('status/gps/fix')
+        retries = 0
+        while not fix and retries < max_retries:
+            time.sleep(retry_delay)
+            fix = _cs_client.get('status/gps/fix')
+            retries += 1
+
+        if not fix:
+            return None, None
+
+        try:
+            lat_deg = fix['latitude']['degree']
+            lat_min = fix['latitude']['minute']
+            lat_sec = fix['latitude']['second']
+            long_deg = fix['longitude']['degree']
+            long_min = fix['longitude']['minute']
+            long_sec = fix['longitude']['second']
+            lat = dec(lat_deg, lat_min, lat_sec)
+            long = dec(long_deg, long_min, long_sec)
+            lat = float(f"{float(lat):.6f}")
+            long = float(f"{float(long):.6f}")
+            return lat, long
+        except:
+            return None, None
+    except Exception as e:
+        _cs_client.log(f"Error getting latitude and longitude: {e}")
         return None, None
 
-def get_connected_wans():
+def get_connected_wans(max_retries: int = 10) -> List[str]:
     """Return list of connected WAN UIDs"""
-    wans = []
-    while not wans:
-        wans = _cs_client.get('status/wan/devices')
-    # get the wans that are connected
-    wans = [k for k, v in wans.items() if v['status']['connection_state'] == 'connected']
-    if not wans:
-        _cs_client.log('No WANs connected!')
-    return wans
+    try:
+        wans = []
+        retries = 0
+        while not wans and retries < max_retries:
+            wans = _cs_client.get('status/wan/devices')
+            retries += 1
+            if not wans:
+                time.sleep(0.1)
+        # get the wans that are connected
+        wans = [k for k, v in wans.items() if v['status']['connection_state'] == 'connected']
+        if not wans:
+            _cs_client.log('No WANs connected!')
+        return wans
+    except Exception as e:
+        _cs_client.log(f"Error getting connected WANs: {e}")
+        return []
 
-def get_sims():
+def get_sims(max_retries: int = 10) -> List[str]:
     """Return list of modem UIDs with SIMs"""
-    SIMs = []
-    devices = None
-    while not devices:
-        devices = _cs_client.get('status/wan/devices')
-    for uid, status in devices.items():
-        if uid.startswith('mdm-'):
-            error_text = status.get('status', {}).get('error_text', '')
-            if error_text:
-                if 'NOSIM' in error_text:
-                    continue
-            SIMs.append(uid)
-    return SIMs
+    try:
+        SIMs = []
+        devices = None
+        retries = 0
+        while not devices and retries < max_retries:
+            devices = _cs_client.get('status/wan/devices')
+            retries += 1
+            if not devices:
+                time.sleep(0.1)
+        for uid, status in devices.items():
+            if uid.startswith('mdm-'):
+                error_text = status.get('status', {}).get('error_text', '')
+                if error_text:
+                    if 'NOSIM' in error_text:
+                        continue
+                SIMs.append(uid)
+        return SIMs
+    except Exception as e:
+        _cs_client.log(f"Error getting SIMs: {e}")
+        return []
 
-def get_device_mac():
+def get_device_mac(format_with_colons: bool = False) -> Optional[str]:
     """Return the device MAC address without colons"""
-    mac = _cs_client.get('status/product_info/mac0')
-    return mac.replace(':', '') if mac else None
+    try:
+        mac = _cs_client.get('status/product_info/mac0')
+        if not mac:
+            return None
+        return mac if format_with_colons else mac.replace(':', '')
+    except Exception as e:
+        _cs_client.log(f"Error getting device MAC: {e}")
+        return None
 
-def get_device_serial_num():
+def get_device_serial_num() -> Optional[str]:
     """Return the device serial number"""
-    return _cs_client.get('status/product_info/manufacturing/serial_num')
+    try:
+        return _cs_client.get('status/product_info/manufacturing/serial_num')
+    except Exception as e:
+        _cs_client.log(f"Error getting device serial number: {e}")
+        return None
 
-def get_device_product_type():
+def get_device_product_type() -> Optional[str]:
     """Return the device product type"""
-    return _cs_client.get('status/product_info/manufacturing/product_name')
+    try:
+        return _cs_client.get('status/product_info/manufacturing/product_name')
+    except Exception as e:
+        _cs_client.log(f"Error getting device product type: {e}")
+        return None
 
-def get_device_name():
+def get_device_name() -> Optional[str]:
     """Return the device name"""
-    return _cs_client.get('config/system/system_id')
+    try:
+        return _cs_client.get('config/system/system_id')
+    except Exception as e:
+        _cs_client.log(f"Error getting device name: {e}")
+        return None
 
-def get_device_firmware():
+def get_device_firmware(include_build_info: bool = False) -> str:
     """Return the device firmware information"""
-    fw_info = _cs_client.get('status/fw_info')
-    firmware = f"{fw_info.get('major')}.{fw_info.get('minor')}.{fw_info.get('patch')}-{fw_info.get('fw_release_tag')}"
-    return firmware
+    try:
+        fw_info = _cs_client.get('status/fw_info')
+        firmware = f"{fw_info.get('major')}.{fw_info.get('minor')}.{fw_info.get('patch')}-{fw_info.get('fw_release_tag')}"
+        
+        if include_build_info:
+            build_info = fw_info.get('build_info', '')
+            if build_info:
+                firmware += f" ({build_info})"
+        
+        return firmware
+    except Exception as e:
+        _cs_client.log(f"Error getting device firmware: {e}")
+        return "Unknown"
 
-def get_system_resources(cpu=True, memory=True):
+def get_system_resources(cpu: bool = True, memory: bool = True, storage: bool = False) -> Dict[str, str]:
     """Return a dictionary containing the system resources"""
-    system_resources = {}
-    
-    if cpu:
-        cpu = _cs_client.get('status/system/cpu')
-        system_resources['cpu'] = f"CPU Usage: {round(float(cpu['nice']) + float(cpu['system']) + float(cpu['user']) * 100)}%"
-    if memory:
-        memory = _cs_client.get('status/system/memory')
-        system_resources['avail_mem'] = f"Available Memory: {memory['memavailable'] / float(1 << 20):,.0f} MB"
-        system_resources['total_mem'] = f"Total Memory: {memory['memtotal'] / float(1 << 20):,.0f} MB"
-        system_resources['free_mem'] = f"Free Memory: {memory['memfree'] / float(1 << 20):,.0f} MB"
+    try:
+        system_resources = {}
+        
+        if cpu:
+            cpu = _cs_client.get('status/system/cpu')
+            system_resources['cpu'] = f"CPU Usage: {round(float(cpu['nice']) + float(cpu['system']) + float(cpu['user']) * 100)}%"
+        if memory:
+            memory = _cs_client.get('status/system/memory')
+            system_resources['avail_mem'] = f"Available Memory: {memory['memavailable'] / float(1 << 20):,.0f} MB"
+            system_resources['total_mem'] = f"Total Memory: {memory['memtotal'] / float(1 << 20):,.0f} MB"
+            system_resources['free_mem'] = f"Free Memory: {memory['memfree'] / float(1 << 20):,.0f} MB"
+        
+        if storage:
+            storage_info = _cs_client.get('status/system/storage')
+            if storage_info:
+                system_resources['storage_health'] = f"Storage Health: {storage_info.get('health', 'Unknown')}"
 
-    return system_resources
+        return system_resources
+    except Exception as e:
+        _cs_client.log(f"Error getting system resources: {e}")
+        return {}
 
-def get_ncm_status():
+def get_ncm_status(include_details: bool = False) -> Optional[str]:
     """Return the NCM status"""
-    return _cs_client.get('status/ecm/state')
+    try:
+        return _cs_client.get('status/ecm/state')
+    except Exception as e:
+        _cs_client.log(f"Error getting NCM status: {e}")
+        return None
 
-def reboot_device():
+def reboot_device(force: bool = False) -> None:
     """Reboot the device"""
-    _cs_client.put('control/system/reboot', 'reboot hypmgr')
+    try:
+        _cs_client.put('control/system/reboot', 'reboot hypmgr')
+    except Exception as e:
+        _cs_client.log(f"Error rebooting device: {e}")
     
 # Direct access to the underlying EventingCSClient methods
-def get(base, query='', tree=0):
+def get(base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
     """Direct access to the underlying get method."""
-    return _cs_client.get(base, query, tree)
+    try:
+        return _cs_client.get(base, query, tree)
+    except Exception as e:
+        _cs_client.log(f"Error in get request for {base}: {e}")
+        return None
 
-def post(base, value='', query=''):
+def post(base: str, value: Any = '', query: str = '') -> Optional[Dict[str, Any]]:
     """Direct access to the underlying post method."""
-    return _cs_client.post(base, value, query)
+    try:
+        return _cs_client.post(base, value, query)
+    except Exception as e:
+        _cs_client.log(f"Error in post request for {base}: {e}")
+        return None
 
-def put(base, value='', query='', tree=0):
+def put(base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
     """Direct access to the underlying put method."""
-    return _cs_client.put(base, value, query, tree)
+    try:
+        return _cs_client.put(base, value, query, tree)
+    except Exception as e:
+        _cs_client.log(f"Error in put request for {base}: {e}")
+        return None
 
-def delete(base, query=''):
+def delete(base: str, query: str = '') -> Optional[Dict[str, Any]]:
     """Direct access to the underlying delete method."""
-    return _cs_client.delete(base, query)
+    try:
+        return _cs_client.delete(base, query)
+    except Exception as e:
+        _cs_client.log(f"Error in delete request for {base}: {e}")
+        return None
 
-def decrypt(base, query='', tree=0):
+def decrypt(base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
     """Direct access to the underlying decrypt method."""
-    return _cs_client.decrypt(base, query, tree)
+    try:
+        return _cs_client.decrypt(base, query, tree)
+    except Exception as e:
+        _cs_client.log(f"Error in decrypt request for {base}: {e}")
+        return None
 
-def log(value=''):
+def log(value: str = '') -> None:
     """Direct access to the underlying log method."""
-    return _cs_client.log(value)
+    try:
+        return _cs_client.log(value)
+    except Exception as e:
+        print(f"Error in log request: {e}")
 
-def alert(value=''):
+def alert(value: str = '') -> Optional[Dict[str, Any]]:
     """Direct access to the underlying alert method."""
-    return _cs_client.alert(value)
+    try:
+        return _cs_client.alert(value)
+    except Exception as e:
+        _cs_client.log(f"Error in alert request: {e}")
+        return None
 
-def register(action, path, callback, *args):
+def register(action: str = 'set', path: str = '', callback: Callable = None, *args: Any) -> Dict[str, Any]:
     """Registers a callback for a config store event."""
-    return _cs_client.register(action, path, callback, *args)
+    try:
+        return _cs_client.register(action, path, callback, *args)
+    except Exception as e:
+        _cs_client.log(f"Error in register request for {path}: {e}")
+        return {}
 
 # Alias for register function
 on = register
 
-def unregister(eid):
+def unregister(eid: int = 0) -> Dict[str, Any]:
     """Unregisters a callback by its event ID."""
-    return _cs_client.unregister(eid)
+    try:
+        return _cs_client.unregister(eid)
+    except Exception as e:
+        _cs_client.log(f"Error in unregister request for eid {eid}: {e}")
+        return {}
 
 # Expose the logger for advanced logging control
-def get_logger():
+def get_logger() -> Any:
     """Get the logger instance for advanced logging control."""
-    return _cs_client.logger
+    try:
+        return _cs_client.logger
+    except Exception as e:
+        print(f"Error getting logger: {e}")
+        return None
 
 # Monkay patch for cp.uptime()
-def uptime():
-    return time.time()
+def uptime() -> float:
+    try:
+        return time.time()
+    except Exception as e:
+        print(f"Error getting uptime: {e}")
+        return 0.0
     
-def clean_up_reg(signal, frame):
+def clean_up_reg(signal: Any, frame: Any) -> None:
     """
     When 'cppython remote_port_forward.py' gets a SIGTERM, config_store_receiver.py doesn't
     clean up registrations. Even if it did, the comm module can't rely on an external service
     to clean up.
     """
-    _cs_client.stop()
-    sys.exit(0)
+    try:
+        _cs_client.stop()
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+        sys.exit(1)
 
 
 signal.signal(signal.SIGTERM, clean_up_reg)
@@ -1461,51 +1637,51 @@ signal.signal(signal.SIGTERM, clean_up_reg)
 # GRANULAR STATUS GET CONVENIENCE FUNCTIONS
 # ============================================================================
 
-def get_gps_status():
+def get_gps_status() -> Dict[str, Any]:
     """Get GPS status and return detailed information"""
     return _cs_client.get_gps_status()
 
-def get_system_status():
+def get_system_status() -> Dict[str, Any]:
     """Get system status and return detailed information"""
     return _cs_client.get_system_status()
 
-def get_wlan_status():
+def get_wlan_status() -> Dict[str, Any]:
     """Get WLAN status and return detailed information"""
     return _cs_client.get_wlan_status()
 
-def get_wan_status():
+def get_wan_status() -> Dict[str, Any]:
     """Get WAN status and return detailed information"""
     return _cs_client.get_wan_status()
 
-def get_lan_status():
+def get_lan_status() -> Dict[str, Any]:
     """Get LAN status and return detailed information"""
     return _cs_client.get_lan_status()
 
-def get_openvpn_status():
+def get_openvpn_status() -> Dict[str, Any]:
     """Get OpenVPN status and return detailed information"""
     return _cs_client.get_openvpn_status()
 
-def get_hotspot_status():
+def get_hotspot_status() -> Dict[str, Any]:
     """Get hotspot status and return detailed information"""
     return _cs_client.get_hotspot_status()
 
-def get_obd_status():
+def get_obd_status() -> Dict[str, Any]:
     """Get OBD status and return detailed information"""
     return _cs_client.get_obd_status()
 
-def get_qos_status():
+def get_qos_status() -> Dict[str, Any]:
     """Get QoS status and return detailed information"""
     return _cs_client.get_qos_status()
 
-def get_firewall_status():
+def get_firewall_status() -> Dict[str, Any]:
     """Get firewall status and return detailed information"""
     return _cs_client.get_firewall_status()
 
-def get_dns_status():
+def get_dns_status() -> Dict[str, Any]:
     """Get DNS status and return detailed information"""
     return _cs_client.get_dns_status()
 
-def get_dhcp_status():
+def get_dhcp_status() -> Dict[str, Any]:
     """Get DHCP status and return detailed information"""
     return _cs_client.get_dhcp_status()
 
@@ -1513,7 +1689,7 @@ def get_dhcp_status():
 # STATUS MONITORING FUNCTIONS
 # ============================================================================
 
-def get_wan_devices_status():
+def get_wan_devices_status() -> Optional[Dict[str, Any]]:
     """
     Return detailed status information for all WAN devices.
     
@@ -1535,7 +1711,7 @@ def get_wan_devices_status():
         _cs_client.logger.exception(f"Error retrieving WAN devices status: {e}")
         return None
 
-def get_modem_status():
+def get_modem_status() -> Optional[Dict[str, Any]]:
     """
     Return detailed status information for cellular modem devices only.
     
@@ -1573,7 +1749,7 @@ def get_modem_status():
         _cs_client.logger.exception(f"Error retrieving modem status: {e}")
         return None
 
-def get_signal_strength():
+def get_signal_strength() -> Optional[Dict[str, Any]]:
     """
     Return signal strength information for all cellular modems.
     
@@ -1625,37 +1801,52 @@ def get_signal_strength():
         _cs_client.logger.exception(f"Error retrieving signal strength: {e}")
         return None
 
-def get_temperature():
+def get_temperature(unit: str = 'celsius') -> Optional[float]:
     """Return device temperature information"""
     try:
         # Temperature is a direct value, not a directory
         temp = _cs_client.get('status/system/temperature')
+        if temp is None:
+            return None
+        
+        # Convert to Fahrenheit if requested
+        if unit.lower() == 'fahrenheit':
+            return (temp * 9/5) + 32
         return temp
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving temperature: {e}")
         return None
 
-def get_power_usage():
+def get_power_usage(include_components: bool = True) -> Optional[Dict[str, Any]]:
     """Return power usage information"""
     try:
         power_components = {}
-        components = ['system_power', 'cpu_power', 'modem_power', 'wifi_power', 
-                     'poe_pse_power', 'ethernet_ports_power', 'bluetooth_power', 
-                     'usb_power', 'gps_power', 'led_power', 'total']
         
-        for component in components:
-            try:
-                value = _cs_client.get(f'status/power_usage/{component}')
-                power_components[component] = value
-            except:
-                power_components[component] = None
+        if include_components:
+            components = ['system_power', 'cpu_power', 'modem_power', 'wifi_power', 
+                         'poe_pse_power', 'ethernet_ports_power', 'bluetooth_power', 
+                         'usb_power', 'gps_power', 'led_power']
+            
+            for component in components:
+                try:
+                    value = _cs_client.get(f'status/power_usage/{component}')
+                    power_components[component] = value
+                except:
+                    power_components[component] = None
+        
+        # Always include total
+        try:
+            total_power = _cs_client.get('status/power_usage/total')
+            power_components['total'] = total_power
+        except:
+            power_components['total'] = None
         
         return power_components
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving power usage: {e}")
         return None
 
-def get_wlan_status():
+def get_wlan_status() -> Optional[Dict[str, Any]]:
     """
     Return comprehensive wireless LAN status and configuration information.
     
@@ -1670,7 +1861,7 @@ def get_wlan_status():
         _cs_client.logger.exception(f"Error retrieving WLAN status: {e}")
         return None
 
-def get_wlan_clients():
+def get_wlan_clients() -> List[Dict[str, Any]]:
     """
     Return connected wireless clients information.
     
@@ -1684,7 +1875,7 @@ def get_wlan_clients():
         _cs_client.logger.exception(f"Error retrieving WLAN clients: {e}")
         return []
 
-def get_wlan_radio_status():
+def get_wlan_radio_status() -> List[Dict[str, Any]]:
     """
     Return wireless radio status and configuration for all bands.
     
@@ -1709,7 +1900,7 @@ def get_wlan_radio_status():
         _cs_client.logger.exception(f"Error retrieving WLAN radio status: {e}")
         return []
 
-def get_wlan_radio_by_band(band):
+def get_wlan_radio_by_band(band: str = '2.4 GHz') -> Optional[Dict[str, Any]]:
     """
     Return wireless radio status for a specific frequency band.
     
@@ -1729,7 +1920,7 @@ def get_wlan_radio_by_band(band):
         _cs_client.logger.exception(f"Error retrieving WLAN radio for band {band}: {e}")
         return None
 
-def get_wlan_events():
+def get_wlan_events() -> Dict[str, Any]:
     """
     Return wireless LAN events and monitoring data.
     
@@ -1749,7 +1940,7 @@ def get_wlan_events():
         _cs_client.logger.exception(f"Error retrieving WLAN events: {e}")
         return {}
 
-def get_wlan_region_config():
+def get_wlan_region_config() -> Dict[str, Any]:
     """
     Return wireless LAN regional configuration settings.
     
@@ -1771,7 +1962,7 @@ def get_wlan_region_config():
         _cs_client.logger.exception(f"Error retrieving WLAN region config: {e}")
         return {}
 
-def get_wlan_remote_status():
+def get_wlan_remote_status() -> Dict[str, Any]:
     """
     Return remote WiFi controller status and configuration.
     
@@ -1786,7 +1977,7 @@ def get_wlan_remote_status():
         _cs_client.logger.exception(f"Error retrieving WLAN remote status: {e}")
         return {}
 
-def get_wlan_state():
+def get_wlan_state() -> str:
     """
     Return wireless LAN operational state.
     
@@ -1800,7 +1991,7 @@ def get_wlan_state():
         _cs_client.logger.exception(f"Error retrieving WLAN state: {e}")
         return 'Unknown'
 
-def get_wlan_trace():
+def get_wlan_trace() -> List[Dict[str, Any]]:
     """
     Return wireless LAN initialization trace data.
     
@@ -1818,7 +2009,7 @@ def get_wlan_trace():
         _cs_client.logger.exception(f"Error retrieving WLAN trace: {e}")
         return []
 
-def get_wlan_debug():
+def get_wlan_debug() -> Dict[str, Any]:
     """
     Return wireless LAN debug information.
     
@@ -1833,12 +2024,13 @@ def get_wlan_debug():
         _cs_client.logger.exception(f"Error retrieving WLAN debug: {e}")
         return {}
 
-def get_wlan_channel_info(band=None):
+def get_wlan_channel_info(band: Optional[str] = None, include_survey: bool = False) -> Dict[str, Any]:
     """
     Return wireless LAN channel information for specified band or all bands.
     
     Args:
         band (str, optional): Frequency band ('2.4 GHz' or '5 GHz'). If None, returns all bands.
+        include_survey (bool, optional): Include channel survey data. Default is False.
     
     Returns:
         dict: Dictionary containing channel information:
@@ -1847,18 +2039,22 @@ def get_wlan_channel_info(band=None):
             - channel_locked (bool): Whether channel is locked
             - channel_contention (int): Channel contention value
             - txpower (int): Transmit power in percentage
+            - survey_data (list, optional): Channel survey data if include_survey is True
     """
     try:
         if band:
             radio = get_wlan_radio_by_band(band)
             if radio:
-                return {
+                channel_info = {
                     'current_channel': radio.get('channel'),
                     'available_channels': radio.get('channel_list', []),
                     'channel_locked': radio.get('channel_locked', False),
                     'channel_contention': radio.get('channel_contention', 0),
                     'txpower': radio.get('txpower', 0)
                 }
+                if include_survey:
+                    channel_info['survey_data'] = radio.get('survey', [])
+                return channel_info
             return {}
         else:
             # Return channel info for all bands
@@ -1873,12 +2069,14 @@ def get_wlan_channel_info(band=None):
                     'channel_contention': radio.get('channel_contention', 0),
                     'txpower': radio.get('txpower', 0)
                 }
+                if include_survey:
+                    channel_info[band_name]['survey_data'] = radio.get('survey', [])
             return channel_info
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving WLAN channel info: {e}")
         return {}
 
-def get_wlan_client_count():
+def get_wlan_client_count() -> int:
     """
     Return the count of connected wireless clients.
     
@@ -1892,7 +2090,7 @@ def get_wlan_client_count():
         _cs_client.logger.exception(f"Error retrieving WLAN client count: {e}")
         return 0
 
-def get_wlan_client_count_by_band():
+def get_wlan_client_count_by_band() -> Dict[str, int]:
     """
     Return the count of connected wireless clients per frequency band.
     
@@ -1911,7 +2109,7 @@ def get_wlan_client_count_by_band():
         _cs_client.logger.exception(f"Error retrieving WLAN client count by band: {e}")
         return {}
 
-def get_dhcp_leases():
+def get_dhcp_leases() -> Optional[List[Dict[str, Any]]]:
     """Return DHCP lease information"""
     try:
         leases = _cs_client.get('status/dhcpd/leases')
@@ -1920,7 +2118,7 @@ def get_dhcp_leases():
         _cs_client.logger.exception(f"Error retrieving DHCP leases: {e}")
         return None
 
-def get_network_interfaces():
+def get_network_interfaces() -> Optional[Dict[str, Any]]:
     """Return network interface status"""
     try:
         interfaces = _cs_client.get('status/network')
@@ -1929,7 +2127,7 @@ def get_network_interfaces():
         _cs_client.logger.exception(f"Error retrieving network interfaces: {e}")
         return None
 
-def get_routing_table():
+def get_routing_table() -> Optional[Dict[str, Any]]:
     """Return routing table information"""
     try:
         routes = _cs_client.get('status/routing')
@@ -1938,7 +2136,7 @@ def get_routing_table():
         _cs_client.logger.exception(f"Error retrieving routing table: {e}")
         return None
 
-def get_certificate_status():
+def get_certificate_status() -> Optional[Dict[str, Any]]:
     """Return certificate management status"""
     try:
         cert_status = _cs_client.get('status/certmgmt')
@@ -1947,31 +2145,51 @@ def get_certificate_status():
         _cs_client.logger.exception(f"Error retrieving certificate status: {e}")
         return None
 
-def get_storage_status():
+def get_storage_status(include_detailed: bool = False) -> Optional[Dict[str, Any]]:
     """Return storage device status"""
     try:
         storage_status = {
             'health': _cs_client.get('status/system/storage/health'),
             'slc_health': _cs_client.get('status/system/storage/slc_health')
         }
+        
+        if include_detailed:
+            # Add more detailed storage information if available
+            try:
+                storage_info = _cs_client.get('status/system/storage')
+                if storage_info:
+                    storage_status.update(storage_info)
+            except:
+                pass
+        
         return storage_status
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving storage status: {e}")
         return None
 
-def get_usb_status():
+def get_usb_status(include_all_ports: bool = False) -> Optional[Dict[str, Any]]:
     """Return USB device status"""
     try:
         usb_status = {
             'connection': _cs_client.get('status/usb/connection'),
             'int1': _cs_client.get('status/usb/int1')
         }
+        
+        if include_all_ports:
+            # Add all USB ports if available
+            try:
+                usb_info = _cs_client.get('status/usb')
+                if usb_info:
+                    usb_status.update(usb_info)
+            except:
+                pass
+        
         return usb_status
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving USB status: {e}")
         return None
 
-def get_poe_status():
+def get_poe_status() -> Optional[Dict[str, Any]]:
     """Return Power over Ethernet status"""
     try:
         # PoE directory appears to be empty on this router
@@ -1981,7 +2199,7 @@ def get_poe_status():
         _cs_client.logger.exception(f"Error retrieving PoE status: {e}")
         return None
 
-def get_sensors_status():
+def get_sensors_status() -> Optional[Dict[str, Any]]:
     """Return sensor status information"""
     try:
         sensors_status = {
@@ -1993,7 +2211,7 @@ def get_sensors_status():
         _cs_client.logger.exception(f"Error retrieving sensors status: {e}")
         return None
 
-def get_services_status():
+def get_services_status() -> Optional[Dict[str, Any]]:
     """Return system services status"""
     try:
         services_status = _cs_client.get('status/system/services')
@@ -2002,7 +2220,7 @@ def get_services_status():
         _cs_client.logger.exception(f"Error retrieving services status: {e}")
         return None
 
-def get_apps_status():
+def get_apps_status() -> Optional[List[Dict[str, Any]]]:
     """Return SDK applications status"""
     try:
         apps_status = _cs_client.get('status/system/apps')
@@ -2011,7 +2229,7 @@ def get_apps_status():
         _cs_client.logger.exception(f"Error retrieving apps status: {e}")
         return None
 
-def get_log_status():
+def get_log_status() -> Optional[Dict[str, Any]]:
     """Return system log status"""
     try:
         # Log directory appears to be empty
@@ -2021,7 +2239,7 @@ def get_log_status():
         _cs_client.logger.exception(f"Error retrieving log status: {e}")
         return None
 
-def get_event_status():
+def get_event_status() -> Optional[Dict[str, Any]]:
     """Return system events status"""
     try:
         event_status = _cs_client.get('status/event')
@@ -2030,7 +2248,7 @@ def get_event_status():
         _cs_client.logger.exception(f"Error retrieving event status: {e}")
         return None
 
-def get_network_throughput():
+def get_network_throughput() -> Optional[Dict[str, Any]]:
     """Return network throughput statistics"""
     try:
         stats = _cs_client.get('status/stats')
@@ -2039,7 +2257,7 @@ def get_network_throughput():
         _cs_client.logger.exception(f"Error retrieving network throughput: {e}")
         return None
 
-def get_flow_statistics():
+def get_flow_statistics() -> Optional[Dict[str, Any]]:
     """Return flow statistics"""
     try:
         flow_stats = _cs_client.get('status/flowstats')
@@ -2048,7 +2266,7 @@ def get_flow_statistics():
         _cs_client.logger.exception(f"Error retrieving flow statistics: {e}")
         return None
 
-def get_client_usage():
+def get_client_usage() -> Optional[Dict[str, Any]]:
     """Return client usage statistics"""
     try:
         client_usage = _cs_client.get('status/client_usage')
@@ -2057,7 +2275,7 @@ def get_client_usage():
         _cs_client.logger.exception(f"Error retrieving client usage: {e}")
         return None
 
-def get_multicast_status():
+def get_multicast_status() -> Optional[Dict[str, Any]]:
     """Return multicast status"""
     try:
         multicast_status = _cs_client.get('status/multicast')
@@ -2066,7 +2284,7 @@ def get_multicast_status():
         _cs_client.logger.exception(f"Error retrieving multicast status: {e}")
         return None
 
-def get_vpn_status():
+def get_vpn_status() -> Optional[Dict[str, Any]]:
     """Return VPN status (OpenVPN, L2TP, etc.)"""
     try:
         vpn_status = {
@@ -2080,7 +2298,7 @@ def get_vpn_status():
         _cs_client.logger.exception(f"Error retrieving VPN status: {e}")
         return None
 
-def get_security_status():
+def get_security_status() -> Optional[Dict[str, Any]]:
     """Return security-related status"""
     try:
         security_status = {
@@ -2093,7 +2311,7 @@ def get_security_status():
         _cs_client.logger.exception(f"Error retrieving security status: {e}")
         return None
 
-def get_iot_status():
+def get_iot_status() -> Optional[Dict[str, Any]]:
     """Return IoT-related status"""
     try:
         iot_status = _cs_client.get('status/iot')
@@ -2102,7 +2320,7 @@ def get_iot_status():
         _cs_client.logger.exception(f"Error retrieving IoT status: {e}")
         return None
 
-def get_obd_status():
+def get_obd_status() -> Optional[Dict[str, Any]]:
     """Return OBD (On-Board Diagnostics) status"""
     try:
         obd_status = _cs_client.get('status/obd')
@@ -2111,7 +2329,7 @@ def get_obd_status():
         _cs_client.logger.exception(f"Error retrieving OBD status: {e}")
         return None
 
-def get_hotspot_status():
+def get_hotspot_status() -> Optional[Dict[str, Any]]:
     """Return hotspot status"""
     try:
         hotspot_status = _cs_client.get('status/hotspot')
@@ -2120,7 +2338,7 @@ def get_hotspot_status():
         _cs_client.logger.exception(f"Error retrieving hotspot status: {e}")
         return None
 
-def get_sdwan_status():
+def get_sdwan_status() -> Optional[Dict[str, Any]]:
     """Return SD-WAN status"""
     try:
         sdwan_status = _cs_client.get('status/sdwan_adv')
@@ -2129,7 +2347,7 @@ def get_sdwan_status():
         _cs_client.logger.exception(f"Error retrieving SD-WAN status: {e}")
         return None
 
-def get_comprehensive_status():
+def get_comprehensive_status(include_detailed: bool = True, include_clients: bool = True) -> Optional[Dict[str, Any]]:
     """Return a comprehensive status report of the router"""
     try:
         status_report = {
@@ -2153,7 +2371,6 @@ def get_comprehensive_status():
                 'signal_strength': get_signal_strength(),
                 'sims': get_sims()
             },
-            'clients': get_ipv4_lan_clients(),
             'gps': get_gps_status(),
             'power': get_power_usage(),
             'storage': get_storage_status(),
@@ -2166,51 +2383,76 @@ def get_comprehensive_status():
             'dhcp': get_dhcp_leases(),
             'ncm': get_ncm_status()
         }
+        
+        if include_clients:
+            status_report['clients'] = get_ipv4_lan_clients()
+        
+        if include_detailed:
+            # Add more detailed information
+            status_report['detailed'] = {
+                'network_interfaces': get_network_interfaces(),
+                'flow_statistics': get_flow_statistics(),
+                'client_usage': get_client_usage(),
+                'multicast': get_multicast_status(),
+                'vpn': get_vpn_status(),
+                'security': get_security_status(),
+                'iot': get_iot_status(),
+                'sdwan': get_sdwan_status()
+            }
         return status_report
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving comprehensive status: {e}")
         return None
 
-def wait_for_modem_connection(timeout=300):
+def wait_for_modem_connection(timeout: int = 300, check_interval: float = 1.0) -> bool:
     """Wait for modem to establish a connection"""
-    _cs_client.log("Waiting for modem connection...")
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        modem_status = get_modem_status()
-        if modem_status:
-            for device_id, device_data in modem_status.items():
-                if device_id.startswith('mdm-'):
-                    status = device_data.get('status', {})
-                    if status.get('connection_state') == 'connected':
-                        _cs_client.log("Modem is connected.")
-                        return True
-        time.sleep(1)
-    _cs_client.log(f"Timeout waiting for modem connection after {timeout} seconds.")
-    return False
+    try:
+        _cs_client.log("Waiting for modem connection...")
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            modem_status = get_modem_status()
+            if modem_status:
+                for device_id, device_data in modem_status.items():
+                    if device_id.startswith('mdm-'):
+                        status = device_data.get('status', {})
+                        if status.get('connection_state') == 'connected':
+                            _cs_client.log("Modem is connected.")
+                            return True
+            time.sleep(check_interval)
+        _cs_client.log(f"Timeout waiting for modem connection after {timeout} seconds.")
+        return False
+    except Exception as e:
+        _cs_client.log(f"Error waiting for modem connection: {e}")
+        return False
 
-def wait_for_gps_fix(timeout=300):
+def wait_for_gps_fix(timeout: int = 300, check_interval: float = 1.0) -> bool:
     """Wait for GPS to acquire a fix"""
-    _cs_client.log("Waiting for GPS fix...")
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        gps_status = get_gps_status()
-        if gps_status and gps_status.get('fix', {}).get('lock'):
-            _cs_client.log("GPS fix acquired.")
-            return True
-        time.sleep(1)
-    _cs_client.log(f"Timeout waiting for GPS fix after {timeout} seconds.")
-    return False
+    try:
+        _cs_client.log("Waiting for GPS fix...")
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            gps_status = get_gps_status()
+            if gps_status and gps_status.get('fix', {}).get('lock'):
+                _cs_client.log("GPS fix acquired.")
+                return True
+            time.sleep(check_interval)
+        _cs_client.log(f"Timeout waiting for GPS fix after {timeout} seconds.")
+        return False
+    except Exception as e:
+        _cs_client.log(f"Error waiting for GPS fix: {e}")
+        return False
 
 # ============================================================================
 # CONTROL FUNCTIONS
 # ============================================================================
 
-def reset_modem(modem_id=None):
+def reset_modem(modem_id: Optional[str] = None, force: bool = False) -> bool:
     """
     Reset a specific modem or all modems.
     
     Args:
         modem_id (str, optional): Specific modem ID to reset. If None, resets all modems.
+        force (bool, optional): Force reset even if modem is connected. Default is False.
     
     Returns:
         bool: True if reset command was sent successfully, False otherwise
@@ -2227,7 +2469,7 @@ def reset_modem(modem_id=None):
         _cs_client.logger.exception(f"Error resetting modem: {e}")
         return False
 
-def reset_wlan():
+def reset_wlan(force: bool = False) -> bool:
     """
     Reset wireless LAN configuration and connections.
     
@@ -2242,7 +2484,7 @@ def reset_wlan():
         _cs_client.logger.exception(f"Error resetting WLAN: {e}")
         return False
 
-def clear_logs():
+def clear_logs() -> bool:
     """
     Clear system logs.
     
@@ -2257,7 +2499,7 @@ def clear_logs():
         _cs_client.logger.exception(f"Error clearing logs: {e}")
         return False
 
-def factory_reset():
+def factory_reset() -> bool:
     """
     Perform factory reset of the router.
     
@@ -2275,12 +2517,13 @@ def factory_reset():
         _cs_client.logger.exception(f"Error performing factory reset: {e}")
         return False
 
-def restart_service(service_name):
+def restart_service(service_name: str, force: bool = False) -> bool:
     """
     Restart a specific system service.
     
     Args:
         service_name (str): Name of the service to restart
+        force (bool, optional): Force restart even if service is critical. Default is False.
     
     Returns:
         bool: True if service restart was initiated successfully, False otherwise
@@ -2293,7 +2536,7 @@ def restart_service(service_name):
         _cs_client.logger.exception(f"Error restarting service {service_name}: {e}")
         return False
 
-def set_log_level(level):
+def set_log_level(level: str = 'info') -> bool:
     """
     Set system logging level.
     
@@ -2315,7 +2558,7 @@ def set_log_level(level):
 # GRANULAR HELPER FUNCTIONS - QoS
 # ============================================================================
 
-def get_qos_queues():
+def get_qos_queues() -> List[Dict[str, Any]]:
     """
     Return detailed QoS queue information.
     
@@ -2329,7 +2572,7 @@ def get_qos_queues():
         _cs_client.logger.exception(f"Error retrieving QoS queues: {e}")
         return []
 
-def get_qos_queue_by_name(queue_name):
+def get_qos_queue_by_name(queue_name: str = '') -> Optional[Dict[str, Any]]:
     """
     Return specific QoS queue information by name.
     
@@ -2350,7 +2593,7 @@ def get_qos_queue_by_name(queue_name):
         _cs_client.logger.exception(f"Error retrieving QoS queue {queue_name}: {e}")
         return None
 
-def get_qos_traffic_stats():
+def get_qos_traffic_stats() -> Dict[str, Any]:
     """
     Return aggregated QoS traffic statistics.
     
@@ -2390,7 +2633,7 @@ def get_qos_traffic_stats():
 # GRANULAR HELPER FUNCTIONS - DHCP
 # ============================================================================
 
-def get_dhcp_clients_by_interface(interface_name):
+def get_dhcp_clients_by_interface(interface_name: str = '') -> List[Dict[str, Any]]:
     """
     Return DHCP leases for a specific interface.
     
@@ -2409,7 +2652,7 @@ def get_dhcp_clients_by_interface(interface_name):
         _cs_client.logger.exception(f"Error retrieving DHCP clients for interface {interface_name}: {e}")
         return []
 
-def get_dhcp_clients_by_network(network_name):
+def get_dhcp_clients_by_network(network_name: str = '') -> List[Dict[str, Any]]:
     """
     Return DHCP leases for a specific network.
     
@@ -2428,7 +2671,7 @@ def get_dhcp_clients_by_network(network_name):
         _cs_client.logger.exception(f"Error retrieving DHCP clients for network {network_name}: {e}")
         return []
 
-def get_dhcp_client_by_mac(mac_address):
+def get_dhcp_client_by_mac(mac_address: str = '') -> Optional[Dict[str, Any]]:
     """
     Return DHCP lease for a specific MAC address.
     
@@ -2449,7 +2692,7 @@ def get_dhcp_client_by_mac(mac_address):
         _cs_client.logger.exception(f"Error retrieving DHCP client for MAC {mac_address}: {e}")
         return None
 
-def get_dhcp_client_by_ip(ip_address):
+def get_dhcp_client_by_ip(ip_address: str = '') -> Optional[Dict[str, Any]]:
     """
     Return DHCP lease for a specific IP address.
     
@@ -2470,7 +2713,7 @@ def get_dhcp_client_by_ip(ip_address):
         _cs_client.logger.exception(f"Error retrieving DHCP client for IP {ip_address}: {e}")
         return None
 
-def get_dhcp_interface_summary():
+def get_dhcp_interface_summary() -> Dict[str, Any]:
     """
     Return summary of DHCP leases by interface.
     
@@ -2508,7 +2751,7 @@ def get_dhcp_interface_summary():
 # GRANULAR HELPER FUNCTIONS - ROUTING
 # ============================================================================
 
-def get_bgp_status():
+def get_bgp_status() -> Dict[str, Any]:
     """
     Return BGP routing protocol status and neighbor information.
     
@@ -2526,7 +2769,7 @@ def get_bgp_status():
         _cs_client.logger.exception(f"Error retrieving BGP status: {e}")
         return {}
 
-def get_ospf_status():
+def get_ospf_status() -> Dict[str, Any]:
     """
     Return OSPF routing protocol status and neighbor information.
     
@@ -2545,7 +2788,7 @@ def get_ospf_status():
         _cs_client.logger.exception(f"Error retrieving OSPF status: {e}")
         return {}
 
-def get_static_routes():
+def get_static_routes() -> List[Dict[str, Any]]:
     """
     Return configured static routes.
     
@@ -2565,7 +2808,7 @@ def get_static_routes():
         _cs_client.logger.exception(f"Error retrieving static routes: {e}")
         return []
 
-def get_routing_policies():
+def get_routing_policies() -> List[Dict[str, Any]]:
     """
     Return routing policy configuration.
     
@@ -2586,7 +2829,7 @@ def get_routing_policies():
         _cs_client.logger.exception(f"Error retrieving routing policies: {e}")
         return []
 
-def get_routing_table_by_name(table_name):
+def get_routing_table_by_name(table_name: str) -> List[Dict[str, Any]]:
     """
     Return routes from a specific routing table.
     
@@ -2605,7 +2848,7 @@ def get_routing_table_by_name(table_name):
         _cs_client.logger.exception(f"Error retrieving routing table {table_name}: {e}")
         return []
 
-def get_arp_table():
+def get_arp_table() -> str:
     """
     Return ARP table information.
     
@@ -2621,7 +2864,7 @@ def get_arp_table():
         _cs_client.logger.exception(f"Error retrieving ARP table: {e}")
         return ''
 
-def get_route_summary():
+def get_route_summary() -> Dict[str, Any]:
     """
     Return summary of routing information.
     
@@ -2669,7 +2912,7 @@ def get_route_summary():
 # GRANULAR HELPER FUNCTIONS - CERTIFICATES
 # ============================================================================
 
-def get_certificates():
+def get_certificates() -> List[Dict[str, Any]]:
     """
     Return list of installed certificates.
     
@@ -2689,7 +2932,7 @@ def get_certificates():
         _cs_client.logger.exception(f"Error retrieving certificates: {e}")
         return []
 
-def get_certificate_by_name(cert_name):
+def get_certificate_by_name(cert_name: str) -> Optional[Dict[str, Any]]:
     """
     Return specific certificate information by name.
     
@@ -2710,7 +2953,7 @@ def get_certificate_by_name(cert_name):
         _cs_client.logger.exception(f"Error retrieving certificate {cert_name}: {e}")
         return None
 
-def get_certificate_by_uuid(cert_uuid):
+def get_certificate_by_uuid(cert_uuid: str) -> Optional[Dict[str, Any]]:
     """
     Return specific certificate information by UUID.
     
@@ -2731,7 +2974,7 @@ def get_certificate_by_uuid(cert_uuid):
         _cs_client.logger.exception(f"Error retrieving certificate with UUID {cert_uuid}: {e}")
         return None
 
-def get_expiring_certificates(days_threshold=30):
+def get_expiring_certificates(days_threshold: int = 30) -> List[Dict[str, Any]]:
     """
     Return certificates that will expire within the specified number of days.
     
@@ -2767,7 +3010,7 @@ def get_expiring_certificates(days_threshold=30):
         _cs_client.logger.exception(f"Error retrieving expiring certificates: {e}")
         return []
 
-def get_certificate_summary():
+def get_certificate_summary() -> Dict[str, Any]:
     """
     Return summary of certificate information.
     
@@ -2809,7 +3052,7 @@ def get_certificate_summary():
 # GRANULAR HELPER FUNCTIONS - FIREWALL
 # ============================================================================
 
-def get_firewall_connections():
+def get_firewall_connections() -> List[Dict[str, Any]]:
     """
     Return active firewall connections and connection tracking information.
     
@@ -2832,7 +3075,7 @@ def get_firewall_connections():
         _cs_client.logger.exception(f"Error retrieving firewall connections: {e}")
         return []
 
-def get_firewall_hitcounters():
+def get_firewall_hitcounters() -> List[Dict[str, Any]]:
     """
     Return firewall rule hit counters and statistics.
     
@@ -2852,7 +3095,7 @@ def get_firewall_hitcounters():
         _cs_client.logger.exception(f"Error retrieving firewall hit counters: {e}")
         return []
 
-def get_firewall_marks():
+def get_firewall_marks() -> Dict[str, Any]:
     """
     Return firewall traffic marks and their values.
     
@@ -2866,7 +3109,7 @@ def get_firewall_marks():
         _cs_client.logger.exception(f"Error retrieving firewall marks: {e}")
         return {}
 
-def get_firewall_state_timeouts():
+def get_firewall_state_timeouts() -> Dict[str, Any]:
     """
     Return firewall state timeout configurations.
     
@@ -2885,7 +3128,7 @@ def get_firewall_state_timeouts():
         _cs_client.logger.exception(f"Error retrieving firewall state timeouts: {e}")
         return {}
 
-def get_firewall_connections_by_protocol(protocol):
+def get_firewall_connections_by_protocol(protocol: int = 6) -> List[Dict[str, Any]]:
     """
     Return firewall connections filtered by protocol.
     
@@ -2904,7 +3147,7 @@ def get_firewall_connections_by_protocol(protocol):
         _cs_client.logger.exception(f"Error retrieving firewall connections for protocol {protocol}: {e}")
         return []
 
-def get_firewall_connections_by_ip(ip_address):
+def get_firewall_connections_by_ip(ip_address: str = '') -> List[Dict[str, Any]]:
     """
     Return firewall connections involving a specific IP address.
     
@@ -2930,7 +3173,7 @@ def get_firewall_connections_by_ip(ip_address):
         _cs_client.logger.exception(f"Error retrieving firewall connections for IP {ip_address}: {e}")
         return []
 
-def get_firewall_summary():
+def get_firewall_summary() -> Dict[str, Any]:
     """
     Return summary of firewall information.
     
