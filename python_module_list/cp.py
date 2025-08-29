@@ -843,9 +843,6 @@ class EventingCSClient(CSClient):
                         long_min = fix['longitude']['minute']
                         long_sec = fix['longitude']['second']
                         
-                        # Import dec function from the module level
-                        from . import dec
-                        
                         decimal_lat = dec(lat_deg, lat_min, lat_sec)
                         decimal_long = dec(long_deg, long_min, long_sec)
                         
