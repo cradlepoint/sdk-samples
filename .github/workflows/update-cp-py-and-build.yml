@@ -23,6 +23,11 @@ jobs:
       with:
         python-version: '3.11'
     
+    - name: Delete METADATA folders
+      run: |
+        find . -type d -name "METADATA" -exec rm -rf {} + 2>/dev/null || true
+        echo "Deleted all METADATA folders"
+    
     - name: Find and update cp.py files
       run: |
         # Create a script to find and update cp.py files
