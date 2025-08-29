@@ -7,7 +7,7 @@ Mobile Site Survey
 
 Application Version
 ===================
-2.6
+2.6.1
 
 
 External Requirements
