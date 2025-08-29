@@ -1,12 +1,28 @@
 """
 NCOS communication module for SDK applications.
 
-Copyright (c) 2025 Ericsson Enterprise Wireless Solutions <www.cradlepoint.com>.  All rights reserved.
+This module provides a comprehensive interface for communicating with NCOS (Network
+Control Operating System) routers. It includes classes and functions for:
 
-This file contains confidential information of Ericsson Enterprise Wireless Solutions and your use of
-this file is subject to the Ericsson Enterprise Wireless Solutions Software License Agreement distributed with
-this file. Unauthorized reproduction or distribution of this file is subject to civil and
-criminal penalties.
+- Direct communication with router configuration store
+- Event-driven programming with config store events
+- Status monitoring and retrieval
+- Device control and management
+- Network configuration and monitoring
+- GPS and location services
+- Certificate management
+- Firewall and security management
+
+The module supports both local execution on NCOS devices and remote execution
+from development machines using HTTP API calls.
+
+Copyright (c) 2025 Ericsson Enterprise Wireless Solutions <www.cradlepoint.com>.
+All rights reserved.
+
+This file contains confidential information of Ericsson Enterprise Wireless Solutions
+and your use of this file is subject to the Ericsson Enterprise Wireless Solutions
+Software License Agreement distributed with this file. Unauthorized reproduction
+or distribution of this file is subject to civil and criminal penalties.
 """
 import json
 import os
@@ -28,21 +44,33 @@ except ImportError:
 
 
 class SdkCSException(Exception):
-    """Custom exception for SDK communication errors."""
+    """Custom exception for SDK communication errors.
+    
+    This exception is raised when errors occur during communication
+    with the NCOS configuration store or when SDK operations fail.
+    """
     pass
 
 
 class CSClient(object):
-    """
-    The CSClient class is the NCOS SDK mechanism for communication between apps and the router tree/config store.
-    Instances of this class communicate with the router using either an explicit socket or with http method calls.
-
-    Apps running locally on the router use a socket on the router to send commands from the app to the router tree
-    and to receive data (JSON) from the router tree.
-
-    Apps running remotely use the requests library to send HTTP method calls to the router and to receive data from
-    the router tree. This allows one to use an IDE to run and debug the application on a the computer. Although,
-    there are limitations with respect to the device hardware access (i.e. serial, USB, etc.).
+    """NCOS SDK mechanism for communication between apps and the router tree/config store.
+    
+    The CSClient class provides the primary interface for communicating with NCOS routers.
+    Instances of this class communicate with the router using either socket connections
+    (for local execution) or HTTP method calls (for remote execution).
+    
+    Apps running locally on the router use a Unix domain socket to send commands from
+    the app to the router tree and to receive data (JSON) from the router tree.
+    
+    Apps running remotely use the requests library to send HTTP method calls to the
+    router and to receive data from the router tree. This allows developers to use
+    an IDE to run and debug the application on a computer, though with limitations
+    regarding device hardware access (e.g., serial, USB, etc.).
+    
+    Attributes:
+        app_name (str): The name of the application using this client.
+        ncos (bool): Whether the client is running on an NCOS device.
+        logger (logging.Logger): Logger instance for the application.
     """
     END_OF_HEADER = b"\r\n\r\n"
     STATUS_HEADER_RE = re.compile(b"status: \w*")
@@ -54,22 +82,34 @@ class CSClient(object):
 
     @classmethod
     def is_initialized(cls) -> bool:
-        """Checks if the singleton instance has been created."""
+        """Check if the singleton instance has been created.
+        
+        Returns:
+            bool: True if the singleton instance exists, False otherwise.
+        """
         return cls in cls._instances
 
     def __new__(cls, *na: Any, **kwna: Any) -> 'CSClient':
-        """Singleton factory (with subclassing support)."""
+        """Create or return the singleton instance with subclassing support.
+        
+        Args:
+            *na: Variable length argument list (not used).
+            **kwna: Arbitrary keyword arguments (not used).
+            
+        Returns:
+            CSClient: The singleton instance of the class.
+        """
         if not cls.is_initialized():
             cls._instances[cls] = super().__new__(cls)
         return cls._instances[cls]
 
     def __init__(self, app_name: str, init: bool = False) -> None:
-        """
-        Initializes the CSClient.
-
+        """Initialize the CSClient instance.
+        
         Args:
-            app_name (str): The name of the application.
-            init (bool): Flag to perform full initialization.
+            app_name (str): The name of the application using this client.
+            init (bool): Flag to perform full initialization. If False, only
+                        the singleton instance is returned without initialization.
         """
         if not init:
             return
@@ -94,24 +134,24 @@ class CSClient(object):
         self.logger = logging.getLogger(app_name)
 
     def get(self, base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a get request to retrieve specified data from a device.
-
+        """Construct and send a GET request to retrieve specified data from a device.
+        
         The behavior of this method is contextual:
-            - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
-              specified data.
-            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
-
+            - If the app is installed on (and executed from) a device, it directly
+              queries the router tree to retrieve the specified data.
+            - If the app is running remotely from a computer, it calls the HTTP GET
+              method to retrieve the specified data.
+        
         Args:
-            base: String representing a path to a resource on a router tree,
-                  (i.e. '/config/system/logging/level').
-            value: Not required.
-            query: Not required.
-            tree: Not required.
-
+            base (str): String representing a path to a resource on a router tree
+                       (e.g., '/config/system/logging/level').
+            query (str): Optional query string for the request. Defaults to empty string.
+            tree (int): Optional tree identifier. Defaults to 0.
+        
         Returns:
-            A dictionary containing the response (i.e. {"success": True, "data:": {}}
-
+            dict or None: A dictionary containing the response data
+                         (e.g., {"success": True, "data": {}}), or None if the
+                         request fails.
         """
         if self.ncos:
             cmd = "get\n{}\n{}\n{}\n".format(base, query, tree)
@@ -133,24 +173,24 @@ class CSClient(object):
             return json.loads(response.text).get('data')
 
     def decrypt(self, base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a decrypt/get request to retrieve specified data from a device.
-
+        """Construct and send a decrypt/GET request to retrieve encrypted data from a device.
+        
         The behavior of this method is contextual:
-            - If the app is installed on (and executed from) a device, it directly queries the router tree to retrieve the
-              specified data.
-            - If the app running remotely from a computer it calls the HTTP GET method to retrieve the specified data.
-
+            - If the app is installed on (and executed from) a device, it directly
+              queries the router tree to retrieve and decrypt the specified data.
+            - If the app is running remotely from a computer, it calls the HTTP GET
+              method to retrieve the specified data.
+        
         Args:
-            base: String representing a path to a resource on a router tree,
-                  (i.e. '/config/system/logging/level').
-            value: Not required.
-            query: Not required.
-            tree: Not required.
-
+            base (str): String representing a path to a resource on a router tree
+                       (e.g., '/config/system/logging/level').
+            query (str): Optional query string for the request. Defaults to empty string.
+            tree (int): Optional tree identifier. Defaults to 0.
+        
         Returns:
-            A dictionary containing the response (i.e. {"success": True, "data:": {}}
-
+            dict or None: A dictionary containing the decrypted response data
+                         (e.g., {"success": True, "data": {}}), or None if the
+                         request fails or if running remotely.
         """
         if self.ncos:
             cmd = "decrypt\n{}\n{}\n{}\n".format(base, query, tree)
@@ -160,25 +200,26 @@ class CSClient(object):
             print('Decrypt is only available when running the app in NCOS.')
 
     def put(self, base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a put request to update or add specified data to the device router tree.
-
+        """Construct and send a PUT request to update or add specified data to the device router tree.
+        
         The behavior of this method is contextual:
-            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
-              the router tree.
-            - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
-              data.
-
-
+            - If the app is installed on (and executed from) a device, it directly
+              updates or adds the specified data to the router tree.
+            - If the app is running remotely from a computer, it calls the HTTP PUT
+              method to update or add the specified data.
+        
         Args:
-            base: String representing a path to a resource on a router tree,
-                  (i.e. '/config/system/logging/level').
-            value: Not required.
-            query: Not required.
-            tree: Not required.
-
+            base (str): String representing a path to a resource on a router tree
+                       (e.g., '/config/system/logging/level').
+            value (Any): The value to set at the specified path. Will be JSON serialized.
+                        Defaults to empty string.
+            query (str): Optional query string for the request. Defaults to empty string.
+            tree (int): Optional tree identifier. Defaults to 0.
+        
         Returns:
-            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+            dict or None: A dictionary containing the response data
+                         (e.g., {"success": True, "data": {}}), or None if the
+                         request fails.
         """
         value = json.dumps(value)
         if self.ncos:
@@ -203,24 +244,25 @@ class CSClient(object):
             return json.loads(response.text)
 
     def post(self, base: str, value: Any = '', query: str = '') -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a post request to update or add specified data to the device router tree.
-
+        """Construct and send a POST request to update or add specified data to the device router tree.
+        
         The behavior of this method is contextual:
-            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
-              the router tree.
-            - If the app running remotely from a computer it calls the HTTP POST method to update or add the specified
-              data.
-
-
+            - If the app is installed on (and executed from) a device, it directly
+              updates or adds the specified data to the router tree.
+            - If the app is running remotely from a computer, it calls the HTTP POST
+              method to update or add the specified data.
+        
         Args:
-            base: String representing a path to a resource on a router tree,
-                  (i.e. '/config/system/logging/level').
-            value: Not required.
-            query: Not required.
-
+            base (str): String representing a path to a resource on a router tree
+                       (e.g., '/config/system/logging/level').
+            value (Any): The value to set at the specified path. Will be JSON serialized.
+                        Defaults to empty string.
+            query (str): Optional query string for the request. Defaults to empty string.
+        
         Returns:
-            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+            dict or None: A dictionary containing the response data
+                         (e.g., {"success": True, "data": {}}), or None if the
+                         request fails.
         """
         value = json.dumps(value)
         if self.ncos:
@@ -245,20 +287,22 @@ class CSClient(object):
             return json.loads(response.text)
 
     def patch(self, value: List[Any]) -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a patch request to update or add specified data to the device router tree.
-
+        """Construct and send a PATCH request to update or add specified data to the device router tree.
+        
         The behavior of this method is contextual:
-            - If the app is installed on(and executed from) a device, it directly updates or adds the specified data to
-              the router tree.
-            - If the app running remotely from a computer it calls the HTTP PUT method to update or add the specified
-              data.
-
+            - If the app is installed on (and executed from) a device, it directly
+              updates or adds the specified data to the router tree.
+            - If the app is running remotely from a computer, it calls the HTTP PUT
+              method to update or add the specified data.
+        
         Args:
-            value: list containing dict of add/changes, and list of removals:  [{add},[remove]]
-
+            value (List[Any]): List containing dict of add/changes, and list of removals:
+                              [{add}, [remove]].
+        
         Returns:
-            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+            dict or None: A dictionary containing the response data
+                         (e.g., {"success": True, "data": {}}), or None if the
+                         request fails.
         """
 
         if self.ncos:
@@ -289,23 +333,23 @@ class CSClient(object):
             return json.loads(response.text)
 
     def delete(self, base: str, query: str = '') -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a delete request to delete specified data to the device router tree.
-
+        """Construct and send a DELETE request to delete specified data from the device router tree.
+        
         The behavior of this method is contextual:
-            - If the app is installed on(and executed from) a device, it directly deletes the specified data to
-              the router tree.
-            - If the app running remotely from a computer it calls the HTTP DELETE method to update or add the specified
-              data.
-
-
+            - If the app is installed on (and executed from) a device, it directly
+              deletes the specified data from the router tree.
+            - If the app is running remotely from a computer, it calls the HTTP DELETE
+              method to delete the specified data.
+        
         Args:
-            base: String representing a path to a resource on a router tree,
-                  (i.e. '/config/system/logging/level').
-            query: Not required.
-
+            base (str): String representing a path to a resource on a router tree
+                       (e.g., '/config/system/logging/level').
+            query (str): Optional query string for the request. Defaults to empty string.
+        
         Returns:
-            A dictionary containing the response (i.e. {"success": True, "data:": {}}
+            dict or None: A dictionary containing the response data
+                         (e.g., {"success": True, "data": {}}), or None if the
+                         request fails.
         """
         if self.ncos:
             cmd = "delete\n{}\n{}\n".format(base, query)
@@ -329,18 +373,17 @@ class CSClient(object):
             return json.loads(response.text)
 
     def alert(self, value: str = '') -> Optional[Dict[str, Any]]:
-        """
-        Constructs and sends a custom alert to NCM for the device. Apps calling this method must be running
-        on the target device to send the alert. If invoked while running on a computer, then only a log is output.
-
+        """Construct and send a custom alert to NCM for the device.
+        
+        Apps calling this method must be running on the target device to send the alert.
+        If invoked while running on a computer, then only a log is output.
+        
         Args:
-
-        app_name: String name of your application.
-        value: String to displayed for the alert.
-
+            value (str): String to be displayed for the alert. Defaults to empty string.
+        
         Returns:
-            Success: None
-            Failure: An error
+            dict or None: Success returns None, failure returns an error dictionary.
+                         When running remotely, always returns None and logs the alert.
         """
         if self.ncos:
             cmd = "alert\n{}\n{}\n".format(self.app_name, value)
@@ -351,14 +394,13 @@ class CSClient(object):
             print('Alert Text: {}'.format(value))
 
     def log(self, value: str = '') -> None:
-        """
-        Adds an INFO log to the device SYSLOG.
-
+        """Add an INFO log to the device SYSLOG.
+        
         Args:
-        value: String text for the log.
-
+            value (str): String text for the log. Defaults to empty string.
+        
         Returns:
-        None
+            None: This method does not return a value.
         """
         if self.ncos:
             # Running in NCOS so write to the logger
@@ -373,12 +415,20 @@ class CSClient(object):
 
 
     def _get_auth(self, device_ip: str, username: str, password: str) -> Any:
-        """
-        Returns the proper HTTP Auth for the NCOS version.
+        """Return the proper HTTP Auth for the NCOS version.
         
-        This is only needed when the app is running in a computer.
+        This is only needed when the app is running on a computer.
         Digest Auth is used for NCOS 6.4 and below while Basic Auth is
         used for NCOS 6.5 and up.
+        
+        Args:
+            device_ip (str): IP address of the target device.
+            username (str): Username for authentication.
+            password (str): Password for authentication.
+        
+        Returns:
+            requests.auth.HTTPBasicAuth or requests.auth.HTTPDigestAuth: The appropriate
+            authentication object based on the NCOS version.
         """
         import requests
         from http import HTTPStatus
@@ -401,10 +451,13 @@ class CSClient(object):
 
     @staticmethod
     def _get_device_access_info() -> Tuple[str, str, str]:
-        """
-        Returns device access info from the sdk_settings.ini file.
+        """Return device access info from the sdk_settings.ini file.
         
         This should only be called when running on a computer.
+        
+        Returns:
+            Tuple[str, str, str]: A tuple containing (device_ip, username, password)
+                                 from the sdk_settings.ini file.
         """
         try:
             device_ip = ''
@@ -449,7 +502,14 @@ class CSClient(object):
             return '', '', ''
 
     def _safe_dispatch(self, cmd: str) -> Dict[str, Any]:
-        """Send the command and return the response."""
+        """Send the command and return the response.
+        
+        Args:
+            cmd (str): The command string to send to the router.
+        
+        Returns:
+            dict: A dictionary containing the response with 'status' and 'data' keys.
+        """
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.connect('/var/tmp/cs.sock')
@@ -460,7 +520,14 @@ class CSClient(object):
             return {"status": "error", "data": str(e)}
 
     def _dispatch(self, cmd: str) -> Dict[str, Any]:
-        """Safely dispatches a command to the router."""
+        """Safely dispatch a command to the router.
+        
+        Args:
+            cmd (str): The command string to send to the router.
+        
+        Returns:
+            dict: A dictionary containing the response from the router.
+        """
         errmsg = None
         result = ""
         try:
@@ -474,7 +541,14 @@ class CSClient(object):
         return result
 
     def _safe_receive(self, sock: socket.socket) -> Dict[str, Any]:
-        """Safely receives data from a socket."""
+        """Safely receive data from a socket.
+        
+        Args:
+            sock (socket.socket): The socket to receive data from.
+        
+        Returns:
+            dict: A dictionary containing the response with 'status' and 'data' keys.
+        """
         sock.settimeout(self.RECV_TIMEOUT)
         data = b""
         eoh = -1
@@ -514,7 +588,14 @@ class CSClient(object):
         return {"status": status_hdr.decode(), "data": result}
 
     def _receive(self, sock: socket.socket) -> Dict[str, Any]:
-        """Receives data from a socket with error handling."""
+        """Receive data from a socket with error handling.
+        
+        Args:
+            sock (socket.socket): The socket to receive data from.
+        
+        Returns:
+            dict: A dictionary containing the response from the socket.
+        """
         errmsg = None
         result = ""
         try:
@@ -528,18 +609,43 @@ class CSClient(object):
 
 
 class EventingCSClient(CSClient):
+    """Event-driven CSClient for handling config store events.
+    
+    The EventingCSClient extends CSClient to provide event-driven programming
+    capabilities. It allows applications to register callbacks that are triggered
+    when specific config store events occur (e.g., when values are set or retrieved).
+    
+    This class manages a background thread that listens for config store events
+    and invokes registered callbacks when events occur.
+    
+    Attributes:
+        running (bool): Whether the event handling loop is currently running.
+        registry (dict): Dictionary mapping event IDs to callback information.
+        eids (int): Counter for generating unique event IDs.
+        on (method): Alias for the register method.
+        un (method): Alias for the unregister method.
+    """
     running = False
     registry = {}
     eids = 1
 
     def __init__(self, app_name: str, init: bool = True) -> None:
-        """Initializes the EventingCSClient and sets up aliases for register/unregister."""
+        """Initialize the EventingCSClient and set up aliases for register/unregister.
+        
+        Args:
+            app_name (str): The name of the application using this client.
+            init (bool): Flag to perform full initialization. Defaults to True.
+        """
         super().__init__(app_name, init)
         self.on = self.register
         self.un = self.unregister
 
     def start(self) -> None:
-        """Starts the event handling loop in a separate thread."""
+        """Start the event handling loop in a separate thread.
+        
+        This method creates a Unix domain socket, starts a background thread
+        to handle config store events, and begins listening for incoming events.
+        """
         try:
             if self.running:
                 self.log(f"Eventing Config Store {self.pid} already running")
@@ -562,7 +668,11 @@ class EventingCSClient(CSClient):
             self.running = False
 
     def stop(self) -> None:
-        """Stops the event handling loop and cleans up resources."""
+        """Stop the event handling loop and clean up resources.
+        
+        This method unregisters all callbacks, closes the event socket,
+        removes the socket file, and stops the background thread.
+        """
         try:
             if not self.running:
                 return
@@ -577,7 +687,12 @@ class EventingCSClient(CSClient):
             self.running = False
 
     def _handle_events(self) -> None:
-        """The main event loop for handling config store events."""
+        """The main event loop for handling config store events.
+        
+        This method runs in a separate thread and continuously polls for
+        incoming config store events. When events are received, it invokes
+        the appropriate registered callbacks.
+        """
         poller = select.poll()
         poller.register(self.event_sock,
                         select.POLLIN | select.POLLERR | select.POLLHUP)  # I don't unregsiter this in cleaning up!
@@ -621,17 +736,16 @@ class EventingCSClient(CSClient):
                 raise
 
     def register(self, action: str = 'set', path: str = '', callback: Callable = None, *args: Any) -> Dict[str, Any]:
-        """
-        Registers a callback for a config store event.
-
+        """Register a callback for a config store event.
+        
         Args:
-            action (str): The action to listen for (e.g., 'set', 'get').
-            path (str): The config store path to monitor.
-            callback (callable): The function to call when the event occurs.
+            action (str): The action to listen for (e.g., 'set', 'get'). Defaults to 'set'.
+            path (str): The config store path to monitor. Defaults to empty string.
+            callback (callable): The function to call when the event occurs. Defaults to None.
             *args: Additional arguments to pass to the callback.
-
+        
         Returns:
-            The result of the registration command.
+            dict: The result of the registration command.
         """
         try:
             if not self.running:
@@ -647,14 +761,13 @@ class EventingCSClient(CSClient):
             return {}
 
     def unregister(self, eid: int = 0) -> Dict[str, Any]:
-        """
-        Unregisters a callback by its event ID.
-
+        """Unregister a callback by its event ID.
+        
         Args:
-            eid (int): The event ID returned by register.
-
+            eid (int): The event ID returned by register. Defaults to 0.
+        
         Returns:
-            The result of the unregistration command.
+            dict: The result of the unregistration command.
         """
         ret = ""
         try:
@@ -673,7 +786,20 @@ class EventingCSClient(CSClient):
     # ============================================================================
     
     def get_gps_status(self) -> Dict[str, Any]:
-        """Get GPS status and return detailed information with decimal coordinates"""
+        """Get GPS status and return detailed information with decimal coordinates.
+        
+        Returns:
+            dict: Dictionary containing GPS status information including:
+                - has_gps_data (bool): Whether GPS data is available
+                - gps_lock (bool): Whether GPS has a lock
+                - satellites (int): Number of satellites in view
+                - location (dict): GPS coordinates in degrees/minutes/seconds format
+                - decimal_coordinates (dict): GPS coordinates in decimal format
+                - altitude (float): Altitude in meters
+                - speed (float): Ground speed in knots
+                - heading (float): Heading in degrees
+                - last_fix_age (int): Age of last GPS fix
+        """
         try:
             gps_data = self.get('status/gps')
             if not gps_data:
@@ -736,7 +862,20 @@ class EventingCSClient(CSClient):
             return {"has_gps_data": False, "error": str(e)}
 
     def get_system_status(self) -> Dict[str, Any]:
-        """Get system status and return detailed information"""
+        """Get system status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing system status information including:
+                - has_system_data (bool): Whether system data is available
+                - uptime (int): System uptime in seconds
+                - temperature (float): System temperature
+                - storage_health (str): Storage health status
+                - cpu_usage (dict): CPU usage statistics
+                - memory_usage (dict): Memory usage statistics
+                - services_running (int): Number of running services
+                - services_disabled (int): Number of disabled services
+                - apps_running (int): Number of running applications
+        """
         try:
             system_data = self.get('status/system')
             if not system_data:
@@ -770,7 +909,16 @@ class EventingCSClient(CSClient):
             return {"has_system_data": False, "error": str(e)}
 
     def get_wlan_status(self) -> Dict[str, Any]:
-        """Get WLAN status and return detailed information"""
+        """Get WLAN status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing WLAN status information including:
+                - has_wlan_data (bool): Whether WLAN data is available
+                - wlan_state (str): WLAN operational state
+                - radios (list): List of radio information
+                - clients_connected (int): Number of connected clients
+                - interfaces (list): List of interface information
+        """
         try:
             wlan_data = self.get('status/wlan')
             if not wlan_data:
@@ -799,7 +947,15 @@ class EventingCSClient(CSClient):
             return {"has_wlan_data": False, "error": str(e)}
 
     def get_wan_status(self) -> Dict[str, Any]:
-        """Get WAN status and return detailed information"""
+        """Get WAN status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing WAN status information including:
+                - has_wan_data (bool): Whether WAN data is available
+                - primary_device (str): Primary WAN device identifier
+                - connection_state (str): Overall connection state
+                - devices (list): List of WAN device information
+        """
         try:
             wan_data = self.get('status/wan')
             if not wan_data:
@@ -833,7 +989,15 @@ class EventingCSClient(CSClient):
             return {"has_wan_data": False, "error": str(e)}
 
     def get_lan_status(self) -> Dict[str, Any]:
-        """Get LAN status and return detailed information"""
+        """Get LAN status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing LAN status information including:
+                - has_lan_data (bool): Whether LAN data is available
+                - clients_connected (int): Number of connected clients
+                - networks (list): List of network information
+                - devices (list): List of device information
+        """
         try:
             lan_data = self.get('status/lan')
             if not lan_data:
@@ -872,7 +1036,15 @@ class EventingCSClient(CSClient):
             return {"has_lan_data": False, "error": str(e)}
 
     def get_openvpn_status(self) -> Dict[str, Any]:
-        """Get OpenVPN status and return detailed information"""
+        """Get OpenVPN status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing OpenVPN status information including:
+                - has_openvpn_data (bool): Whether OpenVPN data is available
+                - tunnels_configured (int): Number of configured tunnels
+                - tunnels_active (int): Number of active tunnels
+                - stats_available (bool): Whether statistics are available
+        """
         try:
             openvpn_data = self.get('status/openvpn')
             if not openvpn_data:
@@ -891,7 +1063,17 @@ class EventingCSClient(CSClient):
             return {"has_openvpn_data": False, "error": str(e)}
 
     def get_hotspot_status(self) -> Dict[str, Any]:
-        """Get hotspot status and return detailed information"""
+        """Get hotspot status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing hotspot status information including:
+                - has_hotspot_data (bool): Whether hotspot data is available
+                - clients_connected (int): Number of connected clients
+                - sessions_active (int): Number of active sessions
+                - domains_allowed (int): Number of allowed domains
+                - hosts_allowed (int): Number of allowed hosts
+                - rate_limit_triggered (bool): Whether rate limiting is triggered
+        """
         try:
             hotspot_data = self.get('status/hotspot')
             if not hotspot_data:
@@ -912,7 +1094,18 @@ class EventingCSClient(CSClient):
             return {"has_hotspot_data": False, "error": str(e)}
 
     def get_obd_status(self) -> Dict[str, Any]:
-        """Get OBD status and return detailed information"""
+        """Get OBD status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing OBD status information including:
+                - has_obd_data (bool): Whether OBD data is available
+                - adapter_configured (bool): Whether OBD adapter is configured
+                - adapter_connected (bool): Whether OBD adapter is connected
+                - vehicle_connected (bool): Whether vehicle is connected
+                - pids_supported (int): Number of supported PIDs
+                - pids_enabled (int): Number of enabled PIDs
+                - ignition_status (str): Vehicle ignition status
+        """
         try:
             obd_data = self.get('status/obd')
             if not obd_data:
@@ -937,7 +1130,16 @@ class EventingCSClient(CSClient):
             return {"has_obd_data": False, "error": str(e)}
 
     def get_qos_status(self) -> Dict[str, Any]:
-        """Get QoS status and return detailed information"""
+        """Get QoS status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing QoS status information including:
+                - has_qos_data (bool): Whether QoS data is available
+                - qos_enabled (bool): Whether QoS is enabled
+                - queues_configured (int): Number of configured queues
+                - queues_active (int): Number of active queues
+                - total_packets (int): Total packets processed
+        """
         try:
             qos_data = self.get('status/qos')
             if not qos_data:
@@ -958,7 +1160,15 @@ class EventingCSClient(CSClient):
             return {"has_qos_data": False, "error": str(e)}
 
     def get_firewall_status(self) -> Dict[str, Any]:
-        """Get firewall status and return detailed information"""
+        """Get firewall status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing firewall status information including:
+                - has_firewall_data (bool): Whether firewall data is available
+                - connections_tracked (int): Number of tracked connections
+                - state_timeouts (dict): State timeout configurations
+                - hitcounters (list): List of firewall rule hit counters
+        """
         try:
             firewall_data = self.get('status/firewall')
             if not firewall_data:
@@ -989,7 +1199,16 @@ class EventingCSClient(CSClient):
             return {"has_firewall_data": False, "error": str(e)}
 
     def get_dns_status(self) -> Dict[str, Any]:
-        """Get DNS status and return detailed information"""
+        """Get DNS status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing DNS status information including:
+                - has_dns_data (bool): Whether DNS data is available
+                - cache_entries (int): Number of cache entries
+                - cache_size (int): Cache size
+                - servers_configured (int): Number of configured DNS servers
+                - queries_forwarded (int): Number of forwarded queries
+        """
         try:
             dns_data = self.get('status/dns')
             if not dns_data:
@@ -1012,7 +1231,14 @@ class EventingCSClient(CSClient):
             return {"has_dns_data": False, "error": str(e)}
 
     def get_dhcp_status(self) -> Dict[str, Any]:
-        """Get DHCP status and return detailed information"""
+        """Get DHCP status and return detailed information.
+        
+        Returns:
+            dict: Dictionary containing DHCP status information including:
+                - has_dhcp_data (bool): Whether DHCP data is available
+                - devices_configured (int): Number of configured devices
+                - devices_with_ip (int): Number of devices with IP addresses
+        """
         try:
             dhcp_data = self.get('status/dhcp')
             if not dhcp_data:
@@ -1033,7 +1259,11 @@ class EventingCSClient(CSClient):
 
 
 def _get_app_name() -> str:
-    """Get the app name from the first section of package.ini"""
+    """Get the app name from the first section of package.ini.
+    
+    Returns:
+        str: The application name from package.ini, or 'SDK' if not found.
+    """
     try:
         # Get the directory where this script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1055,7 +1285,11 @@ def _get_app_name() -> str:
 _cs_client = EventingCSClient(_get_app_name())
 
 def get_uptime() -> int:
-    """Return the router uptime in seconds."""
+    """Return the router uptime in seconds.
+    
+    Returns:
+        int: The router uptime in seconds, or 0 if an error occurs.
+    """
     try:
         uptime = int(_cs_client.get('status/system/uptime'))
         return uptime
@@ -1064,7 +1298,14 @@ def get_uptime() -> int:
         return 0
 
 def wait_for_uptime(min_uptime_seconds: int = 60) -> None:
-    """Wait for the device uptime to be greater than the specified uptime and sleep if it is less than the specified uptime."""
+    """Wait for the device uptime to be greater than the specified uptime.
+    
+    If the current uptime is less than the specified minimum, the function
+    will sleep until the uptime requirement is met.
+    
+    Args:
+        min_uptime_seconds (int): Minimum uptime in seconds. Defaults to 60.
+    """
     try:
         current_uptime = get_uptime()
         if current_uptime < min_uptime_seconds:
@@ -1077,15 +1318,14 @@ def wait_for_uptime(min_uptime_seconds: int = 60) -> None:
         _cs_client.logger.exception(f"Error validating uptime: {e}")
 
 def wait_for_ntp(timeout: int = 300, check_interval: int = 1) -> bool:
-    """
-    Wait until NTP sync age is not null, indicating NTP synchronization.
+    """Wait until NTP sync age is not null, indicating NTP synchronization.
     
     Args:
-        timeout (int): Maximum time to wait in seconds (default: 300)
-        check_interval (int): Time between checks in seconds (default: 1)
+        timeout (int): Maximum time to wait in seconds. Defaults to 300.
+        check_interval (int): Time between checks in seconds. Defaults to 1.
     
     Returns:
-        bool: True if NTP sync was achieved within timeout, False otherwise
+        bool: True if NTP sync was achieved within timeout, False otherwise.
     """
     try:
         start_time = time.time()
@@ -1106,8 +1346,14 @@ def wait_for_ntp(timeout: int = 300, check_interval: int = 1) -> bool:
         return False
 
 def wait_for_wan_connection(timeout: int = 300) -> bool:
-    """Waits for at least one WAN connection to be 'connected'.
-    Returns True if a connection is established within the timeout, otherwise False."""
+    """Wait for at least one WAN connection to be 'connected'.
+    
+    Args:
+        timeout (int): Maximum time to wait in seconds. Defaults to 300.
+    
+    Returns:
+        bool: True if a connection is established within the timeout, False otherwise.
+    """
     try:
         # First check if WAN is already connected
         connection_state = _cs_client.get('status/wan/connection_state')
@@ -1131,7 +1377,14 @@ def wait_for_wan_connection(timeout: int = 300) -> bool:
         return False
 
 def get_appdata(name: str = '') -> Optional[str]:
-    """Get value of appdata from NCOS Config by name."""
+    """Get value of appdata from NCOS Config by name.
+    
+    Args:
+        name (str): The name of the appdata to retrieve. Defaults to empty string.
+    
+    Returns:
+        str or None: The value of the appdata, or None if not found or an error occurs.
+    """
     try:
         appdata = _cs_client.get('config/system/sdk/appdata')
         return next(iter(x["value"] for x in appdata if x["name"] == name), None)
@@ -1140,14 +1393,24 @@ def get_appdata(name: str = '') -> Optional[str]:
         return None
 
 def post_appdata(name: str = '', value: str = '') -> None:
-    """Create appdata in NCOS Config by name."""
+    """Create appdata in NCOS Config by name.
+    
+    Args:
+        name (str): The name of the appdata to create. Defaults to empty string.
+        value (str): The value to set for the appdata. Defaults to empty string.
+    """
     try:
         _cs_client.post('config/system/sdk/appdata', {"name": name, "value": value})
     except Exception as e:
         _cs_client.log(f"Error posting appdata for {name}: {e}")
 
 def put_appdata(name: str = '', value: str = '') -> None:
-    """Set value of appdata in NCOS Config by name."""
+    """Set value of appdata in NCOS Config by name.
+    
+    Args:
+        name (str): The name of the appdata to update. Defaults to empty string.
+        value (str): The new value to set for the appdata. Defaults to empty string.
+    """
     try:
         appdata = _cs_client.get('config/system/sdk/appdata')
         for item in appdata:
@@ -1157,7 +1420,11 @@ def put_appdata(name: str = '', value: str = '') -> None:
         _cs_client.log(f"Error putting appdata for {name}: {e}")
 
 def delete_appdata(name: str = '') -> None:
-    """Delete appdata in NCOS Config by name."""
+    """Delete appdata in NCOS Config by name.
+    
+    Args:
+        name (str): The name of the appdata to delete. Defaults to empty string.
+    """
     try:
         appdata = _cs_client.get('config/system/sdk/appdata')
         for item in appdata:
@@ -1168,8 +1435,14 @@ def delete_appdata(name: str = '') -> None:
 
 def get_ncm_api_keys() -> Dict[str, Optional[str]]:
     """Get NCM API keys from the router's certificate management configuration.
+    
     Returns:
-        dict: Dictionary containing all API keys, with None for any missing keys
+        dict: Dictionary containing all API keys, with None for any missing keys.
+            Keys include: 'X-ECM-API-ID', 'X-ECM-API-KEY', 'X-CP-API-ID',
+            'X-CP-API-KEY', 'Bearer Token'.
+    
+    Raises:
+        Exception: If there is an error retrieving the API keys.
     """
     try:
         certs = _cs_client.get('config/certmgmt/certs')
@@ -1200,7 +1473,17 @@ def get_ncm_api_keys() -> Dict[str, Optional[str]]:
         raise
 
 def extract_cert_and_key(cert_name_or_uuid: str = '') -> Tuple[Optional[str], Optional[str]]:
-    """Extract and save the certificate and key to the local filesystem. Returns the filenames of the certificate and key files."""
+    """Extract and save the certificate and key to the local filesystem.
+    
+    Args:
+        cert_name_or_uuid (str): The name or UUID of the certificate to extract.
+                                Defaults to empty string.
+    
+    Returns:
+        Tuple[str, str] or Tuple[None, None]: A tuple containing the filenames
+        of the certificate and key files, or (None, None) if the certificate
+        is not found or an error occurs.
+    """
     try:
         cert_x509 = None
         cert_key = None
@@ -1253,7 +1536,15 @@ def extract_cert_and_key(cert_name_or_uuid: str = '') -> Tuple[Optional[str], Op
         return None, None
 
 def get_ipv4_wired_clients() -> List[Dict[str, Any]]:
-    """Return a list of IPv4 wired clients and their details."""
+    """Return a list of IPv4 wired clients and their details.
+    
+    Returns:
+        list: List of dictionaries containing wired client information including:
+            - mac (str): MAC address of the client
+            - hostname (str): Hostname of the client (if available)
+            - ip_address (str): IP address of the client
+            - network (str): Network the client is connected to
+    """
     try:
         wired_clients = []
         lan_clients = _cs_client.get('status/lan/clients') or []
@@ -1284,7 +1575,24 @@ def get_ipv4_wired_clients() -> List[Dict[str, Any]]:
         return []
 
 def get_ipv4_wifi_clients() -> List[Dict[str, Any]]:
-    """Return a list of IPv4 Wi-Fi clients and their details."""
+    """Return a list of IPv4 Wi-Fi clients and their details.
+    
+    Returns:
+        list: List of dictionaries containing Wi-Fi client information including:
+            - mac (str): MAC address of the client
+            - hostname (str): Hostname of the client (if available)
+            - ip_address (str): IP address of the client
+            - radio (int): Radio ID the client is connected to
+            - bss (int): BSS ID the client is connected to
+            - ssid (str): SSID the client is connected to
+            - network (str): Network the client is connected to
+            - band (str): Frequency band (2.4 GHz or 5 GHz)
+            - mode (str): Wi-Fi mode (802.11b, 802.11g, etc.)
+            - bw (str): Bandwidth mode
+            - txrate (int): Transmit rate
+            - rssi (int): Signal strength
+            - time (int): Connection time
+    """
     try:
         wifi_clients = []
         wlan_clients = _cs_client.get('status/wlan/clients') or []
@@ -1330,7 +1638,13 @@ def get_ipv4_wifi_clients() -> List[Dict[str, Any]]:
         return []
 
 def get_ipv4_lan_clients() -> Dict[str, List[Dict[str, Any]]]:
-    """Return a dictionary containing all IPv4 clients, both wired and Wi-Fi."""
+    """Return a dictionary containing all IPv4 clients, both wired and Wi-Fi.
+    
+    Returns:
+        dict: Dictionary containing two lists:
+            - wired_clients (list): List of wired client information
+            - wifi_clients (list): List of Wi-Fi client information
+    """
     try:
         wired_clients = get_ipv4_wired_clients()
         wifi_clients = get_ipv4_wifi_clients()
@@ -1347,7 +1661,16 @@ def get_ipv4_lan_clients() -> Dict[str, List[Dict[str, Any]]]:
         return {"wired_clients": [], "wifi_clients": []}
 
 def dec(deg: float, min: float = 0.0, sec: float = 0.0) -> float:
-    """Return decimal version of lat or long from deg, min, sec"""
+    """Return decimal version of latitude or longitude from degrees, minutes, seconds.
+    
+    Args:
+        deg (float): Degrees component of the coordinate.
+        min (float): Minutes component of the coordinate. Defaults to 0.0.
+        sec (float): Seconds component of the coordinate. Defaults to 0.0.
+    
+    Returns:
+        float: Decimal representation of the coordinate, rounded to 6 decimal places.
+    """
     try:
         if str(deg)[0] == '-':
             dec_val = deg - (min / 60) - (sec / 3600)
@@ -1359,7 +1682,16 @@ def dec(deg: float, min: float = 0.0, sec: float = 0.0) -> float:
         return 0.0
 
 def get_lat_long(max_retries: int = 5, retry_delay: float = 0.1) -> Tuple[Optional[float], Optional[float]]:
-    """Return latitude and longitude as floats"""
+    """Return latitude and longitude as floats.
+    
+    Args:
+        max_retries (int): Maximum number of retries to get GPS fix. Defaults to 5.
+        retry_delay (float): Delay between retries in seconds. Defaults to 0.1.
+    
+    Returns:
+        Tuple[float, float] or Tuple[None, None]: A tuple containing (latitude, longitude)
+        in decimal degrees, or (None, None) if GPS fix is not available.
+    """
     try:
         fix = _cs_client.get('status/gps/fix')
         retries = 0
@@ -1390,7 +1722,14 @@ def get_lat_long(max_retries: int = 5, retry_delay: float = 0.1) -> Tuple[Option
         return None, None
 
 def get_connected_wans(max_retries: int = 10) -> List[str]:
-    """Return list of connected WAN UIDs"""
+    """Return list of connected WAN UIDs.
+    
+    Args:
+        max_retries (int): Maximum number of retries to get WAN devices. Defaults to 10.
+    
+    Returns:
+        list: List of WAN device UIDs that are currently connected.
+    """
     try:
         wans = []
         retries = 0
@@ -1409,7 +1748,14 @@ def get_connected_wans(max_retries: int = 10) -> List[str]:
         return []
 
 def get_sims(max_retries: int = 10) -> List[str]:
-    """Return list of modem UIDs with SIMs"""
+    """Return list of modem UIDs with SIMs.
+    
+    Args:
+        max_retries (int): Maximum number of retries to get WAN devices. Defaults to 10.
+    
+    Returns:
+        list: List of modem UIDs that have SIMs installed (excluding those with NOSIM errors).
+    """
     try:
         SIMs = []
         devices = None
@@ -1432,7 +1778,14 @@ def get_sims(max_retries: int = 10) -> List[str]:
         return []
 
 def get_device_mac(format_with_colons: bool = False) -> Optional[str]:
-    """Return the device MAC address without colons"""
+    """Return the device MAC address.
+    
+    Args:
+        format_with_colons (bool): Whether to return MAC address with colons. Defaults to False.
+    
+    Returns:
+        str or None: The device MAC address, or None if not available or an error occurs.
+    """
     try:
         mac = _cs_client.get('status/product_info/mac0')
         if not mac:
@@ -1443,7 +1796,11 @@ def get_device_mac(format_with_colons: bool = False) -> Optional[str]:
         return None
 
 def get_device_serial_num() -> Optional[str]:
-    """Return the device serial number"""
+    """Return the device serial number.
+    
+    Returns:
+        str or None: The device serial number, or None if not available or an error occurs.
+    """
     try:
         return _cs_client.get('status/product_info/manufacturing/serial_num')
     except Exception as e:
@@ -1451,7 +1808,11 @@ def get_device_serial_num() -> Optional[str]:
         return None
 
 def get_device_product_type() -> Optional[str]:
-    """Return the device product type"""
+    """Return the device product type.
+    
+    Returns:
+        str or None: The device product type, or None if not available or an error occurs.
+    """
     try:
         return _cs_client.get('status/product_info/manufacturing/product_name')
     except Exception as e:
@@ -1459,7 +1820,11 @@ def get_device_product_type() -> Optional[str]:
         return None
 
 def get_device_name() -> Optional[str]:
-    """Return the device name"""
+    """Return the device name.
+    
+    Returns:
+        str or None: The device name, or None if not available or an error occurs.
+    """
     try:
         return _cs_client.get('config/system/system_id')
     except Exception as e:
@@ -1467,7 +1832,14 @@ def get_device_name() -> Optional[str]:
         return None
 
 def get_device_firmware(include_build_info: bool = False) -> str:
-    """Return the device firmware information"""
+    """Return the device firmware information.
+    
+    Args:
+        include_build_info (bool): Whether to include build information. Defaults to False.
+    
+    Returns:
+        str: The device firmware version string, or "Unknown" if an error occurs.
+    """
     try:
         fw_info = _cs_client.get('status/fw_info')
         firmware = f"{fw_info.get('major')}.{fw_info.get('minor')}.{fw_info.get('patch')}-{fw_info.get('fw_release_tag')}"
@@ -1483,7 +1855,16 @@ def get_device_firmware(include_build_info: bool = False) -> str:
         return "Unknown"
 
 def get_system_resources(cpu: bool = True, memory: bool = True, storage: bool = False) -> Dict[str, str]:
-    """Return a dictionary containing the system resources"""
+    """Return a dictionary containing the system resources.
+    
+    Args:
+        cpu (bool): Whether to include CPU information. Defaults to True.
+        memory (bool): Whether to include memory information. Defaults to True.
+        storage (bool): Whether to include storage information. Defaults to False.
+    
+    Returns:
+        dict: Dictionary containing system resource information with descriptive strings.
+    """
     try:
         system_resources = {}
         
@@ -1507,7 +1888,14 @@ def get_system_resources(cpu: bool = True, memory: bool = True, storage: bool = 
         return {}
 
 def get_ncm_status(include_details: bool = False) -> Optional[str]:
-    """Return the NCM status"""
+    """Return the NCM status.
+    
+    Args:
+        include_details (bool): Whether to include detailed information. Defaults to False.
+    
+    Returns:
+        str or None: The NCM status, or None if not available or an error occurs.
+    """
     try:
         return _cs_client.get('status/ecm/state')
     except Exception as e:
@@ -1515,7 +1903,11 @@ def get_ncm_status(include_details: bool = False) -> Optional[str]:
         return None
 
 def reboot_device(force: bool = False) -> None:
-    """Reboot the device"""
+    """Reboot the device.
+    
+    Args:
+        force (bool): Whether to force the reboot. Defaults to False.
+    """
     try:
         _cs_client.put('control/system/reboot', 'reboot hypmgr')
     except Exception as e:
@@ -1523,7 +1915,16 @@ def reboot_device(force: bool = False) -> None:
     
 # Direct access to the underlying EventingCSClient methods
 def get(base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
-    """Direct access to the underlying get method."""
+    """Direct access to the underlying get method.
+    
+    Args:
+        base (str): The base path for the request.
+        query (str): Optional query string. Defaults to empty string.
+        tree (int): Optional tree identifier. Defaults to 0.
+    
+    Returns:
+        dict or None: The response data, or None if an error occurs.
+    """
     try:
         return _cs_client.get(base, query, tree)
     except Exception as e:
@@ -1531,7 +1932,16 @@ def get(base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
         return None
 
 def post(base: str, value: Any = '', query: str = '') -> Optional[Dict[str, Any]]:
-    """Direct access to the underlying post method."""
+    """Direct access to the underlying post method.
+    
+    Args:
+        base (str): The base path for the request.
+        value (Any): The value to post. Defaults to empty string.
+        query (str): Optional query string. Defaults to empty string.
+    
+    Returns:
+        dict or None: The response data, or None if an error occurs.
+    """
     try:
         return _cs_client.post(base, value, query)
     except Exception as e:
@@ -1539,7 +1949,17 @@ def post(base: str, value: Any = '', query: str = '') -> Optional[Dict[str, Any]
         return None
 
 def put(base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
-    """Direct access to the underlying put method."""
+    """Direct access to the underlying put method.
+    
+    Args:
+        base (str): The base path for the request.
+        value (Any): The value to put. Defaults to empty string.
+        query (str): Optional query string. Defaults to empty string.
+        tree (int): Optional tree identifier. Defaults to 0.
+    
+    Returns:
+        dict or None: The response data, or None if an error occurs.
+    """
     try:
         return _cs_client.put(base, value, query, tree)
     except Exception as e:
@@ -1547,7 +1967,15 @@ def put(base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[
         return None
 
 def delete(base: str, query: str = '') -> Optional[Dict[str, Any]]:
-    """Direct access to the underlying delete method."""
+    """Direct access to the underlying delete method.
+    
+    Args:
+        base (str): The base path for the request.
+        query (str): Optional query string. Defaults to empty string.
+    
+    Returns:
+        dict or None: The response data, or None if an error occurs.
+    """
     try:
         return _cs_client.delete(base, query)
     except Exception as e:
@@ -1555,7 +1983,16 @@ def delete(base: str, query: str = '') -> Optional[Dict[str, Any]]:
         return None
 
 def decrypt(base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
-    """Direct access to the underlying decrypt method."""
+    """Direct access to the underlying decrypt method.
+    
+    Args:
+        base (str): The base path for the request.
+        query (str): Optional query string. Defaults to empty string.
+        tree (int): Optional tree identifier. Defaults to 0.
+    
+    Returns:
+        dict or None: The response data, or None if an error occurs.
+    """
     try:
         return _cs_client.decrypt(base, query, tree)
     except Exception as e:
@@ -1563,14 +2000,25 @@ def decrypt(base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any
         return None
 
 def log(value: str = '') -> None:
-    """Direct access to the underlying log method."""
+    """Direct access to the underlying log method.
+    
+    Args:
+        value (str): The message to log. Defaults to empty string.
+    """
     try:
         return _cs_client.log(value)
     except Exception as e:
         print(f"Error in log request: {e}")
 
 def alert(value: str = '') -> Optional[Dict[str, Any]]:
-    """Direct access to the underlying alert method."""
+    """Direct access to the underlying alert method.
+    
+    Args:
+        value (str): The alert message. Defaults to empty string.
+    
+    Returns:
+        dict or None: The response data, or None if an error occurs.
+    """
     try:
         return _cs_client.alert(value)
     except Exception as e:
@@ -1578,7 +2026,17 @@ def alert(value: str = '') -> Optional[Dict[str, Any]]:
         return None
 
 def register(action: str = 'set', path: str = '', callback: Callable = None, *args: Any) -> Dict[str, Any]:
-    """Registers a callback for a config store event."""
+    """Register a callback for a config store event.
+    
+    Args:
+        action (str): The action to listen for (e.g., 'set', 'get'). Defaults to 'set'.
+        path (str): The config store path to monitor. Defaults to empty string.
+        callback (callable): The function to call when the event occurs. Defaults to None.
+        *args: Additional arguments to pass to the callback.
+    
+    Returns:
+        dict: The result of the registration command.
+    """
     try:
         return _cs_client.register(action, path, callback, *args)
     except Exception as e:
@@ -1589,7 +2047,14 @@ def register(action: str = 'set', path: str = '', callback: Callable = None, *ar
 on = register
 
 def unregister(eid: int = 0) -> Dict[str, Any]:
-    """Unregisters a callback by its event ID."""
+    """Unregister a callback by its event ID.
+    
+    Args:
+        eid (int): The event ID returned by register. Defaults to 0.
+    
+    Returns:
+        dict: The result of the unregistration command.
+    """
     try:
         return _cs_client.unregister(eid)
     except Exception as e:
@@ -1598,15 +2063,24 @@ def unregister(eid: int = 0) -> Dict[str, Any]:
 
 # Expose the logger for advanced logging control
 def get_logger() -> Any:
-    """Get the logger instance for advanced logging control."""
+    """Get the logger instance for advanced logging control.
+    
+    Returns:
+        logging.Logger or None: The logger instance, or None if an error occurs.
+    """
     try:
         return _cs_client.logger
     except Exception as e:
         print(f"Error getting logger: {e}")
         return None
 
-# Monkay patch for cp.uptime()
+# Monkey patch for cp.uptime()
 def uptime() -> float:
+    """Return the current time in seconds since the epoch.
+    
+    Returns:
+        float: The current time in seconds since the epoch, or 0.0 if an error occurs.
+    """
     try:
         return time.time()
     except Exception as e:
@@ -1614,10 +2088,15 @@ def uptime() -> float:
         return 0.0
     
 def clean_up_reg(signal: Any, frame: Any) -> None:
-    """
+    """Clean up registrations when receiving SIGTERM signal.
+    
     When 'cppython remote_port_forward.py' gets a SIGTERM, config_store_receiver.py doesn't
     clean up registrations. Even if it did, the comm module can't rely on an external service
     to clean up.
+    
+    Args:
+        signal (Any): The signal received.
+        frame (Any): The current stack frame.
     """
     try:
         _cs_client.stop()
@@ -1638,51 +2117,164 @@ signal.signal(signal.SIGTERM, clean_up_reg)
 # ============================================================================
 
 def get_gps_status() -> Dict[str, Any]:
-    """Get GPS status and return detailed information"""
+    """Get GPS status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing GPS status information including:
+            - has_gps_data (bool): Whether GPS data is available
+            - gps_lock (bool): Whether GPS has a lock
+            - satellites (int): Number of satellites in view
+            - location (dict): GPS coordinates in degrees/minutes/seconds format
+            - decimal_coordinates (dict): GPS coordinates in decimal format
+            - altitude (float): Altitude in meters
+            - speed (float): Ground speed in knots
+            - heading (float): Heading in degrees
+            - last_fix_age (int): Age of last GPS fix
+    """
     return _cs_client.get_gps_status()
 
 def get_system_status() -> Dict[str, Any]:
-    """Get system status and return detailed information"""
+    """Get system status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing system status information including:
+            - has_system_data (bool): Whether system data is available
+            - uptime (int): System uptime in seconds
+            - temperature (float): System temperature
+            - storage_health (str): Storage health status
+            - cpu_usage (dict): CPU usage statistics
+            - memory_usage (dict): Memory usage statistics
+            - services_running (int): Number of running services
+            - services_disabled (int): Number of disabled services
+            - apps_running (int): Number of running applications
+    """
     return _cs_client.get_system_status()
 
 def get_wlan_status() -> Dict[str, Any]:
-    """Get WLAN status and return detailed information"""
+    """Get WLAN status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing WLAN status information including:
+            - has_wlan_data (bool): Whether WLAN data is available
+            - wlan_state (str): WLAN operational state
+            - radios (list): List of radio information
+            - clients_connected (int): Number of connected clients
+            - interfaces (list): List of interface information
+    """
     return _cs_client.get_wlan_status()
 
 def get_wan_status() -> Dict[str, Any]:
-    """Get WAN status and return detailed information"""
+    """Get WAN status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing WAN status information including:
+            - has_wan_data (bool): Whether WAN data is available
+            - primary_device (str): Primary WAN device identifier
+            - connection_state (str): Overall connection state
+            - devices (list): List of WAN device information
+    """
     return _cs_client.get_wan_status()
 
 def get_lan_status() -> Dict[str, Any]:
-    """Get LAN status and return detailed information"""
+    """Get LAN status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing LAN status information including:
+            - has_lan_data (bool): Whether LAN data is available
+            - clients_connected (int): Number of connected clients
+            - networks (list): List of network information
+            - devices (list): List of device information
+    """
     return _cs_client.get_lan_status()
 
 def get_openvpn_status() -> Dict[str, Any]:
-    """Get OpenVPN status and return detailed information"""
+    """Get OpenVPN status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing OpenVPN status information including:
+            - has_openvpn_data (bool): Whether OpenVPN data is available
+            - tunnels_configured (int): Number of configured tunnels
+            - tunnels_active (int): Number of active tunnels
+            - stats_available (bool): Whether statistics are available
+    """
     return _cs_client.get_openvpn_status()
 
 def get_hotspot_status() -> Dict[str, Any]:
-    """Get hotspot status and return detailed information"""
+    """Get hotspot status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing hotspot status information including:
+            - has_hotspot_data (bool): Whether hotspot data is available
+            - clients_connected (int): Number of connected clients
+            - sessions_active (int): Number of active sessions
+            - domains_allowed (int): Number of allowed domains
+            - hosts_allowed (int): Number of allowed hosts
+            - rate_limit_triggered (bool): Whether rate limiting is triggered
+    """
     return _cs_client.get_hotspot_status()
 
 def get_obd_status() -> Dict[str, Any]:
-    """Get OBD status and return detailed information"""
+    """Get OBD status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing OBD status information including:
+            - has_obd_data (bool): Whether OBD data is available
+            - adapter_configured (bool): Whether OBD adapter is configured
+            - adapter_connected (bool): Whether OBD adapter is connected
+            - vehicle_connected (bool): Whether vehicle is connected
+            - pids_supported (int): Number of supported PIDs
+            - pids_enabled (int): Number of enabled PIDs
+            - ignition_status (str): Vehicle ignition status
+    """
     return _cs_client.get_obd_status()
 
 def get_qos_status() -> Dict[str, Any]:
-    """Get QoS status and return detailed information"""
+    """Get QoS status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing QoS status information including:
+            - has_qos_data (bool): Whether QoS data is available
+            - qos_enabled (bool): Whether QoS is enabled
+            - queues_configured (int): Number of configured queues
+            - queues_active (int): Number of active queues
+            - total_packets (int): Total packets processed
+    """
     return _cs_client.get_qos_status()
 
 def get_firewall_status() -> Dict[str, Any]:
-    """Get firewall status and return detailed information"""
+    """Get firewall status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing firewall status information including:
+            - has_firewall_data (bool): Whether firewall data is available
+            - connections_tracked (int): Number of tracked connections
+            - state_timeouts (dict): State timeout configurations
+            - hitcounters (list): List of firewall rule hit counters
+    """
     return _cs_client.get_firewall_status()
 
 def get_dns_status() -> Dict[str, Any]:
-    """Get DNS status and return detailed information"""
+    """Get DNS status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing DNS status information including:
+            - has_dns_data (bool): Whether DNS data is available
+            - cache_entries (int): Number of cache entries
+            - cache_size (int): Cache size
+            - servers_configured (int): Number of configured DNS servers
+            - queries_forwarded (int): Number of forwarded queries
+    """
     return _cs_client.get_dns_status()
 
 def get_dhcp_status() -> Dict[str, Any]:
-    """Get DHCP status and return detailed information"""
+    """Get DHCP status and return detailed information.
+    
+    Returns:
+        dict: Dictionary containing DHCP status information including:
+            - has_dhcp_data (bool): Whether DHCP data is available
+            - devices_configured (int): Number of configured devices
+            - devices_with_ip (int): Number of devices with IP addresses
+    """
     return _cs_client.get_dhcp_status()
 
 # ============================================================================
@@ -1690,11 +2282,10 @@ def get_dhcp_status() -> Dict[str, Any]:
 # ============================================================================
 
 def get_wan_devices_status() -> Optional[Dict[str, Any]]:
-    """
-    Return detailed status information for all WAN devices.
+    """Return detailed status information for all WAN devices.
     
     Returns:
-        dict: Dictionary containing all WAN devices with keys like 'mdm-{id}', 'eth-{id}', etc.
+        dict or None: Dictionary containing all WAN devices with keys like 'mdm-{id}', 'eth-{id}', etc.
               Each device contains:
               - config (dict): Device configuration
               - diagnostics (dict): Detailed diagnostic information
@@ -1712,11 +2303,10 @@ def get_wan_devices_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_modem_status() -> Optional[Dict[str, Any]]:
-    """
-    Return detailed status information for cellular modem devices only.
+    """Return detailed status information for cellular modem devices only.
     
     Returns:
-        dict: Dictionary containing only modem devices with keys like 'mdm-{id}'.
+        dict or None: Dictionary containing only modem devices with keys like 'mdm-{id}'.
               Each modem contains:
               - config (dict): Modem configuration
               - diagnostics (dict): Detailed diagnostic information including:
@@ -1750,11 +2340,10 @@ def get_modem_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_signal_strength() -> Optional[Dict[str, Any]]:
-    """
-    Return signal strength information for all cellular modems.
+    """Return signal strength information for all cellular modems.
     
     Returns:
-        dict: Dictionary with modem IDs as keys, containing:
+        dict or None: Dictionary with modem IDs as keys, containing:
             - signal_strength (str): Signal strength percentage
             - signal_backlog (list): Historical signal data with timestamps
             - cellular_health_score (float): Health score (0-100)
@@ -1802,7 +2391,14 @@ def get_signal_strength() -> Optional[Dict[str, Any]]:
         return None
 
 def get_temperature(unit: str = 'celsius') -> Optional[float]:
-    """Return device temperature information"""
+    """Return device temperature information.
+    
+    Args:
+        unit (str): Temperature unit ('celsius' or 'fahrenheit'). Defaults to 'celsius'.
+    
+    Returns:
+        float or None: Device temperature in the specified unit, or None if not available.
+    """
     try:
         # Temperature is a direct value, not a directory
         temp = _cs_client.get('status/system/temperature')
@@ -1818,7 +2414,26 @@ def get_temperature(unit: str = 'celsius') -> Optional[float]:
         return None
 
 def get_power_usage(include_components: bool = True) -> Optional[Dict[str, Any]]:
-    """Return power usage information"""
+    """Return power usage information.
+    
+    Args:
+        include_components (bool): Whether to include individual component power usage.
+                                  Defaults to True.
+    
+    Returns:
+        dict or None: Dictionary containing power usage information including:
+            - total (float): Total power usage
+            - system_power (float): System power usage
+            - cpu_power (float): CPU power usage
+            - modem_power (float): Modem power usage
+            - wifi_power (float): WiFi power usage
+            - poe_pse_power (float): PoE PSE power usage
+            - ethernet_ports_power (float): Ethernet ports power usage
+            - bluetooth_power (float): Bluetooth power usage
+            - usb_power (float): USB power usage
+            - gps_power (float): GPS power usage
+            - led_power (float): LED power usage
+    """
     try:
         power_components = {}
         
@@ -1847,11 +2462,10 @@ def get_power_usage(include_components: bool = True) -> Optional[Dict[str, Any]]
         return None
 
 def get_wlan_status() -> Optional[Dict[str, Any]]:
-    """
-    Return comprehensive wireless LAN status and configuration information.
+    """Return comprehensive wireless LAN status and configuration information.
     
     Returns:
-        dict: Dictionary containing all WLAN status information including
+        dict or None: Dictionary containing all WLAN status information including
               clients, radio details, events, region settings, and trace data.
     """
     try:
@@ -1862,11 +2476,21 @@ def get_wlan_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_wlan_clients() -> List[Dict[str, Any]]:
-    """
-    Return connected wireless clients information.
+    """Return connected wireless clients information.
     
     Returns:
-        list: List of connected wireless clients with their details
+        list: List of connected wireless clients with their details including:
+            - mac (str): MAC address of the client
+            - hostname (str): Hostname of the client
+            - ip_address (str): IP address of the client
+            - radio (int): Radio ID the client is connected to
+            - bss (int): BSS ID the client is connected to
+            - ssid (str): SSID the client is connected to
+            - mode (int): Wi-Fi mode
+            - bw (int): Bandwidth mode
+            - txrate (int): Transmit rate
+            - rssi (int): Signal strength
+            - time (int): Connection time
     """
     try:
         wlan_status = _cs_client.get('status/wlan')
@@ -1876,8 +2500,7 @@ def get_wlan_clients() -> List[Dict[str, Any]]:
         return []
 
 def get_wlan_radio_status() -> List[Dict[str, Any]]:
-    """
-    Return wireless radio status and configuration for all bands.
+    """Return wireless radio status and configuration for all bands.
     
     Returns:
         list: List of radio configurations for each band (2.4 GHz, 5 GHz) containing:
@@ -1901,14 +2524,13 @@ def get_wlan_radio_status() -> List[Dict[str, Any]]:
         return []
 
 def get_wlan_radio_by_band(band: str = '2.4 GHz') -> Optional[Dict[str, Any]]:
-    """
-    Return wireless radio status for a specific frequency band.
+    """Return wireless radio status for a specific frequency band.
     
     Args:
-        band (str): Frequency band ('2.4 GHz' or '5 GHz')
+        band (str): Frequency band ('2.4 GHz' or '5 GHz'). Defaults to '2.4 GHz'.
     
     Returns:
-        dict or None: Radio configuration for the specified band, or None if not found
+        dict or None: Radio configuration for the specified band, or None if not found.
     """
     try:
         radio_status = get_wlan_radio_status()
@@ -1921,17 +2543,16 @@ def get_wlan_radio_by_band(band: str = '2.4 GHz') -> Optional[Dict[str, Any]]:
         return None
 
 def get_wlan_events() -> Dict[str, Any]:
-    """
-    Return wireless LAN events and monitoring data.
+    """Return wireless LAN events and monitoring data.
     
     Returns:
         dict: Dictionary containing WiFi events:
-            - associate: Association events
-            - deauthenticated: Deauthentication events
-            - disassociate: Disassociation events
-            - mac_filter_allow: MAC filter allow events
-            - mac_filter_deny: MAC filter deny events
-            - timeout: Timeout events
+            - associate (list): Association events
+            - deauthenticated (list): Deauthentication events
+            - disassociate (list): Disassociation events
+            - mac_filter_allow (list): MAC filter allow events
+            - mac_filter_deny (list): MAC filter deny events
+            - timeout (list): Timeout events
     """
     try:
         wlan_status = _cs_client.get('status/wlan')
@@ -1941,8 +2562,7 @@ def get_wlan_events() -> Dict[str, Any]:
         return {}
 
 def get_wlan_region_config() -> Dict[str, Any]:
-    """
-    Return wireless LAN regional configuration settings.
+    """Return wireless LAN regional configuration settings.
     
     Returns:
         dict: Dictionary containing regional settings:
@@ -1963,8 +2583,7 @@ def get_wlan_region_config() -> Dict[str, Any]:
         return {}
 
 def get_wlan_remote_status() -> Dict[str, Any]:
-    """
-    Return remote WiFi controller status and configuration.
+    """Return remote WiFi controller status and configuration.
     
     Returns:
         dict: Dictionary containing remote WiFi information:
@@ -1978,11 +2597,10 @@ def get_wlan_remote_status() -> Dict[str, Any]:
         return {}
 
 def get_wlan_state() -> str:
-    """
-    Return wireless LAN operational state.
+    """Return wireless LAN operational state.
     
     Returns:
-        str: WiFi state ('On' or 'Off')
+        str: WiFi state ('On', 'Off', or 'Unknown' if an error occurs).
     """
     try:
         wlan_status = _cs_client.get('status/wlan')
@@ -1992,8 +2610,7 @@ def get_wlan_state() -> str:
         return 'Unknown'
 
 def get_wlan_trace() -> List[Dict[str, Any]]:
-    """
-    Return wireless LAN initialization trace data.
+    """Return wireless LAN initialization trace data.
     
     Returns:
         list: List of trace events with:
@@ -2010,8 +2627,7 @@ def get_wlan_trace() -> List[Dict[str, Any]]:
         return []
 
 def get_wlan_debug() -> Dict[str, Any]:
-    """
-    Return wireless LAN debug information.
+    """Return wireless LAN debug information.
     
     Returns:
         dict: Dictionary containing debug information:
@@ -2025,12 +2641,12 @@ def get_wlan_debug() -> Dict[str, Any]:
         return {}
 
 def get_wlan_channel_info(band: Optional[str] = None, include_survey: bool = False) -> Dict[str, Any]:
-    """
-    Return wireless LAN channel information for specified band or all bands.
+    """Return wireless LAN channel information for specified band or all bands.
     
     Args:
         band (str, optional): Frequency band ('2.4 GHz' or '5 GHz'). If None, returns all bands.
-        include_survey (bool, optional): Include channel survey data. Default is False.
+                              Defaults to None.
+        include_survey (bool, optional): Include channel survey data. Defaults to False.
     
     Returns:
         dict: Dictionary containing channel information:
@@ -2077,11 +2693,10 @@ def get_wlan_channel_info(band: Optional[str] = None, include_survey: bool = Fal
         return {}
 
 def get_wlan_client_count() -> int:
-    """
-    Return the count of connected wireless clients.
+    """Return the count of connected wireless clients.
     
     Returns:
-        int: Number of connected wireless clients
+        int: Number of connected wireless clients, or 0 if an error occurs.
     """
     try:
         clients = get_wlan_clients()
@@ -2091,11 +2706,10 @@ def get_wlan_client_count() -> int:
         return 0
 
 def get_wlan_client_count_by_band() -> Dict[str, int]:
-    """
-    Return the count of connected wireless clients per frequency band.
+    """Return the count of connected wireless clients per frequency band.
     
     Returns:
-        dict: Dictionary with band names as keys and client counts as values
+        dict: Dictionary with band names as keys and client counts as values.
     """
     try:
         radio_status = get_wlan_radio_status()
@@ -2110,7 +2724,17 @@ def get_wlan_client_count_by_band() -> Dict[str, int]:
         return {}
 
 def get_dhcp_leases() -> Optional[List[Dict[str, Any]]]:
-    """Return DHCP lease information"""
+    """Return DHCP lease information.
+    
+    Returns:
+        list or None: List of DHCP leases with client information including:
+            - mac (str): MAC address of the client
+            - hostname (str): Hostname of the client
+            - ip_address (str): IP address of the client
+            - network (str): Network the client is connected to
+            - iface (str): Interface name
+            - lease_time (int): Lease time in seconds
+    """
     try:
         leases = _cs_client.get('status/dhcpd/leases')
         return leases
@@ -2119,7 +2743,14 @@ def get_dhcp_leases() -> Optional[List[Dict[str, Any]]]:
         return None
 
 def get_network_interfaces() -> Optional[Dict[str, Any]]:
-    """Return network interface status"""
+    """Return network interface status.
+    
+    Returns:
+        dict or None: Dictionary containing network interface information including:
+            - interface names as keys
+            - status information for each interface
+            - IP addresses, netmasks, and other network configuration
+    """
     try:
         interfaces = _cs_client.get('status/network')
         return interfaces
@@ -2128,7 +2759,15 @@ def get_network_interfaces() -> Optional[Dict[str, Any]]:
         return None
 
 def get_routing_table() -> Optional[Dict[str, Any]]:
-    """Return routing table information"""
+    """Return routing table information.
+    
+    Returns:
+        dict or None: Dictionary containing routing table information including:
+            - static routes
+            - dynamic routes
+            - routing policies
+            - BGP and OSPF information
+    """
     try:
         routes = _cs_client.get('status/routing')
         return routes
@@ -2137,7 +2776,15 @@ def get_routing_table() -> Optional[Dict[str, Any]]:
         return None
 
 def get_certificate_status() -> Optional[Dict[str, Any]]:
-    """Return certificate management status"""
+    """Return certificate management status.
+    
+    Returns:
+        dict or None: Dictionary containing certificate management information including:
+            - installed certificates
+            - certificate details
+            - CA fingerprints
+            - certificate status
+    """
     try:
         cert_status = _cs_client.get('status/certmgmt')
         return cert_status
@@ -2146,7 +2793,17 @@ def get_certificate_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_storage_status(include_detailed: bool = False) -> Optional[Dict[str, Any]]:
-    """Return storage device status"""
+    """Return storage device status.
+    
+    Args:
+        include_detailed (bool): Whether to include detailed storage information. Defaults to False.
+    
+    Returns:
+        dict or None: Dictionary containing storage status information including:
+            - health (str): Storage health status
+            - slc_health (str): SLC health status
+            - detailed information if include_detailed is True
+    """
     try:
         storage_status = {
             'health': _cs_client.get('status/system/storage/health'),
@@ -2168,7 +2825,17 @@ def get_storage_status(include_detailed: bool = False) -> Optional[Dict[str, Any
         return None
 
 def get_usb_status(include_all_ports: bool = False) -> Optional[Dict[str, Any]]:
-    """Return USB device status"""
+    """Return USB device status.
+    
+    Args:
+        include_all_ports (bool): Whether to include all USB ports. Defaults to False.
+    
+    Returns:
+        dict or None: Dictionary containing USB status information including:
+            - connection (dict): USB connection status
+            - int1 (dict): USB interface 1 information
+            - additional port information if include_all_ports is True
+    """
     try:
         usb_status = {
             'connection': _cs_client.get('status/usb/connection'),
@@ -2190,7 +2857,14 @@ def get_usb_status(include_all_ports: bool = False) -> Optional[Dict[str, Any]]:
         return None
 
 def get_poe_status() -> Optional[Dict[str, Any]]:
-    """Return Power over Ethernet status"""
+    """Return Power over Ethernet status.
+    
+    Returns:
+        dict or None: Dictionary containing PoE status information including:
+            - PoE PSE (Power Sourcing Equipment) status
+            - Power delivery information
+            - Connected device power requirements
+    """
     try:
         # PoE directory appears to be empty on this router
         poe_status = _cs_client.get('status/system/poe_pse')
@@ -2200,7 +2874,13 @@ def get_poe_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_sensors_status() -> Optional[Dict[str, Any]]:
-    """Return sensor status information"""
+    """Return sensor status information.
+    
+    Returns:
+        dict or None: Dictionary containing sensor status information including:
+            - level (dict): Level sensor information
+            - day (dict): Day sensor information
+    """
     try:
         sensors_status = {
             'level': _cs_client.get('status/system/sensors/level'),
@@ -2212,7 +2892,14 @@ def get_sensors_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_services_status() -> Optional[Dict[str, Any]]:
-    """Return system services status"""
+    """Return system services status.
+    
+    Returns:
+        dict or None: Dictionary containing system services status including:
+            - service names as keys
+            - service state information (started, stopped, disabled, etc.)
+            - service configuration details
+    """
     try:
         services_status = _cs_client.get('status/system/services')
         return services_status
@@ -2221,7 +2908,14 @@ def get_services_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_apps_status() -> Optional[List[Dict[str, Any]]]:
-    """Return SDK applications status"""
+    """Return SDK applications status.
+    
+    Returns:
+        list or None: List of SDK applications with their status information including:
+            - app name and identifier
+            - app state (started, stopped, etc.)
+            - app configuration and runtime information
+    """
     try:
         apps_status = _cs_client.get('status/system/apps')
         return apps_status
@@ -2230,7 +2924,14 @@ def get_apps_status() -> Optional[List[Dict[str, Any]]]:
         return None
 
 def get_log_status() -> Optional[Dict[str, Any]]:
-    """Return system log status"""
+    """Return system log status.
+    
+    Returns:
+        dict or None: Dictionary containing system log status information including:
+            - log configuration
+            - log file information
+            - log level settings
+    """
     try:
         # Log directory appears to be empty
         log_status = _cs_client.get('status/log')
@@ -2240,7 +2941,14 @@ def get_log_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_event_status() -> Optional[Dict[str, Any]]:
-    """Return system events status"""
+    """Return system events status.
+    
+    Returns:
+        dict or None: Dictionary containing system events status including:
+            - event configuration
+            - event history
+            - event processing status
+    """
     try:
         event_status = _cs_client.get('status/event')
         return event_status
@@ -2249,7 +2957,15 @@ def get_event_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_network_throughput() -> Optional[Dict[str, Any]]:
-    """Return network throughput statistics"""
+    """Return network throughput statistics.
+    
+    Returns:
+        dict or None: Dictionary containing network throughput statistics including:
+            - interface statistics
+            - packet counts
+            - byte counts
+            - error statistics
+    """
     try:
         stats = _cs_client.get('status/stats')
         return stats
@@ -2258,7 +2974,14 @@ def get_network_throughput() -> Optional[Dict[str, Any]]:
         return None
 
 def get_flow_statistics() -> Optional[Dict[str, Any]]:
-    """Return flow statistics"""
+    """Return flow statistics.
+    
+    Returns:
+        dict or None: Dictionary containing flow statistics including:
+            - active flows
+            - flow tracking information
+            - connection statistics
+    """
     try:
         flow_stats = _cs_client.get('status/flowstats')
         return flow_stats
@@ -2267,7 +2990,14 @@ def get_flow_statistics() -> Optional[Dict[str, Any]]:
         return None
 
 def get_client_usage() -> Optional[Dict[str, Any]]:
-    """Return client usage statistics"""
+    """Return client usage statistics.
+    
+    Returns:
+        dict or None: Dictionary containing client usage statistics including:
+            - client bandwidth usage
+            - connection statistics
+            - usage patterns
+    """
     try:
         client_usage = _cs_client.get('status/client_usage')
         return client_usage
@@ -2276,7 +3006,14 @@ def get_client_usage() -> Optional[Dict[str, Any]]:
         return None
 
 def get_multicast_status() -> Optional[Dict[str, Any]]:
-    """Return multicast status"""
+    """Return multicast status.
+    
+    Returns:
+        dict or None: Dictionary containing multicast status information including:
+            - multicast group information
+            - multicast routing
+            - multicast statistics
+    """
     try:
         multicast_status = _cs_client.get('status/multicast')
         return multicast_status
@@ -2285,7 +3022,15 @@ def get_multicast_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_vpn_status() -> Optional[Dict[str, Any]]:
-    """Return VPN status (OpenVPN, L2TP, etc.)"""
+    """Return VPN status (OpenVPN, L2TP, etc.).
+    
+    Returns:
+        dict or None: Dictionary containing VPN status information including:
+            - openvpn (dict): OpenVPN status and configuration
+            - l2tp (dict): L2TP status and configuration
+            - gre (dict): GRE tunnel status
+            - vxlan (dict): VXLAN tunnel status
+    """
     try:
         vpn_status = {
             'openvpn': get_openvpn_status(),
@@ -2299,7 +3044,14 @@ def get_vpn_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_security_status() -> Optional[Dict[str, Any]]:
-    """Return security-related status"""
+    """Return security-related status.
+    
+    Returns:
+        dict or None: Dictionary containing security status information including:
+            - firewall (dict): Firewall status and configuration
+            - security (dict): General security settings and status
+            - certificates (dict): Certificate management status
+    """
     try:
         security_status = {
             'firewall': get_firewall_status(),
@@ -2312,7 +3064,14 @@ def get_security_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_iot_status() -> Optional[Dict[str, Any]]:
-    """Return IoT-related status"""
+    """Return IoT-related status.
+    
+    Returns:
+        dict or None: Dictionary containing IoT status information including:
+            - IoT device information
+            - IoT protocol status
+            - IoT configuration
+    """
     try:
         iot_status = _cs_client.get('status/iot')
         return iot_status
@@ -2321,7 +3080,15 @@ def get_iot_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_obd_status() -> Optional[Dict[str, Any]]:
-    """Return OBD (On-Board Diagnostics) status"""
+    """Return OBD (On-Board Diagnostics) status.
+    
+    Returns:
+        dict or None: Dictionary containing OBD status information including:
+            - adapter configuration and connection status
+            - vehicle connection information
+            - supported and enabled PIDs
+            - ignition status
+    """
     try:
         obd_status = _cs_client.get('status/obd')
         return obd_status
@@ -2330,7 +3097,15 @@ def get_obd_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_hotspot_status() -> Optional[Dict[str, Any]]:
-    """Return hotspot status"""
+    """Return hotspot status.
+    
+    Returns:
+        dict or None: Dictionary containing hotspot status information including:
+            - connected clients
+            - active sessions
+            - allowed domains and hosts
+            - rate limiting status
+    """
     try:
         hotspot_status = _cs_client.get('status/hotspot')
         return hotspot_status
@@ -2339,7 +3114,15 @@ def get_hotspot_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_sdwan_status() -> Optional[Dict[str, Any]]:
-    """Return SD-WAN status"""
+    """Return SD-WAN status.
+    
+    Returns:
+        dict or None: Dictionary containing SD-WAN status information including:
+            - SD-WAN configuration
+            - tunnel status
+            - routing policies
+            - performance metrics
+    """
     try:
         sdwan_status = _cs_client.get('status/sdwan_adv')
         return sdwan_status
@@ -2348,7 +3131,31 @@ def get_sdwan_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_comprehensive_status(include_detailed: bool = True, include_clients: bool = True) -> Optional[Dict[str, Any]]:
-    """Return a comprehensive status report of the router"""
+    """Return a comprehensive status report of the router.
+    
+    Args:
+        include_detailed (bool): Whether to include detailed information. Defaults to True.
+        include_clients (bool): Whether to include client information. Defaults to True.
+    
+    Returns:
+        dict or None: Comprehensive status report containing:
+            - system (dict): System status and information
+            - network (dict): Network status and configuration
+            - modem (dict): Modem status and signal information
+            - gps (dict): GPS status and location information
+            - power (dict): Power usage information
+            - storage (dict): Storage status
+            - usb (dict): USB device status
+            - poe (dict): PoE status
+            - certificates (dict): Certificate status
+            - openvpn (dict): OpenVPN status
+            - firewall (dict): Firewall status
+            - qos (dict): QoS status
+            - dhcp (dict): DHCP status
+            - ncm (dict): NCM status
+            - clients (dict): Client information if include_clients is True
+            - detailed (dict): Detailed information if include_detailed is True
+    """
     try:
         status_report = {
             'system': {
@@ -2405,7 +3212,15 @@ def get_comprehensive_status(include_detailed: bool = True, include_clients: boo
         return None
 
 def wait_for_modem_connection(timeout: int = 300, check_interval: float = 1.0) -> bool:
-    """Wait for modem to establish a connection"""
+    """Wait for modem to establish a connection.
+    
+    Args:
+        timeout (int): Maximum time to wait in seconds. Defaults to 300.
+        check_interval (float): Time between checks in seconds. Defaults to 1.0.
+    
+    Returns:
+        bool: True if modem connection is established within timeout, False otherwise.
+    """
     try:
         _cs_client.log("Waiting for modem connection...")
         end_time = time.time() + timeout
@@ -2426,7 +3241,15 @@ def wait_for_modem_connection(timeout: int = 300, check_interval: float = 1.0) -
         return False
 
 def wait_for_gps_fix(timeout: int = 300, check_interval: float = 1.0) -> bool:
-    """Wait for GPS to acquire a fix"""
+    """Wait for GPS to acquire a fix.
+    
+    Args:
+        timeout (int): Maximum time to wait in seconds. Defaults to 300.
+        check_interval (float): Time between checks in seconds. Defaults to 1.0.
+    
+    Returns:
+        bool: True if GPS fix is acquired within timeout, False otherwise.
+    """
     try:
         _cs_client.log("Waiting for GPS fix...")
         end_time = time.time() + timeout
@@ -2447,15 +3270,15 @@ def wait_for_gps_fix(timeout: int = 300, check_interval: float = 1.0) -> bool:
 # ============================================================================
 
 def reset_modem(modem_id: Optional[str] = None, force: bool = False) -> bool:
-    """
-    Reset a specific modem or all modems.
+    """Reset a specific modem or all modems.
     
     Args:
         modem_id (str, optional): Specific modem ID to reset. If None, resets all modems.
-        force (bool, optional): Force reset even if modem is connected. Default is False.
+                                  Defaults to None.
+        force (bool, optional): Force reset even if modem is connected. Defaults to False.
     
     Returns:
-        bool: True if reset command was sent successfully, False otherwise
+        bool: True if reset command was sent successfully, False otherwise.
     """
     try:
         if modem_id:
@@ -2470,11 +3293,13 @@ def reset_modem(modem_id: Optional[str] = None, force: bool = False) -> bool:
         return False
 
 def reset_wlan(force: bool = False) -> bool:
-    """
-    Reset wireless LAN configuration and connections.
+    """Reset wireless LAN configuration and connections.
+    
+    Args:
+        force (bool): Force reset even if WLAN is active. Defaults to False.
     
     Returns:
-        bool: True if reset command was sent successfully, False otherwise
+        bool: True if reset command was sent successfully, False otherwise.
     """
     try:
         _cs_client.put('control/wlan/reset', 'reset')
@@ -2485,11 +3310,10 @@ def reset_wlan(force: bool = False) -> bool:
         return False
 
 def clear_logs() -> bool:
-    """
-    Clear system logs.
+    """Clear system logs.
     
     Returns:
-        bool: True if logs were cleared successfully, False otherwise
+        bool: True if logs were cleared successfully, False otherwise.
     """
     try:
         _cs_client.put('control/log/clear', 'clear')
@@ -2500,14 +3324,13 @@ def clear_logs() -> bool:
         return False
 
 def factory_reset() -> bool:
-    """
-    Perform factory reset of the router.
+    """Perform factory reset of the router.
     
     WARNING: This will erase all configuration and return the router to factory defaults.
     Use with extreme caution.
     
     Returns:
-        bool: True if factory reset was initiated successfully, False otherwise
+        bool: True if factory reset was initiated successfully, False otherwise.
     """
     try:
         _cs_client.put('control/system/factory_reset', 'factory_reset')
@@ -2518,15 +3341,14 @@ def factory_reset() -> bool:
         return False
 
 def restart_service(service_name: str, force: bool = False) -> bool:
-    """
-    Restart a specific system service.
+    """Restart a specific system service.
     
     Args:
-        service_name (str): Name of the service to restart
-        force (bool, optional): Force restart even if service is critical. Default is False.
+        service_name (str): Name of the service to restart.
+        force (bool, optional): Force restart even if service is critical. Defaults to False.
     
     Returns:
-        bool: True if service restart was initiated successfully, False otherwise
+        bool: True if service restart was initiated successfully, False otherwise.
     """
     try:
         _cs_client.put(f'control/system/services/{service_name}/restart', 'restart')
@@ -2537,14 +3359,13 @@ def restart_service(service_name: str, force: bool = False) -> bool:
         return False
 
 def set_log_level(level: str = 'info') -> bool:
-    """
-    Set system logging level.
+    """Set system logging level.
     
     Args:
-        level (str): Log level ('debug', 'info', 'warning', 'error')
+        level (str): Log level ('debug', 'info', 'warning', 'error'). Defaults to 'info'.
     
     Returns:
-        bool: True if log level was set successfully, False otherwise
+        bool: True if log level was set successfully, False otherwise.
     """
     try:
         _cs_client.put('config/system/logging/level', level)
@@ -2559,11 +3380,14 @@ def set_log_level(level: str = 'info') -> bool:
 # ============================================================================
 
 def get_qos_queues() -> List[Dict[str, Any]]:
-    """
-    Return detailed QoS queue information.
+    """Return detailed QoS queue information.
     
     Returns:
-        list: List of QoS queues with detailed statistics
+        list: List of QoS queues with detailed statistics including:
+            - queue name and configuration
+            - packet counts and statistics
+            - bandwidth usage
+            - queue status
     """
     try:
         qos_data = _cs_client.get('status/qos')
@@ -2573,15 +3397,15 @@ def get_qos_queues() -> List[Dict[str, Any]]:
         return []
 
 def get_qos_queue_by_name(queue_name: str = '') -> Optional[Dict[str, Any]]:
-    """
-    Return specific QoS queue information by name.
+    """Return QoS queue information for a specific queue by name.
     
     Args:
-        queue_name (str): Name of the queue to retrieve
-        
+        queue_name (str): Name of the QoS queue to retrieve. Defaults to empty string.
+    
     Returns:
-        dict: Queue information or None if not found
+        dict or None: QoS queue information for the specified queue, or None if not found.
     """
+
     try:
         qos_data = _cs_client.get('status/qos')
         if qos_data and 'queues' in qos_data:
@@ -2594,11 +3418,17 @@ def get_qos_queue_by_name(queue_name: str = '') -> Optional[Dict[str, Any]]:
         return None
 
 def get_qos_traffic_stats() -> Dict[str, Any]:
-    """
-    Return aggregated QoS traffic statistics.
+    """Return aggregated QoS traffic statistics.
     
     Returns:
-        dict: Aggregated traffic statistics across all queues
+        dict: Aggregated traffic statistics across all queues including:
+            - total_ibytes (int): Total incoming bytes
+            - total_obytes (int): Total outgoing bytes
+            - total_ipkts (int): Total incoming packets
+            - total_opkts (int): Total outgoing packets
+            - total_idrop_pkts (int): Total incoming dropped packets
+            - total_odrop_pkts (int): Total outgoing dropped packets
+            - queue_count (int): Number of queues
     """
     try:
         qos_data = _cs_client.get('status/qos')
@@ -2634,14 +3464,13 @@ def get_qos_traffic_stats() -> Dict[str, Any]:
 # ============================================================================
 
 def get_dhcp_clients_by_interface(interface_name: str = '') -> List[Dict[str, Any]]:
-    """
-    Return DHCP leases for a specific interface.
+    """Return DHCP leases for a specific interface.
     
     Args:
-        interface_name (str): Interface name to filter by
+        interface_name (str): Interface name to filter by. Defaults to empty string.
         
     Returns:
-        list: DHCP leases for the specified interface
+        list: DHCP leases for the specified interface.
     """
     try:
         leases = _cs_client.get('status/dhcpd/leases')
@@ -2653,14 +3482,13 @@ def get_dhcp_clients_by_interface(interface_name: str = '') -> List[Dict[str, An
         return []
 
 def get_dhcp_clients_by_network(network_name: str = '') -> List[Dict[str, Any]]:
-    """
-    Return DHCP leases for a specific network.
+    """Return DHCP leases for a specific network.
     
     Args:
-        network_name (str): Network name to filter by
+        network_name (str): Network name to filter by. Defaults to empty string.
         
     Returns:
-        list: DHCP leases for the specified network
+        list: DHCP leases for the specified network.
     """
     try:
         leases = _cs_client.get('status/dhcpd/leases')
@@ -2672,14 +3500,13 @@ def get_dhcp_clients_by_network(network_name: str = '') -> List[Dict[str, Any]]:
         return []
 
 def get_dhcp_client_by_mac(mac_address: str = '') -> Optional[Dict[str, Any]]:
-    """
-    Return DHCP lease for a specific MAC address.
+    """Return DHCP lease for a specific MAC address.
     
     Args:
-        mac_address (str): MAC address to search for
+        mac_address (str): MAC address to search for. Defaults to empty string.
         
     Returns:
-        dict: DHCP lease information or None if not found
+        dict or None: DHCP lease information or None if not found.
     """
     try:
         leases = _cs_client.get('status/dhcpd/leases')
@@ -2693,14 +3520,13 @@ def get_dhcp_client_by_mac(mac_address: str = '') -> Optional[Dict[str, Any]]:
         return None
 
 def get_dhcp_client_by_ip(ip_address: str = '') -> Optional[Dict[str, Any]]:
-    """
-    Return DHCP lease for a specific IP address.
+    """Return DHCP lease for a specific IP address.
     
     Args:
-        ip_address (str): IP address to search for
+        ip_address (str): IP address to search for. Defaults to empty string.
         
     Returns:
-        dict: DHCP lease information or None if not found
+        dict or None: DHCP lease information or None if not found.
     """
     try:
         leases = _cs_client.get('status/dhcpd/leases')
@@ -2714,11 +3540,13 @@ def get_dhcp_client_by_ip(ip_address: str = '') -> Optional[Dict[str, Any]]:
         return None
 
 def get_dhcp_interface_summary() -> Dict[str, Any]:
-    """
-    Return summary of DHCP leases by interface.
+    """Return summary of DHCP leases by interface.
     
     Returns:
-        dict: Summary of DHCP leases organized by interface
+        dict: Summary of DHCP leases organized by interface including:
+            - count (int): Number of leases on the interface
+            - networks (list): List of networks on the interface
+            - interface_type (str): Type of interface
     """
     try:
         leases = _cs_client.get('status/dhcpd/leases')
@@ -2752,8 +3580,7 @@ def get_dhcp_interface_summary() -> Dict[str, Any]:
 # ============================================================================
 
 def get_bgp_status() -> Dict[str, Any]:
-    """
-    Return BGP routing protocol status and neighbor information.
+    """Return BGP routing protocol status and neighbor information.
     
     Returns:
         dict: BGP status containing:
@@ -2770,8 +3597,7 @@ def get_bgp_status() -> Dict[str, Any]:
         return {}
 
 def get_ospf_status() -> Dict[str, Any]:
-    """
-    Return OSPF routing protocol status and neighbor information.
+    """Return OSPF routing protocol status and neighbor information.
     
     Returns:
         dict: OSPF status containing:
@@ -2789,8 +3615,7 @@ def get_ospf_status() -> Dict[str, Any]:
         return {}
 
 def get_static_routes() -> List[Dict[str, Any]]:
-    """
-    Return configured static routes.
+    """Return configured static routes.
     
     Returns:
         list: List of static routes with:
@@ -2809,8 +3634,7 @@ def get_static_routes() -> List[Dict[str, Any]]:
         return []
 
 def get_routing_policies() -> List[Dict[str, Any]]:
-    """
-    Return routing policy configuration.
+    """Return routing policy configuration.
     
     Returns:
         list: List of routing policies with:
@@ -2830,14 +3654,13 @@ def get_routing_policies() -> List[Dict[str, Any]]:
         return []
 
 def get_routing_table_by_name(table_name: str) -> List[Dict[str, Any]]:
-    """
-    Return routes from a specific routing table.
+    """Return routes from a specific routing table.
     
     Args:
-        table_name (str): Name of the routing table
+        table_name (str): Name of the routing table.
         
     Returns:
-        list: Routes in the specified table
+        list: Routes in the specified table.
     """
     try:
         routing_data = _cs_client.get('status/routing')
@@ -2849,11 +3672,10 @@ def get_routing_table_by_name(table_name: str) -> List[Dict[str, Any]]:
         return []
 
 def get_arp_table() -> str:
-    """
-    Return ARP table information.
+    """Return ARP table information.
     
     Returns:
-        str: ARP table dump showing MAC to IP mappings
+        str: ARP table dump showing MAC to IP mappings.
     """
     try:
         routing_data = _cs_client.get('status/routing')
@@ -2865,8 +3687,7 @@ def get_arp_table() -> str:
         return ''
 
 def get_route_summary() -> Dict[str, Any]:
-    """
-    Return summary of routing information.
+    """Return summary of routing information.
     
     Returns:
         dict: Summary of routing information including:
@@ -2913,8 +3734,7 @@ def get_route_summary() -> Dict[str, Any]:
 # ============================================================================
 
 def get_certificates() -> List[Dict[str, Any]]:
-    """
-    Return list of installed certificates.
+    """Return list of installed certificates.
     
     Returns:
         list: List of certificates with:
@@ -2933,14 +3753,13 @@ def get_certificates() -> List[Dict[str, Any]]:
         return []
 
 def get_certificate_by_name(cert_name: str) -> Optional[Dict[str, Any]]:
-    """
-    Return specific certificate information by name.
+    """Return specific certificate information by name.
     
     Args:
-        cert_name (str): Name of the certificate to retrieve
+        cert_name (str): Name of the certificate to retrieve.
         
     Returns:
-        dict: Certificate information or None if not found
+        dict or None: Certificate information or None if not found.
     """
     try:
         cert_data = _cs_client.get('status/certmgmt')
@@ -2954,14 +3773,13 @@ def get_certificate_by_name(cert_name: str) -> Optional[Dict[str, Any]]:
         return None
 
 def get_certificate_by_uuid(cert_uuid: str) -> Optional[Dict[str, Any]]:
-    """
-    Return specific certificate information by UUID.
+    """Return specific certificate information by UUID.
     
     Args:
-        cert_uuid (str): UUID of the certificate to retrieve
+        cert_uuid (str): UUID of the certificate to retrieve.
         
     Returns:
-        dict: Certificate information or None if not found
+        dict or None: Certificate information or None if not found.
     """
     try:
         cert_data = _cs_client.get('status/certmgmt')
@@ -2975,15 +3793,15 @@ def get_certificate_by_uuid(cert_uuid: str) -> Optional[Dict[str, Any]]:
         return None
 
 def get_expiring_certificates(days_threshold: int = 30) -> List[Dict[str, Any]]:
-    """
-    Return certificates that will expire within the specified number of days.
+    """Return certificates that are expiring within the specified number of days.
     
     Args:
-        days_threshold (int): Number of days to check for expiration
+        days_threshold (int): Number of days to check for expiration. Defaults to 30.
         
     Returns:
-        list: Certificates expiring within the threshold
+        list: List of certificates expiring within the threshold period.
     """
+
     try:
         from datetime import datetime, timedelta
         cert_data = _cs_client.get('status/certmgmt')
@@ -3011,8 +3829,7 @@ def get_expiring_certificates(days_threshold: int = 30) -> List[Dict[str, Any]]:
         return []
 
 def get_certificate_summary() -> Dict[str, Any]:
-    """
-    Return summary of certificate information.
+    """Return summary of certificate information.
     
     Returns:
         dict: Summary of certificate information including:
@@ -3053,8 +3870,7 @@ def get_certificate_summary() -> Dict[str, Any]:
 # ============================================================================
 
 def get_firewall_connections() -> List[Dict[str, Any]]:
-    """
-    Return active firewall connections and connection tracking information.
+    """Return active firewall connections and connection tracking information.
     
     Returns:
         list: List of active connections with:
@@ -3076,8 +3892,7 @@ def get_firewall_connections() -> List[Dict[str, Any]]:
         return []
 
 def get_firewall_hitcounters() -> List[Dict[str, Any]]:
-    """
-    Return firewall rule hit counters and statistics.
+    """Return firewall rule hit counters and statistics.
     
     Returns:
         list: List of hit counters with:
@@ -3096,11 +3911,10 @@ def get_firewall_hitcounters() -> List[Dict[str, Any]]:
         return []
 
 def get_firewall_marks() -> Dict[str, Any]:
-    """
-    Return firewall traffic marks and their values.
+    """Return firewall traffic marks and their values.
     
     Returns:
-        dict: Dictionary of traffic marks and their hex values
+        dict: Dictionary of traffic marks and their hex values.
     """
     try:
         firewall_data = _cs_client.get('status/firewall')
@@ -3110,8 +3924,7 @@ def get_firewall_marks() -> Dict[str, Any]:
         return {}
 
 def get_firewall_state_timeouts() -> Dict[str, Any]:
-    """
-    Return firewall state timeout configurations.
+    """Return firewall state timeout configurations.
     
     Returns:
         dict: State timeout configurations including:
@@ -3129,14 +3942,13 @@ def get_firewall_state_timeouts() -> Dict[str, Any]:
         return {}
 
 def get_firewall_connections_by_protocol(protocol: int = 6) -> List[Dict[str, Any]]:
-    """
-    Return firewall connections filtered by protocol.
+    """Return firewall connections filtered by protocol.
     
     Args:
-        protocol (int): Protocol number (6=TCP, 17=UDP, etc.)
+        protocol (int): Protocol number (6=TCP, 17=UDP, etc.). Defaults to 6.
         
     Returns:
-        list: Connections for the specified protocol
+        list: Connections for the specified protocol.
     """
     try:
         firewall_data = _cs_client.get('status/firewall')
@@ -3148,14 +3960,13 @@ def get_firewall_connections_by_protocol(protocol: int = 6) -> List[Dict[str, An
         return []
 
 def get_firewall_connections_by_ip(ip_address: str = '') -> List[Dict[str, Any]]:
-    """
-    Return firewall connections involving a specific IP address.
+    """Return firewall connections involving a specific IP address.
     
     Args:
-        ip_address (str): IP address to search for
+        ip_address (str): IP address to search for. Defaults to empty string.
         
     Returns:
-        list: Connections involving the specified IP
+        list: Connections involving the specified IP.
     """
     try:
         firewall_data = _cs_client.get('status/firewall')
@@ -3174,8 +3985,7 @@ def get_firewall_connections_by_ip(ip_address: str = '') -> List[Dict[str, Any]]
         return []
 
 def get_firewall_summary() -> Dict[str, Any]:
-    """
-    Return summary of firewall information.
+    """Return summary of firewall information.
     
     Returns:
         dict: Summary of firewall information including:
