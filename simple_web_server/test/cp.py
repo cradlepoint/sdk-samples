@@ -1863,7 +1863,12 @@ def get_system_resources(cpu: bool = True, memory: bool = True, storage: bool = 
         storage (bool): Whether to include storage information. Defaults to False.
     
     Returns:
-        dict: Dictionary containing system resource information with descriptive strings.
+        dict: Dictionary containing system resource information with descriptive strings including:
+            - cpu (str): CPU usage percentage (e.g., "CPU Usage: 25%") - only if cpu=True
+            - avail_mem (str): Available memory in MB (e.g., "Available Memory: 512 MB") - only if memory=True
+            - total_mem (str): Total memory in MB (e.g., "Total Memory: 1024 MB") - only if memory=True
+            - free_mem (str): Free memory in MB (e.g., "Free Memory: 256 MB") - only if memory=True
+            - storage_health (str): Storage health status (e.g., "Storage Health: Good") - only if storage=True
     """
     try:
         system_resources = {}
