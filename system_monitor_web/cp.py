@@ -3257,7 +3257,7 @@ def wait_for_gps_fix(timeout: int = 300, check_interval: float = 1.0) -> bool:
         end_time = time.time() + timeout
         while time.time() < end_time:
             gps_status = get_gps_status()
-            if gps_status and gps_status.get('fix', {}).get('lock'):
+            if gps_status and gps_status.get('gps_lock'):
                 _cs_client.log("GPS fix acquired.")
                 return True
             time.sleep(check_interval)
