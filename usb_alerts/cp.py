@@ -790,30 +790,33 @@ class EventingCSClient(CSClient):
         
         Returns:
             dict: Dictionary containing GPS status information including:
-                - has_gps_data (bool): Whether GPS data is available
+
                 - gps_lock (bool): Whether GPS has a lock
                 - satellites (int): Number of satellites in view
                 - location (dict): GPS coordinates in degrees/minutes/seconds format
-                - decimal_coordinates (dict): GPS coordinates in decimal format
+                - latitude (float): GPS latitude in decimal format
+                - longitude (float): GPS longitude in decimal format
                 - altitude (float): Altitude in meters
                 - speed (float): Ground speed in knots
                 - heading (float): Heading in degrees
+                - accuracy (float): GPS accuracy in meters
                 - last_fix_age (int): Age of last GPS fix
         """
         try:
             gps_data = self.get('status/gps')
             if not gps_data:
-                return {"has_gps_data": False, "gps_lock": False, "satellites": 0}
+                return {"gps_lock": False, "satellites": 0}
             
             analysis = {
-                "has_gps_data": True,
                 "gps_lock": False,
                 "satellites": 0,
                 "location": None,
-                "decimal_coordinates": None,
+                "latitude": None,
+                "longitude": None,
                 "altitude": None,
                 "speed": None,
                 "heading": None,
+                "accuracy": None,
                 "last_fix_age": None
             }
             
@@ -825,6 +828,7 @@ class EventingCSClient(CSClient):
                     "altitude": fix.get("altitude_meters"),
                     "speed": fix.get("ground_speed_knots"),
                     "heading": fix.get("heading"),
+                    "accuracy": fix.get("accuracy"),
                     "last_fix_age": fix.get("age")
                 })
                 
@@ -834,7 +838,7 @@ class EventingCSClient(CSClient):
                         "longitude": f"{fix['longitude']['degree']}°{fix['longitude']['minute']}'{fix['longitude']['second']}\""
                     }
                     
-                    # Add decimal coordinates using the dec function
+                    # Add decimal coordinates to the root level
                     try:
                         lat_deg = fix['latitude']['degree']
                         lat_min = fix['latitude']['minute']
@@ -846,48 +850,45 @@ class EventingCSClient(CSClient):
                         decimal_lat = dec(lat_deg, lat_min, lat_sec)
                         decimal_long = dec(long_deg, long_min, long_sec)
                         
-                        analysis["decimal_coordinates"] = {
-                            "latitude": decimal_lat,
-                            "longitude": decimal_long
-                        }
+                        analysis["latitude"] = decimal_lat
+                        analysis["longitude"] = decimal_long
                     except Exception as coord_error:
                         self.log(f"Error converting coordinates to decimal: {coord_error}")
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing GPS status: {e}")
-            return {"has_gps_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status and return detailed information.
         
         Returns:
             dict: Dictionary containing system status information including:
-                - has_system_data (bool): Whether system data is available
+
                 - uptime (int): System uptime in seconds
                 - temperature (float): System temperature
-                - storage_health (str): Storage health status
                 - cpu_usage (dict): CPU usage statistics
                 - memory_usage (dict): Memory usage statistics
                 - services_running (int): Number of running services
                 - services_disabled (int): Number of disabled services
-                - apps_running (int): Number of running applications
+                - internal_apps_running (int): Number of running internal applications
+                - external_apps_running (int): Number of running external applications
         """
         try:
             system_data = self.get('status/system')
             if not system_data:
-                return {"has_system_data": False}
+                return {}
             
             analysis = {
-                "has_system_data": True,
                 "uptime": system_data.get("uptime"),
                 "temperature": system_data.get("temperature"),
-                "storage_health": system_data.get("storage", {}).get("health"),
                 "cpu_usage": system_data.get("cpu", {}),
                 "memory_usage": system_data.get("memory", {}),
                 "services_running": 0,
                 "services_disabled": 0,
-                "apps_running": 0
+                "internal_apps_running": 0,
+                "external_apps_running": 0
             }
             
             services = system_data.get("services", {})
@@ -897,126 +898,584 @@ class EventingCSClient(CSClient):
                 elif isinstance(info, dict) and info.get("state") == "disabled":
                     analysis["services_disabled"] += 1
             
-            apps = system_data.get("apps", [])
-            analysis["apps_running"] = len([app for app in apps if app.get("state") == "started"])
+            # Count internal apps (from system/apps)
+            internal_apps = system_data.get("apps", [])
+            analysis["internal_apps_running"] = len([app for app in internal_apps if app.get("state") == "started"])
+            
+            # Count external apps (from system/sdk/apps)
+            sdk_data = system_data.get("sdk", {})
+            external_apps = sdk_data.get("apps", [])
+            analysis["external_apps_running"] = len([app for app in external_apps if app.get("state") == "started"])
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing system status: {e}")
-            return {"has_system_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_wlan_status(self) -> Dict[str, Any]:
         """Get WLAN status and return detailed information.
         
         Returns:
             dict: Dictionary containing WLAN status information including:
-                - has_wlan_data (bool): Whether WLAN data is available
+
                 - wlan_state (str): WLAN operational state
-                - radios (list): List of radio information
-                - clients_connected (int): Number of connected clients
-                - interfaces (list): List of interface information
+                - radios (list): List of radio information including:
+                    - radio_id (int): Radio identifier
+                    - band (str): Radio band (e.g., "2.4 GHz")
+                    - channel (int): Current channel number
+                    - channel_locked (bool): Whether channel is locked
+                    - channel_list (list): Available channels
+                    - channel_contention (int): Channel contention value
+                    - txpower (int): Transmission power
+                    - region_code (int): Regulatory region code
+                    - reconnecting (bool): Whether radio is reconnecting
+                    - bss_count (int): Number of BSS (Basic Service Sets)
+                    - clients_count (int): Number of clients on this radio
+                    - survey_data (int): Number of survey data points
+                - clients_connected (int): Total number of connected clients across all radios
         """
         try:
             wlan_data = self.get('status/wlan')
             if not wlan_data:
-                return {"has_wlan_data": False}
+                return {}
             
             analysis = {
-                "has_wlan_data": True,
                 "wlan_state": wlan_data.get("state"),
                 "radios": [],
-                "clients_connected": 0,
-                "interfaces": []
+                "clients_connected": 0
             }
             
             radios = wlan_data.get("radio", [])
+            total_clients = 0
             for i, radio in enumerate(radios):
                 radio_info = {
                     "radio_id": i,
-                    "survey_data": len(radio.get("survey", [])),
-                    "has_survey": bool(radio.get("survey"))
+                    "band": radio.get("band"),
+                    "channel": radio.get("channel"),
+                    "channel_locked": radio.get("channel_locked"),
+                    "channel_list": radio.get("channel_list", []),
+                    "channel_contention": radio.get("channel_contention"),
+                    "txpower": radio.get("txpower"),
+                    "region_code": radio.get("region_code"),
+                    "reconnecting": radio.get("reconnecting"),
+                    "bss_count": len(radio.get("bss", [])),
+                    "clients_count": len(radio.get("clients", [])),
+                    "survey_data": len(radio.get("survey", []))
                 }
                 analysis["radios"].append(radio_info)
+                total_clients += radio_info["clients_count"]
+            
+            analysis["clients_connected"] = total_clients
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing WLAN status: {e}")
-            return {"has_wlan_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_wan_status(self) -> Dict[str, Any]:
         """Get WAN status and return detailed information.
         
         Returns:
             dict: Dictionary containing WAN status information including:
-                - has_wan_data (bool): Whether WAN data is available
                 - primary_device (str): Primary WAN device identifier
                 - connection_state (str): Overall connection state
-                - devices (list): List of WAN device information
+                - cellular_health_score (str): Overall cellular health score
+                - devices (list): List of WAN device information including:
+                    - uid (str): Device unique identifier
+                    - connection_state (str): Device connection state
+                    - signal_strength (str): Signal strength indicator
+                    - cellular_health (str): Cellular health category
+                    - ip_address (str): Device IP address
+                    - uptime (int): Device uptime in seconds
+                    - For modem devices (uid starts with "mdm"), additional fields:
+                        - active_apn (str): Active APN name
+                        - carrier_id (str): Carrier identifier
+                        - cell_id (str): Cell tower identifier
+                        - cur_plmn (str): Current PLMN code
+                        - dbm (str): Signal strength in dBm
+                        - imei (str): Device IMEI
+                        - lte_bandwidth (str): LTE bandwidth
+                        - model (str): Device model
+                        - mdn (str): Mobile directory number
+                        - home_carrier (str): Home carrier
+                        - phy_cell_id (str): Physical cell ID
+                        - rf_band (str): Radio frequency band
+                        - rf_channel (str): Radio frequency channel
+                        - rsrp (str): Reference signal received power
+                        - rsrq (str): Reference signal received quality
+                        - service_discovery (str): Service discovery info
+                        - sim_number (str): SIM slot number
+                        - sinr (str): Signal to interference plus noise ratio
+                        - service_type (str): Service type (4G/5G)
+                        - service_type_details (str): Detailed service information
+                        - tac (str): Tracking area code
+                        - dl_frequency (str): Downlink frequency
+                        - ul_frequency (str): Uplink frequency
+                        - rsrp_5g (str): 5G RSRP value
+                        - rsrq_5g (str): 5G RSRQ value
+                        - sinr_5g (str): 5G SINR value
+                        - stats (dict): Device statistics including:
+                            - collisions (int): Collision count
+                            - idrops (int): Input drop count
+                            - ierrors (int): Input error count
+                            - in_bytes (int): Input bytes
+                            - ipackets (int): Input packet count
+                            - multicast (int): Multicast count
+                            - odrops (int): Output drop count
+                            - oerrors (int): Output error count
+                            - opackets (int): Output packet count
+                            - out_bytes (int): Output bytes
+                    - For ethernet devices (uid starts with "ethernet"), additional fields:
+                        - capabilities (str): Device capabilities
+                        - config_id (str): Configuration identifier
+                        - interface (str): Interface name
+                        - mac_address (str): MAC address
+                        - mtu (int): Maximum transmission unit
+                        - port (str): Port number
+                        - port_name (dict): Port name mapping
+                        - type (str): Device type
         """
         try:
             wan_data = self.get('status/wan')
             if not wan_data:
-                return {"has_wan_data": False}
+                return {}
             
             analysis = {
-                "has_wan_data": True,
                 "primary_device": wan_data.get("primary_device"),
                 "connection_state": None,
+                "cellular_health_score": None,
                 "devices": []
             }
             
             devices = wan_data.get("devices", {})
             for device_id, device_info in devices.items():
                 device_analysis = {
-                    "device_id": device_id,
+                    "uid": device_id,
                     "connection_state": device_info.get("status", {}).get("connection_state"),
                     "signal_strength": device_info.get("status", {}).get("signal_strength"),
                     "cellular_health": device_info.get("status", {}).get("cellular_health_category"),
-                    "ip_address": device_info.get("status", {}).get("ipinfo", {}).get("ip_address")
+                    "ip_address": device_info.get("status", {}).get("ipinfo", {}).get("ip_address"),
+                    "uptime": device_info.get("status", {}).get("uptime")
                 }
+                
+                # Add modem diagnostics for modem devices
+                if device_id.startswith("mdm"):
+                    try:
+                        diagnostics = self.get(f'status/wan/devices/{device_id}/diagnostics')
+                        if diagnostics:
+                            device_analysis.update({
+                                "active_apn": diagnostics.get("ACTIVEAPN"),
+                                "carrier_id": diagnostics.get("CARRID"),
+                                "cell_id": diagnostics.get("CELL_ID"),
+                                "cur_plmn": diagnostics.get("CUR_PLMN"),
+                                "dbm": diagnostics.get("DBM"),
+                                "imei": diagnostics.get("DISP_IMEI"),
+                                "lte_bandwidth": diagnostics.get("LTEBANDWIDTH"),
+                                "model": diagnostics.get("MDL"),
+                                "mdn": diagnostics.get("MDN"),
+                                "home_carrier": diagnostics.get("HOMECARRID"),
+                                "phy_cell_id": diagnostics.get("PHY_CELL_ID"),
+                                "rf_band": diagnostics.get("RFBAND"),
+                                "rf_channel": diagnostics.get("RFCHANNEL"),
+                                "rsrp": diagnostics.get("RSRP"),
+                                "rsrq": diagnostics.get("RSRQ"),
+                                "service_discovery": diagnostics.get("SERDIS"),
+                                "sim_number": diagnostics.get("SIM_NUM"),
+                                "sinr": diagnostics.get("SINR"),
+                                "service_type": diagnostics.get("SRVC_TYPE"),
+                                "service_type_details": diagnostics.get("SRVC_TYPE_DETAILS"),
+                                "tac": diagnostics.get("TAC"),
+                                "dl_frequency": diagnostics.get("DLFRQ"),
+                                "ul_frequency": diagnostics.get("ULFRQ"),
+                                "rsrp_5g": diagnostics.get("RSRP_5G"),
+                                "rsrq_5g": diagnostics.get("RSRQ_5G"),
+                                "sinr_5g": diagnostics.get("SINR_5G")
+                            })
+                        
+                        # Add modem statistics
+                        stats = self.get(f'status/wan/devices/{device_id}/stats')
+                        if stats:
+                            device_analysis.update({
+                                "stats": {
+                                    "collisions": stats.get("collisions"),
+                                    "idrops": stats.get("idrops"),
+                                    "ierrors": stats.get("ierrors"),
+                                    "in_bytes": stats.get("in"),
+                                    "ipackets": stats.get("ipackets"),
+                                    "multicast": stats.get("multicast"),
+                                    "odrops": stats.get("odrops"),
+                                    "oerrors": stats.get("oerrors"),
+                                    "opackets": stats.get("opackets"),
+                                    "out_bytes": stats.get("out")
+                                }
+                            })
+                    except Exception as e:
+                        self.log(f"Error getting modem diagnostics for {device_id}: {e}")
+                
+                # Add ethernet device information for ethernet devices
+                elif device_id.startswith("ethernet"):
+                    try:
+                        info = self.get(f'status/wan/devices/{device_id}/info')
+                        if info:
+                            device_analysis.update({
+                                "capabilities": info.get("capabilities"),
+                                "config_id": info.get("config_id"),
+                                "interface": info.get("iface"),
+                                "mac_address": info.get("mac"),
+                                "mtu": info.get("mtu"),
+                                "port": info.get("port"),
+                                "port_name": info.get("port_name"),
+                                "type": info.get("type")
+                            })
+                    except Exception as e:
+                        self.log(f"Error getting ethernet info for {device_id}: {e}")
+                
                 analysis["devices"].append(device_analysis)
                 
-                # Set connection state from first device
+                # Set connection state and cellular health score from first device
                 if analysis["connection_state"] is None:
                     analysis["connection_state"] = device_analysis["connection_state"]
+                if analysis["cellular_health_score"] is None and device_analysis.get("cellular_health"):
+                    analysis["cellular_health_score"] = device_analysis["cellular_health"]
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing WAN status: {e}")
-            return {"has_wan_data": False, "error": str(e)}
+            return {"error": str(e)}
+
+    def get_wan_devices(self) -> Dict[str, Any]:
+        """Get WAN device information only.
+        
+        Returns:
+            dict: Dictionary containing WAN device information including:
+                - primary_device (str): Primary WAN device identifier
+                - devices (list): List of WAN device information including:
+                    - uid (str): Device unique identifier
+                    - connection_state (str): Device connection state
+                    - signal_strength (str): Signal strength indicator
+                    - cellular_health (str): Cellular health category
+                    - ip_address (str): Device IP address
+                    - uptime (int): Device uptime in seconds
+        """
+        try:
+            wan_data = self.get('status/wan')
+            if not wan_data:
+                return {}
+            
+            devices = wan_data.get("devices", {})
+            device_list = []
+            
+            for device_id, device_info in devices.items():
+                device_analysis = {
+                    "uid": device_id,
+                    "connection_state": device_info.get("status", {}).get("connection_state"),
+                    "signal_strength": device_info.get("status", {}).get("signal_strength"),
+                    "cellular_health": device_info.get("status", {}).get("cellular_health_category"),
+                    "ip_address": device_info.get("status", {}).get("ipinfo", {}).get("ip_address"),
+                    "uptime": device_info.get("status", {}).get("uptime")
+                }
+                device_list.append(device_analysis)
+            
+            return {
+                "primary_device": wan_data.get("primary_device"),
+                "devices": device_list
+            }
+        except Exception as e:
+            self.log(f"Error analyzing WAN devices: {e}")
+            return {"error": str(e)}
+
+    def get_wan_modem_diagnostics(self, device_id: str) -> Dict[str, Any]:
+        """Get modem diagnostics for a specific WAN device.
+        
+        Args:
+            device_id (str): WAN device identifier to get diagnostics for
+            
+        Returns:
+            dict: Dictionary containing modem diagnostics including:
+                - device_id (str): Device identifier
+                - diagnostics (dict): Modem diagnostics including:
+                    - active_apn (str): Active APN name
+                    - carrier_id (str): Carrier identifier
+                    - cell_id (str): Cell tower identifier
+                    - cur_plmn (str): Current PLMN code
+                    - dbm (str): Signal strength in dBm
+                    - imei (str): Device IMEI
+                    - lte_bandwidth (str): LTE bandwidth
+                    - model (str): Device model
+                    - mdn (str): Mobile directory number
+                    - home_carrier (str): Home carrier
+                    - phy_cell_id (str): Physical cell ID
+                    - rf_band (str): Radio frequency band
+                    - rf_channel (str): Radio frequency channel
+                    - rsrp (str): Reference signal received power
+                    - rsrq (str): Reference signal received quality
+                    - service_discovery (str): Service discovery info
+                    - sim_number (str): SIM slot number
+                    - sinr (str): Signal to interference plus noise ratio
+                    - service_type (str): Service type (4G/5G)
+                    - service_type_details (str): Detailed service information
+                    - tac (str): Tracking area code
+                    - dl_frequency (str): Downlink frequency
+                    - ul_frequency (str): Uplink frequency
+                    - rsrp_5g (str): 5G RSRP value
+                    - rsrq_5g (str): 5G RSRQ value
+                    - sinr_5g (str): 5G SINR value
+        """
+        try:
+            if not device_id.startswith("mdm"):
+                return {"device_id": device_id, "error": "Device is not a modem"}
+            
+            diagnostics = self.get(f'status/wan/devices/{device_id}/diagnostics')
+            if not diagnostics:
+                return {"device_id": device_id}
+            
+            return {
+                "device_id": device_id,
+                "diagnostics": {
+                    "active_apn": diagnostics.get("ACTIVEAPN"),
+                    "carrier_id": diagnostics.get("CARRID"),
+                    "cell_id": diagnostics.get("CELL_ID"),
+                    "cur_plmn": diagnostics.get("CUR_PLMN"),
+                    "dbm": diagnostics.get("DBM"),
+                    "imei": diagnostics.get("DISP_IMEI"),
+                    "lte_bandwidth": diagnostics.get("LTEBANDWIDTH"),
+                    "model": diagnostics.get("MDL"),
+                    "mdn": diagnostics.get("MDN"),
+                    "home_carrier": diagnostics.get("HOMECARRID"),
+                    "phy_cell_id": diagnostics.get("PHY_CELL_ID"),
+                    "rf_band": diagnostics.get("RFBAND"),
+                    "rf_channel": diagnostics.get("RFCHANNEL"),
+                    "rsrp": diagnostics.get("RSRP"),
+                    "rsrq": diagnostics.get("RSRQ"),
+                    "service_discovery": diagnostics.get("SERDIS"),
+                    "sim_number": diagnostics.get("SIM_NUM"),
+                    "sinr": diagnostics.get("SINR"),
+                    "service_type": diagnostics.get("SRVC_TYPE"),
+                    "service_type_details": diagnostics.get("SRVC_TYPE_DETAILS"),
+                    "tac": diagnostics.get("TAC"),
+                    "dl_frequency": diagnostics.get("DLFRQ"),
+                    "ul_frequency": diagnostics.get("ULFRQ"),
+                    "rsrp_5g": diagnostics.get("RSRP_5G"),
+                    "rsrq_5g": diagnostics.get("RSRQ_5G"),
+                    "sinr_5g": diagnostics.get("SINR_5G")
+                }
+            }
+        except Exception as e:
+            self.log(f"Error getting modem diagnostics for {device_id}: {e}")
+            return {"device_id": device_id, "error": str(e)}
+
+    def get_wan_modem_stats(self, device_id: str) -> Dict[str, Any]:
+        """Get modem statistics for a specific WAN device.
+        
+        Args:
+            device_id (str): WAN device identifier to get statistics for
+            
+        Returns:
+            dict: Dictionary containing modem statistics including:
+                - device_id (str): Device identifier
+                - stats (dict): Modem statistics including:
+                    - collisions (int): Collision count
+                    - idrops (int): Input drop count
+                    - ierrors (int): Input error count
+                    - in_bytes (int): Input bytes
+                    - ipackets (int): Input packet count
+                    - multicast (int): Multicast count
+                    - odrops (int): Output drop count
+                    - oerrors (int): Output error count
+                    - opackets (int): Output packet count
+                    - out_bytes (int): Output bytes
+        """
+        try:
+            if not device_id.startswith("mdm"):
+                return {"device_id": device_id, "error": "Device is not a modem"}
+            
+            stats = self.get(f'status/wan/devices/{device_id}/stats')
+            if not stats:
+                return {"device_id": device_id}
+            
+            return {
+                "device_id": device_id,
+                "stats": {
+                    "collisions": stats.get("collisions"),
+                    "idrops": stats.get("idrops"),
+                    "ierrors": stats.get("ierrors"),
+                    "in_bytes": stats.get("in"),
+                    "ipackets": stats.get("ipackets"),
+                    "multicast": stats.get("multicast"),
+                    "odrops": stats.get("odrops"),
+                    "oerrors": stats.get("oerrors"),
+                    "opackets": stats.get("opackets"),
+                    "out_bytes": stats.get("out")
+                }
+            }
+        except Exception as e:
+            self.log(f"Error getting modem stats for {device_id}: {e}")
+            return {"device_id": device_id, "error": str(e)}
+
+    def get_wan_ethernet_info(self, device_id: str) -> Dict[str, Any]:
+        """Get ethernet device information for a specific WAN device.
+        
+        Args:
+            device_id (str): WAN device identifier to get information for
+            
+        Returns:
+            dict: Dictionary containing ethernet device information including:
+                - device_id (str): Device identifier
+                - info (dict): Ethernet device information including:
+                    - capabilities (str): Device capabilities
+                    - config_id (str): Configuration identifier
+                    - interface (str): Interface name
+                    - mac_address (str): MAC address
+                    - mtu (int): Maximum transmission unit
+                    - port (str): Port number
+                    - port_name (dict): Port name mapping
+                    - type (str): Device type
+        """
+        try:
+            if not device_id.startswith("ethernet"):
+                return {"device_id": device_id, "error": "Device is not ethernet"}
+            
+            info = self.get(f'status/wan/devices/{device_id}/info')
+            if not info:
+                return {"device_id": device_id}
+            
+            return {
+                "device_id": device_id,
+                "info": {
+                    "capabilities": info.get("capabilities"),
+                    "config_id": info.get("config_id"),
+                    "interface": info.get("iface"),
+                    "mac_address": info.get("mac"),
+                    "mtu": info.get("mtu"),
+                    "port": info.get("port"),
+                    "port_name": info.get("port_name"),
+                    "type": info.get("type")
+                }
+            }
+        except Exception as e:
+            self.log(f"Error getting ethernet info for {device_id}: {e}")
+            return {"device_id": device_id, "error": str(e)}
 
     def get_lan_status(self) -> Dict[str, Any]:
         """Get LAN status and return detailed information.
         
         Returns:
             dict: Dictionary containing LAN status information including:
-                - has_lan_data (bool): Whether LAN data is available
-                - clients_connected (int): Number of connected clients
-                - networks (list): List of network information
-                - devices (list): List of device information
+                - clients_connected (int): Number of connected clients (IPv4 only)
+                - total_clients (int): Total number of clients (IPv4 + IPv6)
+                - lan_stats (dict): Overall LAN statistics including:
+                    - bps (int): Total bits per second
+                    - collisions (int): Collision count
+                    - ibps (int): Input bits per second
+                    - idrops (int): Input drop count
+                    - ierrors (int): Input error count
+                    - imcasts (int): Input multicast count
+                    - in_bytes (int): Input bytes
+                    - ipackets (int): Input packet count
+                    - noproto (int): No protocol count
+                    - obps (int): Output bits per second
+                    - oerrors (int): Output error count
+                    - omcasts (int): Output multicast count
+                    - opackets (int): Output packet count
+                    - out_bytes (int): Output bytes
+                    - timestamp (float): Statistics timestamp
+                - clients (list): List of connected clients (IPv4 only) including:
+                    - ip_address (str): Client IP address
+                    - mac (str): Client MAC address
+                - networks (list): List of network information including:
+                    - name (str): Network identifier
+                    - display_name (str): Human-readable network name
+                    - ip_address (str): Network IP address
+                    - netmask (str): Network netmask
+                    - broadcast (str): Network broadcast address
+                    - hostname (str): Network hostname
+                    - type (str): Network type
+                    - devices (list): Network devices including:
+                        - interface (str): Device interface name
+                        - state (str): Device state
+                        - type (str): Device type
+                        - uid (str): Device unique identifier
+                - devices (list): List of device information with statistics including:
+                    - name (str): Device name
+                    - interface (str): Device interface
+                    - link_state (str): Device link state
+                    - type (str): Device type
+                    - stats (dict): Device statistics including:
+                        - collisions (int): Collision count
+                        - idrops (int): Input drop count
+                        - ierrors (int): Input error count
+                        - in_bytes (int): Input bytes
+                        - ipackets (int): Input packet count
+                        - multicast (int): Multicast count
+                        - odrops (int): Output drop count
+                        - oerrors (int): Output error count
+                        - opackets (int): Output packet count
+                        - out_bytes (int): Output bytes
         """
         try:
             lan_data = self.get('status/lan')
             if not lan_data:
-                return {"has_lan_data": False}
+                return {}
+            
+            # Get LAN statistics
+            lan_stats = self.get('status/lan/stats') or {}
+            
+            # Get clients and filter out IPv6
+            all_clients = lan_data.get("clients", [])
+            ipv4_clients = [client for client in all_clients if not client.get("ip_address", "").startswith("fe80::")]
             
             analysis = {
-                "has_lan_data": True,
-                "clients_connected": len(lan_data.get("clients", [])),
+                "clients_connected": len(ipv4_clients),
+                "total_clients": len(all_clients),
+                "lan_stats": {
+                    "bps": lan_stats.get("bps"),
+                    "collisions": lan_stats.get("collisions"),
+                    "ibps": lan_stats.get("ibps"),
+                    "idrops": lan_stats.get("idrops"),
+                    "ierrors": lan_stats.get("ierrors"),
+                    "imcasts": lan_stats.get("imcasts"),
+                    "in_bytes": lan_stats.get("in"),
+                    "ipackets": lan_stats.get("ipackets"),
+                    "noproto": lan_stats.get("noproto"),
+                    "obps": lan_stats.get("obps"),
+                    "oerrors": lan_stats.get("oerrors"),
+                    "omcasts": lan_stats.get("omcasts"),
+                    "opackets": lan_stats.get("opackets"),
+                    "out_bytes": lan_stats.get("out"),
+                    "timestamp": lan_stats.get("ts")
+                },
+                "clients": ipv4_clients,
                 "networks": [],
                 "devices": []
             }
             
+            # Process networks
             networks = lan_data.get("networks", {})
             for network_name, network_info in networks.items():
                 network_analysis = {
                     "name": network_name,
+                    "display_name": network_info.get("info", {}).get("name"),
                     "ip_address": network_info.get("info", {}).get("ip_address"),
                     "netmask": network_info.get("info", {}).get("netmask"),
-                    "device_count": len(network_info.get("devices", []))
+                    "broadcast": network_info.get("info", {}).get("broadcast"),
+                    "hostname": network_info.get("info", {}).get("hostname"),
+                    "type": network_info.get("info", {}).get("type"),
+                    "devices": []
                 }
+                
+                # Add network devices
+                for device in network_info.get("devices", []):
+                    device_info = {
+                        "interface": device.get("iface"),
+                        "state": device.get("state"),
+                        "type": device.get("type"),
+                        "uid": device.get("uid")
+                    }
+                    network_analysis["devices"].append(device_info)
+                
                 analysis["networks"].append(network_analysis)
             
+            # Process devices with statistics
             devices = lan_data.get("devices", {})
             for device_name, device_info in devices.items():
                 device_analysis = {
@@ -1025,19 +1484,255 @@ class EventingCSClient(CSClient):
                     "link_state": device_info.get("status", {}).get("link_state"),
                     "type": device_info.get("info", {}).get("type")
                 }
+                
+                # Add device statistics
+                try:
+                    device_stats = self.get(f'status/lan/devices/{device_name}/stats')
+                    if device_stats:
+                        device_analysis["stats"] = {
+                            "collisions": device_stats.get("collisions"),
+                            "idrops": device_stats.get("idrops"),
+                            "ierrors": device_stats.get("ierrors"),
+                            "in_bytes": device_stats.get("in"),
+                            "ipackets": device_stats.get("ipackets"),
+                            "multicast": device_stats.get("multicast"),
+                            "odrops": device_stats.get("odrops"),
+                            "oerrors": device_stats.get("oerrors"),
+                            "opackets": device_stats.get("opackets"),
+                            "out_bytes": device_stats.get("out")
+                        }
+                except Exception as e:
+                    self.log(f"Error getting device stats for {device_name}: {e}")
+                
                 analysis["devices"].append(device_analysis)
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing LAN status: {e}")
-            return {"has_lan_data": False, "error": str(e)}
+            return {"error": str(e)}
+
+    def get_lan_clients(self) -> Dict[str, Any]:
+        """Get LAN client information only.
+        
+        Returns:
+            dict: Dictionary containing LAN client information including:
+                - clients_connected (int): Number of connected clients (IPv4 only)
+                - total_clients (int): Total number of clients (IPv4 + IPv6)
+                - clients (list): List of connected clients (IPv4 only) including:
+                    - ip_address (str): Client IP address
+                    - mac (str): Client MAC address
+        """
+        try:
+            lan_data = self.get('status/lan')
+            if not lan_data:
+                return {}
+            
+            # Get clients and filter out IPv6
+            all_clients = lan_data.get("clients", [])
+            ipv4_clients = [client for client in all_clients if not client.get("ip_address", "").startswith("fe80::")]
+            
+            return {
+                "clients_connected": len(ipv4_clients),
+                "total_clients": len(all_clients),
+                "clients": ipv4_clients
+            }
+        except Exception as e:
+            self.log(f"Error analyzing LAN clients: {e}")
+            return {"error": str(e)}
+
+    def get_lan_networks(self) -> Dict[str, Any]:
+        """Get LAN network information only.
+        
+        Returns:
+            dict: Dictionary containing LAN network information including:
+                - networks (list): List of network information including:
+                    - name (str): Network identifier
+                    - display_name (str): Human-readable network name
+                    - ip_address (str): Network IP address
+                    - netmask (str): Network netmask
+                    - broadcast (str): Network broadcast address
+                    - hostname (str): Network hostname
+                    - type (str): Network type
+                    - devices (list): Network devices including:
+                        - interface (str): Device interface name
+                        - state (str): Device state
+                        - type (str): Device type
+                        - uid (str): Device unique identifier
+        """
+        try:
+            lan_data = self.get('status/lan')
+            if not lan_data:
+                return {}
+            
+            networks = lan_data.get("networks", {})
+            network_list = []
+            
+            for network_name, network_info in networks.items():
+                network_analysis = {
+                    "name": network_name,
+                    "display_name": network_info.get("info", {}).get("name"),
+                    "ip_address": network_info.get("info", {}).get("ip_address"),
+                    "netmask": network_info.get("info", {}).get("netmask"),
+                    "broadcast": network_info.get("info", {}).get("broadcast"),
+                    "hostname": network_info.get("info", {}).get("hostname"),
+                    "type": network_info.get("info", {}).get("type"),
+                    "devices": []
+                }
+                
+                # Add network devices
+                for device in network_info.get("devices", []):
+                    device_info = {
+                        "interface": device.get("iface"),
+                        "state": device.get("state"),
+                        "type": device.get("type"),
+                        "uid": device.get("uid")
+                    }
+                    network_analysis["devices"].append(device_info)
+                
+                network_list.append(network_analysis)
+            
+            return {
+                "networks": network_list
+            }
+        except Exception as e:
+            self.log(f"Error analyzing LAN networks: {e}")
+            return {"error": str(e)}
+
+    def get_lan_devices(self) -> Dict[str, Any]:
+        """Get LAN device information only.
+        
+        Returns:
+            dict: Dictionary containing LAN device information including:
+                - devices (list): List of device information including:
+                    - name (str): Device name
+                    - interface (str): Device interface
+                    - link_state (str): Device link state
+                    - type (str): Device type
+        """
+        try:
+            lan_data = self.get('status/lan')
+            if not lan_data:
+                return {}
+            
+            devices = lan_data.get("devices", {})
+            device_list = []
+            
+            for device_name, device_info in devices.items():
+                device_analysis = {
+                    "name": device_name,
+                    "interface": device_info.get("info", {}).get("iface"),
+                    "link_state": device_info.get("status", {}).get("link_state"),
+                    "type": device_info.get("info", {}).get("type")
+                }
+                device_list.append(device_analysis)
+            
+            return {
+                "devices": device_list
+            }
+        except Exception as e:
+            self.log(f"Error analyzing LAN devices: {e}")
+            return {"error": str(e)}
+
+    def get_lan_statistics(self) -> Dict[str, Any]:
+        """Get overall LAN statistics only.
+        
+        Returns:
+            dict: Dictionary containing LAN statistics including:
+                - lan_stats (dict): Overall LAN statistics including:
+                    - bps (int): Total bits per second
+                    - collisions (int): Collision count
+                    - ibps (int): Input bits per second
+                    - idrops (int): Input drop count
+                    - ierrors (int): Input error count
+                    - imcasts (int): Input multicast count
+                    - in_bytes (int): Input bytes
+                    - ipackets (int): Input packet count
+                    - noproto (int): No protocol count
+                    - obps (int): Output bits per second
+                    - oerrors (int): Output error count
+                    - omcasts (int): Output multicast count
+                    - opackets (int): Output packet count
+                    - out_bytes (int): Output bytes
+                    - timestamp (float): Statistics timestamp
+        """
+        try:
+            lan_stats = self.get('status/lan/stats')
+            if not lan_stats:
+                return {}
+            
+            return {
+                "lan_stats": {
+                    "bps": lan_stats.get("bps"),
+                    "collisions": lan_stats.get("collisions"),
+                    "ibps": lan_stats.get("ibps"),
+                    "idrops": lan_stats.get("idrops"),
+                    "ierrors": lan_stats.get("ierrors"),
+                    "imcasts": lan_stats.get("imcasts"),
+                    "in_bytes": lan_stats.get("in"),
+                    "ipackets": lan_stats.get("ipackets"),
+                    "noproto": lan_stats.get("noproto"),
+                    "obps": lan_stats.get("obps"),
+                    "oerrors": lan_stats.get("oerrors"),
+                    "omcasts": lan_stats.get("omcasts"),
+                    "opackets": lan_stats.get("opackets"),
+                    "out_bytes": lan_stats.get("out"),
+                    "timestamp": lan_stats.get("ts")
+                }
+            }
+        except Exception as e:
+            self.log(f"Error analyzing LAN statistics: {e}")
+            return {"error": str(e)}
+
+    def get_lan_device_stats(self, device_name: str) -> Dict[str, Any]:
+        """Get statistics for a specific LAN device.
+        
+        Args:
+            device_name (str): Name of the LAN device to get statistics for
+            
+        Returns:
+            dict: Dictionary containing device statistics including:
+                - device_name (str): Name of the device
+                - stats (dict): Device statistics including:
+                    - collisions (int): Collision count
+                    - idrops (int): Input drop count
+                    - ierrors (int): Input error count
+                    - in_bytes (int): Input bytes
+                    - ipackets (int): Input packet count
+                    - multicast (int): Multicast count
+                    - odrops (int): Output drop count
+                    - oerrors (int): Output error count
+                    - opackets (int): Output packet count
+                    - out_bytes (int): Output bytes
+        """
+        try:
+            device_stats = self.get(f'status/lan/devices/{device_name}/stats')
+            if not device_stats:
+                return {"device_name": device_name}
+            
+            return {
+                "device_name": device_name,
+                "stats": {
+                    "collisions": device_stats.get("collisions"),
+                    "idrops": device_stats.get("idrops"),
+                    "ierrors": device_stats.get("ierrors"),
+                    "in_bytes": device_stats.get("in"),
+                    "ipackets": device_stats.get("ipackets"),
+                    "multicast": device_stats.get("multicast"),
+                    "odrops": device_stats.get("odrops"),
+                    "oerrors": device_stats.get("oerrors"),
+                    "opackets": device_stats.get("opackets"),
+                    "out_bytes": device_stats.get("out")
+                }
+            }
+        except Exception as e:
+            self.log(f"Error getting device stats for {device_name}: {e}")
+            return {"device_name": device_name, "error": str(e)}
 
     def get_openvpn_status(self) -> Dict[str, Any]:
         """Get OpenVPN status and return detailed information.
         
         Returns:
             dict: Dictionary containing OpenVPN status information including:
-                - has_openvpn_data (bool): Whether OpenVPN data is available
                 - tunnels_configured (int): Number of configured tunnels
                 - tunnels_active (int): Number of active tunnels
                 - stats_available (bool): Whether statistics are available
@@ -1045,10 +1740,9 @@ class EventingCSClient(CSClient):
         try:
             openvpn_data = self.get('status/openvpn')
             if not openvpn_data:
-                return {"has_openvpn_data": False}
+                return {}
             
             analysis = {
-                "has_openvpn_data": True,
                 "tunnels_configured": len(openvpn_data.get("tunnels", [])),
                 "tunnels_active": len([t for t in openvpn_data.get("tunnels", []) if t.get("status") == "up"]),
                 "stats_available": bool(openvpn_data.get("stats"))
@@ -1057,14 +1751,13 @@ class EventingCSClient(CSClient):
             return analysis
         except Exception as e:
             self.log(f"Error analyzing OpenVPN status: {e}")
-            return {"has_openvpn_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_hotspot_status(self) -> Dict[str, Any]:
         """Get hotspot status and return detailed information.
         
         Returns:
             dict: Dictionary containing hotspot status information including:
-                - has_hotspot_data (bool): Whether hotspot data is available
                 - clients_connected (int): Number of connected clients
                 - sessions_active (int): Number of active sessions
                 - domains_allowed (int): Number of allowed domains
@@ -1074,10 +1767,9 @@ class EventingCSClient(CSClient):
         try:
             hotspot_data = self.get('status/hotspot')
             if not hotspot_data:
-                return {"has_hotspot_data": False}
+                return {}
             
             analysis = {
-                "has_hotspot_data": True,
                 "clients_connected": len(hotspot_data.get("clients", {})),
                 "sessions_active": len(hotspot_data.get("sessions", {})),
                 "domains_allowed": len(hotspot_data.get("allowed", {}).get("domains", [])),
@@ -1088,50 +1780,76 @@ class EventingCSClient(CSClient):
             return analysis
         except Exception as e:
             self.log(f"Error analyzing hotspot status: {e}")
-            return {"has_hotspot_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_obd_status(self) -> Dict[str, Any]:
         """Get OBD status and return detailed information.
         
         Returns:
             dict: Dictionary containing OBD status information including:
-                - has_obd_data (bool): Whether OBD data is available
                 - adapter_configured (bool): Whether OBD adapter is configured
                 - adapter_connected (bool): Whether OBD adapter is connected
                 - vehicle_connected (bool): Whether vehicle is connected
                 - pids_supported (int): Number of supported PIDs
                 - pids_enabled (int): Number of enabled PIDs
                 - ignition_status (str): Vehicle ignition status
+                - pids (list): List of PID information including:
+                    - config_name (str): PID configuration name
+                    - enabled (bool): Whether PID is enabled
+                    - last_value (str): Last value received for this PID
+                    - name (str): PID name
+                    - pid (int): PID identifier
+                    - supported (bool): Whether PID is supported by vehicle
+                    - units (str): Units for PID values
+                    - update_interval (int): Update interval in milliseconds
+                    - values (list): Historical values for this PID
         """
         try:
             obd_data = self.get('status/obd')
             if not obd_data:
-                return {"has_obd_data": False}
+                return {}
             
             adapter = obd_data.get("adapter", {})
             vehicle = obd_data.get("vehicle", {})
             
+            # Process PIDs data
+            pids_data = obd_data.get("pids", [])
+            pids_list = []
+            
+            for pid in pids_data:
+                pid_info = {
+                    "config_name": pid.get("config_name"),
+                    "enabled": pid.get("enabled", False),
+                    "last_value": pid.get("last_value", ""),
+                    "name": pid.get("name"),
+                    "pid": pid.get("pid"),
+                    "supported": pid.get("supported", False),
+                    "units": pid.get("units"),
+                    "update_interval": pid.get("update_interval"),
+                    "values": pid.get("values", [])
+                }
+                pids_list.append(pid_info)
+            
             analysis = {
-                "has_obd_data": True,
                 "adapter_configured": adapter.get("configured", False),
                 "adapter_connected": adapter.get("connected", False),
                 "vehicle_connected": vehicle.get("ext_tool") != "Disconnected",
-                "pids_supported": len([pid for pid in obd_data.get("pids", []) if pid.get("supported", False)]),
-                "pids_enabled": len([pid for pid in obd_data.get("pids", []) if pid.get("enabled", False)]),
-                "ignition_status": vehicle.get("ign_status")
+                "pids_supported": len([pid for pid in pids_data if pid.get("supported", False)]),
+                "pids_enabled": len([pid for pid in pids_data if pid.get("enabled", False)]),
+                "ignition_status": vehicle.get("ign_status"),
+                "pids": pids_list
             }
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing OBD status: {e}")
-            return {"has_obd_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_qos_status(self) -> Dict[str, Any]:
         """Get QoS status and return detailed information.
         
         Returns:
             dict: Dictionary containing QoS status information including:
-                - has_qos_data (bool): Whether QoS data is available
                 - qos_enabled (bool): Whether QoS is enabled
                 - queues_configured (int): Number of configured queues
                 - queues_active (int): Number of active queues
@@ -1140,11 +1858,10 @@ class EventingCSClient(CSClient):
         try:
             qos_data = self.get('status/qos')
             if not qos_data:
-                return {"has_qos_data": False}
+                return {}
             
             queues = qos_data.get("queues", [])
             analysis = {
-                "has_qos_data": True,
                 "qos_enabled": qos_data.get("enabled", False),
                 "queues_configured": len(queues),
                 "queues_active": len([q for q in queues if q.get("ipkts", 0) > 0 or q.get("opkts", 0) > 0]),
@@ -1154,14 +1871,13 @@ class EventingCSClient(CSClient):
             return analysis
         except Exception as e:
             self.log(f"Error analyzing QoS status: {e}")
-            return {"has_qos_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_firewall_status(self) -> Dict[str, Any]:
         """Get firewall status and return detailed information.
         
         Returns:
             dict: Dictionary containing firewall status information including:
-                - has_firewall_data (bool): Whether firewall data is available
                 - connections_tracked (int): Number of tracked connections
                 - state_timeouts (dict): State timeout configurations
                 - hitcounters (list): List of firewall rule hit counters
@@ -1169,13 +1885,12 @@ class EventingCSClient(CSClient):
         try:
             firewall_data = self.get('status/firewall')
             if not firewall_data:
-                return {"has_firewall_data": False}
+                return {}
             
             connections = firewall_data.get("connections", [])
             hitcounters = firewall_data.get("hitcounter", [])
             
             analysis = {
-                "has_firewall_data": True,
                 "connections_tracked": len(connections),
                 "state_timeouts": firewall_data.get("state_timeouts", {}),
                 "hitcounters": []
@@ -1193,14 +1908,13 @@ class EventingCSClient(CSClient):
             return analysis
         except Exception as e:
             self.log(f"Error analyzing firewall status: {e}")
-            return {"has_firewall_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_dns_status(self) -> Dict[str, Any]:
         """Get DNS status and return detailed information.
         
         Returns:
             dict: Dictionary containing DNS status information including:
-                - has_dns_data (bool): Whether DNS data is available
                 - cache_entries (int): Number of cache entries
                 - cache_size (int): Cache size
                 - servers_configured (int): Number of configured DNS servers
@@ -1209,13 +1923,12 @@ class EventingCSClient(CSClient):
         try:
             dns_data = self.get('status/dns')
             if not dns_data:
-                return {"has_dns_data": False}
+                return {}
             
             cache = dns_data.get("cache", {})
             servers = cache.get("servers", [])
             
             analysis = {
-                "has_dns_data": True,
                 "cache_entries": len(cache.get("entries", [])),
                 "cache_size": cache.get("size", 0),
                 "servers_configured": len(servers),
@@ -1225,33 +1938,68 @@ class EventingCSClient(CSClient):
             return analysis
         except Exception as e:
             self.log(f"Error analyzing DNS status: {e}")
-            return {"has_dns_data": False, "error": str(e)}
+            return {"error": str(e)}
 
     def get_dhcp_status(self) -> Dict[str, Any]:
         """Get DHCP status and return detailed information.
         
         Returns:
             dict: Dictionary containing DHCP status information including:
-                - has_dhcp_data (bool): Whether DHCP data is available
-                - devices_configured (int): Number of configured devices
-                - devices_with_ip (int): Number of devices with IP addresses
+                - total_leases (int): Total number of DHCP leases
+                - active_leases (int): Number of active leases
+                - leases_by_interface (dict): Leases grouped by interface
+                - leases_by_network (dict): Leases grouped by network
+                - leases (list): List of all DHCP leases including:
+                    - client_id (str): Client identifier
+                    - expire (int): Lease expiration time
+                    - hostname (str): Client hostname
+                    - iface (str): Interface name
+                    - iface_type (str): Interface type (ethernet, wireless, etc.)
+                    - ip_address (str): Assigned IP address
+                    - mac (str): Client MAC address
+                    - network (str): Network name
+                    - ssid (str): SSID for wireless clients
         """
         try:
-            dhcp_data = self.get('status/dhcp')
+            dhcp_data = self.get('status/dhcpd')
             if not dhcp_data:
-                return {"has_dhcp_data": False}
+                return {}
             
-            devices = list(dhcp_data.keys())
+            leases = dhcp_data.get("leases", [])
+            current_time = int(time.time())
+            
+            # Group leases by interface and network
+            leases_by_interface = {}
+            leases_by_network = {}
+            
+            for lease in leases:
+                # Group by interface
+                iface = lease.get("iface", "unknown")
+                if iface not in leases_by_interface:
+                    leases_by_interface[iface] = []
+                leases_by_interface[iface].append(lease)
+                
+                # Group by network
+                network = lease.get("network", "unknown")
+                if network not in leases_by_network:
+                    leases_by_network[network] = []
+                leases_by_network[network].append(lease)
+            
+            # Count active leases (not expired)
+            active_leases = len([lease for lease in leases if lease.get("expire", 0) > current_time])
+            
             analysis = {
-                "has_dhcp_data": True,
-                "devices_configured": len(devices),
-                "devices_with_ip": len([d for d in devices if dhcp_data[d].get("ipinfo", {}).get("ip_address")])
+                "total_leases": len(leases),
+                "active_leases": active_leases,
+                "leases_by_interface": leases_by_interface,
+                "leases_by_network": leases_by_network,
+                "leases": leases
             }
             
             return analysis
         except Exception as e:
             self.log(f"Error analyzing DHCP status: {e}")
-            return {"has_dhcp_data": False, "error": str(e)}
+            return {"error": str(e)}
 
 
 
@@ -2123,14 +2871,15 @@ def get_gps_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing GPS status information including:
-            - has_gps_data (bool): Whether GPS data is available
-            - gps_lock (bool): Whether GPS has a lock
-            - satellites (int): Number of satellites in view
+                - gps_lock (bool): Whether GPS has a lock
+                - satellites (int): Number of satellites in view
             - location (dict): GPS coordinates in degrees/minutes/seconds format
-            - decimal_coordinates (dict): GPS coordinates in decimal format
+            - latitude (float): GPS latitude in decimal format
+            - longitude (float): GPS longitude in decimal format
             - altitude (float): Altitude in meters
             - speed (float): Ground speed in knots
             - heading (float): Heading in degrees
+            - accuracy (float): GPS accuracy in meters
             - last_fix_age (int): Age of last GPS fix
     """
     return _cs_client.get_gps_status()
@@ -2140,15 +2889,14 @@ def get_system_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing system status information including:
-            - has_system_data (bool): Whether system data is available
             - uptime (int): System uptime in seconds
             - temperature (float): System temperature
-            - storage_health (str): Storage health status
             - cpu_usage (dict): CPU usage statistics
             - memory_usage (dict): Memory usage statistics
             - services_running (int): Number of running services
             - services_disabled (int): Number of disabled services
-            - apps_running (int): Number of running applications
+            - internal_apps_running (int): Number of running internal applications
+            - external_apps_running (int): Number of running external applications
     """
     return _cs_client.get_system_status()
 
@@ -2157,7 +2905,6 @@ def get_wlan_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing WLAN status information including:
-            - has_wlan_data (bool): Whether WLAN data is available
             - wlan_state (str): WLAN operational state
             - radios (list): List of radio information
             - clients_connected (int): Number of connected clients
@@ -2170,31 +2917,322 @@ def get_wan_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing WAN status information including:
-            - has_wan_data (bool): Whether WAN data is available
             - primary_device (str): Primary WAN device identifier
             - connection_state (str): Overall connection state
-            - devices (list): List of WAN device information
+            - cellular_health_score (str): Overall cellular health score
+            - devices (list): List of WAN device information including:
+                - uid (str): Device unique identifier
+                - connection_state (str): Device connection state
+                - signal_strength (str): Signal strength indicator
+                - cellular_health (str): Cellular health category
+                - ip_address (str): Device IP address
+                - uptime (int): Device uptime in seconds
+                - For modem devices (uid starts with "mdm"), additional fields:
+                    - active_apn (str): Active APN name
+                    - carrier_id (str): Carrier identifier
+                    - cell_id (str): Cell tower identifier
+                    - cur_plmn (str): Current PLMN code
+                    - dbm (str): Signal strength in dBm
+                    - imei (str): Device IMEI
+                    - lte_bandwidth (str): LTE bandwidth
+                    - model (str): Device model
+                    - mdn (str): Mobile directory number
+                    - home_carrier (str): Home carrier
+                    - phy_cell_id (str): Physical cell ID
+                    - rf_band (str): Radio frequency band
+                    - rf_channel (str): Radio frequency channel
+                    - rsrp (str): Reference signal received power
+                    - rsrq (str): Reference signal received quality
+                    - service_discovery (str): Service discovery info
+                    - sim_number (str): SIM slot number
+                    - sinr (str): Signal to interference plus noise ratio
+                    - service_type (str): Service type (4G/5G)
+                    - service_type_details (str): Detailed service information
+                    - tac (str): Tracking area code
+                    - dl_frequency (str): Downlink frequency
+                    - ul_frequency (str): Uplink frequency
+                    - rsrp_5g (str): 5G RSRP value
+                    - rsrq_5g (str): 5G RSRQ value
+                    - sinr_5g (str): 5G SINR value
+                    - stats (dict): Device statistics including:
+                        - collisions (int): Collision count
+                        - idrops (int): Input drop count
+                        - ierrors (int): Input error count
+                        - in_bytes (int): Input bytes
+                        - ipackets (int): Input packet count
+                        - multicast (int): Multicast count
+                        - odrops (int): Output drop count
+                        - oerrors (int): Output error count
+                        - opackets (int): Output packet count
+                        - out_bytes (int): Output bytes
+                - For ethernet devices (uid starts with "ethernet"), additional fields:
+                    - capabilities (str): Device capabilities
+                    - config_id (str): Configuration identifier
+                    - interface (str): Interface name
+                    - mac_address (str): MAC address
+                    - mtu (int): Maximum transmission unit
+                    - port (str): Port number
+                    - port_name (dict): Port name mapping
+                    - type (str): Device type
     """
     return _cs_client.get_wan_status()
+
+def get_wan_devices() -> Dict[str, Any]:
+    """Get WAN device information only.
+    
+    Returns:
+        dict: Dictionary containing WAN device information including:
+            - primary_device (str): Primary WAN device identifier
+            - devices (list): List of WAN device information including:
+                - uid (str): Device unique identifier
+                - connection_state (str): Device connection state
+                - signal_strength (str): Signal strength indicator
+                - cellular_health (str): Cellular health category
+                - ip_address (str): Device IP address
+                - uptime (int): Device uptime in seconds
+    """
+    return _cs_client.get_wan_devices()
+
+def get_wan_modem_diagnostics(device_id: str) -> Dict[str, Any]:
+    """Get modem diagnostics for a specific WAN device.
+    
+    Args:
+        device_id (str): WAN device identifier to get diagnostics for
+        
+    Returns:
+        dict: Dictionary containing modem diagnostics including:
+            - device_id (str): Device identifier
+            - diagnostics (dict): Modem diagnostics including:
+                - active_apn (str): Active APN name
+                - carrier_id (str): Carrier identifier
+                - cell_id (str): Cell tower identifier
+                - cur_plmn (str): Current PLMN code
+                - dbm (str): Signal strength in dBm
+                - imei (str): Device IMEI
+                - lte_bandwidth (str): LTE bandwidth
+                - model (str): Device model
+                - mdn (str): Mobile directory number
+                - home_carrier (str): Home carrier
+                - phy_cell_id (str): Physical cell ID
+                - rf_band (str): Radio frequency band
+                - rf_channel (str): Radio frequency channel
+                - rsrp (str): Reference signal received power
+                - rsrq (str): Reference signal received quality
+                - service_discovery (str): Service discovery info
+                - sim_number (str): SIM slot number
+                - sinr (str): Signal to interference plus noise ratio
+                - service_type (str): Service type (4G/5G)
+                - service_type_details (str): Detailed service information
+                - tac (str): Tracking area code
+                - dl_frequency (str): Downlink frequency
+                - ul_frequency (str): Uplink frequency
+                - rsrp_5g (str): 5G RSRP value
+                - rsrq_5g (str): 5G RSRQ value
+                - sinr_5g (str): 5G SINR value
+    """
+    return _cs_client.get_wan_modem_diagnostics(device_id)
+
+def get_wan_modem_stats(device_id: str) -> Dict[str, Any]:
+    """Get modem statistics for a specific WAN device.
+    
+    Args:
+        device_id (str): WAN device identifier to get statistics for
+        
+    Returns:
+        dict: Dictionary containing modem statistics including:
+            - device_id (str): Device identifier
+            - stats (dict): Modem statistics including:
+                - collisions (int): Collision count
+                - idrops (int): Input drop count
+                - ierrors (int): Input error count
+                - in_bytes (int): Input bytes
+                - ipackets (int): Input packet count
+                - multicast (int): Multicast count
+                - odrops (int): Output drop count
+                - oerrors (int): Output error count
+                - opackets (int): Output packet count
+                - out_bytes (int): Output bytes
+    """
+    return _cs_client.get_wan_modem_stats(device_id)
+
+def get_wan_ethernet_info(device_id: str) -> Dict[str, Any]:
+    """Get ethernet device information for a specific WAN device.
+    
+    Args:
+        device_id (str): WAN device identifier to get information for
+        
+    Returns:
+        dict: Dictionary containing ethernet device information including:
+            - device_id (str): Device identifier
+            - info (dict): Ethernet device information including:
+                - capabilities (str): Device capabilities
+                - config_id (str): Configuration identifier
+                - interface (str): Interface name
+                - mac_address (str): MAC address
+                - mtu (int): Maximum transmission unit
+                - port (str): Port number
+                - port_name (dict): Port name mapping
+                - type (str): Device type
+    """
+    return _cs_client.get_wan_ethernet_info(device_id)
 
 def get_lan_status() -> Dict[str, Any]:
     """Get LAN status and return detailed information.
     
     Returns:
         dict: Dictionary containing LAN status information including:
-            - has_lan_data (bool): Whether LAN data is available
-            - clients_connected (int): Number of connected clients
-            - networks (list): List of network information
-            - devices (list): List of device information
+            - clients_connected (int): Number of connected clients (IPv4 only)
+            - total_clients (int): Total number of clients (IPv4 + IPv6)
+            - lan_stats (dict): Overall LAN statistics including:
+                - bps (int): Total bits per second
+                - collisions (int): Collision count
+                - ibps (int): Input bits per second
+                - idrops (int): Input drop count
+                - ierrors (int): Input error count
+                - imcasts (int): Input multicast count
+                - in_bytes (int): Input bytes
+                - ipackets (int): Input packet count
+                - noproto (int): No protocol count
+                - obps (int): Output bits per second
+                - oerrors (int): Output error count
+                - omcasts (int): Output multicast count
+                - opackets (int): Output packet count
+                - out_bytes (int): Output bytes
+                - timestamp (float): Statistics timestamp
+            - clients (list): List of connected clients (IPv4 only) including:
+                - ip_address (str): Client IP address
+                - mac (str): Client MAC address
+            - networks (list): List of network information including:
+                - name (str): Network identifier
+                - display_name (str): Human-readable network name
+                - ip_address (str): Network IP address
+                - netmask (str): Network netmask
+                - broadcast (str): Network broadcast address
+                - hostname (str): Network hostname
+                - type (str): Network type
+                - devices (list): Network devices including:
+                    - interface (str): Device interface name
+                    - state (str): Device state
+                    - type (str): Device type
+                    - uid (str): Device unique identifier
+            - devices (list): List of device information with statistics including:
+                - name (str): Device name
+                - interface (str): Device interface
+                - link_state (str): Device link state
+                - type (str): Device type
+                - stats (dict): Device statistics including:
+                    - collisions (int): Collision count
+                    - idrops (int): Input drop count
+                    - ierrors (int): Input error count
+                    - in_bytes (int): Input bytes
+                    - ipackets (int): Input packet count
+                    - multicast (int): Multicast count
+                    - odrops (int): Output drop count
+                    - oerrors (int): Output error count
+                    - opackets (int): Output packet count
+                    - out_bytes (int): Output bytes
     """
     return _cs_client.get_lan_status()
+
+def get_lan_clients() -> Dict[str, Any]:
+    """Get LAN client information only.
+    
+    Returns:
+        dict: Dictionary containing LAN client information including:
+            - clients_connected (int): Number of connected clients (IPv4 only)
+            - total_clients (int): Total number of clients (IPv4 + IPv6)
+            - clients (list): List of connected clients (IPv4 only) including:
+                - ip_address (str): Client IP address
+                - mac (str): Client MAC address
+    """
+    return _cs_client.get_lan_clients()
+
+def get_lan_networks() -> Dict[str, Any]:
+    """Get LAN network information only.
+    
+    Returns:
+        dict: Dictionary containing LAN network information including:
+            - networks (list): List of network information including:
+                - name (str): Network identifier
+                - display_name (str): Human-readable network name
+                - ip_address (str): Network IP address
+                - netmask (str): Network netmask
+                - broadcast (str): Network broadcast address
+                - hostname (str): Network hostname
+                - type (str): Network type
+                - devices (list): Network devices including:
+                    - interface (str): Device interface name
+                    - state (str): Device state
+                    - type (str): Device type
+                    - uid (str): Device unique identifier
+    """
+    return _cs_client.get_lan_networks()
+
+def get_lan_devices() -> Dict[str, Any]:
+    """Get LAN device information only.
+    
+    Returns:
+        dict: Dictionary containing LAN device information including:
+            - devices (list): List of device information including:
+                - name (str): Device name
+                - interface (str): Device interface
+                - link_state (str): Device link state
+                - type (str): Device type
+    """
+    return _cs_client.get_lan_devices()
+
+def get_lan_statistics() -> Dict[str, Any]:
+    """Get overall LAN statistics only.
+    
+    Returns:
+        dict: Dictionary containing LAN statistics including:
+            - lan_stats (dict): Overall LAN statistics including:
+                - bps (int): Total bits per second
+                - collisions (int): Collision count
+                - ibps (int): Input bits per second
+                - idrops (int): Input drop count
+                - ierrors (int): Input error count
+                - imcasts (int): Input multicast count
+                - in_bytes (int): Input bytes
+                - ipackets (int): Input packet count
+                - noproto (int): No protocol count
+                - obps (int): Output bits per second
+                - oerrors (int): Output error count
+                - omcasts (int): Output multicast count
+                - opackets (int): Output packet count
+                - out_bytes (int): Output bytes
+                - timestamp (float): Statistics timestamp
+    """
+    return _cs_client.get_lan_statistics()
+
+def get_lan_device_stats(device_name: str) -> Dict[str, Any]:
+    """Get statistics for a specific LAN device.
+    
+    Args:
+        device_name (str): Name of the LAN device to get statistics for
+        
+    Returns:
+        dict: Dictionary containing device statistics including:
+            - device_name (str): Name of the device
+            - stats (dict): Device statistics including:
+                - collisions (int): Collision count
+                - idrops (int): Input drop count
+                - ierrors (int): Input error count
+                - in_bytes (int): Input bytes
+                - ipackets (int): Input packet count
+                - multicast (int): Multicast count
+                - odrops (int): Output drop count
+                - oerrors (int): Output error count
+                - opackets (int): Output packet count
+                - out_bytes (int): Output bytes
+    """
+    return _cs_client.get_lan_device_stats(device_name)
 
 def get_openvpn_status() -> Dict[str, Any]:
     """Get OpenVPN status and return detailed information.
     
     Returns:
         dict: Dictionary containing OpenVPN status information including:
-            - has_openvpn_data (bool): Whether OpenVPN data is available
             - tunnels_configured (int): Number of configured tunnels
             - tunnels_active (int): Number of active tunnels
             - stats_available (bool): Whether statistics are available
@@ -2206,7 +3244,6 @@ def get_hotspot_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing hotspot status information including:
-            - has_hotspot_data (bool): Whether hotspot data is available
             - clients_connected (int): Number of connected clients
             - sessions_active (int): Number of active sessions
             - domains_allowed (int): Number of allowed domains
@@ -2220,13 +3257,22 @@ def get_obd_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing OBD status information including:
-            - has_obd_data (bool): Whether OBD data is available
             - adapter_configured (bool): Whether OBD adapter is configured
             - adapter_connected (bool): Whether OBD adapter is connected
             - vehicle_connected (bool): Whether vehicle is connected
             - pids_supported (int): Number of supported PIDs
             - pids_enabled (int): Number of enabled PIDs
             - ignition_status (str): Vehicle ignition status
+            - pids (list): List of PID information including:
+                - config_name (str): PID configuration name
+                - enabled (bool): Whether PID is enabled
+                - last_value (str): Last value received for this PID
+                - name (str): PID name
+                - pid (int): PID identifier
+                - supported (bool): Whether PID is supported by vehicle
+                - units (str): Units for PID values
+                - update_interval (int): Update interval in milliseconds
+                - values (list): Historical values for this PID
     """
     return _cs_client.get_obd_status()
 
@@ -2235,7 +3281,6 @@ def get_qos_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing QoS status information including:
-            - has_qos_data (bool): Whether QoS data is available
             - qos_enabled (bool): Whether QoS is enabled
             - queues_configured (int): Number of configured queues
             - queues_active (int): Number of active queues
@@ -2248,7 +3293,6 @@ def get_firewall_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing firewall status information including:
-            - has_firewall_data (bool): Whether firewall data is available
             - connections_tracked (int): Number of tracked connections
             - state_timeouts (dict): State timeout configurations
             - hitcounters (list): List of firewall rule hit counters
@@ -2260,7 +3304,6 @@ def get_dns_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing DNS status information including:
-            - has_dns_data (bool): Whether DNS data is available
             - cache_entries (int): Number of cache entries
             - cache_size (int): Cache size
             - servers_configured (int): Number of configured DNS servers
@@ -2273,9 +3316,20 @@ def get_dhcp_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing DHCP status information including:
-            - has_dhcp_data (bool): Whether DHCP data is available
-            - devices_configured (int): Number of configured devices
-            - devices_with_ip (int): Number of devices with IP addresses
+            - total_leases (int): Total number of DHCP leases
+            - active_leases (int): Number of active leases
+            - leases_by_interface (dict): Leases grouped by interface
+            - leases_by_network (dict): Leases grouped by network
+            - leases (list): List of all DHCP leases including:
+                - client_id (str): Client identifier
+                - expire (int): Lease expiration time
+                - hostname (str): Client hostname
+                - iface (str): Interface name
+                - iface_type (str): Interface type (ethernet, wireless, etc.)
+                - ip_address (str): Assigned IP address
+                - mac (str): Client MAC address
+                - network (str): Network name
+                - ssid (str): SSID for wireless clients
     """
     return _cs_client.get_dhcp_status()
 
@@ -2744,22 +3798,6 @@ def get_dhcp_leases() -> Optional[List[Dict[str, Any]]]:
         _cs_client.logger.exception(f"Error retrieving DHCP leases: {e}")
         return None
 
-def get_network_interfaces() -> Optional[Dict[str, Any]]:
-    """Return network interface status.
-    
-    Returns:
-        dict or None: Dictionary containing network interface information including:
-            - interface names as keys
-            - status information for each interface
-            - IP addresses, netmasks, and other network configuration
-    """
-    try:
-        interfaces = _cs_client.get('status/network')
-        return interfaces
-    except Exception as e:
-        _cs_client.logger.exception(f"Error retrieving network interfaces: {e}")
-        return None
-
 def get_routing_table() -> Optional[Dict[str, Any]]:
     """Return routing table information.
     
@@ -2909,38 +3947,48 @@ def get_services_status() -> Optional[Dict[str, Any]]:
         _cs_client.logger.exception(f"Error retrieving services status: {e}")
         return None
 
-def get_apps_status() -> Optional[List[Dict[str, Any]]]:
-    """Return SDK applications status.
+def get_apps_status() -> Optional[Dict[str, Any]]:
+    """Return both internal system applications and external SDK applications status.
     
     Returns:
-        list or None: List of SDK applications with their status information including:
-            - app name and identifier
-            - app state (started, stopped, etc.)
-            - app configuration and runtime information
+        dict or None: Dictionary containing application status information including:
+            - internal_apps (list): List of internal system applications including:
+                - app name and identifier
+                - app state (started, stopped, etc.)
+                - app configuration and runtime information
+            - external_apps (list): List of external SDK applications including:
+                - app name and identifier
+                - app state (started, stopped, etc.)
+                - app configuration and runtime information
+            - total_apps (int): Total number of applications
+            - running_apps (int): Total number of running applications
     """
     try:
-        apps_status = _cs_client.get('status/system/apps')
-        return apps_status
+        # Get internal system apps
+        internal_apps = _cs_client.get('status/system/apps') or []
+        
+        # Get external SDK apps
+        sdk_data = _cs_client.get('status/system/sdk') or {}
+        external_apps = sdk_data.get('apps', [])
+        
+        # Calculate totals
+        total_apps = len(internal_apps) + len(external_apps)
+        running_apps = (
+            len([app for app in internal_apps if app.get('state') == 'started']) +
+            len([app for app in external_apps if app.get('state') == 'started'])
+        )
+        
+        return {
+            'internal_apps': internal_apps,
+            'external_apps': external_apps,
+            'total_apps': total_apps,
+            'running_apps': running_apps
+        }
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving apps status: {e}")
         return None
 
-def get_log_status() -> Optional[Dict[str, Any]]:
-    """Return system log status.
-    
-    Returns:
-        dict or None: Dictionary containing system log status information including:
-            - log configuration
-            - log file information
-            - log level settings
-    """
-    try:
-        # Log directory appears to be empty
-        log_status = _cs_client.get('status/log')
-        return log_status
-    except Exception as e:
-        _cs_client.logger.exception(f"Error retrieving log status: {e}")
-        return None
+
 
 def get_event_status() -> Optional[Dict[str, Any]]:
     """Return system events status.
@@ -2958,70 +4006,105 @@ def get_event_status() -> Optional[Dict[str, Any]]:
         _cs_client.logger.exception(f"Error retrieving event status: {e}")
         return None
 
-def get_network_throughput() -> Optional[Dict[str, Any]]:
-    """Return network throughput statistics.
-    
-    Returns:
-        dict or None: Dictionary containing network throughput statistics including:
-            - interface statistics
-            - packet counts
-            - byte counts
-            - error statistics
-    """
-    try:
-        stats = _cs_client.get('status/stats')
-        return stats
-    except Exception as e:
-        _cs_client.logger.exception(f"Error retrieving network throughput: {e}")
-        return None
+
 
 def get_flow_statistics() -> Optional[Dict[str, Any]]:
-    """Return flow statistics.
+    """Return flow statistics with destination-based flow information.
     
     Returns:
         dict or None: Dictionary containing flow statistics including:
-            - active flows
-            - flow tracking information
-            - connection statistics
+            - total_destinations (int): Total number of destination flows
+            - total_packets (int): Total packets across all flows
+            - destinations (list): List of destination flow information including:
+                - appid (int): Application identifier
+                - bytesin (int): Bytes received from destination
+                - bytesout (int): Bytes sent to destination
+                - catid (int): Category identifier
+                - conns (int): Number of connections
+                - destination (str): Destination IP address
+                - iface (str): Interface name
+                - latency (int): Connection latency
+                - pktin (int): Packets received from destination
+                - pktout (int): Packets sent to destination
+                - samples (int): Number of latency samples
+                - sumsquare (int): Sum of squared latency values
+                - tcppkts (int): TCP packet count
+                - udppkts (int): UDP packet count
     """
     try:
         flow_stats = _cs_client.get('status/flowstats')
-        return flow_stats
+        if not flow_stats:
+            return {}
+        
+        ipdst_data = flow_stats.get("ipdst", {})
+        destinations = ipdst_data.get("destinations", [])
+        
+        return {
+            "total_destinations": ipdst_data.get("totaldsts", 0),
+            "total_packets": ipdst_data.get("totalpkts", 0),
+            "destinations": destinations
+        }
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving flow statistics: {e}")
         return None
 
 def get_client_usage() -> Optional[Dict[str, Any]]:
-    """Return client usage statistics.
+    """Return detailed client usage statistics with bandwidth and connection information.
     
     Returns:
         dict or None: Dictionary containing client usage statistics including:
-            - client bandwidth usage
-            - connection statistics
-            - usage patterns
+            - enabled (bool): Whether client usage tracking is enabled
+            - total_clients (int): Total number of clients with usage data
+            - total_traffic (dict): Summary of total traffic across all clients
+            - stats (list): List of client usage statistics including:
+                - app_list (list): List of applications used by client
+                - connect_time (int): Current connection time in seconds
+                - down_bytes (int): Total download bytes
+                - down_delta (int): Download bytes since last reset
+                - down_packets (int): Total download packets
+                - first_time (int): First connection timestamp
+                - ip (str): Client IP address
+                - last_time (int): Last activity timestamp
+                - mac (str): Client MAC address
+                - name (str): Client hostname or identifier
+                - network (str): Network name client is connected to
+                - ssid (str): SSID for wireless clients
+                - type (str): Client connection type (wireless, ethernet, etc.)
+                - up_bytes (int): Total upload bytes
+                - up_delta (int): Upload bytes since last reset
+                - up_packets (int): Total upload packets
     """
     try:
         client_usage = _cs_client.get('status/client_usage')
-        return client_usage
+        if not client_usage:
+            return {}
+        
+        stats = client_usage.get("stats", [])
+        
+        # Calculate total traffic across all clients
+        total_down_bytes = sum(client.get("down_bytes", 0) for client in stats)
+        total_up_bytes = sum(client.get("up_bytes", 0) for client in stats)
+        total_down_packets = sum(client.get("down_packets", 0) for client in stats)
+        total_up_packets = sum(client.get("up_packets", 0) for client in stats)
+        
+        return {
+            "enabled": client_usage.get("enabled", False),
+            "total_clients": len(stats),
+            "total_traffic": {
+                "down_bytes": total_down_bytes,
+                "up_bytes": total_up_bytes,
+                "down_packets": total_down_packets,
+                "up_packets": total_up_packets,
+                "total_bytes": total_down_bytes + total_up_bytes,
+                "total_packets": total_down_packets + total_up_packets
+            },
+            "stats": stats
+        }
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving client usage: {e}")
         return None
 
-def get_multicast_status() -> Optional[Dict[str, Any]]:
-    """Return multicast status.
-    
-    Returns:
-        dict or None: Dictionary containing multicast status information including:
-            - multicast group information
-            - multicast routing
-            - multicast statistics
-    """
-    try:
-        multicast_status = _cs_client.get('status/multicast')
-        return multicast_status
-    except Exception as e:
-        _cs_client.logger.exception(f"Error retrieving multicast status: {e}")
-        return None
+
 
 def get_vpn_status() -> Optional[Dict[str, Any]]:
     """Return VPN status (OpenVPN, L2TP, etc.).
@@ -3081,22 +4164,7 @@ def get_iot_status() -> Optional[Dict[str, Any]]:
         _cs_client.logger.exception(f"Error retrieving IoT status: {e}")
         return None
 
-def get_obd_status() -> Optional[Dict[str, Any]]:
-    """Return OBD (On-Board Diagnostics) status.
-    
-    Returns:
-        dict or None: Dictionary containing OBD status information including:
-            - adapter configuration and connection status
-            - vehicle connection information
-            - supported and enabled PIDs
-            - ignition status
-    """
-    try:
-        obd_status = _cs_client.get('status/obd')
-        return obd_status
-    except Exception as e:
-        _cs_client.logger.exception(f"Error retrieving OBD status: {e}")
-        return None
+
 
 def get_hotspot_status() -> Optional[Dict[str, Any]]:
     """Return hotspot status.
@@ -3116,18 +4184,29 @@ def get_hotspot_status() -> Optional[Dict[str, Any]]:
         return None
 
 def get_sdwan_status() -> Optional[Dict[str, Any]]:
-    """Return SD-WAN status.
+    """Return SD-WAN status with advanced features and monitoring information.
     
     Returns:
         dict or None: Dictionary containing SD-WAN status information including:
-            - SD-WAN configuration
-            - tunnel status
-            - routing policies
-            - performance metrics
+            - forward_error_correction (dict): FEC statistics and configuration
+            - link_monitoring (dict): Link monitoring status and configuration
+            - quality_of_experience (dict): QoE metrics and monitoring
+            - user_mode_driver (dict): UMD status and configuration including:
+                - status (str): UMD operational status (enabled/disabled)
+            - wan_bonding (dict): WAN bonding configuration and status
     """
     try:
         sdwan_status = _cs_client.get('status/sdwan_adv')
-        return sdwan_status
+        if not sdwan_status:
+            return {}
+        
+        return {
+            "forward_error_correction": sdwan_status.get("forward_error_correction", {}),
+            "link_monitoring": sdwan_status.get("link_mon", {}),
+            "quality_of_experience": sdwan_status.get("qoe", {}),
+            "user_mode_driver": sdwan_status.get("user_mode_driver", {}),
+            "wan_bonding": sdwan_status.get("wan_bonding", {})
+        }
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving SD-WAN status: {e}")
         return None
@@ -3199,10 +4278,9 @@ def get_comprehensive_status(include_detailed: bool = True, include_clients: boo
         if include_detailed:
             # Add more detailed information
             status_report['detailed'] = {
-                'network_interfaces': get_network_interfaces(),
+
                 'flow_statistics': get_flow_statistics(),
                 'client_usage': get_client_usage(),
-                'multicast': get_multicast_status(),
                 'vpn': get_vpn_status(),
                 'security': get_security_status(),
                 'iot': get_iot_status(),
