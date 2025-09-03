@@ -5,200 +5,187 @@ This document lists all available methods when importing the `cp` module for NCO
 ## Core Communication Methods
 
 ### Basic CRUD Operations
-- `get(base, query='', tree=0)` - Retrieve data from router tree
-- `post(base, value='', query='')` - Send POST request to router tree
-- `put(base, value='', query='', tree=0)` - Send PUT request to router tree
-- `delete(base, query='')` - Send DELETE request to router tree
-- `decrypt(base, query='', tree=0)` - Decrypt sensitive data
+- `get(base: str, query: str = '', tree: int = 0)` → `Optional[Dict[str, Any]]`
+- `post(base: str, value: Any = '', query: str = '')` → `Optional[Dict[str, Any]]`
+- `put(base: str, value: Any = '', query: str = '', tree: int = 0)` → `Optional[Dict[str, Any]]`
+- `delete(base: str, query: str = '')` → `Optional[Dict[str, Any]]`
+- `decrypt(base: str, query: str = '', tree: int = 0)` → `Optional[Dict[str, Any]]`
+- `patch(value: List[Any])` → `Optional[Dict[str, Any]]`
 
 ### Logging and Alerts
-- `log(value='')` - Add log entry to system log
-- `alert(value='')` - Send custom alert to NCM
+- `log(value: str = '')` → `None`
+- `alert(value: str = '')` → `Optional[Dict[str, Any]]`
 
 ## Event Handling Methods
 
-- `register(action, path, callback, *args)` - Register callback for config store events
-- `on(action, path, callback, *args)` - Alias for register
-- `unregister(eid)` - Unregister callback by event ID
+- `register(action: str = 'set', path: str = '', callback: Callable = None, *args: Any)` → `Dict[str, Any]`
+- `on(action: str = 'set', path: str = '', callback: Callable = None, *args: Any)` → `Dict[str, Any]` (alias for register)
+- `unregister(eid: int = 0)` → `Dict[str, Any]`
 
 ## Device Information Methods
 
-- `get_uptime()` - Get router uptime in seconds
-- `get_device_mac()` - Get device MAC address
-- `get_device_serial_num()` - Get device serial number
-- `get_device_product_type()` - Get device product type
-- `get_device_name()` - Get device name
-- `get_device_firmware()` - Get device firmware information
+- `get_uptime()` → `int`
+- `get_device_mac(format_with_colons: bool = False)` → `Optional[str]`
+- `get_device_serial_num()` → `Optional[str]`
+- `get_device_product_type()` → `Optional[str]`
+- `get_device_name()` → `Optional[str]`
+- `get_device_firmware(include_build_info: bool = False)` → `str`
 
 ## Network Status Methods
 
 ### WAN/LAN Status
-- `get_wan_status()` - Get WAN status and connection information
-- `get_lan_status()` - Get LAN status and client information
-- `get_wlan_status()` - Get wireless LAN status
-- `get_connected_wans()` - Get list of connected WAN UIDs
-- `get_sims()` - Get list of modem UIDs with SIMs
+- `get_wan_status()` → `Dict[str, Any]`
+- `get_wan_devices()` → `Dict[str, Any]`
+- `get_wan_modem_diagnostics(device_id: str)` → `Dict[str, Any]`
+- `get_wan_modem_stats(device_id: str)` → `Dict[str, Any]`
+- `get_wan_ethernet_info(device_id: str)` → `Dict[str, Any]`
+- `get_lan_status()` → `Dict[str, Any]`
+- `get_lan_clients()` → `Dict[str, Any]`
+- `get_lan_networks()` → `Dict[str, Any]`
+- `get_lan_devices()` → `Dict[str, Any]`
+- `get_lan_statistics()` → `Dict[str, Any]`
+- `get_lan_device_stats(device_name: str)` → `Dict[str, Any]`
+- `get_wlan_status()` → `Optional[Dict[str, Any]]`
+- `get_wlan_clients()` → `List[Dict[str, Any]]`
+- `get_wlan_radio_status()` → `List[Dict[str, Any]]`
+- `get_wlan_radio_by_band(band: str = '2.4 GHz')` → `Optional[Dict[str, Any]]`
+- `get_wlan_channel_info(band: Optional[str] = None, include_survey: bool = False)` → `Dict[str, Any]`
+- `get_wlan_client_count()` → `int`
+- `get_wlan_client_count_by_band()` → `Dict[str, int]`
+- `get_wlan_events()` → `Dict[str, Any]`
+- `get_wlan_region_config()` → `Dict[str, Any]`
+- `get_wlan_remote_status()` → `Dict[str, Any]`
+- `get_wlan_state()` → `str`
+- `get_wlan_trace()` → `List[Dict[str, Any]]`
+- `get_wlan_debug()` → `Dict[str, Any]`
 
 ### Client Information
-- `get_ipv4_wired_clients()` - Get IPv4 wired clients
-- `get_ipv4_wifi_clients()` - Get IPv4 Wi-Fi clients
-- `get_ipv4_lan_clients()` - Get all IPv4 clients (wired + Wi-Fi)
+- `get_ipv4_wired_clients()` → `List[Dict[str, Any]]`
+- `get_ipv4_wifi_clients()` → `List[Dict[str, Any]]`
+- `get_ipv4_lan_clients()` → `Dict[str, List[Dict[str, Any]]]`
+- `get_connected_wans(max_retries: int = 10)` → `List[str]`
+- `get_sims(max_retries: int = 10)` → `List[str]`
 
 ## GPS and Location Methods
 
-- `get_gps_status()` - Get GPS status and fix information
-- `get_lat_long()` - Get latitude and longitude as floats
-- `dec(deg, min, sec)` - Convert degrees/minutes/seconds to decimal
+- `get_gps_status()` → `Dict[str, Any]`
+- `get_lat_long(max_retries: int = 5, retry_delay: float = 0.1)` → `Tuple[Optional[float], Optional[float]]`
+- `dec(deg: float, min: float = 0.0, sec: float = 0.0)` → `float`
 
 ## System Status Methods
 
-- `get_system_resources(cpu=True, memory=True)` - Get system resource usage
-- `get_temperature()` - Get device temperature
-- `get_power_usage()` - Get power usage information
-- `get_ncm_status()` - Get NCM connection status
+- `get_system_status()` → `Dict[str, Any]`
+- `get_system_resources(cpu: bool = True, memory: bool = True, storage: bool = False)` → `Dict[str, str]`
+- `get_temperature(unit: str = 'celsius')` → `Optional[float]`
+- `get_power_usage(include_components: bool = True)` → `Optional[Dict[str, Any]]`
+- `get_ncm_status(include_details: bool = False)` → `Optional[str]`
+- `get_wan_devices_status()` → `Optional[Dict[str, Any]]`
+- `get_modem_status()` → `Optional[Dict[str, Any]]`
+- `get_signal_strength()` → `Optional[Dict[str, Any]]`
 
 ## Configuration Management Methods
 
 ### Appdata Management
-- `get_appdata(name)` - Get appdata value by name
-- `post_appdata(name, value)` - Create appdata entry
-- `put_appdata(name, value)` - Update appdata value
-- `delete_appdata(name)` - Delete appdata entry
+- `get_appdata(name: str = '')` → `Optional[str]`
+- `post_appdata(name: str = '', value: str = '')` → `None`
+- `put_appdata(name: str = '', value: str = '')` → `None`
+- `delete_appdata(name: str = '')` → `None`
 
 ### Certificate Management
-- `get_ncm_api_keys()` - Get NCM API keys
-- `extract_cert_and_key(cert_name_or_uuid)` - Extract certificate and key files
+- `get_ncm_api_keys()` → `Dict[str, Optional[str]]`
+- `extract_cert_and_key(cert_name_or_uuid: str = '')` → `Tuple[Optional[str], Optional[str]]`
+- `get_certificates()` → `List[Dict[str, Any]]`
+- `get_certificate_by_name(cert_name: str)` → `Optional[Dict[str, Any]]`
+- `get_certificate_by_uuid(cert_uuid: str)` → `Optional[Dict[str, Any]]`
+- `get_expiring_certificates(days_threshold: int = 30)` → `List[Dict[str, Any]]`
+- `get_certificate_summary()` → `Dict[str, Any]`
 
 ## Wait/Utility Methods
 
-- `wait_for_uptime(min_uptime_seconds)` - Wait for minimum uptime
-- `wait_for_ntp(timeout=300, check_interval=1)` - Wait for NTP sync
-- `wait_for_wan_connection(timeout=300)` - Wait for WAN connection
-- `wait_for_modem_connection(timeout=300)` - Wait for modem connection
-- `wait_for_gps_fix(timeout=300)` - Wait for GPS fix
+- `wait_for_uptime(min_uptime_seconds: int = 60)` → `None`
+- `wait_for_ntp(timeout: int = 300, check_interval: int = 1)` → `bool`
+- `wait_for_wan_connection(timeout: int = 300)` → `bool`
+- `wait_for_modem_connection(timeout: int = 300, check_interval: float = 1.0)` → `bool`
+- `wait_for_gps_fix(timeout: int = 300, check_interval: float = 1.0)` → `bool`
 
 ## Control Methods
 
 ### Device Control
-- `reboot_device()` - Reboot the device
-- `factory_reset()` - Perform factory reset
+- `reboot_device(force: bool = False)` → `None`
+- `factory_reset()` → `bool`
 
 ### Network Control
-- `reset_modem(modem_id=None)` - Reset modem(s)
-- `reset_wlan()` - Reset WLAN configuration
+- `reset_modem(modem_id: Optional[str] = None, force: bool = False)` → `bool`
+- `reset_wlan(force: bool = False)` → `bool`
 
 ### System Control
-- `clear_logs()` - Clear system logs
-- `restart_service(service_name)` - Restart system service
-- `set_log_level(level)` - Set logging level
-
-## Advanced Status Methods
-
-- `get_wan_devices_status()` - Get detailed WAN device status
-- `get_modem_status()` - Get cellular modem status
-- `get_signal_strength()` - Get signal strength information
-- `get_comprehensive_status()` - Get comprehensive system status
-
+- `clear_logs()` → `bool`
+- `restart_service(service_name: str, force: bool = False)` → `bool`
+- `set_log_level(level: str = 'info')` → `bool`
 
 ## Specialized Status Methods
 
-- `get_openvpn_status()` - Get OpenVPN status
-- `get_hotspot_status()` - Get hotspot status
-- `get_obd_status()` - Get OBD status
-- `get_qos_status()` - Get QoS status
-- `get_firewall_status()` - Get firewall status
-- `get_dns_status()` - Get DNS status
-- `get_dhcp_status()` - Get DHCP status
+- `get_openvpn_status()` → `Dict[str, Any]`
+- `get_hotspot_status()` → `Optional[Dict[str, Any]]`
+- `get_obd_status()` → `Dict[str, Any]`
+- `get_qos_status()` → `Dict[str, Any]`
+- `get_firewall_status()` → `Dict[str, Any]`
+- `get_dns_status()` → `Dict[str, Any]`
+- `get_dhcp_status()` → `Dict[str, Any]`
+- `get_dhcp_leases()` → `Optional[List[Dict[str, Any]]]`
+- `get_routing_table()` → `Optional[Dict[str, Any]]`
+- `get_certificate_status()` → `Optional[Dict[str, Any]]`
+- `get_storage_status(include_detailed: bool = False)` → `Optional[Dict[str, Any]]`
+- `get_usb_status(include_all_ports: bool = False)` → `Optional[Dict[str, Any]]`
+- `get_poe_status()` → `Optional[Dict[str, Any]]`
+- `get_sensors_status()` → `Optional[Dict[str, Any]]`
+- `get_services_status()` → `Optional[Dict[str, Any]]`
+- `get_apps_status()` → `Optional[Dict[str, Any]]`
+- `get_event_status()` → `Optional[Dict[str, Any]]`
+- `get_flow_statistics()` → `Optional[Dict[str, Any]]`
+- `get_client_usage()` → `Optional[Dict[str, Any]]`
+- `get_vpn_status()` → `Optional[Dict[str, Any]]`
+- `get_security_status()` → `Optional[Dict[str, Any]]`
+- `get_iot_status()` → `Optional[Dict[str, Any]]`
+- `get_sdwan_status()` → `Optional[Dict[str, Any]]`
+- `get_comprehensive_status(include_detailed: bool = True, include_clients: bool = True)` → `Optional[Dict[str, Any]]`
 
 ## Specialized Helper Methods
 
 ### QoS Methods
-- `get_qos_queues()` - Get QoS queue details
-- `get_qos_queue_by_name(queue_name)` - Get specific QoS queue
-- `get_qos_traffic_stats()` - Get QoS traffic statistics
+- `get_qos_queues()` → `List[Dict[str, Any]]`
+- `get_qos_queue_by_name(queue_name: str = '')` → `Optional[Dict[str, Any]]`
+- `get_qos_traffic_stats()` → `Dict[str, Any]`
 
 ### DHCP Methods
-- `get_dhcp_clients_by_interface(interface_name)` - Get DHCP clients by interface
-- `get_dhcp_clients_by_network(network_name)` - Get DHCP clients by network
-- `get_dhcp_client_by_mac(mac_address)` - Get DHCP client by MAC
-- `get_dhcp_client_by_ip(ip_address)` - Get DHCP client by IP
-- `get_dhcp_interface_summary()` - Get DHCP interface summary
+- `get_dhcp_clients_by_interface(interface_name: str = '')` → `List[Dict[str, Any]]`
+- `get_dhcp_clients_by_network(network_name: str = '')` → `List[Dict[str, Any]]`
+- `get_dhcp_client_by_mac(mac_address: str = '')` → `Optional[Dict[str, Any]]`
+- `get_dhcp_client_by_ip(ip_address: str = '')` → `Optional[Dict[str, Any]]`
+- `get_dhcp_interface_summary()` → `Dict[str, Any]`
 
 ### Routing Methods
-- `get_bgp_status()` - Get BGP status
-- `get_ospf_status()` - Get OSPF status
-- `get_static_routes()` - Get static routes
-- `get_routing_policies()` - Get routing policies
-- `get_routing_table_by_name(table_name)` - Get routing table by name
-- `get_arp_table()` - Get ARP table
-- `get_route_summary()` - Get routing summary
-
-### Certificate Methods
-- `get_certificates()` - Get certificates list
-- `get_certificate_by_name(cert_name)` - Get certificate by name
-- `get_certificate_by_uuid(cert_uuid)` - Get certificate by UUID
-- `get_expiring_certificates(days_threshold=30)` - Get expiring certificates
-- `get_certificate_summary()` - Get certificate summary
+- `get_bgp_status()` → `Dict[str, Any]`
+- `get_ospf_status()` → `Dict[str, Any]`
+- `get_static_routes()` → `List[Dict[str, Any]]`
+- `get_routing_policies()` → `List[Dict[str, Any]]`
+- `get_routing_table_by_name(table_name: str)` → `List[Dict[str, Any]]`
+- `get_arp_table()` → `str`
+- `get_route_summary()` → `Dict[str, Any]`
 
 ### Firewall Methods
-- `get_firewall_connections()` - Get firewall connections
-- `get_firewall_hitcounters()` - Get firewall hit counters
-- `get_firewall_marks()` - Get firewall marks
-- `get_firewall_state_timeouts()` - Get firewall timeouts
-- `get_firewall_connections_by_protocol(protocol)` - Get connections by protocol
-- `get_firewall_connections_by_ip(ip_address)` - Get connections by IP
-- `get_firewall_summary()` - Get firewall summary
-
-## WLAN Specialized Methods
-
-### Client Management
-- `get_wlan_clients()` - Get WLAN clients
-- `get_wlan_client_count()` - Get WLAN client count
-- `get_wlan_client_count_by_band()` - Get WLAN client count by band
-
-### Radio Management
-- `get_wlan_radio_status()` - Get WLAN radio status
-- `get_wlan_radio_by_band(band)` - Get WLAN radio by band
-- `get_wlan_channel_info(band=None)` - Get WLAN channel info
-
-### Configuration and Events
-- `get_wlan_events()` - Get WLAN events
-- `get_wlan_region_config()` - Get WLAN region config
-- `get_wlan_remote_status()` - Get WLAN remote status
-- `get_wlan_state()` - Get WLAN state
-- `get_wlan_trace()` - Get WLAN trace
-- `get_wlan_debug()` - Get WLAN debug info
-
-## Additional Status Methods
-
-### Hardware Status
-- `get_storage_status()` - Get storage status
-- `get_usb_status()` - Get USB status
-- `get_poe_status()` - Get PoE status
-- `get_sensors_status()` - Get sensors status
-
-### System Services Status
-- `get_services_status()` - Get services status
-- `get_apps_status()` - Get apps status
-- `get_log_status()` - Get log status
-- `get_event_status()` - Get event status
-
-### Network Performance Status
-- `get_network_throughput()` - Get network throughput
-- `get_flow_statistics()` - Get flow statistics
-- `get_client_usage()` - Get client usage
-- `get_multicast_status()` - Get multicast status
-
-### Advanced Network Status
-- `get_vpn_status()` - Get VPN status
-- `get_security_status()` - Get security status
-- `get_iot_status()` - Get IoT status
-- `get_sdwan_status()` - Get SD-WAN status
+- `get_firewall_connections()` → `List[Dict[str, Any]]`
+- `get_firewall_hitcounters()` → `List[Dict[str, Any]]`
+- `get_firewall_marks()` → `Dict[str, Any]`
+- `get_firewall_state_timeouts()` → `Dict[str, Any]`
+- `get_firewall_connections_by_protocol(protocol: int = 6)` → `List[Dict[str, Any]]`
+- `get_firewall_connections_by_ip(ip_address: str = '')` → `List[Dict[str, Any]]`
+- `get_firewall_summary()` → `Dict[str, Any]`
 
 ## Utility Methods
 
-- `get_logger()` - Get logger instance for advanced logging
-- `uptime()` - Get uptime (monkey patched version)
+- `get_logger()` → `Any`
+- `uptime()` → `float` (monkey patched version)
 
 ---
 
@@ -242,6 +229,5 @@ status = cp.get_comprehensive_status()
 cp.wait_for_wan_connection()
 cp.wait_for_gps_fix()
 ```
-
 
 This comprehensive list shows that the `cp` module provides extensive functionality for interacting with NCOS routers, including status monitoring, network operations, and system control.
