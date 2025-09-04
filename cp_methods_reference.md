@@ -182,10 +182,29 @@ This document lists all available methods when importing the `cp` module for NCO
 - `get_firewall_connections_by_ip(ip_address: str = '')` → `List[Dict[str, Any]]`
 - `get_firewall_summary()` → `Dict[str, Any]`
 
+## WAN Profile Management Methods
+
+### Profile Retrieval
+- `get_wan_profiles()` → `Dict[str, Any]`
+- `get_wan_device_profile(device_id: str)` → `Optional[Dict[str, Any]]`
+- `get_wan_profile_by_trigger_string(trigger_string: str)` → `Optional[Dict[str, Any]]`
+- `get_wan_profile_by_name(profile_name: str)` → `Optional[Dict[str, Any]]`
+- `get_wan_device_summary()` → `Dict[str, Any]`
+
+### Profile Configuration
+- `set_wan_device_priority(device_id: str, new_priority: float)` → `bool`
+- `make_wan_device_highest_priority(device_id: str)` → `bool`
+- `enable_wan_device(device_id: str)` → `bool`
+- `disable_wan_device(device_id: str)` → `bool`
+- `set_wan_device_default_connection_state(device_id: str, connection_state: str)` → `bool`
+- `set_wan_device_bandwidth(device_id: str, ingress_kbps: int = None, egress_kbps: int = None)` → `bool`
+- `reorder_wan_profiles(device_priorities: Dict[str, float])` → `bool`
+
 ## Utility Methods
 
 - `get_logger()` → `Any`
 - `uptime()` → `float` (monkey patched version)
+- `clean_up_reg(signal: Any, frame: Any)` → `None`
 
 ---
 
@@ -230,4 +249,23 @@ cp.wait_for_wan_connection()
 cp.wait_for_gps_fix()
 ```
 
-This comprehensive list shows that the `cp` module provides extensive functionality for interacting with NCOS routers, including status monitoring, network operations, and system control.
+### WAN Profile Management
+```python
+import cp
+
+# Get all WAN profiles
+profiles = cp.get_wan_profiles()
+
+# Set a device to highest priority
+cp.make_wan_device_highest_priority("mdm-123456")
+
+# Enable/disable devices
+cp.enable_wan_device("ethernet-1")
+cp.disable_wan_device("mdm-789012")
+
+# Set connection state and bandwidth
+cp.set_wan_device_default_connection_state("mdm-123456", "alwayson")
+cp.set_wan_device_bandwidth("mdm-123456", ingress_kbps=5000, egress_kbps=1000)
+```
+
+This comprehensive list shows that the `cp` module provides extensive functionality for interacting with NCOS routers, including status monitoring, network operations, system control, and WAN profile management.
