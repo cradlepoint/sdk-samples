@@ -2871,8 +2871,8 @@ def get_gps_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing GPS status information including:
-                - gps_lock (bool): Whether GPS has a lock
-                - satellites (int): Number of satellites in view
+            - gps_lock (bool): Whether GPS has a lock
+            - satellites (int): Number of satellites in view
             - location (dict): GPS coordinates in degrees/minutes/seconds format
             - latitude (float): GPS latitude in decimal format
             - longitude (float): GPS longitude in decimal format
@@ -3953,9 +3953,9 @@ def get_apps_status() -> Optional[Dict[str, Any]]:
     Returns:
         dict or None: Dictionary containing application status information including:
             - internal_apps (list): List of internal system applications including:
-                - app name and identifier
-                - app state (started, stopped, etc.)
-                - app configuration and runtime information
+            - app name and identifier
+            - app state (started, stopped, etc.)
+            - app configuration and runtime information
             - external_apps (list): List of external SDK applications including:
                 - app name and identifier
                 - app state (started, stopped, etc.)
@@ -4210,6 +4210,399 @@ def get_sdwan_status() -> Optional[Dict[str, Any]]:
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving SD-WAN status: {e}")
         return None
+
+# ============================================================================
+# WAN PROFILE MANAGEMENT FUNCTIONS
+# ============================================================================
+
+def get_wan_profiles() -> Dict[str, Any]:
+    """Get all WAN profile rules and their configurations.
+    
+    Returns:
+        dict: Dictionary containing WAN profile information including:
+            - profiles (list): List of WAN profile rules with:
+                - _id_ (str): Unique identifier for the profile
+                - priority (float): Priority value (lower = higher priority)
+                - trigger_name (str): Human-readable profile name
+                - trigger_string (str): Matching string for device detection
+                - disabled (bool): Whether profile is disabled
+                - def_conn_state (str): Default connection state
+                - bandwidth_ingress (int): Download bandwidth in kbps
+                - bandwidth_egress (int): Upload bandwidth in kbps
+    """
+    try:
+        wan_rules = _cs_client.get('config/wan/rules2')
+        if not wan_rules:
+            return {"profiles": []}
+        
+        profiles = []
+        for rule in wan_rules:
+            profile_info = {
+                "_id_": rule.get("_id_"),
+                "priority": rule.get("priority", 999),
+                "trigger_name": rule.get("trigger_name", ""),
+                "trigger_string": rule.get("trigger_string", ""),
+                "disabled": rule.get("disabled", False),
+                "def_conn_state": rule.get("def_conn_state", "auto"),
+                "bandwidth_ingress": rule.get("bandwidth_ingress", 1300),
+                "bandwidth_egress": rule.get("bandwidth_egress", 1300)
+            }
+            profiles.append(profile_info)
+        
+        # Sort by priority (lower values first)
+        profiles.sort(key=lambda x: x["priority"])
+        
+        return {
+            "profiles": profiles,
+            "total_profiles": len(profiles),
+            "enabled_profiles": len([p for p in profiles if not p["disabled"]]),
+            "disabled_profiles": len([p for p in profiles if p["disabled"]])
+        }
+    except Exception as e:
+        _cs_client.logger.exception(f"Error retrieving WAN profiles: {e}")
+        return {"error": str(e)}
+
+def get_wan_device_profile(device_id: str) -> Optional[Dict[str, Any]]:
+    """Get the WAN profile configuration currently applied to a specific device.
+    
+    Args:
+        device_id (str): WAN device identifier (e.g., "mdm-123456", "ethernet-1")
+        
+    Returns:
+        dict or None: Device profile information including:
+            - device_id (str): Device identifier
+            - profile_id (str): ID of the matched profile
+            - profile_name (str): Name of the matched profile
+            - priority (float): Profile priority
+            - disabled (bool): Whether profile is disabled
+            - def_conn_state (str): Default connection state
+            - bandwidth (dict): Bandwidth configuration
+    """
+    try:
+        # Get device info to find the config_id
+        device_info = _cs_client.get(f'status/wan/devices/{device_id}/info')
+        if not device_info:
+            return None
+        
+        profile_id = device_info.get("config_id")
+        if not profile_id:
+            return None
+        
+        # Get the profile details
+        profile = _cs_client.get(f'config/wan/rules2/{profile_id}')
+        if not profile:
+            return None
+        
+        return {
+            "device_id": device_id,
+            "profile_id": profile_id,
+            "profile_name": profile.get("trigger_name", ""),
+            "priority": profile.get("priority", 999),
+            "disabled": profile.get("disabled", False),
+            "def_conn_state": profile.get("def_conn_state", "auto"),
+            "bandwidth": {
+                "ingress": profile.get("bandwidth_ingress", 1300),
+                "egress": profile.get("bandwidth_egress", 1300)
+            }
+        }
+    except Exception as e:
+        _cs_client.logger.exception(f"Error retrieving device profile for {device_id}: {e}")
+        return None
+
+def set_wan_device_priority(device_id: str, new_priority: float) -> bool:
+    """Set a WAN device to a specific priority by adjusting its profile priority.
+    
+    Args:
+        device_id (str): WAN device identifier
+        new_priority (float): New priority value (lower = higher priority)
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Get current device profile
+        device_profile = get_wan_device_profile(device_id)
+        if not device_profile:
+            return False
+        
+        profile_id = device_profile["profile_id"]
+        
+        # Update the profile priority
+        result = _cs_client.put(f'config/wan/rules2/{profile_id}/priority', new_priority)
+        return result is not None
+    except Exception as e:
+        _cs_client.logger.exception(f"Error setting device priority for {device_id}: {e}")
+        return False
+
+def make_wan_device_highest_priority(device_id: str) -> bool:
+    """Make a WAN device the highest priority by setting its profile to the lowest priority value.
+    
+    Args:
+        device_id (str): WAN device identifier
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Get all profiles to find the lowest priority
+        profiles = get_wan_profiles()
+        if "error" in profiles:
+            return False
+        
+        if not profiles["profiles"]:
+            return False
+        
+        # Find the lowest priority value
+        lowest_priority = min(p["priority"] for p in profiles["profiles"])
+        
+        # Set the device to an even lower priority (higher priority)
+        new_priority = lowest_priority - 1.0
+        
+        return set_wan_device_priority(device_id, new_priority)
+    except Exception as e:
+        _cs_client.logger.exception(f"Error making device highest priority for {device_id}: {e}")
+        return False
+
+def enable_wan_device(device_id: str) -> bool:
+    """Enable a WAN device by setting its profile to enabled.
+    
+    Args:
+        device_id (str): WAN device identifier
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        device_profile = get_wan_device_profile(device_id)
+        if not device_profile:
+            return False
+        
+        profile_id = device_profile["profile_id"]
+        
+        # Set disabled to false
+        result = _cs_client.put(f'config/wan/rules2/{profile_id}/disabled', False)
+        return result is not None
+    except Exception as e:
+        _cs_client.logger.exception(f"Error enabling device {device_id}: {e}")
+        return False
+
+def disable_wan_device(device_id: str) -> bool:
+    """Disable a WAN device by setting its profile to disabled.
+    
+    Args:
+        device_id (str): WAN device identifier
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        device_profile = get_wan_device_profile(device_id)
+        if not device_profile:
+            return False
+        
+        profile_id = device_profile["profile_id"]
+        
+        # Set disabled to true
+        result = _cs_client.put(f'config/wan/rules2/{profile_id}/disabled', True)
+        return result is not None
+    except Exception as e:
+        _cs_client.logger.exception(f"Error disabling device {device_id}: {e}")
+        return False
+
+def set_wan_device_default_connection_state(device_id: str, connection_state: str) -> bool:
+    """Set the default connection state for a WAN device.
+    
+    Args:
+        device_id (str): WAN device identifier
+        connection_state (str): Connection state ("alwayson", "auto", "ondemand", "disabled")
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        device_profile = get_wan_device_profile(device_id)
+        if not device_profile:
+            return False
+        
+        profile_id = device_profile["profile_id"]
+        
+        # Update the def_conn_state
+        result = _cs_client.put(f'config/wan/rules2/{profile_id}/def_conn_state', connection_state)
+        return result is not None
+    except Exception as e:
+        _cs_client.logger.exception(f"Error setting connection state for {device_id}: {e}")
+        return False
+
+def set_wan_device_bandwidth(device_id: str, ingress_kbps: int = None, egress_kbps: int = None) -> bool:
+    """Set bandwidth limits for a WAN device.
+    
+    Args:
+        device_id (str): WAN device identifier
+        ingress_kbps (int): Download bandwidth in kbps (optional)
+        egress_kbps (int): Upload bandwidth in kbps (optional)
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        device_profile = get_wan_device_profile(device_id)
+        if not device_profile:
+            return False
+        
+        profile_id = device_profile["profile_id"]
+        
+        success = True
+        
+        # Update ingress bandwidth if specified
+        if ingress_kbps is not None:
+            result = _cs_client.put(f'config/wan/rules2/{profile_id}/bandwidth_ingress', ingress_kbps)
+            if not result:
+                success = False
+        
+        # Update egress bandwidth if specified
+        if egress_kbps is not None:
+            result = _cs_client.put(f'config/wan/rules2/{profile_id}/bandwidth_egress', egress_kbps)
+            if not result:
+                success = False
+        
+        return success
+    except Exception as e:
+        _cs_client.logger.exception(f"Error setting bandwidth for {device_id}: {e}")
+        return False
+
+def reorder_wan_profiles(device_priorities: Dict[str, float]) -> bool:
+    """Reorder WAN profiles based on desired device priorities.
+    
+    Args:
+        device_priorities (dict): Dictionary mapping device IDs to desired priority values
+                                 Lower values = higher priority
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        success = True
+        
+        for device_id, priority in device_priorities.items():
+            result = set_wan_device_priority(device_id, priority)
+            if not result:
+                success = False
+                _cs_client.logger.error(f"Failed to set priority for device {device_id}")
+        
+        return success
+    except Exception as e:
+        _cs_client.logger.exception(f"Error reordering WAN profiles: {e}")
+        return False
+
+def get_wan_profile_by_trigger_string(trigger_string: str) -> Optional[Dict[str, Any]]:
+    """Find a WAN profile by its trigger string.
+    
+    Args:
+        trigger_string (str): Trigger string to search for
+        
+    Returns:
+        dict or None: Profile information if found
+    """
+    try:
+        profiles = get_wan_profiles()
+        if "error" in profiles:
+            return None
+        
+        for profile in profiles["profiles"]:
+            if profile["trigger_string"] == trigger_string:
+                return profile
+        
+        return None
+    except Exception as e:
+        _cs_client.logger.exception(f"Error finding profile by trigger string: {e}")
+        return None
+
+def get_wan_profile_by_name(profile_name: str) -> Optional[Dict[str, Any]]:
+    """Find a WAN profile by its trigger name.
+    
+    Args:
+        profile_name (str): Profile name to search for
+        
+    Returns:
+        dict or None: Profile information if found
+    """
+    try:
+        profiles = get_wan_profiles()
+        if "error" in profiles:
+            return None
+        
+        for profile in profiles["profiles"]:
+            if profile["trigger_name"] == profile_name:
+                return profile
+        
+        return None
+    except Exception as e:
+        _cs_client.logger.exception(f"Error finding profile by name: {e}")
+        return None
+
+def get_wan_device_summary() -> Dict[str, Any]:
+    """Get a summary of all WAN devices and their profile configurations.
+    
+    Returns:
+        dict: Summary of WAN devices including:
+            - devices (list): List of device information
+            - profiles (list): List of profile information
+            - priority_order (list): Devices ordered by priority (highest first)
+            - enabled_devices (int): Count of enabled devices
+            - disabled_devices (int): Count of disabled devices
+    """
+    try:
+        # Get WAN devices
+        wan_devices = _cs_client.get('status/wan/devices')
+        if not wan_devices:
+            return {"devices": [], "profiles": [], "priority_order": [], "enabled_devices": 0, "disabled_devices": 0}
+        
+        # Get all profiles
+        profiles = get_wan_profiles()
+        if "error" in profiles:
+            return {"error": "Failed to retrieve profiles"}
+        
+        devices_info = []
+        priority_order = []
+        
+        for device_id, device_data in wan_devices.items():
+            device_profile = get_wan_device_profile(device_id)
+            if device_profile:
+                device_info = {
+                    "device_id": device_id,
+                    "device_type": device_data.get("type", "unknown"),
+                    "connection_state": device_data.get("status", {}).get("connection_state", "unknown"),
+                    "profile_id": device_profile["profile_id"],
+                    "profile_name": device_profile["profile_name"],
+                    "priority": device_profile["priority"],
+                    "disabled": device_profile["disabled"],
+                    "def_conn_state": device_profile["def_conn_state"],
+                    "bandwidth": device_profile["bandwidth"]
+                }
+                devices_info.append(device_info)
+                priority_order.append(device_info)
+        
+        # Sort by priority (lowest value first = highest priority)
+        priority_order.sort(key=lambda x: x["priority"])
+        
+        enabled_count = len([d for d in devices_info if not d["disabled"]])
+        disabled_count = len([d for d in devices_info if d["disabled"]])
+        
+        return {
+            "devices": devices_info,
+            "profiles": profiles["profiles"],
+            "priority_order": priority_order,
+            "enabled_devices": enabled_count,
+            "disabled_devices": disabled_count,
+            "total_devices": len(devices_info)
+        }
+    except Exception as e:
+        _cs_client.logger.exception(f"Error getting WAN device summary: {e}")
+        return {"error": str(e)}
+
+# ============================================================================
+# COMPREHENSIVE STATUS FUNCTION
+# ============================================================================
 
 def get_comprehensive_status(include_detailed: bool = True, include_clients: bool = True) -> Optional[Dict[str, Any]]:
     """Return a comprehensive status report of the router.
