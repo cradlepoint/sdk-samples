@@ -14,9 +14,15 @@ import subprocess
 import configparser
 import unittest
 import urllib3
+import datetime
+import hashlib
+import re
+import tarfile
+import gzip
 urllib3.disable_warnings()
 
 from requests.auth import HTTPDigestAuth
+from OpenSSL import crypto
 
 # These will be set in init() by using the sdk_settings.ini file.
 # They are used by various functions in the file.
@@ -26,6 +32,15 @@ g_dev_client_ip = ''
 g_dev_client_username = ''
 g_dev_client_password = ''
 g_python_cmd = 'python3'  # Default for Linux and OS X
+
+# Constants for packaging
+META_DATA_FOLDER = 'METADATA'
+CONFIG_FILE = 'package.ini'
+SIGNATURE_FILE = 'SIGNATURE.DS'
+MANIFEST_FILE = 'MANIFEST.json'
+
+BYTE_CODE_FILES = re.compile(r'^.*/.(pyc|pyo|pyd)$')
+BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
 
 
 # Returns the proper HTTP Auth for the global username and password.
@@ -174,26 +189,157 @@ def scan_for_cr(path):
                         f.write(new_content)
                     print(f'Removed carriage return (\\r) from file {file_path}')
 
+
+def file_checksum(hash_func=hashlib.sha256, file=None):
+    h = hash_func()
+    buffer_size = h.block_size * 64
+
+    with open(file, 'rb') as f:
+        for buffer in iter(lambda: f.read(buffer_size), b''):
+            h.update(buffer)
+    return h.hexdigest()
+
+
+def hash_dir(target, hash_func=hashlib.sha256):
+    hashed_files = {}
+    for path, d, f in os.walk(target):
+        for fl in f:
+            if not fl.startswith('.') and not os.path.basename(path).startswith('.'):
+                # we need this be LINUX fashion!
+                if sys.platform == "win32":
+                    # swap the network\\tcp_echo to be network/tcp_echo
+                    fully_qualified_file = path.replace('\\', '/') + '/' + fl
+                else:  # else allow normal method
+                    fully_qualified_file = os.path.join(path, fl)
+                hashed_files[fully_qualified_file[len(target) + 1:]] =\
+                    file_checksum(hash_func, fully_qualified_file)
+            else:
+                print("Did not include {} in the App package.".format(fl))
+
+    return hashed_files
+
+
+def pack_package(app_root, app_name):
+    tar_name = f"{app_name}.tar"
+    with tarfile.open(tar_name, 'w') as tar:
+        tar.add(app_root, arcname=os.path.basename(app_root))
+
+    gzip_name = "{}.tar.gz".format(app_name)
+    with open(tar_name, 'rb') as f_in:
+        with gzip.open(gzip_name, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+    if os.path.isfile(tar_name):
+        os.remove(tar_name)
+
+
+def create_signature(meta_data_folder, pkey):
+    manifest_file = os.path.join(meta_data_folder, MANIFEST_FILE)
+    with open(os.path.join(meta_data_folder, SIGNATURE_FILE), 'wb') as sf:
+        checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
+        if pkey:
+            sf.write(crypto.sign(pkey, checksum, 'sha256'))
+        else:
+            sf.write(checksum)
+
+
+def clean_manifest_folder(app_metadata_folder):
+    path, dirs, files = next(os.walk(app_metadata_folder))
+
+    for file in files:
+        fully_qualified_file = os.path.join(path, file)
+        os.remove(fully_qualified_file)
+
+    for d in dirs:
+        shutil.rmtree(os.path.join(path, d))
+
+
+def clean_bytecode_files(app_root):
+    for path, dirs, files in os.walk(app_root):
+        for file in filter(lambda x: BYTE_CODE_FILES.match(x), files):
+            os.remove(os.path.join(path, file))
+        for d in filter(lambda x: BYTE_CODE_FOLDERS.match(x), dirs):
+            shutil.rmtree(os.path.join(path, d))
+    pass
+
+
+def package_application(app_root, pkey):
+    app_root = os.path.realpath(app_root)
+    app_config_file = os.path.join(app_root, CONFIG_FILE)
+    app_metadata_folder = os.path.join(app_root, META_DATA_FOLDER)
+    app_manifest_file = os.path.join(app_metadata_folder, MANIFEST_FILE)
+    config = configparser.ConfigParser()
+    config.read(app_config_file)
+    if not os.path.exists(app_metadata_folder):
+        os.makedirs(app_metadata_folder)
+
+    for section in config.sections():
+        app_name = section
+        assert os.path.basename(app_root) == app_name
+
+        clean_manifest_folder(app_metadata_folder)
+
+        clean_bytecode_files(app_root)
+
+        pmf = {}
+        pmf['version_major'] = int(1)
+        pmf['version_minor'] = int(0)
+        pmf['version_patch'] = int(0)
+
+        app = {}
+        app['name'] = str(section)
+        try:
+            app['uuid'] = config[section]['uuid']
+        except KeyError:
+            if not pkey:
+                app['uuid'] = str(uuid.uuid4())
+            else:
+                raise
+        app['vendor'] = config[section]['vendor']
+        app['notes'] = config[section]['notes']
+        app['version_major'] = int(config[section].get('version_major', '0'))
+        app['version_minor'] = int(config[section].get('version_minor', '0'))
+        app['version_patch'] = int(config[section].get('version_patch', '0'))
+        app['firmware_major'] = int(config[section].get('firmware_major', '0'))
+        app['firmware_minor'] = int(config[section].get('firmware_minor', '0'))
+        app['restart'] = config[section].getboolean('restart')
+        app['reboot'] = config[section].getboolean('reboot')
+        app['date'] = datetime.datetime.now().isoformat()
+        if config.has_option(section, 'auto_start'):
+            app['auto_start'] = config[section].getboolean('auto_start')
+        if config.has_option(section, 'app_type'):
+            app['app_type'] = int(config[section]['app_type'])
+
+        data = {}
+        data['pmf'] = pmf
+        data['app'] = app
+
+        app['files'] = hash_dir(app_root)
+
+        with open(app_manifest_file, 'w') as f:
+            f.write(json.dumps(data, indent=4, sort_keys=True))
+
+        create_signature(app_metadata_folder, pkey)
+
+        app_name_version = f"{section} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
+        pack_package(app_root, app_name_version)
+
+        print(f'Package {app_name_version}.tar.gz created')
+
+
 # Package the app files into a tar.gz archive.
 def package(app=None):
     app_name = app or g_app_name
     print("Packaging {}".format(app_name))
     success = True
-    package_script_path = os.path.join('tools', 'bin', 'package_application.py')
     app_path = os.path.join(app_name)
     scan_for_cr(app_path)
     setup_script(app_path)
 
     try:
-        result = subprocess.run('{} {} {}'.format(g_python_cmd, package_script_path, app_path), shell=True, capture_output=True, text=True)
-        if result.stdout:
-            print(result.stdout)
-        if result.stderr:
-            print(result.stderr)
-        if result.returncode != 0:
-            print('Error packaging {}: {}'.format(app_name, result.stderr))
-            success = False
-    except subprocess.CalledProcessError as err:
+        # Call package_application directly instead of via subprocess
+        package_application(app_path, None)  # pkey=None for no signing
+    except Exception as err:
         print('Error packaging {}: {}'.format(app_name, err))
         success = False
     finally:
@@ -282,9 +428,6 @@ def install():
         except Exception as e:
             app_archive = f"{g_app_name}.tar.gz"
 
-        if not os.path.exists(app_archive):
-            print(f'ERROR: File {app_archive} does not exist. Cannot install.')
-            return
         # Use sshpass for Linux or OS X
         cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
                g_dev_client_password, app_archive,
@@ -305,7 +448,6 @@ def install():
         except subprocess.CalledProcessError as err:
             # There is always an error because the NCOS device will drop the connection.
             # print('Error installing: {}'.format(err))
-            print('Successfully Installed {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
             return 0
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
