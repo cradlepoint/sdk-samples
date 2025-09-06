@@ -171,7 +171,7 @@ def check_and_update_file(file_path, local_path=None):
                 'local_timestamp': local_timestamp
             }
 
-def upgrade():
+def update():
     """
     Check and update core files from the GitHub repository.
     Updates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py
@@ -718,7 +718,7 @@ def output_help():
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
     print('purge: Purge all apps from the locally connected NCOS device.\n')
     print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
-    print('upgrade: Check and update core SDK files from GitHub repository.\n')
+    print('update: Check and update core SDK files from GitHub repository.\n')
     print('\tUpdates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py\n')
     print('unit: Run any unit tests associated with selected app.\n')
     print('system: Run any system tests associated with selected app.\n')
@@ -830,7 +830,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         option = str(sys.argv[2])
 
-    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge', 'upgrade']:
+    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge', 'update']:
         # Load the settings from the sdk_settings.ini file.
         if not init(option):
             sys.exit(0)
@@ -874,8 +874,8 @@ if __name__ == "__main__":
         # This is handled in init()
         pass
 
-    elif utility_name == 'upgrade':
-        upgrade()
+    elif utility_name == 'update':
+        update()
 
     elif utility_name == 'unit':
         # load any tests in app/test/unit
