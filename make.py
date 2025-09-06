@@ -25,6 +25,205 @@ urllib3.disable_warnings()
 from requests.auth import HTTPDigestAuth
 from OpenSSL import crypto
 
+# Upgrade functionality for checking and updating files from GitHub
+def get_github_commit_timestamp(file_path):
+    """
+    Get the timestamp of the last commit for a specific file in cradlepoint/sdk-samples.
+    
+    Args:
+        file_path (str): Path to the file (e.g., 'app_template/cp.py')
+    
+    Returns:
+        datetime: Timestamp of the last commit, or None if error
+    """
+    url = "https://api.github.com/repos/cradlepoint/sdk-samples/commits"
+    params = {'path': file_path, 'per_page': 1}
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        
+        commit_data = response.json()[0]
+        timestamp_str = commit_data['commit']['committer']['date']
+        
+        # Convert to datetime object (compatible with all Python versions)
+        # GitHub returns ISO format like: 2024-01-15T10:30:45Z
+        # Remove 'Z' and parse manually
+        timestamp_str = timestamp_str.replace('Z', '')
+        return datetime.datetime.strptime(timestamp_str, '%Y-%m-%dT%H:%M:%S')
+        
+    except (requests.exceptions.RequestException, KeyError, IndexError) as e:
+        print(f"Error getting GitHub commit timestamp: {e}")
+        return None
+
+def get_local_file_timestamp(file_path):
+    """
+    Get the modification timestamp of a local file.
+    
+    Args:
+        file_path (str): Path to the local file
+    
+    Returns:
+        datetime: Timestamp of the file modification, or None if file doesn't exist
+    """
+    if not os.path.exists(file_path):
+        return None
+    
+    timestamp = os.path.getmtime(file_path)
+    return datetime.datetime.fromtimestamp(timestamp)
+
+def download_file_from_github(file_path, output_path=None):
+    """
+    Download a file from cradlepoint/sdk-samples repository.
+    
+    Args:
+        file_path (str): Path to the file in the repo (e.g., 'app_template/cp.py')
+        output_path (str, optional): Local path to save the file
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    # GitHub raw URL format
+    raw_url = f"https://raw.githubusercontent.com/cradlepoint/sdk-samples/master/{file_path}"
+    
+    try:
+        response = requests.get(raw_url)
+        response.raise_for_status()
+        
+        # If no output path specified, use the original file path
+        if output_path is None:
+            output_path = file_path
+        
+        # Create directory if it doesn't exist (only if there's a directory path)
+        dir_path = os.path.dirname(output_path)
+        if dir_path:
+            os.makedirs(dir_path, exist_ok=True)
+        
+        # Write the file
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(response.text)
+        
+        print(f"File downloaded successfully to: {output_path}")
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error downloading file: {e}")
+        return False
+
+def check_and_update_file(file_path, local_path=None):
+    """
+    Check if the GitHub version of a file is newer than the local version,
+    and download if it is.
+    
+    Args:
+        file_path (str): Path to the file in the repo (e.g., 'app_template/cp.py')
+        local_path (str, optional): Local path to the file. If None, uses file_path
+    
+    Returns:
+        dict: Status information about the check and update
+    """
+    if local_path is None:
+        local_path = file_path
+    
+    print(f"Checking file: {file_path}")
+    
+    # Get GitHub commit timestamp
+    github_timestamp = get_github_commit_timestamp(file_path)
+    if github_timestamp is None:
+        return {'status': 'error', 'message': 'Could not get GitHub timestamp'}
+    
+    # Get local file timestamp
+    local_timestamp = get_local_file_timestamp(local_path)
+    
+    print(f"GitHub last commit: {github_timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    
+    if local_timestamp is None:
+        print("Local file does not exist. Downloading...")
+        success = download_file_from_github(file_path, local_path)
+        return {
+            'status': 'downloaded' if success else 'error',
+            'message': 'File downloaded' if success else 'Download failed',
+            'github_timestamp': github_timestamp,
+            'local_timestamp': None
+        }
+    else:
+        print(f"Local file modified: {local_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Compare timestamps (GitHub timestamp is in UTC, local is in local timezone)
+        # Since we removed timezone info, we'll compare naive datetime objects
+        # This is a simple comparison - in practice, GitHub timestamps are typically newer
+        
+        if github_timestamp > local_timestamp:
+            print("GitHub version is newer. Downloading...")
+            success = download_file_from_github(file_path, local_path)
+            return {
+                'status': 'updated' if success else 'error',
+                'message': 'File updated' if success else 'Update failed',
+                'github_timestamp': github_timestamp,
+                'local_timestamp': local_timestamp
+            }
+        else:
+            print("Local file is up to date.")
+            return {
+                'status': 'up_to_date',
+                'message': 'Local file is current',
+                'github_timestamp': github_timestamp,
+                'local_timestamp': local_timestamp
+            }
+
+def upgrade():
+    """
+    Check and update core files from the GitHub repository.
+    Updates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py
+    """
+    print("Checking for updates to core SDK files...")
+    print("=" * 50)
+    
+    # Files to check and update
+    files_to_check = [
+        "cp.py",
+        "cp_methods_reference.md", 
+        "make.py",
+        "app_template/cp.py"
+    ]
+    
+    results = {}
+    updated_count = 0
+    error_count = 0
+    
+    for file_path in files_to_check:
+        print(f"\n--- {file_path} ---")
+        result = check_and_update_file(file_path)
+        results[file_path] = result
+        
+        if result['status'] == 'updated':
+            updated_count += 1
+        elif result['status'] == 'downloaded':
+            updated_count += 1
+        elif result['status'] == 'error':
+            error_count += 1
+        
+        print(f"Status: {result['status']}")
+    
+    # Summary
+    print("\n" + "=" * 50)
+    print("UPGRADE SUMMARY")
+    print("=" * 50)
+    
+    for file_path, result in results.items():
+        status_icon = "✓" if result['status'] in ['updated', 'downloaded', 'up_to_date'] else "✗"
+        print(f"{status_icon} {file_path}: {result['status']}")
+    
+    print(f"\nFiles updated: {updated_count}")
+    print(f"Errors: {error_count}")
+    print(f"Files up to date: {len(files_to_check) - updated_count - error_count}")
+    
+    if updated_count > 0:
+        print(f"\n{updated_count} file(s) have been updated.")
+    
+    if error_count > 0:
+        print(f"\n{error_count} file(s) had errors during the update process.")
+
 # These will be set in init() by using the sdk_settings.ini file.
 # They are used by various functions in the file.
 g_app_name = ''
@@ -519,6 +718,8 @@ def output_help():
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
     print('purge: Purge all apps from the locally connected NCOS device.\n')
     print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
+    print('upgrade: Check and update core SDK files from GitHub repository.\n')
+    print('\tUpdates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py\n')
     print('unit: Run any unit tests associated with selected app.\n')
     print('system: Run any system tests associated with selected app.\n')
     print('help: Print this help information.\n')
@@ -629,7 +830,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         option = str(sys.argv[2])
 
-    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge']:
+    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge', 'upgrade']:
         # Load the settings from the sdk_settings.ini file.
         if not init(option):
             sys.exit(0)
@@ -672,6 +873,9 @@ if __name__ == "__main__":
     elif utility_name == 'uuid':
         # This is handled in init()
         pass
+
+    elif utility_name == 'upgrade':
+        upgrade()
 
     elif utility_name == 'unit':
         # load any tests in app/test/unit
