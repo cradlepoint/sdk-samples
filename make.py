@@ -103,6 +103,11 @@ def download_file_from_github(file_path, output_path=None):
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(response.text)
         
+        # Update file timestamp to current time to prevent repeated downloads
+        import time
+        current_time = time.time()
+        os.utime(output_path, (current_time, current_time))
+        
         print(f"File downloaded successfully to: {output_path}")
         return True
         
