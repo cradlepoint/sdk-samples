@@ -152,13 +152,11 @@ def check_and_update_file(file_path, local_path=None):
             'local_timestamp': None
         }
     else:
-        print(f"Local file modified: {local_timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        # Compare timestamps (GitHub timestamp is in UTC, local is in local timezone)
-        # Convert local timestamp to UTC for proper comparison
+        # Convert local timestamp to UTC for proper comparison and display
         import time
         local_utc_offset = time.timezone if (time.daylight == 0) else time.altzone
         local_utc_timestamp = local_timestamp - datetime.timedelta(seconds=local_utc_offset)
+        print(f"Local file modified: {local_utc_timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
         
         if github_timestamp > local_utc_timestamp:
             print("GitHub version is newer. Downloading...")
