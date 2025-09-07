@@ -158,8 +158,8 @@ def check_and_update_file(file_path, local_path=None):
         # Convert local timestamp to UTC for proper comparison
         import time
         local_utc_offset = time.timezone if (time.daylight == 0) else time.altzone
-        # time.timezone is negative, so we add it to convert local to UTC
-        local_utc_timestamp = local_timestamp + datetime.timedelta(seconds=abs(local_utc_offset))
+        # time.timezone is negative (seconds behind UTC), so we add it to get UTC
+        local_utc_timestamp = local_timestamp + datetime.timedelta(seconds=local_utc_offset)
         
         if github_timestamp > local_utc_timestamp:
             print("GitHub version is newer. Downloading...")
