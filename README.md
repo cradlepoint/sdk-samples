@@ -16,8 +16,8 @@
     - The main python tool used to manage application paackages.  Supports actions: create, build, install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
 - **sdk_settings.ini**
     - This is the ini file that contains the settings used by python make.py.
-- **tools/**
-    - Contains support files for the SDK. There is also a simple python syslog server that can be used during application development.
+- **tools/bin**
+    - Contains pscp.exe for windows.
 
 ## Sample Application Descriptions
 
