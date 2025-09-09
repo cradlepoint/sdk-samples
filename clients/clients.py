@@ -1,15 +1,20 @@
-# Ericsson Cradlepoint SDK Application
+# clients.py
+# Put clients in asset_id field
+# Or specify a different path in SDK appdata named "clients"
+
 import time
 import cp
+
 cp.log('Starting...')
+
 while True:
-    clients = cp.get_ipv4_lan_clients()
-    text = f'{len(clients["wired_clients"]) + len(clients["wifi_clients"])} clients: '
-    for client in clients['wired_clients']:
-        text += f'{client["ip_address"]} ({client["mac"]})'
-    for client in clients['wifi_clients']:
-        text += f'{client["ip_address"]} ({client["mac"]})'
+    results_field = cp.get_appdata('clients') or '/config/system/asset_id'
+    lan_data = cp.get_lan_clients()
+    clients = lan_data['ipv4_clients']
+    text = f"{lan_data['total_ipv4_clients']} Clients: "
+    for client in clients:
+        text += f"{client['ip_address']} ({client['mac']}), "
     text = text[:-2]
-    cp.put('/config/system/asset_id', text)
+    cp.put(results_field, text)
     cp.log(text)
-    time.sleep(300)
+    time.sleep(60)
