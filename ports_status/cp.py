@@ -126,12 +126,21 @@ class CSClient(object):
         except Exception:
             self.ncos = False
             
+        # Cache device access credentials to avoid reading config file on every API call
+        self._cached_device_ip = None
+        self._cached_username = None
+        self._cached_password = None
+        self._cached_auth = None
+            
         handlers = [logging.StreamHandler()]
         if self.ncos:
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
                             handlers=handlers)
         self.logger = logging.getLogger(app_name)
+        
+        # Disable urllib3 connection pool logging to reduce noise
+        logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
 
     def get(self, base: str, query: str = '', tree: int = 0) -> Optional[Dict[str, Any]]:
         """Construct and send a GET request to retrieve specified data from a device.
@@ -159,11 +168,11 @@ class CSClient(object):
         else:
             # Running in a computer so use http to send the get to the device.
             import requests
-            device_ip, username, password = self._get_device_access_info()
+            device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
-                response = requests.get(device_api, auth=self._get_auth(device_ip, username, password))
+                response = requests.get(device_api, auth=self._get_cached_auth())
 
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
@@ -228,13 +237,13 @@ class CSClient(object):
         else:
             # Running in a computer so use http to send the put to the device.
             import requests
-            device_ip, username, password = self._get_device_access_info()
+            device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
                 response = requests.put(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=self._get_auth(device_ip, username, password),
+                                        auth=self._get_cached_auth(),
                                         data={"data": '{}'.format(value)})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
@@ -271,13 +280,13 @@ class CSClient(object):
         else:
             # Running in a computer so use http to send the post to the device.
             import requests
-            device_ip, username, password = self._get_device_access_info()
+            device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
                 response = requests.post(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=self._get_auth(device_ip, username, password),
+                                        auth=self._get_cached_auth(),
                                         data={"data": '{}'.format(value)})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
@@ -317,13 +326,13 @@ class CSClient(object):
         else:
             # Running in a computer so use http to send the put to the device.
             import requests
-            device_ip, username, password = self._get_device_access_info()
+            device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/'.format(device_ip)
 
             try:
                 response = requests.patch(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=self._get_auth(device_ip, username, password),
+                                        auth=self._get_cached_auth(),
                                         data={"data": '{}'.format(json.dumps(value))})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
@@ -357,13 +366,13 @@ class CSClient(object):
         else:
             # Running in a computer so use http to send the delete to the device.
             import requests
-            device_ip, username, password = self._get_device_access_info()
+            device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
             try:
                 response = requests.delete(device_api,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                        auth=self._get_auth(device_ip, username, password),
+                                        auth=self._get_cached_auth(),
                                         data={"data": '{}'.format(base)})
             except (requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError):
@@ -413,6 +422,28 @@ class CSClient(object):
             # Running in a computer so just use print for the log.
             print(value)
 
+
+    def _get_cached_credentials(self) -> Tuple[str, str, str]:
+        """Get cached device credentials, loading them if not already cached.
+        
+        Returns:
+            Tuple[str, str, str]: A tuple containing (device_ip, username, password)
+        """
+        if self._cached_device_ip is None:
+            self._cached_device_ip, self._cached_username, self._cached_password = self._get_device_access_info()
+        return self._cached_device_ip, self._cached_username, self._cached_password
+    
+    def _get_cached_auth(self) -> Any:
+        """Get cached authentication object, creating it if not already cached.
+        
+        Returns:
+            requests.auth.HTTPBasicAuth or requests.auth.HTTPDigestAuth: The appropriate
+            authentication object based on the NCOS version.
+        """
+        if self._cached_auth is None:
+            device_ip, username, password = self._get_cached_credentials()
+            self._cached_auth = self._get_auth(device_ip, username, password)
+        return self._cached_auth
 
     def _get_auth(self, device_ip: str, username: str, password: str) -> Any:
         """Return the proper HTTP Auth for the NCOS version.
@@ -468,7 +499,18 @@ class CSClient(object):
                 import os
                 import configparser
 
-                settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
+                # Try parent directory first, then fallback to current directory
+                parent_settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
+                current_settings_file = os.path.join(os.getcwd(), 'sdk_settings.ini')
+                
+                # Check which file exists
+                if os.path.exists(parent_settings_file):
+                    settings_file = parent_settings_file
+                elif os.path.exists(current_settings_file):
+                    settings_file = current_settings_file
+                else:
+                    settings_file = parent_settings_file  # Use parent as default for error messages
+                
                 config = configparser.ConfigParser()
                 config.read(settings_file)
 
@@ -1361,8 +1403,8 @@ class EventingCSClient(CSClient):
         
         Returns:
             dict: Dictionary containing LAN status information including:
-                - clients_connected (int): Number of connected clients (IPv4 only)
-                - total_clients (int): Total number of clients (IPv4 + IPv6)
+                - total_ipv4_clients (int): Number of connected IPv4 clients
+                - total_ipv6_clients (int): Number of connected IPv6 clients
                 - lan_stats (dict): Overall LAN statistics including:
                     - bps (int): Total bits per second
                     - collisions (int): Collision count
@@ -1379,7 +1421,10 @@ class EventingCSClient(CSClient):
                     - opackets (int): Output packet count
                     - out_bytes (int): Output bytes
                     - timestamp (float): Statistics timestamp
-                - clients (list): List of connected clients (IPv4 only) including:
+                - ipv4_clients (list): List of connected IPv4 clients including:
+                    - ip_address (str): Client IP address
+                    - mac (str): Client MAC address
+                - ipv6_clients (list): List of connected IPv6 clients including:
                     - ip_address (str): Client IP address
                     - mac (str): Client MAC address
                 - networks (list): List of network information including:
@@ -1420,13 +1465,12 @@ class EventingCSClient(CSClient):
             # Get LAN statistics
             lan_stats = self.get('status/lan/stats') or {}
             
-            # Get clients and filter out IPv6
-            all_clients = lan_data.get("clients", [])
-            ipv4_clients = [client for client in all_clients if not client.get("ip_address", "").startswith("fe80::")]
+            # Get client information using get_lan_clients
+            client_data = self.get_lan_clients()
             
             analysis = {
-                "clients_connected": len(ipv4_clients),
-                "total_clients": len(all_clients),
+                "total_ipv4_clients": client_data.get("total_ipv4_clients", 0),
+                "total_ipv6_clients": client_data.get("total_ipv6_clients", 0),
                 "lan_stats": {
                     "bps": lan_stats.get("bps"),
                     "collisions": lan_stats.get("collisions"),
@@ -1444,7 +1488,8 @@ class EventingCSClient(CSClient):
                     "out_bytes": lan_stats.get("out"),
                     "timestamp": lan_stats.get("ts")
                 },
-                "clients": ipv4_clients,
+                "ipv4_clients": client_data.get("ipv4_clients", []),
+                "ipv6_clients": client_data.get("ipv6_clients", []),
                 "networks": [],
                 "devices": []
             }
@@ -1516,9 +1561,12 @@ class EventingCSClient(CSClient):
         
         Returns:
             dict: Dictionary containing LAN client information including:
-                - clients_connected (int): Number of connected clients (IPv4 only)
-                - total_clients (int): Total number of clients (IPv4 + IPv6)
-                - clients (list): List of connected clients (IPv4 only) including:
+                - total_ipv4_clients (int): Number of connected IPv4 clients
+                - total_ipv6_clients (int): Number of connected IPv6 clients
+                - ipv4_clients (list): List of connected IPv4 clients including:
+                    - ip_address (str): Client IP address
+                    - mac (str): Client MAC address
+                - ipv6_clients (list): List of connected IPv6 clients including:
                     - ip_address (str): Client IP address
                     - mac (str): Client MAC address
         """
@@ -1527,14 +1575,16 @@ class EventingCSClient(CSClient):
             if not lan_data:
                 return {}
             
-            # Get clients and filter out IPv6
+            # Get clients and separate IPv4 and IPv6
             all_clients = lan_data.get("clients", [])
             ipv4_clients = [client for client in all_clients if not client.get("ip_address", "").startswith("fe80::")]
+            ipv6_clients = [client for client in all_clients if client.get("ip_address", "").startswith("fe80::")]
             
             return {
-                "clients_connected": len(ipv4_clients),
-                "total_clients": len(all_clients),
-                "clients": ipv4_clients
+                "total_ipv4_clients": len(ipv4_clients),
+                "total_ipv6_clients": len(ipv6_clients),
+                "ipv4_clients": ipv4_clients,
+                "ipv6_clients": ipv6_clients
             }
         except Exception as e:
             self.log(f"Error analyzing LAN clients: {e}")
@@ -2000,6 +2050,1524 @@ class EventingCSClient(CSClient):
         except Exception as e:
             self.log(f"Error analyzing DHCP status: {e}")
             return {"error": str(e)}
+
+    def get_wan_primary_device(self) -> Optional[str]:
+        """Get the WAN primary device identifier.
+        
+        Returns:
+            str: Primary WAN device identifier, or None if not available
+        """
+        try:
+            primary_device = self.get('status/wan/primary_device')
+            return primary_device
+        except Exception as e:
+            self.log(f"Error retrieving WAN primary device: {e}")
+            return None
+
+    def ping_host(self, host: str, count: int = 4, timeout: float = 15.0, 
+                  interval: float = 0.5, packet_size: int = 56, 
+                  interface: str = None, bind_ip: bool = False) -> Optional[Dict[str, Any]]:
+        """Ping a host using the router's diagnostic tools.
+        
+        Args:
+            host: Target hostname or IP address
+            count: Number of ping packets to send (default: 4)
+            timeout: Timeout in seconds (default: 15.0)
+            interval: Interval between packets in seconds (default: 0.5)
+            packet_size: Size of ping packets in bytes (default: 56)
+            interface: Network interface to use (default: None - uses WAN primary device)
+            bind_ip: Whether to bind to specific IP (default: False)
+            
+        Returns:
+            dict: Ping results including statistics with keys:
+                - tx: number of pings transmitted
+                - rx: number of pings received  
+                - loss: percentage of lost pings
+                - min: minimum round trip time in milliseconds
+                - max: maximum round trip time in milliseconds
+                - avg: average round trip time in milliseconds
+                - error: error message if not successful
+        """
+        import time
+        
+        try:
+            # Initialize ping parameters - exact UI approach (minimal parameters)
+            ping_params = {
+                "host": host,
+                "size": packet_size,
+                "df": True,  # UI uses true, not "do"
+                "srcaddr": ""  # UI uses empty string, not null
+            }
+            
+            # Initialize result dictionary with parameters
+            pingstats = dict(ping_params)
+            
+            # Start ping process - match UI approach (simpler)
+            self.put('control/ping/start', ping_params)
+            
+            # Wait for completion, checking status periodically
+            result = None
+            try_count = 0
+            max_tries = 30
+            
+            while try_count < max_tries:
+                result = self.get('control/ping')
+                if result and result.get('status') in ["error", "done"]:
+                    break
+                time.sleep(0.5)
+                try_count += 1
+            
+            if try_count == max_tries:
+                pingstats['error'] = "No Results - Execution Timed Out"
+            elif result and result.get('status') == "error":
+                pingstats['error'] = result.get('result', 'Unknown error occurred')
+            elif result and result.get('result'):
+                # Parse ping results from text output
+                try:
+                    parsedresults = result.get('result').split('\n')
+                    
+                    # Check if we have statistics (ping completed)
+                    has_stats = any('---' in line for line in parsedresults)
+                    
+                    if has_stats:
+                        # Parse statistics from completed ping
+                        stats_line = None
+                        rtt_line = None
+                        
+                        # Find the statistics and RTT lines
+                        for i, line in enumerate(parsedresults):
+                            if 'packets transmitted' in line and 'received' in line:
+                                stats_line = line
+                            elif 'round-trip' in line and 'min/avg/max' in line:
+                                rtt_line = line
+                        
+                        if stats_line:
+                            # Extract tx, rx, loss from statistics line
+                            import re
+                            tx_match = re.search(r'(\d+)\s+packets transmitted', stats_line)
+                            rx_match = re.search(r'(\d+)\s+received', stats_line)
+                            loss_match = re.search(r'(\d+\.?\d*)% packet loss', stats_line)
+                            
+                            if tx_match:
+                                pingstats['tx'] = int(tx_match.group(1))
+                            if rx_match:
+                                pingstats['rx'] = int(rx_match.group(1))
+                            if loss_match:
+                                pingstats['loss'] = float(loss_match.group(1))
+                        
+                        if rtt_line:
+                            # Extract min, avg, max RTT
+                            rtt_match = re.search(r'min/avg/max\s*=\s*([\d.]+)/([\d.]+)/([\d.]+)', rtt_line)
+                            if rtt_match:
+                                pingstats['min'] = float(rtt_match.group(1))
+                                pingstats['avg'] = float(rtt_match.group(2))
+                                pingstats['max'] = float(rtt_match.group(3))
+                    else:
+                        # Parse individual ping responses (ping still running)
+                        ping_responses = [line for line in parsedresults if 'icmp_seq=' in line and 'time=' in line]
+                        if ping_responses:
+                            pingstats['tx'] = len(ping_responses)
+                            pingstats['rx'] = len(ping_responses)
+                            pingstats['loss'] = 0.0
+                            
+                            # Calculate RTT statistics from individual responses
+                            rtt_times = []
+                            for response in ping_responses:
+                                try:
+                                    time_part = response.split('time=')[1].split(' ms')[0]
+                                    rtt_times.append(float(time_part))
+                                except:
+                                    pass
+                            
+                            if rtt_times:
+                                pingstats['min'] = min(rtt_times)
+                                pingstats['max'] = max(rtt_times)
+                                pingstats['avg'] = sum(rtt_times) / len(rtt_times)
+                        else:
+                            pingstats['error'] = 'No ping responses found'
+                    
+                except Exception as e:
+                    self.log(f'Exception parsing ping results: {e}')
+                    # Don't override successful ping results with parsing errors
+                    if 'tx' not in pingstats:
+                        pingstats['error'] = f'Failed to parse results: {e}'
+            else:
+                pingstats['error'] = 'No results received'
+            
+            return pingstats
+            
+        except Exception as e:
+            self.log(f"Error pinging host {host}: {e}")
+            return {'error': str(e)}
+
+    def traceroute_host(self, host: str, max_hops: int = 30, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+        """Perform traceroute to a host using the router's diagnostic tools.
+        
+        Args:
+            host: Target hostname or IP address
+            max_hops: Maximum number of hops (default: 30)
+            timeout: Timeout per hop in seconds (default: 5.0)
+            
+        Returns:
+            dict: Traceroute results including hop information
+        """
+        import time
+        
+        try:
+            # Initialize traceroute parameters - minimal approach like ping
+            traceroute_params = {
+                "host": host
+            }
+            
+            # Initialize result dictionary with parameters
+            traceroute_stats = dict(traceroute_params)
+            
+            # Start traceroute process - same approach as ping
+            self.put('control/traceroute/start', traceroute_params)
+            
+            # Wait for completion, checking status periodically
+            result = None
+            try_count = 0
+            max_tries = 60  # Traceroute can take longer than ping
+            
+            while try_count < max_tries:
+                result = self.get('control/traceroute')
+                if result and result.get('status') in ["error", "done", "not started"]:
+                    break
+                time.sleep(1.0)  # Check every second for traceroute
+                try_count += 1
+            
+            if try_count == max_tries:
+                traceroute_stats['error'] = "No Results - Execution Timed Out"
+            elif result and result.get('status') == "error":
+                traceroute_stats['error'] = result.get('result', 'Unknown error occurred')
+            elif result and result.get('result'):
+                # Parse traceroute results from text output
+                try:
+                    traceroute_result = result.get('result')
+                    
+                    # Handle both string and array formats
+                    if isinstance(traceroute_result, list):
+                        # API returns array of strings
+                        traceroute_output = ''.join(traceroute_result)
+                    else:
+                        # API returns single string
+                        traceroute_output = traceroute_result
+                    
+                    traceroute_stats['raw_output'] = traceroute_output
+                    
+                    # Parse hops from traceroute output with detailed latency metrics
+                    lines = traceroute_output.split('\n')
+                    hops = []
+                    hop_details = []
+                    all_latencies = []
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if line and not line.startswith('traceroute to'):
+                            # Parse hop information
+                            if 'ms' in line or '*' in line:
+                                hops.append(line)
+                                
+                                # Parse detailed hop information
+                                hop_info = self._parse_traceroute_hop(line)
+                                if hop_info:
+                                    hop_details.append(hop_info)
+                                    # Collect all valid latencies for overall statistics
+                                    if hop_info.get('latencies'):
+                                        all_latencies.extend(hop_info['latencies'])
+                    
+                    traceroute_stats['hops'] = hops
+                    traceroute_stats['hop_count'] = len(hops)
+                    traceroute_stats['hop_details'] = hop_details
+                    
+                    # Calculate overall latency statistics
+                    if all_latencies:
+                        traceroute_stats['latency_stats'] = {
+                            'min': min(all_latencies),
+                            'max': max(all_latencies),
+                            'avg': sum(all_latencies) / len(all_latencies),
+                            'total_samples': len(all_latencies)
+                        }
+                    
+                except Exception as e:
+                    self.log(f'Exception parsing traceroute results: {e}')
+                    # Don't override successful traceroute results with parsing errors
+                    if 'hops' not in traceroute_stats:
+                        traceroute_stats['error'] = f'Failed to parse results: {e}'
+            else:
+                traceroute_stats['error'] = 'No results received'
+            
+            return traceroute_stats
+            
+        except Exception as e:
+            self.log(f"Error performing traceroute to {host}: {e}")
+            return {'error': str(e)}
+
+    def _parse_traceroute_hop(self, hop_line: str) -> Optional[Dict[str, Any]]:
+        """Parse individual traceroute hop line for detailed metrics.
+        
+        Args:
+            hop_line: Raw traceroute hop line (e.g., "1 192.168.1.1 (192.168.1.1)  1.234 ms  1.567 ms  1.890 ms")
+            
+        Returns:
+            dict: Parsed hop information with latencies and IPs
+        """
+        import re
+        
+        try:
+            # Extract hop number
+            hop_match = re.match(r'^\s*(\d+)', hop_line)
+            if not hop_match:
+                return None
+                
+            hop_num = int(hop_match.group(1))
+            
+            # Extract IP addresses (both with and without hostnames)
+            ip_pattern = r'(\d+\.\d+\.\d+\.\d+)'
+            ips = re.findall(ip_pattern, hop_line)
+            
+            # Extract latency values
+            latency_pattern = r'(\d+\.?\d*)\s*ms'
+            latencies = [float(match) for match in re.findall(latency_pattern, hop_line)]
+            
+            # Count timeouts (*)
+            timeouts = hop_line.count('*')
+            
+            hop_info = {
+                'hop_number': hop_num,
+                'ips': ips,
+                'latencies': latencies,
+                'timeouts': timeouts,
+                'total_probes': len(latencies) + timeouts
+            }
+            
+            # Calculate hop-specific statistics
+            if latencies:
+                hop_info['latency_stats'] = {
+                    'min': min(latencies),
+                    'max': max(latencies),
+                    'avg': sum(latencies) / len(latencies),
+                    'samples': len(latencies)
+                }
+            
+            # Determine primary IP (first non-timeout IP)
+            hop_info['primary_ip'] = ips[0] if ips else None
+            
+            return hop_info
+            
+        except Exception as e:
+            self.log(f'Error parsing hop line "{hop_line}": {e}')
+            return None
+
+    def speed_test(self, host: str = "", interface: str = "", duration: int = 5, 
+                   packet_size: int = 0, port: int = None, protocol: str = "tcp",
+                   direction: str = "recv") -> Optional[Dict[str, Any]]:
+        """Perform network speed test using netperf (based on UI implementation).
+        
+        Args:
+            host: Target host for speed test (empty for auto-detect)
+            interface: Network interface to use (empty for auto-detect)
+            duration: Test duration in seconds (default: 5)
+            packet_size: Packet size in bytes (0 for default)
+            port: Port number (None for default)
+            protocol: Protocol to use - "tcp" or "udp" (default: "tcp")
+            direction: Test direction - "recv", "send", or "rr" (default: "recv")
+            
+        Returns:
+            dict: Speed test results including throughput in Mbps
+        """
+        import time
+        
+        try:
+            # If no interface specified, get the WAN primary device interface
+            if not interface:
+                primary_device = self.get_wan_primary_device()
+                if primary_device:
+                    # Get the interface name for the primary device
+                    wan_status = self.get('status/wan')
+                    devices = wan_status.get('devices', {})
+                    if primary_device in devices:
+                        device_info = devices[primary_device].get('info', {})
+                        interface = device_info.get('iface', primary_device)
+                    else:
+                        interface = primary_device
+                else:
+                    interface = "any"
+            
+            # Build speedtest parameters matching UI format
+            speedtest_params = {
+                "input": {
+                    "options": {
+                        "limit": {
+                            "size": packet_size,
+                            "time": duration
+                        },
+                        "port": port,
+                        "fwport": None,
+                        "host": host,
+                        "ifc_wan": interface,
+                        "tcp": protocol == "tcp",
+                        "udp": protocol == "udp",
+                        "send": direction == "send",
+                        "recv": direction == "recv",
+                        "rr": direction == "rr"
+                    },
+                    "tests": None
+                },
+                "run": 1
+            }
+            
+            # Start speedtest
+            start_result = self.put('control/netperf', speedtest_params)
+            
+            if not start_result:
+                return {'error': 'Failed to start speedtest'}
+            
+            # Wait for completion, checking status periodically
+            result = None
+            try_count = 0
+            max_tries = duration + 10  # Wait a bit longer than test duration
+            
+            while try_count < max_tries:
+                result = self.get('control/netperf/output')
+                if result and result.get('status') in ['complete', 'error']:
+                    break
+                time.sleep(1.0)
+                try_count += 1
+            
+            if try_count == max_tries:
+                return {'error': 'Speedtest timed out'}
+            
+            # Get the results from the performance results path
+            if result and result.get('results_path'):
+                results_path = result['results_path']
+                perf_results = self.get(results_path.lstrip('/'))
+            else:
+                perf_results = None
+            
+            if perf_results:
+                # Parse the performance results
+                speedtest_stats = {
+                    'parameters': speedtest_params,
+                    'start_result': start_result,
+                    'status': result.get('status'),
+                    'command': result.get('command'),
+                    'raw_results': perf_results
+                }
+                
+                # Extract throughput data from perf_results
+                if isinstance(perf_results, dict):
+                    # Check if perf_results contains test data directly (like "tcp_down")
+                    for test_name, test_data in perf_results.items():
+                        if isinstance(test_data, dict) and 'THROUGHPUT' in test_data:
+                            throughput = test_data.get('THROUGHPUT')
+                            throughput_units = test_data.get('THROUGHPUT_UNITS')
+                            elapsed_time = test_data.get('ELAPSED_TIME')
+                            
+                            if throughput and throughput_units:
+                                # Convert to Mbps if needed
+                                throughput_value = float(throughput)
+                                if '10^6bits/s' in throughput_units:
+                                    # Already in Mbps
+                                    speedtest_stats['throughput_mbps'] = throughput_value
+                                elif 'bits/s' in throughput_units:
+                                    # Convert from bits/s to Mbps
+                                    speedtest_stats['throughput_mbps'] = throughput_value / 1000000
+                                elif 'bytes/s' in throughput_units:
+                                    # Convert from bytes/s to Mbps
+                                    speedtest_stats['throughput_mbps'] = (throughput_value * 8) / 1000000
+                                
+                                speedtest_stats['test_type'] = test_name
+                                speedtest_stats['elapsed_time'] = elapsed_time
+                                speedtest_stats['raw_throughput'] = throughput
+                                speedtest_stats['throughput_units'] = throughput_units
+                                break
+                    
+                    # If no direct test data found, check for nested device structure
+                    if 'throughput_mbps' not in speedtest_stats:
+                        for device_name, device_data in perf_results.items():
+                            if isinstance(device_data, dict) and 'perf_results' in device_data:
+                                perf_data = device_data['perf_results']
+                                if perf_data:
+                                    speedtest_stats['device'] = device_name
+                                    speedtest_stats['performance'] = perf_data
+                                    
+                                    # Extract throughput metrics
+                                    for test_name, test_data in perf_data.items():
+                                        if isinstance(test_data, dict):
+                                            throughput = test_data.get('THROUGHPUT')
+                                            throughput_units = test_data.get('THROUGHPUT_UNITS')
+                                            elapsed_time = test_data.get('ELAPSED_TIME')
+                                            
+                                            if throughput and throughput_units:
+                                                # Convert to Mbps if needed
+                                                throughput_value = float(throughput)
+                                                if '10^6bits/s' in throughput_units:
+                                                    # Already in Mbps
+                                                    speedtest_stats['throughput_mbps'] = throughput_value
+                                                elif 'bits/s' in throughput_units:
+                                                    # Convert from bits/s to Mbps
+                                                    speedtest_stats['throughput_mbps'] = throughput_value / 1000000
+                                                elif 'bytes/s' in throughput_units:
+                                                    # Convert from bytes/s to Mbps
+                                                    speedtest_stats['throughput_mbps'] = (throughput_value * 8) / 1000000
+                                                
+                                                speedtest_stats['test_type'] = test_name
+                                                speedtest_stats['elapsed_time'] = elapsed_time
+                                                speedtest_stats['raw_throughput'] = throughput
+                                                speedtest_stats['throughput_units'] = throughput_units
+                                                break
+                
+                return speedtest_stats
+            else:
+                return {'error': 'No performance results found'}
+            
+        except Exception as e:
+            self.log(f"Error performing speed test: {e}")
+            return {'error': str(e)}
+
+    def stop_speed_test(self) -> Optional[Dict[str, Any]]:
+        """Stop any running speed test."""
+        try:
+            result = self.put('control/netperf/stop', '')
+            return {'result': result}
+        except Exception as e:
+            self.log(f"Error stopping speed test: {e}")
+            return None
+
+    def start_packet_capture(self, interface: str = "any", filter: str = "", 
+                            count: int = 20, timeout: int = 600,
+                            wifichannel: str = "", wifichannelwidth: str = "", 
+                            wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+        """Start packet capture using tcpdump API.
+        
+        Args:
+            interface: Network interface to capture on (e.g., "mdm-9a724d09", "mon0", "any")
+            filter: BPF filter expression (e.g., "net 192.168.0.0/24 and tcp and not port 80")
+            count: Number of packets to capture (default: 20, 0 = unlimited)
+            timeout: Capture timeout in seconds (default: 600, 0 = unlimited)
+            wifichannel: WiFi channel for wireless captures (default: "")
+            wifichannelwidth: WiFi channel width (default: "")
+            wifiextrachannel: WiFi extra channel (default: "")
+            url: Capture URL endpoint (default: "http://127.0.0.1:8000/capture")
+            
+        Note:
+            If both count=0 and timeout=0, the capture will stream forever until interrupted.
+            This is useful for continuous monitoring or thread-based captures.
+            Use at least one limit (count > 0 or timeout > 0) for finite captures.
+            
+        Returns:
+            dict: Packet capture start result with download URL
+        """
+        import datetime
+        
+        try:
+            # Log infinite capture mode
+            if count == 0 and timeout == 0:
+                self.log("INFO: Infinite capture mode - will stream forever until interrupted")
+                self.log("Use this mode for continuous monitoring or thread-based captures")
+            
+            # Generate timestamp-based filename
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = f"{timestamp}.pcap"
+            
+            # Build tcpdump API URL with parameters
+            params = {
+                "iface": interface,
+                "args": filter,
+                "wifichannel": wifichannel,
+                "wifichannelwidth": wifichannelwidth,
+                "wifiextrachannel": wifiextrachannel,
+                "timeout": timeout,
+                "count": count,
+                "url": url
+            }
+            
+            # Create the API endpoint URL with query parameters
+            import urllib.parse
+            query_string = urllib.parse.urlencode(params)
+            api_url = f"tcpdump/{filename}?{query_string}"
+            
+            # Start packet capture by making GET request to the tcpdump API
+            # This will start the capture and return the pcap file
+            capture_result = self.get(api_url)
+            
+            # Handle the response properly
+            if isinstance(capture_result, tuple):
+                # If it's a tuple, extract the data part
+                capture_result = capture_result[1] if len(capture_result) > 1 else capture_result[0]
+            
+            return {
+                'parameters': params,
+                'filename': filename,
+                'api_url': api_url,
+                'capture_result': capture_result,
+                'download_url': f"{self._get_cached_credentials()[0]}/api/{api_url}?iface={interface}&args={filter}&wifichannel={wifichannel}&wifichannelwidth={wifichannelwidth}&wifiextrachannel={wifiextrachannel}&timeout={timeout}&count={count}&url={url}"
+            }
+            
+        except Exception as e:
+            self.log(f"Error starting packet capture: {e}")
+            return {'error': str(e)}
+
+    def stop_packet_capture(self) -> Optional[Dict[str, Any]]:
+        """Stop running packet capture.
+        
+        Note: The tcpdump API doesn't have a specific stop endpoint.
+        Captures are typically stopped by timeout or packet count limits.
+        
+        Returns:
+            dict: Stop result (informational)
+        """
+        try:
+            # The tcpdump API doesn't have a stop endpoint
+            # Captures are controlled by timeout and count parameters
+            return {
+                'message': 'Packet capture stop not supported by API',
+                'note': 'Captures are controlled by timeout and count parameters',
+                'suggestion': 'Use shorter timeout or lower count for shorter captures'
+            }
+            
+        except Exception as e:
+            self.log(f"Error stopping packet capture: {e}")
+            return {'error': str(e)}
+
+    def get_available_interfaces(self) -> Optional[Dict[str, Any]]:
+        """Get available network interfaces for packet capture.
+        
+        Returns:
+            dict: Available interfaces with their types and status
+        """
+        try:
+            # Get WAN devices
+            wan_status = self.get('status/wan')
+            devices = wan_status.get('devices', {})
+            
+            interfaces = {}
+            
+            # Add WAN interfaces
+            for device_name, device_data in devices.items():
+                if isinstance(device_data, dict) and 'info' in device_data:
+                    info = device_data['info']
+                    iface = info.get('iface')
+                    device_type = info.get('type', 'unknown')
+                    status = device_data.get('status', {})
+                    connection_state = status.get('connection_state', 'unknown')
+                    
+                    interfaces[iface] = {
+                        'device_name': device_name,
+                        'type': device_type,
+                        'connection_state': connection_state,
+                        'description': f"{device_type} interface ({device_name})"
+                    }
+            
+            # Add common monitoring interfaces
+            interfaces['mon0'] = {
+                'device_name': 'mon0',
+                'type': 'wifi_monitor',
+                'connection_state': 'monitor',
+                'description': '2.4GHz WiFi monitor interface'
+            }
+            
+            interfaces['mon1'] = {
+                'device_name': 'mon1', 
+                'type': 'wifi_monitor',
+                'connection_state': 'monitor',
+                'description': '5GHz WiFi monitor interface'
+            }
+            
+            interfaces['any'] = {
+                'device_name': 'any',
+                'type': 'any',
+                'connection_state': 'any',
+                'description': 'Capture on all interfaces'
+            }
+            
+            return {
+                'interfaces': interfaces,
+                'total_count': len(interfaces)
+            }
+            
+        except Exception as e:
+            self.log(f"Error getting available interfaces: {e}")
+            return {'error': str(e)}
+
+    def download_packet_capture(self, filename: str, local_path: str = None, capture_params: dict = None) -> Optional[Dict[str, Any]]:
+        """Download a packet capture file.
+        
+        Args:
+            filename: Name of the pcap file to download
+            local_path: Local path to save the file (default: current directory)
+            capture_params: Parameters used in the original capture (optional)
+            
+        Returns:
+            dict: Download result with file path
+        """
+        import os
+        import urllib.request
+        import urllib.parse
+        
+        try:
+            if not local_path:
+                local_path = f"./{filename}"
+            
+            # Always use HTTP download - the tcpdump API serves files on-demand
+            # Whether running locally or remotely, we need to use the HTTP API
+            if self.ncos:
+                # Running on router - use localhost
+                device_ip = "127.0.0.1"
+            else:
+                # Running remotely - use cached device IP
+                device_ip = self._get_cached_credentials()[0]  # device_ip is at index 0
+            
+            # Build the download URL with the same parameters used in the capture
+            # Based on the HAR file, we need to include the capture parameters
+            if capture_params:
+                # Use the actual parameters from the capture
+                params = urllib.parse.urlencode(capture_params)
+                download_url = f"http://{device_ip}/api/tcpdump/{filename}?{params}"
+            else:
+                # Default parameters if none provided
+                download_url = f"http://{device_ip}/api/tcpdump/{filename}?iface=any&args=tcp&wifichannel=&wifichannelwidth=&wifiextrachannel=&timeout=30&count=5"
+            
+            # Add authentication for the download
+            import urllib.request
+            import base64
+            
+            # Create a password manager for authentication
+            password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+            password_mgr.add_password(None, f"http://{device_ip}", "admin", "1q1q1q1q1q")
+            handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
+            opener = urllib.request.build_opener(handler)
+            urllib.request.install_opener(opener)
+            
+            # Download the file
+            urllib.request.urlretrieve(download_url, local_path)
+            
+            # Get file size
+            file_size = os.path.getsize(local_path)
+            
+            return {
+                'filename': filename,
+                'local_path': local_path,
+                'download_url': download_url,
+                'file_size': file_size,
+                'success': True
+            }
+            
+        except Exception as e:
+            self.log(f"Error downloading packet capture: {e}")
+            return {'error': str(e)}
+
+    def start_streaming_capture(self, interface: str = "any", filter: str = "", 
+                               wifichannel: str = "", wifichannelwidth: str = "", 
+                               wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+        """Start a streaming packet capture that runs forever until interrupted.
+        
+        This is a convenience method for continuous monitoring or thread-based captures.
+        
+        Args:
+            interface: Network interface to capture on (e.g., "mdm-9a724d09", "mon0", "any")
+            filter: BPF filter expression (e.g., "net 192.168.0.0/24 and tcp and not port 80")
+            wifichannel: WiFi channel for wireless captures (default: "")
+            wifichannelwidth: WiFi channel width (default: "")
+            wifiextrachannel: WiFi extra channel (default: "")
+            url: Capture URL endpoint (default: "http://127.0.0.1:8000/capture")
+            
+        Returns:
+            dict: Streaming capture start result with download URL
+        """
+        return self.start_packet_capture(
+            interface=interface,
+            filter=filter,
+            count=0,  # Unlimited packets
+            timeout=0,  # Unlimited time
+            wifichannel=wifichannel,
+            wifichannelwidth=wifichannelwidth,
+            wifiextrachannel=wifiextrachannel,
+            url=url
+        )
+
+    def get_packet_capture_status(self) -> Optional[Dict[str, Any]]:
+        """Get packet capture status.
+        
+        Returns:
+            dict: Current capture status
+        """
+        try:
+            # Get tcpdump status
+            status = self.get('control/system/tcpdump')
+            
+            # Handle the response properly
+            if isinstance(status, tuple):
+                # If it's a tuple, extract the data part
+                status = status[1] if len(status) > 1 else status[0]
+            
+            return {
+                'status': status
+            }
+            
+        except Exception as e:
+            self.log(f"Error getting packet capture status: {e}")
+            return None
+
+    def start_file_server(self, folder_path: str = "/tmp", port: int = 8000, 
+                         host: str = "0.0.0.0", title: str = "File Download") -> Optional[Dict[str, Any]]:
+        """Start a modern web file server for downloading files from a folder.
+        
+        Args:
+            folder_path: Path to the folder to serve files from (default: "/tmp")
+            port: Port to run the server on (default: 8000)
+            host: Host to bind to (default: "0.0.0.0" - all interfaces)
+            title: Title for the web page (default: "File Download")
+            
+        Returns:
+            dict: Server start result with URL and status
+        """
+        import threading
+        import http.server
+        import socketserver
+        import os
+        import mimetypes
+        from datetime import datetime
+        
+        try:
+            # Ensure folder exists
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path, exist_ok=True)
+            
+            class FileServerHandler(http.server.SimpleHTTPRequestHandler):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, directory=folder_path, **kwargs)
+                
+                def do_GET(self):
+                    if self.path == '/':
+                        self.send_file_listing()
+                    else:
+                        super().do_GET()
+                
+                def send_file_listing(self):
+                    """Send a modern file listing page"""
+                    try:
+                        files = []
+                        total_size = 0
+                        
+                        for item in os.listdir(folder_path):
+                            item_path = os.path.join(folder_path, item)
+                            if os.path.isfile(item_path):
+                                stat = os.stat(item_path)
+                                size = stat.st_size
+                                mtime = datetime.fromtimestamp(stat.st_mtime)
+                                files.append({
+                                    'name': item,
+                                    'size': size,
+                                    'size_human': self.format_size(size),
+                                    'modified': mtime.strftime('%Y-%m-%d %H:%M:%S'),
+                                    'type': mimetypes.guess_type(item)[0] or 'application/octet-stream'
+                                })
+                                total_size += size
+                        
+                        # Sort by modification time (newest first)
+                        files.sort(key=lambda x: x['modified'], reverse=True)
+                        
+                        html = self.generate_file_listing_html(files, total_size)
+                        
+                        self.send_response(200)
+                        self.send_header('Content-type', 'text/html; charset=utf-8')
+                        self.send_header('Content-Length', str(len(html.encode('utf-8'))))
+                        self.end_headers()
+                        self.wfile.write(html.encode('utf-8'))
+                        
+                    except Exception as e:
+                        self.send_error(500, f"Error listing files: {e}")
+                
+                def format_size(self, size):
+                    """Format file size in human readable format"""
+                    for unit in ['B', 'KB', 'MB', 'GB']:
+                        if size < 1024.0:
+                            return f"{size:.1f} {unit}"
+                        size /= 1024.0
+                    return f"{size:.1f} TB"
+                
+                def generate_file_listing_html(self, files, total_size):
+                    """Generate modern HTML for file listing"""
+                    file_count = len(files)
+                    total_size_human = self.format_size(total_size)
+                    
+                    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }}
+        .container {{ 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }}
+        .header {{ 
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+        }}
+        .header h1 {{ font-size: 2.5em; margin-bottom: 10px; font-weight: 300; }}
+        .header p {{ opacity: 0.9; font-size: 1.1em; }}
+        .stats {{ 
+            display: flex; 
+            justify-content: center; 
+            gap: 30px; 
+            margin-top: 20px; 
+            flex-wrap: wrap;
+        }}
+        .stat {{ 
+            background: rgba(255,255,255,0.2); 
+            padding: 15px 25px; 
+            border-radius: 25px; 
+            backdrop-filter: blur(10px);
+        }}
+        .content {{ padding: 30px; }}
+        .file-list {{ 
+            display: grid; 
+            gap: 15px; 
+        }}
+        .file-item {{ 
+            display: flex; 
+            align-items: center; 
+            padding: 20px; 
+            background: #f8f9fa; 
+            border-radius: 10px; 
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }}
+        .file-item:hover {{ 
+            background: #e3f2fd; 
+            border-color: #2196f3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }}
+        .file-icon {{ 
+            width: 50px; 
+            height: 50px; 
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            border-radius: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            color: white; 
+            font-size: 1.5em; 
+            margin-right: 20px;
+            flex-shrink: 0;
+        }}
+        .file-info {{ flex: 1; }}
+        .file-name {{ 
+            font-size: 1.2em; 
+            font-weight: 600; 
+            color: #2c3e50; 
+            margin-bottom: 5px;
+            word-break: break-all;
+        }}
+        .file-meta {{ 
+            color: #7f8c8d; 
+            font-size: 0.9em; 
+            display: flex; 
+            gap: 15px; 
+            flex-wrap: wrap;
+        }}
+        .download-btn {{ 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 25px; 
+            text-decoration: none; 
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }}
+        .download-btn:hover {{ 
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }}
+        .empty {{ 
+            text-align: center; 
+            padding: 60px 20px; 
+            color: #7f8c8d; 
+        }}
+        .empty-icon {{ 
+            font-size: 4em; 
+            margin-bottom: 20px; 
+            opacity: 0.5;
+        }}
+        @media (max-width: 768px) {{
+            .file-item {{ flex-direction: column; text-align: center; }}
+            .file-icon {{ margin: 0 0 15px 0; }}
+            .file-meta {{ justify-content: center; }}
+            .stats {{ flex-direction: column; align-items: center; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📁 {title}</h1>
+            <p>Download files from the server</p>
+            <div class="stats">
+                <div class="stat">📊 {file_count} files</div>
+                <div class="stat">💾 {total_size_human}</div>
+            </div>
+        </div>
+        <div class="content">
+"""
+                    
+                    if files:
+                        html += '<div class="file-list">'
+                        for file in files:
+                            html += f"""
+            <div class="file-item">
+                <div class="file-icon">📄</div>
+                <div class="file-info">
+                    <div class="file-name">{file['name']}</div>
+                    <div class="file-meta">
+                        <span>📅 {file['modified']}</span>
+                        <span>📏 {file['size_human']}</span>
+                        <span>🏷️ {file['type']}</span>
+                    </div>
+                </div>
+                <a href="{file['name']}" class="download-btn" download>⬇️ Download</a>
+            </div>"""
+                        html += '</div>'
+                    else:
+                        html += f"""
+            <div class="empty">
+                <div class="empty-icon">📂</div>
+                <h3>No files found</h3>
+                <p>Upload some files to the <code>{folder_path}</code> directory to see them here.</p>
+            </div>"""
+                    
+                    html += """
+        </div>
+    </div>
+</body>
+</html>"""
+                    return html
+                
+                def log_message(self, format, *args):
+                    # Use cp.log if available, otherwise print
+                    try:
+                        import cp
+                        cp.log(f"FileServer: {format % args}")
+                    except:
+                        print(f"FileServer: {format % args}")
+            
+            # Start server in background thread
+            def run_server():
+                try:
+                    with socketserver.TCPServer((host, port), FileServerHandler) as httpd:
+                        self.log(f"File server started on http://{host}:{port}")
+                        self.log(f"Serving files from: {folder_path}")
+                        httpd.serve_forever()
+                except Exception as e:
+                    self.log(f"File server error: {e}")
+            
+            server_thread = threading.Thread(target=run_server, daemon=True)
+            server_thread.start()
+            
+            return {
+                'status': 'started',
+                'url': f'http://{host}:{port}',
+                'folder_path': folder_path,
+                'port': port,
+                'host': host,
+                'title': title
+            }
+        except Exception as e:
+            self.log(f"Error starting file server: {e}")
+            return {'error': str(e)}
+
+    def create_user(self, username: str, password: str, group: str = "admin") -> dict:
+        """Create a new user on the router.
+        
+        Args:
+            username (str): The username for the new user
+            password (str): The password for the new user
+            group (str): The group for the user (default: "admin")
+            
+        Returns:
+            dict: Result of the user creation operation
+        """
+        try:
+            user_data = {
+                "group": group,
+                "password": password,
+                "username": username
+            }
+            
+            result = self.post('config/system/users/', user_data)
+            
+            if isinstance(result, tuple):
+                result = result[1] if len(result) > 1 else result[0]
+                
+            return {
+                'success': True,
+                'username': username,
+                'group': group,
+                'result': result
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
+
+    def get_users(self) -> dict:
+        """Get list of all users on the router.
+        
+        Returns:
+            dict: List of users and their information
+        """
+        try:
+            result = self.get('config/system/users/')
+            
+            if isinstance(result, tuple):
+                result = result[1] if len(result) > 1 else result[0]
+                
+            return {
+                'success': True,
+                'users': result
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def delete_user(self, username: str) -> dict:
+        """Delete a user from the router.
+        
+        Args:
+            username (str): The username to delete
+            
+        Returns:
+            dict: Result of the user deletion operation
+        """
+        try:
+            # First get the user to find their _id_
+            users_result = self.get_users()
+            if not users_result.get('success'):
+                return users_result
+                
+            users = users_result.get('users', [])
+            user_to_delete = None
+            
+            if isinstance(users, list):
+                for i, user in enumerate(users):
+                    if isinstance(user, dict) and user.get('username') == username:
+                        user_to_delete = {'user': user, 'index': i, '_id_': user.get('_id_')}
+                        break
+            
+            if not user_to_delete:
+                return {
+                    'success': False,
+                    'error': f'User {username} not found',
+                    'username': username
+                }
+            
+            # Try deleting by _id_ first, then by index
+            user_id = user_to_delete['_id_']
+            index = user_to_delete['index']
+            
+            # Try by _id_ first
+            result = self.delete(f'config/system/users/{user_id}')
+            
+            if isinstance(result, tuple):
+                result = result[1] if len(result) > 1 else result[0]
+            
+            # If that fails, try by index
+            if not result.get('success', True):
+                result = self.delete(f'config/system/users/{index}')
+                if isinstance(result, tuple):
+                    result = result[1] if len(result) > 1 else result[0]
+                
+            return {
+                'success': True,
+                'username': username,
+                'user_id': user_id,
+                'index': index,
+                'result': result
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
+
+    def ensure_user_exists(self, username: str, password: str, group: str = "admin") -> dict:
+        """Ensure a user exists, creating it if it doesn't.
+        
+        Args:
+            username (str): The username to ensure exists
+            password (str): The password for the user (used if creating)
+            group (str): The group for the user (default: "admin")
+            
+        Returns:
+            dict: Result of the operation
+        """
+        try:
+            # First check if user exists
+            users_result = self.get_users()
+            if not users_result.get('success'):
+                return users_result
+                
+            users = users_result.get('users', [])
+            existing_user = None
+            
+            if isinstance(users, list):
+                for user in users:
+                    if isinstance(user, dict) and user.get('username') == username:
+                        existing_user = user
+                        break
+            elif isinstance(users, dict):
+                # Handle case where users might be a dict with usernames as keys
+                if username in users:
+                    existing_user = users[username]
+                    
+            if existing_user:
+                return {
+                    'success': True,
+                    'username': username,
+                    'action': 'exists',
+                    'user': existing_user
+                }
+            else:
+                # User doesn't exist, create it
+                create_result = self.create_user(username, password, group)
+                if create_result.get('success'):
+                    create_result['action'] = 'created'
+                return create_result
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
+
+    def _generate_random_password(self, length: int = 16) -> str:
+        """Generate a random password with mixed characters.
+        
+        Args:
+            length: Length of the password (default: 16)
+            
+        Returns:
+            str: Random password
+        """
+        import random
+        import string
+        
+        # Define character sets
+        lowercase = string.ascii_lowercase
+        uppercase = string.ascii_uppercase
+        digits = string.digits
+        special = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        
+        # Ensure at least one character from each set
+        password = [
+            random.choice(lowercase),
+            random.choice(uppercase),
+            random.choice(digits),
+            random.choice(special)
+        ]
+        
+        # Fill the rest with random characters from all sets
+        all_chars = lowercase + uppercase + digits + special
+        for _ in range(length - 4):
+            password.append(random.choice(all_chars))
+        
+        # Shuffle the password
+        random.shuffle(password)
+        return ''.join(password)
+
+    def ensure_fresh_user(self, username: str, group: str = "admin") -> dict:
+        """Ensure a user exists with a fresh random password, deleting existing user first.
+        
+        Args:
+            username (str): The username to ensure exists
+            group (str): The group for the user (default: "admin")
+            
+        Returns:
+            dict: Result of the operation with the generated password
+        """
+        try:
+            # First, try to delete the user if it exists
+            delete_result = self.delete_user(username)
+            if delete_result.get('success'):
+                self.log(f"Deleted existing user '{username}'")
+            else:
+                self.log(f"User '{username}' did not exist or deletion failed: {delete_result.get('error', 'Unknown')}")
+            
+            # Generate a random password
+            password = self._generate_random_password()
+            
+            # Create the user with the new password
+            create_result = self.create_user(username, password, group)
+            if create_result.get('success'):
+                create_result['password'] = password
+                create_result['action'] = 'created_fresh'
+                self.log(f"Created fresh user '{username}' with random password")
+            else:
+                create_result['password'] = password
+                
+            return create_result
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
+
+    def comprehensive_packet_capture(self, 
+                                   interface: str = "mon1",
+                                   filter: str = "",
+                                   count: int = 10,
+                                   timeout: int = 10,
+                                   start_file_server: bool = True,
+                                   file_server_port: int = 8001,
+                                   capture_user: str = "SDKTCPDUMP") -> dict:
+        """Comprehensive packet capture that handles everything in one call.
+        
+        This method:
+        1. Creates/ensures a dedicated user exists
+        2. Captures packets on specified interface
+        3. Downloads the pcap file
+        4. Starts a file server to serve the captured files (optional)
+        
+        Args:
+            interface: Network interface to capture on (default: "mon1" - 5GHz WiFi monitor)
+            filter: BPF filter expression (default: "" for all traffic)
+            count: Number of packets to capture (default: 10)
+            timeout: Capture timeout in seconds (default: 10)
+            start_file_server: Whether to start file server (default: True)
+            file_server_port: Port for file server (default: 8001)
+            capture_user: Username for packet capture operations (default: "SDKTCPDUMP")
+            
+        Returns:
+            dict: Comprehensive result with all operation details
+        """
+        result = {
+            'success': False,
+            'user_creation': None,
+            'packet_capture': None,
+            'file_download': None,
+            'file_server': None,
+            'captured_file': None,
+            'file_server_url': None,
+            'generated_password': None
+        }
+        
+        try:
+            # Step 1: Ensure dedicated user exists with fresh random password
+            self.log(f"Step 1: Setting up fresh user '{capture_user}' for packet capture...")
+            user_result = self.ensure_fresh_user(capture_user, "admin")
+            result['user_creation'] = user_result
+            result['generated_password'] = user_result.get('password')
+            if not user_result.get('success'):
+                result['error'] = f"Failed to create user: {user_result.get('error')}"
+                return result
+            self.log(f"User setup: {user_result.get('action', 'unknown')}")
+            
+            # Step 2: Start packet capture
+            self.log(f"Step 2: Starting packet capture on {interface}...")
+            capture_result = self.start_packet_capture(
+                interface=interface,
+                filter=filter,
+                count=count,
+                timeout=timeout,
+                url=""  # No custom URL to avoid connection issues
+            )
+            result['packet_capture'] = capture_result
+            
+            if not capture_result or 'filename' not in capture_result:
+                result['error'] = "Failed to start packet capture"
+                return result
+            
+            filename = capture_result['filename']
+            self.log(f"Capture started, filename: {filename}")
+            
+            # Step 3: Wait for capture to complete and download file
+            self.log("Step 3: Waiting for capture to complete...")
+            import time
+            time.sleep(max(3, timeout // 3))  # Wait for capture to complete
+            
+            # Create captures directory
+            import os
+            captures_dir = os.path.join(os.getcwd(), "captures")
+            os.makedirs(captures_dir, exist_ok=True)
+            local_path = os.path.join(captures_dir, filename)
+            
+            # Download the captured file
+            self.log(f"Step 4: Downloading captured file {filename}...")
+            download_result = self.download_packet_capture(
+                filename, 
+                local_path, 
+                capture_result.get('parameters', {})
+            )
+            result['file_download'] = download_result
+            
+            if not download_result.get('success'):
+                result['error'] = f"Failed to download pcap file: {download_result.get('error')}"
+                return result
+            
+            file_size = download_result.get('file_size', 0)
+            self.log(f"Successfully downloaded pcap file: {local_path} ({file_size} bytes)")
+            result['captured_file'] = {
+                'filename': filename,
+                'local_path': local_path,
+                'file_size': file_size
+            }
+            
+            # Step 5: Start file server (optional)
+            if start_file_server:
+                self.log(f"Step 5: Starting file server on port {file_server_port}...")
+                file_server_result = self.start_file_server(
+                    folder_path=captures_dir,
+                    port=file_server_port,
+                    host="0.0.0.0",
+                    title="Packet Capture Files"
+                )
+                result['file_server'] = file_server_result
+                
+                if file_server_result.get('status') == 'started':
+                    file_server_url = file_server_result.get('url', f'http://0.0.0.0:{file_server_port}')
+                    result['file_server_url'] = file_server_url
+                    self.log(f"File server started: {file_server_url}")
+                else:
+                    self.log(f"File server warning: {file_server_result.get('error', 'Unknown error')}")
+            
+            result['success'] = True
+            self.log("Comprehensive packet capture completed successfully!")
+            return result
+            
+        except Exception as e:
+            result['error'] = str(e)
+            self.log(f"Error in comprehensive packet capture: {e}")
+            return result
+
+
+    def dns_lookup(self, hostname: str, record_type: str = "A") -> Optional[Dict[str, Any]]:
+        """Perform DNS lookup using the router's DNS tools.
+        
+        Args:
+            hostname: Hostname to resolve
+            record_type: DNS record type (A, AAAA, MX, etc.)
+            
+        Returns:
+            dict: DNS lookup results
+        """
+        try:
+            # Perform DNS lookup
+            dns_params = {
+                "hostname": hostname,
+                "record_type": record_type
+            }
+            
+            result = self.post('control/dns/lookup', dns_params)
+            
+            return {
+                'hostname': hostname,
+                'record_type': record_type,
+                'result': result
+            }
+            
+        except Exception as e:
+            self.log(f"Error performing DNS lookup for {hostname}: {e}")
+            return None
+
+    def clear_dns_cache(self) -> Optional[Dict[str, Any]]:
+        """Clear the router's DNS cache.
+        
+        Returns:
+            dict: Cache clear result
+        """
+        try:
+            # Clear DNS cache
+            result = self.post('control/dns/cache', {"clear": True})
+            
+            return {
+                'result': result
+            }
+            
+        except Exception as e:
+            self.log(f"Error clearing DNS cache: {e}")
+            return None
+
+    def network_connectivity_test(self, host: str = "8.8.8.8", port: int = 53, 
+                                 timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+        """Test network connectivity to a host and port.
+        
+        Args:
+            host: Target host (default: "8.8.8.8")
+            port: Target port (default: 53)
+            timeout: Timeout in seconds (default: 5.0)
+            
+        Returns:
+            dict: Connectivity test results
+        """
+        try:
+            # Test connectivity
+            test_params = {
+                "host": host,
+                "port": port,
+                "timeout": timeout
+            }
+            
+            result = self.post('control/network/connectivity_test', test_params)
+            
+            return {
+                'host': host,
+                'port': port,
+                'timeout': timeout,
+                'result': result
+            }
+            
+        except Exception as e:
+            self.log(f"Error testing connectivity to {host}:{port}: {e}")
+            return None
+
+    def stop_ping(self) -> Optional[Dict[str, Any]]:
+        """Stop any running ping process.
+        
+        Returns:
+            dict: Stop result
+        """
+        try:
+            # Stop ping process
+            result = self.put('control/ping/stop', '')
+            
+            return {
+                'result': result
+            }
+            
+        except Exception as e:
+            self.log(f"Error stopping ping: {e}")
+            return None
 
 
 
@@ -3081,8 +4649,8 @@ def get_lan_status() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing LAN status information including:
-            - clients_connected (int): Number of connected clients (IPv4 only)
-            - total_clients (int): Total number of clients (IPv4 + IPv6)
+            - total_ipv4_clients (int): Number of connected IPv4 clients
+            - total_ipv6_clients (int): Number of connected IPv6 clients
             - lan_stats (dict): Overall LAN statistics including:
                 - bps (int): Total bits per second
                 - collisions (int): Collision count
@@ -3099,7 +4667,10 @@ def get_lan_status() -> Dict[str, Any]:
                 - opackets (int): Output packet count
                 - out_bytes (int): Output bytes
                 - timestamp (float): Statistics timestamp
-            - clients (list): List of connected clients (IPv4 only) including:
+            - ipv4_clients (list): List of connected IPv4 clients including:
+                - ip_address (str): Client IP address
+                - mac (str): Client MAC address
+            - ipv6_clients (list): List of connected IPv6 clients including:
                 - ip_address (str): Client IP address
                 - mac (str): Client MAC address
             - networks (list): List of network information including:
@@ -3139,9 +4710,12 @@ def get_lan_clients() -> Dict[str, Any]:
     
     Returns:
         dict: Dictionary containing LAN client information including:
-            - clients_connected (int): Number of connected clients (IPv4 only)
-            - total_clients (int): Total number of clients (IPv4 + IPv6)
-            - clients (list): List of connected clients (IPv4 only) including:
+            - total_ipv4_clients (int): Number of connected IPv4 clients
+            - total_ipv6_clients (int): Number of connected IPv6 clients
+            - ipv4_clients (list): List of connected IPv4 clients including:
+                - ip_address (str): Client IP address
+                - mac (str): Client MAC address
+            - ipv6_clients (list): List of connected IPv6 clients including:
                 - ip_address (str): Client IP address
                 - mac (str): Client MAC address
     """
@@ -4600,6 +6174,19 @@ def get_wan_device_summary() -> Dict[str, Any]:
         _cs_client.logger.exception(f"Error getting WAN device summary: {e}")
         return {"error": str(e)}
 
+
+def get_wan_primary_device() -> Optional[str]:
+    """Get the WAN primary device identifier.
+    
+    Returns:
+        str: Primary WAN device identifier, or None if not available
+    """
+    try:
+        return _cs_client.get_wan_primary_device()
+    except Exception as e:
+        print(f"Error retrieving WAN primary device: {e}")
+        return None
+
 # ============================================================================
 # COMPREHENSIVE STATUS FUNCTION
 # ============================================================================
@@ -5490,3 +7077,441 @@ def get_firewall_summary() -> Dict[str, Any]:
     except Exception as e:
         _cs_client.logger.exception(f"Error retrieving firewall summary: {e}")
         return {}
+
+
+# ============================================================================
+# NETWORK DIAGNOSTIC CONVENIENCE FUNCTIONS
+# ============================================================================
+
+def ping_host(host: str, count: int = 4, timeout: float = 15.0, 
+              interval: float = 0.5, packet_size: int = 56, 
+              interface: str = None, bind_ip: bool = False) -> Optional[Dict[str, Any]]:
+    """Ping a host using the router's diagnostic tools.
+    
+    Args:
+        host: Target hostname or IP address
+        count: Number of ping packets to send (default: 4)
+        timeout: Timeout in seconds (default: 15.0)
+        interval: Interval between packets in seconds (default: 0.5)
+        packet_size: Size of ping packets in bytes (default: 56)
+        interface: Network interface to use (default: None - uses WAN primary device)
+        bind_ip: Whether to bind to specific IP (default: False)
+        
+    Returns:
+        dict: Ping results including statistics with keys:
+            - tx: number of pings transmitted
+            - rx: number of pings received  
+            - loss: percentage of lost pings
+            - min: minimum round trip time in milliseconds
+            - max: maximum round trip time in milliseconds
+            - avg: average round trip time in milliseconds
+            - error: error message if not successful
+    """
+    try:
+        return _cs_client.ping_host(host, count, timeout, interval, packet_size, interface, bind_ip)
+    except Exception as e:
+        print(f"Error pinging host {host}: {e}")
+        return None
+
+
+def traceroute_host(host: str, max_hops: int = 30, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    """Perform traceroute to a host using the router's diagnostic tools.
+    
+    Args:
+        host: Target hostname or IP address
+        max_hops: Maximum number of hops (default: 30)
+        timeout: Timeout per hop in seconds (default: 5.0)
+        
+    Returns:
+        dict: Traceroute results including hop information
+    """
+    try:
+        return _cs_client.traceroute_host(host, max_hops, timeout)
+    except Exception as e:
+        print(f"Error performing traceroute to {host}: {e}")
+        return None
+
+
+def speed_test(host: str = "", interface: str = "", duration: int = 5, 
+               packet_size: int = 0, port: int = None, protocol: str = "tcp",
+               direction: str = "recv") -> Optional[Dict[str, Any]]:
+    """Perform network speed test using netperf.
+    
+    Args:
+        host: Target host for speed test (empty for local test)
+        interface: Network interface to use (empty for auto)
+        duration: Test duration in seconds (default: 5)
+        packet_size: Packet size in bytes (0 for default)
+        port: Port number (None for default)
+        protocol: Protocol to use - "tcp" or "udp" (default: "tcp")
+        direction: Test direction - "recv", "send", or "rr" (default: "recv")
+        
+    Returns:
+        dict: Speed test results including throughput
+    """
+    try:
+        return _cs_client.speed_test(host, interface, duration, packet_size, port, protocol, direction)
+    except Exception as e:
+        print(f"Error performing speed test: {e}")
+        return None
+
+
+def start_packet_capture(interface: str = "any", filter: str = "", 
+                        count: int = 20, timeout: int = 600,
+                        wifichannel: str = "", wifichannelwidth: str = "", 
+                        wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+    """Start packet capture using tcpdump API.
+    
+    Args:
+        interface: Network interface to capture on (e.g., "mdm-9a724d09", "mon0", "any")
+        filter: BPF filter expression (e.g., "net 192.168.0.0/24 and tcp and not port 80")
+        count: Number of packets to capture (default: 20, 0 = unlimited)
+        timeout: Capture timeout in seconds (default: 600, 0 = unlimited)
+        wifichannel: WiFi channel for wireless captures (default: "")
+        wifichannelwidth: WiFi channel width (default: "")
+        wifiextrachannel: WiFi extra channel (default: "")
+        url: Capture URL endpoint (default: "http://127.0.0.1:8000/capture")
+        
+    Note:
+        If both count=0 and timeout=0, the capture will stream forever until interrupted.
+        This is useful for continuous monitoring or thread-based captures.
+        Use at least one limit (count > 0 or timeout > 0) for finite captures.
+        
+    Returns:
+        dict: Packet capture start result with download URL
+    """
+    try:
+        return _cs_client.start_packet_capture(interface, filter, count, timeout, wifichannel, wifichannelwidth, wifiextrachannel, url)
+    except Exception as e:
+        print(f"Error starting packet capture: {e}")
+        return None
+
+
+def stop_packet_capture() -> Optional[Dict[str, Any]]:
+    """Stop running packet capture.
+    
+    Note: The tcpdump API doesn't have a specific stop endpoint.
+    Captures are typically stopped by timeout or packet count limits.
+    
+    Returns:
+        dict: Stop result (informational)
+    """
+    try:
+        return _cs_client.stop_packet_capture()
+    except Exception as e:
+        print(f"Error stopping packet capture: {e}")
+        return None
+
+
+def get_available_interfaces() -> Optional[Dict[str, Any]]:
+    """Get available network interfaces for packet capture.
+    
+    Returns:
+        dict: Available interfaces with their types and status
+    """
+    try:
+        return _cs_client.get_available_interfaces()
+    except Exception as e:
+        print(f"Error getting available interfaces: {e}")
+        return None
+
+
+def download_packet_capture(filename: str, local_path: str = None, capture_params: dict = None) -> Optional[Dict[str, Any]]:
+    """Download a packet capture file.
+    
+    Args:
+        filename: Name of the pcap file to download
+        local_path: Local path to save the file (default: current directory)
+        capture_params: Parameters used in the original capture (optional)
+        
+    Returns:
+        dict: Download result with file path
+    """
+    try:
+        return _cs_client.download_packet_capture(filename, local_path, capture_params)
+    except Exception as e:
+        print(f"Error downloading packet capture: {e}")
+        return None
+
+
+def start_streaming_capture(interface: str = "any", filter: str = "", 
+                           wifichannel: str = "", wifichannelwidth: str = "", 
+                           wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+    """Start a streaming packet capture that runs forever until interrupted.
+    
+    This is a convenience method for continuous monitoring or thread-based captures.
+    
+    Args:
+        interface: Network interface to capture on (e.g., "mdm-9a724d09", "mon0", "any")
+        filter: BPF filter expression (e.g., "net 192.168.0.0/24 and tcp and not port 80")
+        wifichannel: WiFi channel for wireless captures (default: "")
+        wifichannelwidth: WiFi channel width (default: "")
+        wifiextrachannel: WiFi extra channel (default: "")
+        url: Capture URL endpoint (default: "http://127.0.0.1:8000/capture")
+        
+    Returns:
+        dict: Streaming capture start result with download URL
+    """
+    try:
+        return _cs_client.start_streaming_capture(interface, filter, wifichannel, wifichannelwidth, wifiextrachannel, url)
+    except Exception as e:
+        print(f"Error starting streaming capture: {e}")
+        return None
+
+
+def get_packet_capture_status() -> Optional[Dict[str, Any]]:
+    """Get packet capture status.
+    
+    Returns:
+        dict: Current capture status
+    """
+    try:
+        return _cs_client.get_packet_capture_status()
+    except Exception as e:
+        print(f"Error getting packet capture status: {e}")
+        return None
+
+
+def dns_lookup(hostname: str, record_type: str = "A") -> Optional[Dict[str, Any]]:
+    """Perform DNS lookup using the router's DNS tools.
+    
+    Args:
+        hostname: Hostname to resolve
+        record_type: DNS record type (A, AAAA, MX, etc.)
+        
+    Returns:
+        dict: DNS lookup results
+    """
+    try:
+        return _cs_client.dns_lookup(hostname, record_type)
+    except Exception as e:
+        print(f"Error performing DNS lookup for {hostname}: {e}")
+        return None
+
+
+def clear_dns_cache() -> Optional[Dict[str, Any]]:
+    """Clear the router's DNS cache.
+    
+    Returns:
+        dict: Cache clear result
+    """
+    try:
+        return _cs_client.clear_dns_cache()
+    except Exception as e:
+        print(f"Error clearing DNS cache: {e}")
+        return None
+
+
+def network_connectivity_test(host: str = "8.8.8.8", port: int = 53, 
+                             timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    """Test network connectivity to a host and port.
+    
+    Args:
+        host: Target host (default: "8.8.8.8")
+        port: Target port (default: 53)
+        timeout: Timeout in seconds (default: 5.0)
+        
+    Returns:
+        dict: Connectivity test results
+    """
+    try:
+        return _cs_client.network_connectivity_test(host, port, timeout)
+    except Exception as e:
+        print(f"Error testing connectivity to {host}:{port}: {e}")
+        return None
+
+
+def stop_ping() -> Optional[Dict[str, Any]]:
+    """Stop any running ping process.
+    
+    Returns:
+        dict: Stop result
+    """
+    try:
+        return _cs_client.stop_ping()
+    except Exception as e:
+        print(f"Error stopping ping: {e}")
+        return None
+
+
+def speed_test(host: str = "", interface: str = "", duration: int = 5, 
+               packet_size: int = 0, port: int = None, protocol: str = "tcp",
+               direction: str = "recv") -> Optional[Dict[str, Any]]:
+    """Perform network speed test using netperf.
+    
+    Args:
+        host: Target host for speed test (empty for auto-detect)
+        interface: Network interface to use (empty for auto-detect)
+        duration: Test duration in seconds (default: 5)
+        packet_size: Packet size in bytes (0 for default)
+        port: Port number (None for default)
+        protocol: Protocol to use - "tcp" or "udp" (default: "tcp")
+        direction: Test direction - "recv", "send", or "rr" (default: "recv")
+        
+    Returns:
+        dict: Speed test results including throughput in Mbps
+    """
+    try:
+        return _cs_client.speed_test(host, interface, duration, packet_size, port, protocol, direction)
+    except Exception as e:
+        print(f"Error performing speed test: {e}")
+        return None
+
+
+def stop_speed_test() -> Optional[Dict[str, Any]]:
+    """Stop any running speed test.
+    
+    Returns:
+        dict: Stop result
+    """
+    try:
+        return _cs_client.stop_speed_test()
+    except Exception as e:
+        print(f"Error stopping speed test: {e}")
+        return None
+
+
+def start_file_server(folder_path: str = "/tmp", port: int = 8000, 
+                     host: str = "0.0.0.0", title: str = "File Download") -> Optional[Dict[str, Any]]:
+    """Start a modern web file server for downloading files from a folder.
+    
+    Args:
+        folder_path: Path to the folder to serve files from (default: "/tmp")
+        port: Port to run the server on (default: 8000)
+        host: Host to bind to (default: "0.0.0.0" - all interfaces)
+        title: Title for the web page (default: "File Download")
+        
+    Returns:
+        dict: Server start result with URL and status
+    """
+    try:
+        return _cs_client.start_file_server(folder_path, port, host, title)
+    except Exception as e:
+        print(f"Error starting file server: {e}")
+        return None
+
+
+def create_user(username: str, password: str, group: str = "admin") -> Optional[Dict[str, Any]]:
+    """Create a new user on the router.
+    
+    Args:
+        username (str): The username for the new user
+        password (str): The password for the new user
+        group (str): The group for the user (default: "admin")
+        
+    Returns:
+        dict: Result of the user creation operation
+    """
+    try:
+        return _cs_client.create_user(username, password, group)
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        return None
+
+
+def get_users() -> Optional[Dict[str, Any]]:
+    """Get list of all users on the router.
+    
+    Returns:
+        dict: List of users and their information
+    """
+    try:
+        return _cs_client.get_users()
+    except Exception as e:
+        print(f"Error getting users: {e}")
+        return None
+
+
+def delete_user(username: str) -> Optional[Dict[str, Any]]:
+    """Delete a user from the router.
+    
+    Args:
+        username (str): The username to delete
+        
+    Returns:
+        dict: Result of the user deletion operation
+    """
+    try:
+        return _cs_client.delete_user(username)
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return None
+
+
+def ensure_user_exists(username: str, password: str, group: str = "admin") -> Optional[Dict[str, Any]]:
+    """Ensure a user exists, creating it if it doesn't.
+    
+    Args:
+        username (str): The username to ensure exists
+        password (str): The password for the user (used if creating)
+        group (str): The group for the user (default: "admin")
+        
+    Returns:
+        dict: Result of the operation
+    """
+    try:
+        return _cs_client.ensure_user_exists(username, password, group)
+    except Exception as e:
+        print(f"Error ensuring user exists: {e}")
+        return None
+
+
+def ensure_fresh_user(username: str, group: str = "admin") -> Optional[Dict[str, Any]]:
+    """Ensure a user exists with a fresh random password, deleting existing user first.
+    
+    Args:
+        username (str): The username to ensure exists
+        group (str): The group for the user (default: "admin")
+        
+    Returns:
+        dict: Result of the operation with the generated password
+    """
+    try:
+        return _cs_client.ensure_fresh_user(username, group)
+    except Exception as e:
+        print(f"Error ensuring fresh user exists: {e}")
+        return None
+
+
+def comprehensive_packet_capture(interface: str = "mon1",
+                               filter: str = "",
+                               count: int = 10,
+                               timeout: int = 10,
+                               start_file_server: bool = True,
+                               file_server_port: int = 8001,
+                               capture_user: str = "SDKTCPDUMP") -> Optional[Dict[str, Any]]:
+    """Comprehensive packet capture that handles everything in one call.
+    
+    This convenience function:
+    1. Creates/ensures a dedicated user exists
+    2. Captures packets on specified interface
+    3. Downloads the pcap file
+    4. Starts a file server to serve the captured files (optional)
+    
+    Args:
+        interface: Network interface to capture on (default: "mon1" - 5GHz WiFi monitor)
+        filter: BPF filter expression (default: "" for all traffic)
+        count: Number of packets to capture (default: 10)
+        timeout: Capture timeout in seconds (default: 10)
+        start_file_server: Whether to start file server (default: True)
+        file_server_port: Port for file server (default: 8001)
+        capture_user: Username for packet capture operations (default: "SDKTCPDUMP")
+        
+    Returns:
+        dict: Comprehensive result with all operation details
+    """
+    try:
+        return _cs_client.comprehensive_packet_capture(
+            interface=interface,
+            filter=filter,
+            count=count,
+            timeout=timeout,
+            start_file_server=start_file_server,
+            file_server_port=file_server_port,
+            capture_user=capture_user
+        )
+    except Exception as e:
+        print(f"Error in comprehensive packet capture: {e}")
+        return None
+
+
