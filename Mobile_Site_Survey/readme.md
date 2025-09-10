@@ -1,66 +1,99 @@
 ![image](https://github.com/cradlepoint/sdk-samples/assets/7169690/656231d7-7b60-4670-8bd3-c7b66ae0955e)
 
-Application Name
-================
-Mobile Site Survey
+# Mobile Site Survey: Cellular Network Drive Testing Application
 
+## Overview
 
-Application Version
-===================
-2.6.1
+Mobile Site Survey is a comprehensive cellular network assessment platform designed for drive testing and stationary deployment evaluation. The application performs automated network performance measurements, collecting geospatial data, cellular signal diagnostics, and network throughput metrics for comprehensive coverage analysis.
 
+**GPS Requirement**: This application requires active GPS connectivity and location lock for proper operation. All testing functions depend on accurate GPS positioning data.
 
-External Requirements
-=====================
-- Modem(s) with cellular connectivity
-- GPS antenna and location lock
+## System Requirements
 
+- **Hardware**: Cellular modem(s) with active connectivity
+- **Positioning**: GPS antenna with location lock capability (required)
+- **Network**: Router with web interface access
 
-Application Purpose
-===================
-This app is intended to perform drive testing of cellular networks but also works for testing stationary deployments.
-It will run automatic tests collecting location (GPS), interface diagnostics (including cellular signal), and speedtests (optional).
+## Web Interface Configuration
 
-The app is configurable through a webUI running on port 8000.  Use NCM Remote Connect to 127.0.0.1 port 8000 HTTP.
-Or locally, forward the Primary LAN Zone to the Router Zone with the Default Allow All policy.
+The application provides a web-based management interface accessible via:
 
-* Execute Manual Survey - a button is provided at the top to start testing. Or delete the description field.
-* Download Results - Opens a new tab with results files (CSV) available for download.
-* Save Config - saves Mobile Site Survey configuration to router.
+- **Local Access**: HTTP service on port 8000
+- **Remote Access**: NetCloud Manager Remote Connect to 127.0.0.1:8000 (HTTP only)
+- **Network Configuration**: Configure firewall rules to forward Primary LAN Zone to Router Zone with Default Allow All policy
 
-Survey Options:
+## Core Functionality
 
-* Run Distance based tests - The app will run tests when the router has moved the distance defined
-* Distance Between Tests (meters) - Set the distance for automatic testing
+### Manual Survey Execution
+- **Execute Manual Survey**: Initiate immediate testing via web interface control
+- **Browse Surveys**: Access web interface for CSV result downloads
+- **Configuration Persistence**: Save Mobile Site Survey configuration to router storage
 
-* Run Time based tests - The app will run tests at the time interval defined
-* Time Between Tests (seconds) - Set the time interval for automatic testing
+### Automated Testing Parameters
 
-Both distance and timed tests can be enabled.
-Note: New tests cannot start until all current interface tests complete.
+**Distance-Based Testing**
+- **Enabled**: Automatic test execution based on geospatial movement (requires GPS)
+- **Distance Threshold**: Configurable minimum distance (meters) between test executions
+- **Geospatial Triggering**: Automatic test initiation based on GPS position changes
 
-* Test Ethernet and Wifi-as-WAN - Disabled only tests cellular modems
-* Run Speedtests - Include Ookla TCP upload and download tests (if disabled, app will ping 8.8.8.8 to measure latency)
-* Monitor Packet Loss Between Tests - Continuously ping 8.8.8.8 and track tx/rx, packet loss
-* Write to .csv - Write test results to .csv file on router flash (Accessible via FTP server)
-* Debug Logs - Additional debugging logs for application troubleshooting.
+**Time-Based Testing**
+- **Timed Tests**: Configurable time intervals (seconds) between test cycles
+- **Scheduled Execution**: Automated testing based on time-based triggers
 
-Send to Server
-Powered by https://5g-ready.io
-* Enable Send to Server - Application will send results to server using HTTP POST
-* Include Full Interface Diagnostics - send all available diagnostics (not just signal)
-* Include Application Logs - send testing logs (useful for troubleshooting)
-* Server URL - The URL of the HTTP server to send the results to (e.g. https://5g-ready.io/injector)
-* Server Token - Bearer token for server authentication
+**Note**: Distance and time-based testing can be enabled simultaneously. New test cycles are queued until current interface diagnostics complete.
 
-Surveyors
-If you have multiple routers that you would like to synchronize testing with the app will start them at the same time.
-Be sure routers are reachable on port 8000.
-* Enable Surveyors - Trigger remote routers applications to test at the same time
-* Surveyors - Enter the IP Addresses of other routers, separated by commas.
+## Testing Configuration Options
 
----
+### Interface Testing
+- **Multi-Interface Support**: Test all connected WAN interfaces including Ethernet and Wi-Fi-as-WAN
+- **Cellular-Only Mode**: Disable non-cellular interface testing
 
-By default the app will tests every 50 meters including speedtests and write results to a .csv file.
+### Performance Measurement
+- **Speed Testing**: Ookla TCP upload/download performance tests
+- **Latency Measurement**: ICMP ping to 8.8.8.8 (fallback when speed tests disabled)
 
-You can edit the default settings in settings.py
+### Data Management
+- **CSV Export**: Write test results to router flash storage (accessible via HTTP)
+- **Debug Logging**: Enhanced diagnostic logging for troubleshooting
+
+## Server Integration
+
+**Powered by 5g-ready.io**
+
+### Data Transmission
+- **HTTP POST Integration**: Automated results transmission to remote server
+- **Comprehensive Diagnostics**: Optional transmission of full interface diagnostics
+- **Log Transmission**: Application logs for server-side troubleshooting
+
+### Authentication
+- **Server URL**: Configurable HTTP endpoint (e.g., https://5g-ready.io/injector)
+- **Bearer Token Authentication**: Optional server authentication token
+
+## Multi-Router Synchronization
+
+### Surveyor Coordination
+- **Synchronized Testing**: Coordinate testing across multiple router instances
+- **Network Requirements**: Ensure routers are accessible on port 8000
+- **IP Configuration**: Comma-separated list of remote router IP addresses
+
+## Data Collection Schema
+
+The application collects the following metrics by default:
+- **Temporal**: Timestamp
+- **Geospatial**: Latitude, Longitude (GPS-dependent)
+- **Network Identity**: Carrier, Cell ID, Service Display, Band
+- **Signal Quality**: RSSI, SINR, RSRP, RSRQ
+- **Performance**: Download/Upload speeds, Latency
+- **Traffic Statistics**: Bytes Sent, Bytes Received
+- **Reference**: Results URL
+
+## Default Configuration
+
+The application operates with the following default parameters:
+- **Test Interval**: 50-meter distance threshold
+- **Speed Testing**: Enabled
+- **Data Export**: CSV format to router flash storage
+
+## Configuration Management
+
+Default settings can be modified in `settings.py` for custom deployment requirements.
