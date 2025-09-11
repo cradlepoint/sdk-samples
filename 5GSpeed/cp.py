@@ -35,10 +35,24 @@ import signal
 import sys
 import time
 import configparser
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
+import urllib.request
+import urllib.parse
+import traceback
+import requests
+import base64
+import datetime
+import random
+import string
+import http.server
+import socketserver
+import mimetypes
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Literal
+from http import HTTPStatus
+from datetime import datetime, timedelta
+from enum import Enum
 
 try:
-    import traceback
+    pass  # traceback already imported above
 except ImportError:
     traceback = None
 
@@ -73,8 +87,8 @@ class CSClient(object):
         logger (logging.Logger): Logger instance for the application.
     """
     END_OF_HEADER = b"\r\n\r\n"
-    STATUS_HEADER_RE = re.compile(b"status: \w*")
-    CONTENT_LENGTH_HEADER_RE = re.compile(b"content-length: \w*")
+    STATUS_HEADER_RE = re.compile(rb"status: \w*")
+    CONTENT_LENGTH_HEADER_RE = re.compile(rb"content-length: \w*")
     MAX_PACKET_SIZE = 8192
     RECV_TIMEOUT = 2.0
 
@@ -167,7 +181,6 @@ class CSClient(object):
             return self._dispatch(cmd).get('data')
         else:
             # Running in a computer so use http to send the get to the device.
-            import requests
             device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
@@ -236,7 +249,6 @@ class CSClient(object):
             return self._dispatch(cmd)
         else:
             # Running in a computer so use http to send the put to the device.
-            import requests
             device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
@@ -279,7 +291,6 @@ class CSClient(object):
             return self._dispatch(cmd)
         else:
             # Running in a computer so use http to send the post to the device.
-            import requests
             device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
@@ -325,7 +336,6 @@ class CSClient(object):
             return self._dispatch(cmd)
         else:
             # Running in a computer so use http to send the put to the device.
-            import requests
             device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/'.format(device_ip)
 
@@ -365,7 +375,6 @@ class CSClient(object):
             return self._dispatch(cmd)
         else:
             # Running in a computer so use http to send the delete to the device.
-            import requests
             device_ip, username, password = self._get_cached_credentials()
             device_api = 'http://{}/api/{}/{}'.format(device_ip, base, query)
 
@@ -461,8 +470,6 @@ class CSClient(object):
             requests.auth.HTTPBasicAuth or requests.auth.HTTPDigestAuth: The appropriate
             authentication object based on the NCOS version.
         """
-        import requests
-        from http import HTTPStatus
 
         use_basic = False
         device_api = 'http://{}/api/status/product_info'.format(device_ip)
@@ -496,8 +503,6 @@ class CSClient(object):
             device_password = ''
 
             if 'linux' not in sys.platform:
-                import os
-                import configparser
 
                 # Try parent directory first, then fallback to current directory
                 parent_settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
@@ -2088,7 +2093,6 @@ class EventingCSClient(CSClient):
                 - avg: average round trip time in milliseconds
                 - error: error message if not successful
         """
-        import time
         
         try:
             # Initialize ping parameters - exact UI approach (minimal parameters)
@@ -2143,7 +2147,6 @@ class EventingCSClient(CSClient):
                         
                         if stats_line:
                             # Extract tx, rx, loss from statistics line
-                            import re
                             tx_match = re.search(r'(\d+)\s+packets transmitted', stats_line)
                             rx_match = re.search(r'(\d+)\s+received', stats_line)
                             loss_match = re.search(r'(\d+\.?\d*)% packet loss', stats_line)
@@ -2211,7 +2214,6 @@ class EventingCSClient(CSClient):
         Returns:
             dict: Traceroute results including hop information
         """
-        import time
         
         try:
             # Initialize traceroute parameters - minimal approach like ping
@@ -2313,7 +2315,6 @@ class EventingCSClient(CSClient):
         Returns:
             dict: Parsed hop information with latencies and IPs
         """
-        import re
         
         try:
             # Extract hop number
@@ -2377,7 +2378,6 @@ class EventingCSClient(CSClient):
         Returns:
             dict: Speed test results including throughput in Mbps
         """
-        import time
         
         try:
             # If no interface specified, get the WAN primary device interface
@@ -2539,7 +2539,7 @@ class EventingCSClient(CSClient):
     def start_packet_capture(self, interface: str = "any", filter: str = "", 
                             count: int = 20, timeout: int = 600,
                             wifichannel: str = "", wifichannelwidth: str = "", 
-                            wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+                            wifiextrachannel: str = "", url: str = "") -> Optional[Dict[str, Any]]:
         """Start packet capture using tcpdump API.
         
         Args:
@@ -2550,7 +2550,7 @@ class EventingCSClient(CSClient):
             wifichannel: WiFi channel for wireless captures (default: "")
             wifichannelwidth: WiFi channel width (default: "")
             wifiextrachannel: WiFi extra channel (default: "")
-            url: Capture URL endpoint (default: "http://127.0.0.1:8000/capture")
+            url: Capture URL endpoint (default: "" - use router default behavior)
             
         Note:
             If both count=0 and timeout=0, the capture will stream forever until interrupted.
@@ -2560,7 +2560,6 @@ class EventingCSClient(CSClient):
         Returns:
             dict: Packet capture start result with download URL
         """
-        import datetime
         
         try:
             # Log infinite capture mode
@@ -2569,7 +2568,7 @@ class EventingCSClient(CSClient):
                 self.log("Use this mode for continuous monitoring or thread-based captures")
             
             # Generate timestamp-based filename
-            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             filename = f"{timestamp}.pcap"
             
             # Build tcpdump API URL with parameters
@@ -2585,7 +2584,6 @@ class EventingCSClient(CSClient):
             }
             
             # Create the API endpoint URL with query parameters
-            import urllib.parse
             query_string = urllib.parse.urlencode(params)
             api_url = f"tcpdump/{filename}?{query_string}"
             
@@ -2703,9 +2701,7 @@ class EventingCSClient(CSClient):
         Returns:
             dict: Download result with file path
         """
-        import os
-        import urllib.request
-        import urllib.parse
+
         
         try:
             if not local_path:
@@ -2731,8 +2727,6 @@ class EventingCSClient(CSClient):
                 download_url = f"http://{device_ip}/api/tcpdump/{filename}?iface=any&args=tcp&wifichannel=&wifichannelwidth=&wifiextrachannel=&timeout=30&count=5"
             
             # Add authentication for the download
-            import urllib.request
-            import base64
             
             # Create a password manager for authentication
             password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
@@ -2761,7 +2755,7 @@ class EventingCSClient(CSClient):
 
     def start_streaming_capture(self, interface: str = "any", filter: str = "", 
                                wifichannel: str = "", wifichannelwidth: str = "", 
-                               wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+                               wifiextrachannel: str = "", url: str = "") -> Optional[Dict[str, Any]]:
         """Start a streaming packet capture that runs forever until interrupted.
         
         This is a convenience method for continuous monitoring or thread-based captures.
@@ -2772,7 +2766,7 @@ class EventingCSClient(CSClient):
             wifichannel: WiFi channel for wireless captures (default: "")
             wifichannelwidth: WiFi channel width (default: "")
             wifiextrachannel: WiFi extra channel (default: "")
-            url: Capture URL endpoint (default: "http://127.0.0.1:8000/capture")
+            url: Capture URL endpoint (default: "" - use router default behavior)
             
         Returns:
             dict: Streaming capture start result with download URL
@@ -2811,12 +2805,13 @@ class EventingCSClient(CSClient):
             self.log(f"Error getting packet capture status: {e}")
             return None
 
-    def start_file_server(self, folder_path: str = "/tmp", port: int = 8000, 
+    def start_file_server(self, folder_path: str = "files", port: int = 8000, 
                          host: str = "0.0.0.0", title: str = "File Download") -> Optional[Dict[str, Any]]:
         """Start a modern web file server for downloading files from a folder.
         
         Args:
-            folder_path: Path to the folder to serve files from (default: "/tmp")
+            folder_path: Path to the folder to serve files from (default: "files")
+                        Always uses subdirectories from current working directory
             port: Port to run the server on (default: 8000)
             host: Host to bind to (default: "0.0.0.0" - all interfaces)
             title: Title for the web page (default: "File Download")
@@ -2824,21 +2819,23 @@ class EventingCSClient(CSClient):
         Returns:
             dict: Server start result with URL and status
         """
-        import threading
-        import http.server
-        import socketserver
-        import os
-        import mimetypes
-        from datetime import datetime
         
         try:
+            # Ensure folder_path is relative to current working directory
+            if os.path.isabs(folder_path):
+                # If absolute path provided, use just the basename as subdirectory
+                folder_path = os.path.basename(folder_path)
+            
+            # Create full path relative to current working directory
+            full_folder_path = os.path.join(os.getcwd(), folder_path)
+            
             # Ensure folder exists
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path, exist_ok=True)
+            if not os.path.exists(full_folder_path):
+                os.makedirs(full_folder_path, exist_ok=True)
             
             class FileServerHandler(http.server.SimpleHTTPRequestHandler):
                 def __init__(self, *args, **kwargs):
-                    super().__init__(*args, directory=folder_path, **kwargs)
+                    super().__init__(*args, directory=full_folder_path, **kwargs)
                 
                 def do_GET(self):
                     if self.path == '/':
@@ -2852,8 +2849,8 @@ class EventingCSClient(CSClient):
                         files = []
                         total_size = 0
                         
-                        for item in os.listdir(folder_path):
-                            item_path = os.path.join(folder_path, item)
+                        for item in os.listdir(full_folder_path):
+                            item_path = os.path.join(full_folder_path, item)
                             if os.path.isfile(item_path):
                                 stat = os.stat(item_path)
                                 size = stat.st_size
@@ -2890,7 +2887,7 @@ class EventingCSClient(CSClient):
                     return f"{size:.1f} TB"
                 
                 def generate_file_listing_html(self, files, total_size):
-                    """Generate modern HTML for file listing"""
+                    """Generate Ericsson-inspired HTML for file listing"""
                     file_count = len(files)
                     total_size_human = self.format_size(total_size)
                     
@@ -2904,128 +2901,160 @@ class EventingCSClient(CSClient):
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #ffffff;
+            color: #1a1a1a;
+            line-height: 1.6;
             min-height: 100vh;
-            padding: 20px;
         }}
-        .container {{ 
-            max-width: 1000px; 
-            margin: 0 auto; 
-            background: white; 
-            border-radius: 12px; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
+        .header {{
+            background: #ffffff;
+            border-bottom: 1px solid #e5e5e5;
+            padding: 2rem;
+            text-align: center;
         }}
-        .header {{ 
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white; 
-            padding: 30px; 
-            text-align: center; 
+        .header h1 {{
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 0.5rem;
         }}
-        .header h1 {{ font-size: 2.5em; margin-bottom: 10px; font-weight: 300; }}
-        .header p {{ opacity: 0.9; font-size: 1.1em; }}
-        .stats {{ 
-            display: flex; 
-            justify-content: center; 
-            gap: 30px; 
-            margin-top: 20px; 
+        .header p {{
+            color: #666666;
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }}
+        .stats {{
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
             flex-wrap: wrap;
         }}
-        .stat {{ 
-            background: rgba(255,255,255,0.2); 
-            padding: 15px 25px; 
-            border-radius: 25px; 
-            backdrop-filter: blur(10px);
+        .stat {{
+            background: #f8f9fa;
+            border: 1px solid #e5e5e5;
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            color: #1a1a1a;
+            font-weight: 500;
         }}
-        .content {{ padding: 30px; }}
-        .file-list {{ 
-            display: grid; 
-            gap: 15px; 
+        .container {{
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #ffffff;
         }}
-        .file-item {{ 
-            display: flex; 
-            align-items: center; 
-            padding: 20px; 
-            background: #f8f9fa; 
-            border-radius: 10px; 
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
+        .content {{
+            padding: 2rem;
         }}
-        .file-item:hover {{ 
-            background: #e3f2fd; 
-            border-color: #2196f3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        .file-list {{
+            display: grid;
+            gap: 1rem;
         }}
-        .file-icon {{ 
-            width: 50px; 
-            height: 50px; 
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-            border-radius: 10px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            color: white; 
-            font-size: 1.5em; 
-            margin-right: 20px;
+        .file-item {{
+            display: flex;
+            align-items: center;
+            padding: 1.5rem;
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }}
+        .file-item:hover {{
+            border-color: #0066cc;
+            box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
+            transform: translateY(-1px);
+        }}
+        .file-icon {{
+            width: 48px;
+            height: 48px;
+            background: #f8f9fa;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666666;
+            font-size: 1.2rem;
+            margin-right: 1rem;
             flex-shrink: 0;
         }}
-        .file-info {{ flex: 1; }}
-        .file-name {{ 
-            font-size: 1.2em; 
-            font-weight: 600; 
-            color: #2c3e50; 
-            margin-bottom: 5px;
+        .file-info {{
+            flex: 1;
+        }}
+        .file-name {{
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 0.25rem;
             word-break: break-all;
         }}
-        .file-meta {{ 
-            color: #7f8c8d; 
-            font-size: 0.9em; 
-            display: flex; 
-            gap: 15px; 
+        .file-meta {{
+            color: #666666;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 1rem;
             flex-wrap: wrap;
         }}
-        .download-btn {{ 
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white; 
-            padding: 12px 25px; 
-            border: none; 
-            border-radius: 25px; 
-            text-decoration: none; 
-            font-weight: 600;
-            transition: all 0.3s ease;
+        .download-btn {{
+            background: #0066cc;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
             display: inline-block;
         }}
-        .download-btn:hover {{ 
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        .download-btn:hover {{
+            background: #0052a3;
+            transform: translateY(-1px);
         }}
-        .empty {{ 
-            text-align: center; 
-            padding: 60px 20px; 
-            color: #7f8c8d; 
+        .empty {{
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #666666;
         }}
-        .empty-icon {{ 
-            font-size: 4em; 
-            margin-bottom: 20px; 
+        .empty-icon {{
+            font-size: 3rem;
+            margin-bottom: 1rem;
             opacity: 0.5;
         }}
+        .empty h3 {{
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 0.5rem;
+        }}
+        .empty p {{
+            color: #666666;
+        }}
+        .empty code {{
+            background: #f8f9fa;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }}
         @media (max-width: 768px) {{
+            .header {{ padding: 1.5rem 1rem; }}
+            .header h1 {{ font-size: 2rem; }}
+            .content {{ padding: 1rem; }}
             .file-item {{ flex-direction: column; text-align: center; }}
-            .file-icon {{ margin: 0 0 15px 0; }}
+            .file-icon {{ margin: 0 0 1rem 0; }}
             .file-meta {{ justify-content: center; }}
-            .stats {{ flex-direction: column; align-items: center; }}
+            .stats {{ flex-direction: column; align-items: center; gap: 1rem; }}
         }}
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📁 {title}</h1>
+            <h1>{title}</h1>
             <p>Download files from the server</p>
             <div class="stats">
-                <div class="stat">📊 {file_count} files</div>
-                <div class="stat">💾 {total_size_human}</div>
+                <div class="stat">{file_count} files</div>
+                <div class="stat">{total_size_human}</div>
             </div>
         </div>
         <div class="content">
@@ -3064,19 +3093,13 @@ class EventingCSClient(CSClient):
                     return html
                 
                 def log_message(self, format, *args):
-                    # Use cp.log if available, otherwise print
-                    try:
-                        import cp
-                        cp.log(f"FileServer: {format % args}")
-                    except:
-                        print(f"FileServer: {format % args}")
+                    # Use print for file server logging
+                    print(f"FileServer: {format % args}")
             
             # Start server in background thread
             def run_server():
                 try:
                     with socketserver.TCPServer((host, port), FileServerHandler) as httpd:
-                        self.log(f"File server started on http://{host}:{port}")
-                        self.log(f"Serving files from: {folder_path}")
                         httpd.serve_forever()
                 except Exception as e:
                     self.log(f"File server error: {e}")
@@ -3087,7 +3110,7 @@ class EventingCSClient(CSClient):
             return {
                 'status': 'started',
                 'url': f'http://{host}:{port}',
-                'folder_path': folder_path,
+                'folder_path': full_folder_path,
                 'port': port,
                 'host': host,
                 'title': title
@@ -3278,8 +3301,6 @@ class EventingCSClient(CSClient):
         Returns:
             str: Random password
         """
-        import random
-        import string
         
         # Define character sets
         lowercase = string.ascii_lowercase
@@ -3343,46 +3364,49 @@ class EventingCSClient(CSClient):
                 'username': username
             }
 
-    def comprehensive_packet_capture(self, 
-                                   interface: str = "mon1",
-                                   filter: str = "",
-                                   count: int = 10,
-                                   timeout: int = 10,
-                                   start_file_server: bool = True,
-                                   file_server_port: int = 8001,
-                                   capture_user: str = "SDKTCPDUMP") -> dict:
-        """Comprehensive packet capture that handles everything in one call.
+    def packet_capture(self, 
+                      iface: str = None,
+                      filter: str = "",
+                      count: int = 10,
+                      timeout: int = 10,
+                      save_directory: str = "captures",
+                      capture_user: str = "SDKTCPDUMP") -> dict:
+        """Packet capture that handles everything in one call.
         
         This method:
         1. Creates/ensures a dedicated user exists
         2. Captures packets on specified interface
-        3. Downloads the pcap file
-        4. Starts a file server to serve the captured files (optional)
+        3. Downloads the pcap file to local directory
+        4. Deletes the temporary user after successful completion
         
         Args:
-            interface: Network interface to capture on (default: "mon1" - 5GHz WiFi monitor)
+            iface: Network interface to capture on (default: cp.get('config/lan/0/_id_'))
             filter: BPF filter expression (default: "" for all traffic)
             count: Number of packets to capture (default: 10)
             timeout: Capture timeout in seconds (default: 10)
-            start_file_server: Whether to start file server (default: True)
-            file_server_port: Port for file server (default: 8001)
+            save_directory: Directory to save captured files (default: "captures")
             capture_user: Username for packet capture operations (default: "SDKTCPDUMP")
             
         Returns:
-            dict: Comprehensive result with all operation details
+            dict: Result with all operation details
         """
         result = {
             'success': False,
             'user_creation': None,
             'packet_capture': None,
             'file_download': None,
-            'file_server': None,
             'captured_file': None,
-            'file_server_url': None,
-            'generated_password': None
+            'generated_password': None,
+            'monitor_mode_disabled': None,
+            'monitor_mode_error': None,
+            'user_deletion': None
         }
         
         try:
+            # Set default interface if not provided
+            if iface is None:
+                iface = self.get('config/lan/0/_id_')
+            
             # Step 1: Ensure dedicated user exists with fresh random password
             self.log(f"Step 1: Setting up fresh user '{capture_user}' for packet capture...")
             user_result = self.ensure_fresh_user(capture_user, "admin")
@@ -3391,16 +3415,14 @@ class EventingCSClient(CSClient):
             if not user_result.get('success'):
                 result['error'] = f"Failed to create user: {user_result.get('error')}"
                 return result
-            self.log(f"User setup: {user_result.get('action', 'unknown')}")
             
             # Step 2: Start packet capture
-            self.log(f"Step 2: Starting packet capture on {interface}...")
+            self.log(f"Step 2: Starting packet capture on {iface}...")
             capture_result = self.start_packet_capture(
-                interface=interface,
+                interface=iface,
                 filter=filter,
                 count=count,
-                timeout=timeout,
-                url=""  # No custom URL to avoid connection issues
+                timeout=timeout
             )
             result['packet_capture'] = capture_result
             
@@ -3413,12 +3435,10 @@ class EventingCSClient(CSClient):
             
             # Step 3: Wait for capture to complete and download file
             self.log("Step 3: Waiting for capture to complete...")
-            import time
             time.sleep(max(3, timeout // 3))  # Wait for capture to complete
             
-            # Create captures directory
-            import os
-            captures_dir = os.path.join(os.getcwd(), "captures")
+            # Create save directory
+            captures_dir = os.path.join(os.getcwd(), save_directory)
             os.makedirs(captures_dir, exist_ok=True)
             local_path = os.path.join(captures_dir, filename)
             
@@ -3443,31 +3463,40 @@ class EventingCSClient(CSClient):
                 'file_size': file_size
             }
             
-            # Step 5: Start file server (optional)
-            if start_file_server:
-                self.log(f"Step 5: Starting file server on port {file_server_port}...")
-                file_server_result = self.start_file_server(
-                    folder_path=captures_dir,
-                    port=file_server_port,
-                    host="0.0.0.0",
-                    title="Packet Capture Files"
-                )
-                result['file_server'] = file_server_result
-                
-                if file_server_result.get('status') == 'started':
-                    file_server_url = file_server_result.get('url', f'http://0.0.0.0:{file_server_port}')
-                    result['file_server_url'] = file_server_url
-                    self.log(f"File server started: {file_server_url}")
-                else:
-                    self.log(f"File server warning: {file_server_result.get('error', 'Unknown error')}")
+            # Disable monitor mode for mon0 or mon1 interfaces after successful capture
+            if iface in ['mon0', 'mon1']:
+                self.log(f"Disabling monitor mode for interface {iface}...")
+                try:
+                    monitor_result = self.put('control/wlan/monitor', False)
+                    if monitor_result:
+                        self.log(f"Successfully disabled monitor mode for {iface}")
+                        result['monitor_mode_disabled'] = True
+                    else:
+                        self.log(f"Warning: Failed to disable monitor mode for {iface}")
+                        result['monitor_mode_disabled'] = False
+                except Exception as e:
+                    self.log(f"Error disabling monitor mode for {iface}: {e}")
+                    result['monitor_mode_disabled'] = False
+                    result['monitor_mode_error'] = str(e)
             
+            # Step 5: Delete the temporary user after successful completion
+            self.log(f"Step 5: Deleting temporary user '{capture_user}'...")
+            delete_result = self.delete_user(capture_user)
+            result['user_deletion'] = delete_result
+            
+            if not delete_result.get('success'):
+                result['error'] = f"Failed to delete user '{capture_user}': {delete_result.get('error', 'Unknown error')}"
+                self.log(f"Error: Failed to delete user '{capture_user}': {delete_result.get('error', 'Unknown error')}")
+                return result
+            
+            self.log(f"Successfully deleted user '{capture_user}'")
             result['success'] = True
-            self.log("Comprehensive packet capture completed successfully!")
+            self.log("Packet capture completed successfully!")
             return result
             
         except Exception as e:
             result['error'] = str(e)
-            self.log(f"Error in comprehensive packet capture: {e}")
+            self.log(f"Error in packet capture: {e}")
             return result
 
 
@@ -4127,7 +4156,7 @@ def get_device_product_type() -> Optional[str]:
         str or None: The device product type, or None if not available or an error occurs.
     """
     try:
-        return _cs_client.get('status/product_info/manufacturing/product_name')
+        return _cs_client.get('status/product_info/product_name')
     except Exception as e:
         _cs_client.log(f"Error getting device product type: {e}")
         return None
@@ -4204,6 +4233,204 @@ def get_system_resources(cpu: bool = True, memory: bool = True, storage: bool = 
     except Exception as e:
         _cs_client.log(f"Error getting system resources: {e}")
         return {}
+
+
+# ============================================================================
+# GPIO FUNCTIONS
+# ============================================================================
+
+# Type alias for GPIO names that can be used in function parameters
+GPIOType = Literal[
+    "power_input", "power_output", "sata_1", "sata_2", "sata_3", "sata_4",
+    "sata_ignition_sense", "expander_1", "expander_2", "expander_3", "accessory_1"
+]
+
+# GPIO mapping for different router models
+GPIO_MAP = {
+    'IBR200': {
+        'power_input': '/status/gpio/CGPIO_CONNECTOR_INPUT',
+        'power_output': '/status/gpio/CGPIO_CONNECTOR_OUTPUT'
+    },
+    'IBR600': {
+        'power_input': '/status/gpio/CONNECTOR_INPUT',
+        'power_output': '/status/gpio/CONNECTOR_OUTPUT'
+    },
+    'IBR900': {
+        'power_input': '/status/gpio/CONNECTOR_INPUT',
+        'power_output': '/status/gpio/CONNECTOR_OUTPUT',
+        'sata_1': '/status/gpio/SATA_GPIO_1',
+        'sata_2': '/status/gpio/SATA_GPIO_2',
+        'sata_3': '/status/gpio/SATA_GPIO_3',
+        'sata_4': '/status/gpio/SATA_GPIO_4',
+        'sata_ignition_sense': '/status/gpio/SATA_IGNITION_SENSE'
+    },
+    'IBR1100': {
+        'power_input': '/status/gpio/CGPIO_CONNECTOR_INPUT',
+        'power_output': '/status/gpio/CGPIO_CONNECTOR_OUTPUT',
+        'expander_1': '/status/gpio/CGPIO_SERIAL_INPUT_1',
+        'expander_2': '/status/gpio/CGPIO_SERIAL_INPUT_2',
+        'expander_3': '/status/gpio/CGPIO_SERIAL_INPUT_3'
+    },
+    'R920': {
+        'power_input': '/status/gpio/CONNECTOR_GPIO_1',
+        'power_output': '/status/gpio/CONNECTOR_GPIO_2'
+    },
+    'R980': {
+        'power_input': '/status/gpio/CONNECTOR_GPIO_1',
+        'power_output': '/status/gpio/CONNECTOR_GPIO_2'
+    },
+    'R1900': {
+        'power_input': '/status/gpio/CONNECTOR_GPIO_2',  # UI shows input on power 2
+        'power_output': '/status/gpio/CONNECTOR_GPIO_1',  # UI shows output on power 1
+        'expander_1': '/status/gpio/EXPANDER_GPIO_1',
+        'expander_2': '/status/gpio/EXPANDER_GPIO_2',
+        'expander_3': '/status/gpio/EXPANDER_GPIO_3',
+        'accessory_1': '/status/gpio/ACCESSORY_GPIO_1'
+    }
+}
+
+
+def get_router_model() -> Optional[str]:
+    """Extract the router model from the product name.
+    
+    Returns the part of the product name before the first dash (-) character.
+    This is used to determine which GPIO mapping to use for the current router.
+    
+    Returns:
+        str or None: The router model (e.g., 'IBR200', 'R1900'), or None if an error occurs.
+    """
+    try:
+        product_name = get_device_product_type()
+        if product_name:
+            # Extract everything before the first dash
+            model = product_name.split('-')[0]
+            return model
+        return None
+    except Exception as e:
+        _cs_client.log(f"Error getting router model: {e}")
+        return None
+
+
+def get_gpio(
+    gpio_name: GPIOType, 
+    router_model: Optional[str] = None, 
+    return_path: bool = False
+) -> Optional[Union[Any, str]]:
+    """Get the current value or path of a specific GPIO.
+    
+    Args:
+        gpio_name (GPIOType): The name of the GPIO (e.g., 'power_input', 'sata_1').
+        router_model (str, optional): The router model. If None, will be determined automatically.
+        return_path (bool): If True, returns the GPIO path instead of the value. Defaults to False.
+    
+    Returns:
+        Any, str, or None: The current GPIO value, GPIO path, or None if not found or an error occurs.
+    """
+    try:
+        if router_model is None:
+            router_model = get_router_model()
+        
+        if not router_model:
+            _cs_client.log("Unable to determine router model")
+            return None
+        
+        if router_model not in GPIO_MAP:
+            _cs_client.log(f"Router model '{router_model}' not found in GPIO mapping")
+            return None
+        
+        if gpio_name not in GPIO_MAP[router_model]:
+            _cs_client.log(f"GPIO '{gpio_name}' not found for router model '{router_model}'")
+            return None
+        
+        gpio_path = GPIO_MAP[router_model][gpio_name]
+        
+        if return_path:
+            return gpio_path
+        
+        # Get the GPIO value
+        response = _cs_client.get(gpio_path)
+        return response if response is not None else None
+    except Exception as e:
+        _cs_client.log(f"Error getting GPIO {'path' if return_path else 'value'} for '{gpio_name}': {e}")
+        return None
+
+
+def get_all_gpio_values(router_model: Optional[str] = None) -> Dict[str, Any]:
+    """Get all available GPIO values for the current router model.
+    
+    Args:
+        router_model (str, optional): The router model. If None, will be determined automatically.
+    
+    Returns:
+        dict: Dictionary containing GPIO names as keys and their current values as values.
+              Returns empty dict if an error occurs.
+    """
+    try:
+        if router_model is None:
+            router_model = get_router_model()
+        
+        if not router_model or router_model not in GPIO_MAP:
+            _cs_client.log(f"Router model '{router_model}' not found in GPIO mapping")
+            return {}
+        
+        gpio_values = {}
+        for gpio_name in GPIO_MAP[router_model]:
+            value = get_gpio(gpio_name, router_model)
+            if value is not None:
+                gpio_values[gpio_name] = value
+        
+        return gpio_values
+    except Exception as e:
+        _cs_client.log(f"Error getting all GPIO values: {e}")
+        return {}
+
+
+def get_available_gpios(router_model: Optional[str] = None) -> List[str]:
+    """Get a list of available GPIO names for the current router model.
+    
+    Args:
+        router_model (str, optional): The router model. If None, will be determined automatically.
+    
+    Returns:
+        list: List of available GPIO names for the current router model.
+              Returns empty list if an error occurs.
+    """
+    try:
+        if router_model is None:
+            router_model = get_router_model()
+        
+        if not router_model or router_model not in GPIO_MAP:
+            _cs_client.log(f"Router model '{router_model}' not found in GPIO mapping")
+            return []
+        
+        return list(GPIO_MAP[router_model].keys())
+    except Exception as e:
+        _cs_client.log(f"Error getting available GPIOs: {e}")
+        return []
+
+
+def get_all_gpios() -> Optional[Dict[str, Any]]:
+    """Get all GPIO values directly from the router's /status/gpio endpoint.
+    
+    This function returns the raw GPIO data from the router, which includes all
+    available GPIO pins and their current values, regardless of the router model.
+    This is different from get_all_gpio_values() which only returns GPIOs that
+    are mapped for the specific router model.
+    
+    Returns:
+        dict or None: Dictionary containing all GPIO data from the router, or None if an error occurs.
+                     The structure depends on the router model and may include:
+                     - digital: Dictionary of digital GPIO values
+                     - analog: Dictionary of analog GPIO values (if available)
+                     - Other GPIO-related data specific to the router model
+    """
+    try:
+        response = _cs_client.get('/status/gpio')
+        return response if response is not None else None
+    except Exception as e:
+        _cs_client.log(f"Error getting all GPIOs from /status/gpio: {e}")
+        return None
+
 
 def get_ncm_status(include_details: bool = False) -> Optional[str]:
     """Return the NCM status.
@@ -6863,7 +7090,6 @@ def get_expiring_certificates(days_threshold: int = 30) -> List[Dict[str, Any]]:
     """
 
     try:
-        from datetime import datetime, timedelta
         cert_data = _cs_client.get('status/certmgmt')
         if not cert_data or 'view' not in cert_data:
             return []
@@ -7159,7 +7385,7 @@ def speed_test(host: str = "", interface: str = "", duration: int = 5,
 def start_packet_capture(interface: str = "any", filter: str = "", 
                         count: int = 20, timeout: int = 600,
                         wifichannel: str = "", wifichannelwidth: str = "", 
-                        wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+                        wifiextrachannel: str = "", url: str = "") -> Optional[Dict[str, Any]]:
     """Start packet capture using tcpdump API.
     
     Args:
@@ -7236,7 +7462,7 @@ def download_packet_capture(filename: str, local_path: str = None, capture_param
 
 def start_streaming_capture(interface: str = "any", filter: str = "", 
                            wifichannel: str = "", wifichannelwidth: str = "", 
-                           wifiextrachannel: str = "", url: str = "http://127.0.0.1:8000/capture") -> Optional[Dict[str, Any]]:
+                           wifiextrachannel: str = "", url: str = "") -> Optional[Dict[str, Any]]:
     """Start a streaming packet capture that runs forever until interrupted.
     
     This is a convenience method for continuous monitoring or thread-based captures.
@@ -7371,12 +7597,13 @@ def stop_speed_test() -> Optional[Dict[str, Any]]:
         return None
 
 
-def start_file_server(folder_path: str = "/tmp", port: int = 8000, 
+def start_file_server(folder_path: str = "files", port: int = 8000, 
                      host: str = "0.0.0.0", title: str = "File Download") -> Optional[Dict[str, Any]]:
     """Start a modern web file server for downloading files from a folder.
     
     Args:
-        folder_path: Path to the folder to serve files from (default: "/tmp")
+        folder_path: Path to the folder to serve files from (default: "files")
+                    Always uses subdirectories from current working directory
         port: Port to run the server on (default: 8000)
         host: Host to bind to (default: "0.0.0.0" - all interfaces)
         title: Title for the web page (default: "File Download")
@@ -7473,45 +7700,40 @@ def ensure_fresh_user(username: str, group: str = "admin") -> Optional[Dict[str,
         return None
 
 
-def comprehensive_packet_capture(interface: str = "mon1",
-                               filter: str = "",
-                               count: int = 10,
-                               timeout: int = 10,
-                               start_file_server: bool = True,
-                               file_server_port: int = 8001,
-                               capture_user: str = "SDKTCPDUMP") -> Optional[Dict[str, Any]]:
-    """Comprehensive packet capture that handles everything in one call.
+def packet_capture(iface: str = None,
+                  filter: str = "",
+                  count: int = 10,
+                  timeout: int = 10,
+                  save_directory: str = "captures",
+                  capture_user: str = "SDKTCPDUMP") -> Optional[Dict[str, Any]]:
+    """Packet capture that handles everything in one call.
     
     This convenience function:
     1. Creates/ensures a dedicated user exists
     2. Captures packets on specified interface
-    3. Downloads the pcap file
-    4. Starts a file server to serve the captured files (optional)
+    3. Downloads the pcap file to local directory
+    4. Deletes the temporary user after successful completion
     
     Args:
-        interface: Network interface to capture on (default: "mon1" - 5GHz WiFi monitor)
+        iface: Network interface to capture on (default: cp.get('config/lan/0/_id_'))
         filter: BPF filter expression (default: "" for all traffic)
         count: Number of packets to capture (default: 10)
         timeout: Capture timeout in seconds (default: 10)
-        start_file_server: Whether to start file server (default: True)
-        file_server_port: Port for file server (default: 8001)
+        save_directory: Directory to save captured files (default: "captures")
         capture_user: Username for packet capture operations (default: "SDKTCPDUMP")
         
     Returns:
-        dict: Comprehensive result with all operation details
+        dict: Result with all operation details
     """
     try:
-        return _cs_client.comprehensive_packet_capture(
-            interface=interface,
+        return _cs_client.packet_capture(
+            iface=iface,
             filter=filter,
             count=count,
             timeout=timeout,
-            start_file_server=start_file_server,
-            file_server_port=file_server_port,
+            save_directory=save_directory,
             capture_user=capture_user
         )
     except Exception as e:
-        print(f"Error in comprehensive packet capture: {e}")
+        print(f"Error in packet capture: {e}")
         return None
-
-
