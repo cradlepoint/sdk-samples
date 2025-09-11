@@ -1,0 +1,29 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2025-09-11T10:25:10.831963",
+        "files": {
+            "cp.py": "07d4a2b9d66780aaf95a535db93a392d39a7db97822eea48e2b07280e3da3bc4",
+            "gpio_sample.py": "86e947b0301b7b45cbd66be76d625c575a484bfcadcd532683b1862c3584b1bf",
+            "package.ini": "835f4ca84e64441c809e64a8fdabeaba016e8b86fb2addfcb7f1b435fe2f79a4",
+            "readme.md": "0140e5c1083ba52b89e460fe4736893292854536c27781cb3e9e6402e480d56d",
+            "start.sh": "501f7185e7b8bc969474700fdc8094e37cc621fbb1ff9ce8c0661b3e89f7d1bf"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 25,
+        "name": "gpio_sample",
+        "notes": "SDK Application",
+        "reboot": true,
+        "restart": false,
+        "uuid": "0074e066-3e6f-4d84-8855-6c925f4cc67d",
+        "vendor": "Cradlepoint",
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    }
+}
