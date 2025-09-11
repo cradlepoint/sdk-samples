@@ -31,6 +31,13 @@ Example:
 10:25:21 AM INFO gpio_sample gpio value: 0
 ```
 
+## GPIO Methods
+
+- `cp.get_gpio()` - Get a GPIO value by common pin name
+- `cp.get_all_gpios()` - Get GPIO value of all common pin names
+- `cp.get_available_gpios()` - Get available common pin names per router model
+- `cp.get_raw_gpios()` - Get raw JSON output from `status/gpio`
+  
 ## Supported GPIOs
 
 Common GPIO pins include:
