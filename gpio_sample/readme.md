@@ -38,5 +38,7 @@ Common GPIO pins include:
 - `power_output` - Power output control
 - `expander_1/2/3` - Expansion connector GPIOs
 - `accessory_1` - Accessory connector GPIO
+- `sata_1/2/3/4` - SATA expansion connector GPIOs
+- `sata_ignition_sense` - SATA expansion connector GPIO
 
 *Note: Available GPIOs depend on the specific router model.*
