@@ -4355,7 +4355,7 @@ def get_gpio(
         return None
 
 
-def get_all_gpio_values(router_model: Optional[str] = None) -> Dict[str, Any]:
+def get_all_gpios(router_model: Optional[str] = None) -> Dict[str, Any]:
     """Get all available GPIO values for the current router model.
     
     Args:
@@ -4409,12 +4409,12 @@ def get_available_gpios(router_model: Optional[str] = None) -> List[str]:
         return []
 
 
-def get_all_gpios() -> Optional[Dict[str, Any]]:
+def get_raw_gpios() -> Optional[Dict[str, Any]]:
     """Get all GPIO values directly from the router's /status/gpio endpoint.
     
     This function returns the raw GPIO data from the router, which includes all
     available GPIO pins and their current values, regardless of the router model.
-    This is different from get_all_gpio_values() which only returns GPIOs that
+    This is different from get_all_gpios() which only returns GPIOs that
     are mapped for the specific router model.
     
     Returns:
@@ -4428,7 +4428,7 @@ def get_all_gpios() -> Optional[Dict[str, Any]]:
         response = _cs_client.get('/status/gpio')
         return response if response is not None else None
     except Exception as e:
-        _cs_client.log(f"Error getting all GPIOs from /status/gpio: {e}")
+        _cs_client.log(f"Error getting raw GPIOs from /status/gpio: {e}")
         return None
 
 
