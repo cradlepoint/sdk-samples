@@ -63,6 +63,8 @@
     - Send alert when entering or exiting geofences.  Configure geofences in SDK app data after loading app.
 - **gpio_any_wan_connected**
     - Set GPIO out high when any wan (not just modems) is connected.
+- **gpio_sample**
+    - Demonstrates GPIO (General Purpose Input/Output) functionality.
 - **hello_world**
     - Outputs a 'Hello World!' log every 10 seconds.
 - **hspt**
