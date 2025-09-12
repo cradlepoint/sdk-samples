@@ -105,6 +105,9 @@ jobs:
         python update_cp_py.py
         UPDATED=$?
         
+        # Clean up the temporary script
+        rm -f update_cp_py.py
+        
         if [ $UPDATED -eq 1 ]; then
           echo "Files were updated, proceeding with commit"
         else
