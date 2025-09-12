@@ -12,8 +12,12 @@
 
 ## Files
 
+- **cp.py**
+    - The Python library used in applications to communicate with the router (NCOS).
+- **cp_methods_reference.md**
+    - Contains all available methods/functions when importing cp.py 
 - **make.py**
-    - The main python tool used to manage application paackages.  Supports actions: create, build, install, uninstall, start, stop, or purge from a locally connected device that is in DEV mode.
+    - The main python tool used to manage application paackages.  Supports actions: create, build, install, uninstall, start, stop, purge, and update from a locally connected device that is in DEV mode.
 - **sdk_settings.ini**
     - This is the ini file that contains the settings used by python make.py.
 - **tools/bin**
@@ -149,6 +153,8 @@
 ## `cp.py` Usage Example
 
 To use the library, import the `cp` module and call the desired functions.
+
+See the [cp_methods_reference](https://github.com/cradlepoint/sdk-samples/blob/master/cp_methods_reference.md) for a list of available methods/functions in cp.py.
 
 ```python
 # import the SDK library
