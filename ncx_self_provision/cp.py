@@ -4184,7 +4184,7 @@ def get_device_firmware(include_build_info: bool = False) -> str:
     """
     try:
         fw_info = _cs_client.get('status/fw_info')
-        firmware = f"{fw_info.get('major_version')}.{fw_info.get('minor_version')}.{fw_info.get('patch_version')}-{fw_info.get('fw_release_tag')}"
+        firmware = f"{fw_info.get('major')}.{fw_info.get('minor')}.{fw_info.get('patch')}-{fw_info.get('fw_release_tag')}"
         
         if include_build_info:
             build_info = fw_info.get('build_info', '')
