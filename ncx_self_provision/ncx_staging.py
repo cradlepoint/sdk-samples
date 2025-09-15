@@ -10,18 +10,11 @@ api_keys = {
     "Bearer Token": ""
 }
 
-# Provide staging group id from NCM
-staging_group_id = '123456'
-
 # Initialize APIv2 client
 n2 = ncm.NcmClientv2(api_keys=api_keys)
 
-# Set APIv2 keys and APIv3 Bearer Token to staging group by group id
-n2.set_ncm_api_keys_by_group(group_id=staging_group_id, x_ecm_api_id=api_keys['X-ECM-API-ID'], x_ecm_api_key=api_keys['X-ECM-API-KEY'], 
-                             x_cp_api_id=api_keys['X-CP-API-ID'], x_cp_api_key=api_keys['X-CP-API-KEY'], bearer_token=api_keys['Bearer Token'])
-
-
 # Provide values to use as part of config_json. production group id, exchange network id, etc. examples below
+staging_group_id = '123456' # Stagig group ID as a string. Device must be in this group with ncx_self_provision SDK applied to group
 prod_group_id = '654321' # Production group id as string. Site will be moved to this group after provisioning
 exchange_network_id = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' # Exchange network id. Site will be added to this network
 lan_as_dns = 'True' # 'True' if LAN as DNS is to be enabled for the site
@@ -32,6 +25,10 @@ create_wildcard_resource = 'True' # 'True' if a wildcard FQDN resource is to be 
 secure_connect_lic = 'NCX-SCIOT' # Secure Connect license typeto apply to the router. Obtain from APIv3 'regrades' endpoint docs
 sdwan_lic = 'None' # SD-WAN license type to apply to the router. Obtain from APIv3 'regrades' endpoint docs or 'None' if not applicable
 hmf_lic = 'None' # HMF license type to apply to the router. Obtain from APIv3 'regrades' endpoint docs or 'None' if not applicable
+
+# Set APIv2 keys and APIv3 Bearer Token to staging group by group id
+n2.set_ncm_api_keys_by_group(group_id=staging_group_id, x_ecm_api_id=api_keys['X-ECM-API-ID'], x_ecm_api_key=api_keys['X-ECM-API-KEY'], 
+                             x_cp_api_id=api_keys['X-CP-API-ID'], x_cp_api_key=api_keys['X-CP-API-KEY'], bearer_token=api_keys['Bearer Token'])
 
 # Build config_json to apply to staging group
 config_json = {
@@ -89,6 +86,11 @@ config_json = {
                             "name": "hmf_lic",
                             "value": f'{hmf_lic}',
                             "_id_": "00000009-8e48-3903-ad8c-538bad254b4c"
+                        },
+                        "0000000a-8e48-3903-ad8c-538bad254b4c": {
+                            "name": "staging_group_id",
+                            "value": f'{staging_group_id}',
+                            "_id_": "0000000a-8e48-3903-ad8c-538bad254b4c"
                         }
                     }
                 }

@@ -3,10 +3,69 @@ import ncm
 import ipaddress
 import time
 
+# Validate router firmware 
+def validate_readiness():
+    device_name = cp.get_device_name()
+    
+    # Get static configuration data once
+    staging_group_id = cp.get_appdata('staging_group_id')
+    prod_group_id = cp.get_appdata('prod_group_id')
+    staging_group_firmware_id = n2.get_group_by_id(group_id=staging_group_id)['target_firmware'].split('/')[6]
+    prod_group_firmware_id = n2.get_group_by_id(group_id=prod_group_id)['target_firmware'].split('/')[6]
+
+    def get_router_data():
+        """Helper function to get current router data"""
+        router_info = n2.get_router_by_name(router_name=device_name)
+        
+        return {
+            'product_id': router_info['product'].split('/')[6],
+            'actual_firmware': router_info['actual_firmware'].split('/')[6],
+            'target_firmware': router_info['target_firmware'].split('/')[6],
+            'group_id': router_info['group'].split('/')[6]
+        }
+
+
+    def get_device_firmware_id(product_id):
+        """Helper function to get device firmware ID"""
+        device_firmware = cp.get_device_firmware().split('-')[0]
+        
+        return n2.get_firmware_for_product_id_by_version(product_id=product_id, firmware_name=device_firmware)['id']
+
+
+    # Get initial router data
+    router_data = get_router_data()
+    
+    # Check if router group ID equals staging group ID
+    if router_data['group_id'] != staging_group_id:
+        cp.log(f"ERROR: Router group ID ({router_data['group_id']}) does not match staging group ID ({staging_group_id})")
+        
+        return False
+
+    # Wait for router firmware to sync (actual == target)
+    while router_data['actual_firmware'] != router_data['target_firmware']:
+        cp.log(f"Router actual firmware ({router_data['actual_firmware']}) does not match target firmware ({router_data['target_firmware']}). Waiting 15 seconds...")
+        time.sleep(15)
+        router_data = get_router_data()
+    
+    cp.log(f"Router actual firmware ({router_data['actual_firmware']}) matches target firmware ({router_data['target_firmware']})")
+
+    # Wait for device firmware ID to match both group firmware IDs
+    device_firmware_id = get_device_firmware_id(router_data['product_id'])
+    while device_firmware_id != staging_group_firmware_id or device_firmware_id != prod_group_firmware_id:
+        cp.log(f"Device firmware ID ({device_firmware_id}) does not match staging ({staging_group_firmware_id}) or production ({prod_group_firmware_id}) group firmware IDs. Waiting 15 seconds...")
+        time.sleep(15)
+        device_firmware_id = get_device_firmware_id(router_data['product_id'])
+    
+    cp.log(f"Device firmware ID ({device_firmware_id}) matches both staging and production group firmware IDs")
+    
+    return True
+
+
 # Build APIv2 keys and APIv3 Bearer Token from device config
 def build_keys():
     api_keys = cp.get_ncm_api_keys()
     cp.log(f"APIv2 keys: {api_keys}")
+
     return api_keys
 
 
@@ -84,6 +143,8 @@ if __name__ == "__main__":
     api_keys = build_keys()
     n2 = ncm.NcmClientv2(api_keys=api_keys)
     n3 = ncm.NcmClientv3(api_key=api_keys['Bearer Token'])
+    validate_readiness()
+    time.sleep(5)
     apply_license()
     site_info = create_exchange_site()
     time.sleep(5)

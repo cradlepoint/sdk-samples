@@ -28,8 +28,8 @@ Before deploying, you need to update the `ncx_staging.py` script with your speci
 
 2. **Group Configuration** - Set your staging and production group IDs:
    ```python
-   staging_group_id = 'staging_group_id'
-   prod_group_id = 'prod_group_id'
+   staging_group_id = 'staging_group_id'  # Required: Devices must be in this group to run
+   prod_group_id = 'prod_group_id'        # Target group for provisioned devices
    ```
 
 3. **Exchange Network Settings** - Configure your NCX/SASE network settings:
@@ -85,11 +85,15 @@ python make.py build
 When devices are moved into the staging group, they will automatically:
 
 1. **Wait for System Readiness** - Wait for router uptime and WAN connection
-2. **Build API Keys** - Retrieve and decrypt API credentials from device certificates
-3. **Apply Licenses** - Apply the configured Secure Connect, SD-WAN and HMF licenses to the router
-4. **Create Exchange Site** - Create an exchange site in the specified network
-5. **Create Resources** - Create configured resources (LAN subnet, FQDN, wildcard)
-6. **Move to Production group** - Move the router to the production group
+2. **Validate Readiness** - Comprehensive validation checks including:
+   - Verify router is in the correct staging group
+   - Wait for router actual firmware to match target firmware
+   - Wait for device firmware ID to match both staging and production group firmware IDs
+3. **Build API Keys** - Retrieve and decrypt API credentials from device certificates
+4. **Apply Licenses** - Apply the configured Secure Connect, SD-WAN and HMF licenses to the router
+5. **Create Exchange Site** - Create an exchange site in the specified network
+6. **Create Resources** - Create configured resources (LAN subnet, FQDN, wildcard)
+7. **Move to Production group** - Move the router to the production group
 
 ## File Descriptions
 
@@ -107,6 +111,7 @@ The following parameters are configured via the staging script and used by the s
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
+| `staging_group_id` | Staging group ID where devices must be located to run the application | `'123456'` |
 | `prod_group_id` | Production group ID where devices will be moved after provisioning | `'654321'` |
 | `exchange_network_id` | NCX/SASE exchange network ID | `'ABCDEFGHIJKLMNOPQRSTUVWXYZ'` |
 | `lan_as_dns` | Enable LAN as DNS for the exchange site | `'True'` or `'False'` |
@@ -124,11 +129,12 @@ The following parameters are configured via the staging script and used by the s
 Before deploying this application, ensure you have:
 
 1. **NCM API Access** - Valid API credentials for both v2 and v3 APIs
-2. **Staging Group** - A group in NCM designated for staging devices
+2. **Staging Group** - A group in NCM designated for staging devices (devices must be in this group to run)
 3. **Production Group** - A group in NCM where provisioned devices will be moved
 4. **Exchange Network** - An NCX/SASE exchange network configured in NCM
 5. **Secure Connect License** - Valid license type for your deployment
 6. **Device Certificates** - API keys stored as certificates on the devices
+7. **Firmware Compatibility** - Ensure staging and production groups have compatible firmware versions
 
 ## Troubleshooting
 
@@ -136,12 +142,17 @@ Before deploying this application, ensure you have:
 
 1. **API Key Decryption Failures** - Ensure API keys are properly stored as certificates on the devices
 2. **Network Connectivity** - Verify devices have WAN connectivity before provisioning
-3. **License Application Failures** - Check that the license type is valid and available
-4. **Group Assignment Failures** - Verify production group ID is correct and accessible
+3. **Group Validation Failures** - Ensure devices are in the correct staging group before running
+4. **Firmware Sync Issues** - The application will wait for firmware synchronization; check logs for progress
+5. **License Application Failures** - Check that the license type is valid and available
+6. **Group Assignment Failures** - Verify production group ID is correct and accessible
 
 ### Logs
 
 The application provides detailed logging throughout the provisioning process. Check the device logs in NCM for:
+- Group validation status and staging group verification
+- Firmware synchronization progress (actual vs target firmware)
+- Device firmware ID matching with group firmware IDs
 - API key retrieval and decryption status
 - License application results
 - Exchange site creation details
