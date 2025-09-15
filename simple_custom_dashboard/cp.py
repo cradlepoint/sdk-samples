@@ -3547,39 +3547,6 @@ class EventingCSClient(CSClient):
             self.log(f"Error clearing DNS cache: {e}")
             return None
 
-    def network_connectivity_test(self, host: str = "8.8.8.8", port: int = 53, 
-                                 timeout: float = 5.0) -> Optional[Dict[str, Any]]:
-        """Test network connectivity to a host and port.
-        
-        Args:
-            host: Target host (default: "8.8.8.8")
-            port: Target port (default: 53)
-            timeout: Timeout in seconds (default: 5.0)
-            
-        Returns:
-            dict: Connectivity test results
-        """
-        try:
-            # Test connectivity
-            test_params = {
-                "host": host,
-                "port": port,
-                "timeout": timeout
-            }
-            
-            result = self.post('control/network/connectivity_test', test_params)
-            
-            return {
-                'host': host,
-                'port': port,
-                'timeout': timeout,
-                'result': result
-            }
-            
-        except Exception as e:
-            self.log(f"Error testing connectivity to {host}:{port}: {e}")
-            return None
-
     def stop_ping(self) -> Optional[Dict[str, Any]]:
         """Stop any running ping process.
         
@@ -3598,6 +3565,730 @@ class EventingCSClient(CSClient):
             self.log(f"Error stopping ping: {e}")
             return None
 
+    def set_manual_apn(self, device_or_id: str, new_apn: str) -> Optional[Dict[str, Any]]:
+        """Set manual APN for a modem device or WAN rule.
+        
+        Args:
+            device_or_id (str): Either a modem device name (starts with 'mdm') or a WAN rule _id_
+            new_apn (str): The new APN to set
+            
+        Returns:
+            dict: Result with operation details including:
+                - device_id (str): The device identifier used
+                - rule_id (str): The WAN rule _id_ that was modified
+                - new_apn (str): The APN that was set
+                - success (bool): Whether the operation was successful
+        """
+        try:
+            rule_id = None
+            
+            # Check if input is a modem device name
+            if device_or_id.startswith('mdm'):
+                # Get device info to find the config_id (WAN rule _id_)
+                device_info = self.get(f'status/wan/devices/{device_or_id}/config')
+                if not device_info:
+                    return {
+                        'device_id': device_or_id,
+                        'error': f'Device {device_or_id} not found or no config available',
+                        'success': False
+                    }
+                
+                rule_id = device_info.get('_id_')
+                if not rule_id:
+                    return {
+                        'device_id': device_or_id,
+                        'error': f'No WAN rule _id_ found for device {device_or_id}',
+                        'success': False
+                    }
+            else:
+                # Assume it's already a WAN rule _id_
+                rule_id = device_or_id
+            
+            # Update the WAN rule with manual APN configuration
+            apn_config = {
+                "modem": {
+                    "apn_mode": "manual",
+                    "manual_apn": new_apn
+                }
+            }
+            
+            result = self.put(f'config/wan/rules2/{rule_id}', apn_config)
+            
+            if result is not None:
+                return {
+                    'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+                    'rule_id': rule_id,
+                    'new_apn': new_apn,
+                    'success': True
+                }
+            else:
+                return {
+                    'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+                    'rule_id': rule_id,
+                    'error': 'Failed to update WAN rule configuration',
+                    'success': False
+                }
+                
+        except Exception as e:
+            self.log(f"Error setting manual APN for {device_or_id}: {e}")
+            return {
+                'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+                'error': str(e),
+                'success': False
+            }
+
+    def remove_manual_apn(self, device_or_id: str) -> Optional[Dict[str, Any]]:
+        """Remove manual APN configuration for a modem device or WAN rule.
+        
+        Args:
+            device_or_id (str): Either a modem device name (starts with 'mdm') or a WAN rule _id_
+            
+        Returns:
+            dict: Result with operation details including:
+                - device_id (str): The device identifier used
+                - rule_id (str): The WAN rule _id_ that was modified
+                - success (bool): Whether the operation was successful
+        """
+        try:
+            rule_id = None
+            
+            # Check if input is a modem device name
+            if device_or_id.startswith('mdm'):
+                # Get device info to find the config_id (WAN rule _id_)
+                device_info = self.get(f'status/wan/devices/{device_or_id}/config')
+                if not device_info:
+                    return {
+                        'device_id': device_or_id,
+                        'error': f'Device {device_or_id} not found or no config available',
+                        'success': False
+                    }
+                
+                rule_id = device_info.get('_id_')
+                if not rule_id:
+                    return {
+                        'device_id': device_or_id,
+                        'error': f'No WAN rule _id_ found for device {device_or_id}',
+                        'success': False
+                    }
+            else:
+                # Assume it's already a WAN rule _id_
+                rule_id = device_or_id
+            
+            # Remove the manual APN configuration by setting apn_mode to auto
+            apn_config = {
+                "modem": {
+                    "apn_mode": "auto"
+                }
+            }
+            
+            result = self.put(f'config/wan/rules2/{rule_id}', apn_config)
+            
+            if result is not None:
+                return {
+                    'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+                    'rule_id': rule_id,
+                    'success': True
+                }
+            else:
+                return {
+                    'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+                    'rule_id': rule_id,
+                    'error': 'Failed to update WAN rule configuration',
+                    'success': False
+                }
+                
+        except Exception as e:
+            self.log(f"Error removing manual APN for {device_or_id}: {e}")
+            return {
+                'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+                'error': str(e),
+                'success': False
+            }
+
+    def add_advanced_apn(self, carrier: str, apn: str) -> Optional[Dict[str, Any]]:
+        """Add an advanced APN configuration to the custom APNs list.
+        
+        Args:
+            carrier (str): Carrier name or PLMN identifier
+            apn (str): APN name to configure
+            
+        Returns:
+            dict: Result with operation details including:
+                - carrier (str): The carrier that was added
+                - apn (str): The APN that was added
+                - success (bool): Whether the operation was successful
+        """
+        try:
+            # Get existing custom APNs
+            existing_apns = self.get('config/wan/custom_apns')
+            if not existing_apns:
+                existing_apns = []
+            
+            # Check if this carrier/APN combination already exists
+            for existing_apn in existing_apns:
+                if (existing_apn.get('carrier') == carrier and 
+                    existing_apn.get('apn') == apn):
+                    return {
+                        'carrier': carrier,
+                        'apn': apn,
+                        'error': f'Advanced APN for carrier "{carrier}" and APN "{apn}" already exists',
+                        'success': False
+                    }
+            
+            # Add the new advanced APN to the existing array
+            new_apn_entry = {
+                "carrier": carrier,
+                "apn": apn
+            }
+            
+            # Append to existing array and update the entire array
+            updated_apns = existing_apns + [new_apn_entry]
+            result = self.put('config/wan/custom_apns', updated_apns)
+            
+            if result is not None:
+                return {
+                    'carrier': carrier,
+                    'apn': apn,
+                    'success': True
+                }
+            else:
+                return {
+                    'carrier': carrier,
+                    'apn': apn,
+                    'error': 'Failed to add advanced APN configuration',
+                    'success': False
+                }
+                
+        except Exception as e:
+            self.log(f"Error adding advanced APN for carrier {carrier} and APN {apn}: {e}")
+            return {
+                'carrier': carrier,
+                'apn': apn,
+                'error': str(e),
+                'success': False
+            }
+
+    def delete_advanced_apn(self, carrier_or_apn: str) -> Optional[Dict[str, Any]]:
+        """Delete an advanced APN configuration from the custom APNs list.
+        
+        Args:
+            carrier_or_apn (str): Carrier name, PLMN identifier, or APN name to match and delete
+            
+        Returns:
+            dict: Result with operation details including:
+                - matched_entries (list): List of entries that were matched and deleted
+                - success (bool): Whether the operation was successful
+                - deleted_count (int): Number of entries deleted
+        """
+        try:
+            # Get existing custom APNs
+            existing_apns = self.get('config/wan/custom_apns')
+            if not existing_apns:
+                return {
+                    'matched_entries': [],
+                    'deleted_count': 0,
+                    'error': 'No custom APNs found',
+                    'success': False
+                }
+            
+            # Find matching entries and create filtered array
+            matched_entries = []
+            remaining_apns = []
+            
+            for apn_entry in existing_apns:
+                if (apn_entry.get('carrier') == carrier_or_apn or 
+                    apn_entry.get('apn') == carrier_or_apn):
+                    matched_entries.append(apn_entry)
+                else:
+                    remaining_apns.append(apn_entry)
+            
+            if not matched_entries:
+                return {
+                    'matched_entries': [],
+                    'deleted_count': 0,
+                    'error': f'No advanced APN found matching "{carrier_or_apn}"',
+                    'success': False
+                }
+            
+            # Update the array with remaining entries
+            result = self.put('config/wan/custom_apns', remaining_apns)
+            
+            if result is not None:
+                return {
+                    'matched_entries': matched_entries,
+                    'deleted_count': len(matched_entries),
+                    'success': True
+                }
+            else:
+                return {
+                    'matched_entries': matched_entries,
+                    'deleted_count': 0,
+                    'error': 'Failed to update custom APNs configuration',
+                    'success': False
+                }
+                
+        except Exception as e:
+            self.log(f"Error deleting advanced APN matching {carrier_or_apn}: {e}")
+            return {
+                'matched_entries': [],
+                'deleted_count': 0,
+                'error': str(e),
+                'success': False
+            }
+
+    def monitor_log(self, 
+                    pattern: str = None,
+                    callback: callable = None,
+                    follow: bool = True,
+                    max_lines: int = 0,
+                    timeout: int = 0) -> Optional[Dict[str, Any]]:
+        """Monitor /var/log/messages and optionally match lines against a pattern, sending matches to a callback.
+        
+        This method provides real-time log monitoring with pattern matching and callback handling.
+        It runs in a separate thread to avoid blocking the main application.
+        
+        Args:
+            pattern: Regex pattern to match against log lines (default: None for all lines)
+            callback: Function to call with matching lines (default: None for no callback)
+            follow: Whether to follow the file (like tail -f) (default: True)
+            max_lines: Maximum number of lines to process (0 = unlimited) (default: 0)
+            timeout: Timeout in seconds (0 = no timeout) (default: 0)
+            
+        Returns:
+            dict: Result with thread information and status
+        """
+        import threading
+        import re
+        import time
+        from subprocess import Popen, PIPE
+        from queue import Queue, Empty
+        
+        result = {
+            'success': False,
+            'thread_id': None,
+            'log_file': '/var/log/messages',
+            'pattern': pattern,
+            'callback': callback is not None,
+            'follow': follow,
+            'max_lines': max_lines,
+            'timeout': timeout,
+            'error': None
+        }
+        
+        try:
+            # Validate inputs
+            log_file = '/var/log/messages'
+            if not os.path.exists(log_file):
+                result['error'] = f"Log file does not exist: {log_file}"
+                return result
+            
+            if callback and not callable(callback):
+                result['error'] = "Callback must be a callable function"
+                return result
+            
+            # Compile regex pattern if provided
+            compiled_pattern = None
+            if pattern:
+                try:
+                    compiled_pattern = re.compile(pattern)
+                except re.error as e:
+                    result['error'] = f"Invalid regex pattern: {e}"
+                    return result
+            
+            # Create a queue for communication between threads
+            line_queue = Queue()
+            stop_event = threading.Event()
+            
+            def monitor_worker():
+                """Worker thread that monitors the log file."""
+                try:
+                    # Build tail command
+                    cmd = ['/usr/bin/tail']
+                    if follow:
+                        cmd.append('-F')
+                    if max_lines > 0:
+                        cmd.extend(['-n', str(max_lines)])
+                    cmd.append(log_file)
+                    
+                    self.log(f"Starting monitor process: {' '.join(cmd)}")
+                    monitor_process = Popen(cmd, stdout=PIPE, stderr=PIPE, bufsize=1, universal_newlines=True)
+                    
+                    line_count = 0
+                    start_time = time.time()
+                    
+                    for line in iter(monitor_process.stdout.readline, ''):
+                        if stop_event.is_set():
+                            break
+                            
+                        # Check timeout
+                        if timeout > 0 and (time.time() - start_time) > timeout:
+                            self.log(f"Monitor timeout reached: {timeout} seconds")
+                            break
+                        
+                        # Check max lines
+                        if max_lines > 0 and line_count >= max_lines:
+                            self.log(f"Max lines reached: {max_lines}")
+                            break
+                        
+                        line = line.rstrip('\n\r')
+                        if not line:
+                            continue
+                        
+                        line_count += 1
+                        
+                        # Check pattern match
+                        if compiled_pattern:
+                            if not compiled_pattern.search(line):
+                                continue
+                        
+                        # Send line to callback or queue
+                        if callback:
+                            try:
+                                callback(line)
+                            except Exception as e:
+                                self.log(f"Error in callback: {e}")
+                        else:
+                            line_queue.put(line)
+                    
+                    # Clean up process
+                    monitor_process.terminate()
+                    monitor_process.wait(timeout=5)
+                    
+                except Exception as e:
+                    self.log(f"Error in monitor worker: {e}")
+                    line_queue.put(f"ERROR: {e}")
+                finally:
+                    line_queue.put(None)  # Signal end of stream
+            
+            # Start the monitor worker thread
+            monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
+            monitor_thread.start()
+            
+            result.update({
+                'success': True,
+                'thread_id': monitor_thread.ident,
+                'thread_name': monitor_thread.name,
+                'line_queue': line_queue,
+                'stop_event': stop_event
+            })
+            
+            self.log(f"Started monitor_log thread {monitor_thread.ident} for {log_file}")
+            
+        except Exception as e:
+            result['error'] = str(e)
+            self.log(f"Error starting monitor_log: {e}")
+        
+        return result
+    
+    def stop_monitor_log(self, monitor_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Stop a running monitor_log operation.
+        
+        Args:
+            monitor_result: The result dictionary returned by monitor_log()
+            
+        Returns:
+            dict: Result of the stop operation
+        """
+        result = {
+            'success': False,
+            'stopped': False,
+            'error': None
+        }
+        
+        try:
+            if not monitor_result or not monitor_result.get('success'):
+                result['error'] = "Invalid monitor_result provided"
+                return result
+            
+            stop_event = monitor_result.get('stop_event')
+            if stop_event:
+                stop_event.set()
+                result['stopped'] = True
+                result['success'] = True
+                self.log(f"Stopped monitor_log thread {monitor_result.get('thread_id')}")
+            else:
+                result['error'] = "No stop_event found in monitor_result"
+                
+        except Exception as e:
+            result['error'] = str(e)
+            self.log(f"Error stopping monitor_log: {e}")
+        
+        return result
+
+    def monitor_sms(self, 
+                    callback: callable,
+                    timeout: int = 0) -> Optional[Dict[str, Any]]:
+        """Monitor SMS messages and send parsed data to a callback function.
+        
+        This method monitors /var/log/messages for SMS received messages and automatically
+        parses the phone number and message content, sending structured data to the callback.
+        
+        Args:
+            callback: Function to call with SMS data (phone_number, message, raw_line)
+            timeout: Timeout in seconds (0 = no timeout) (default: 0)
+            
+        Returns:
+            dict: Result with thread information and status
+            
+        Example:
+            def sms_handler(phone_number, message, raw_line):
+                print(f"SMS from {phone_number}: {message}")
+                # Auto-reply
+                cp.execute_cli(f'sms {phone_number} Thanks for your message!')
+            
+            result = _cs_client.monitor_sms(callback=sms_handler)
+        """
+        import re
+        
+        def sms_parser(raw_line: str):
+            """Parse SMS log line and extract phone number and message."""
+            try:
+                # SMS log format is typically: "SMS received: <message> <phone_number>"
+                # We need to extract the message and phone number
+                
+                # Remove timestamp and "SMS received:" prefix
+                if "SMS received:" in raw_line:
+                    sms_part = raw_line.split("SMS received:", 1)[1].strip()
+                    
+                    # Split by spaces to get individual parts
+                    parts = sms_part.split()
+                    
+                    if len(parts) >= 2:
+                        # Last part is typically the phone number
+                        phone_number = parts[-1]
+                        
+                        # Everything before the last part is the message
+                        message = " ".join(parts[:-1])
+                        
+                        # Call the user's callback with parsed data
+                        callback(phone_number, message, raw_line)
+                    else:
+                        # Fallback: if we can't parse properly, send raw data
+                        callback("unknown", sms_part, raw_line)
+                        
+            except Exception as e:
+                self.log(f"Error parsing SMS line: {e}")
+                # Call callback with error data
+                callback("error", str(e), raw_line)
+        
+        # Use the existing monitor_log method with SMS-specific parsing
+        return self.monitor_log(
+            pattern="SMS received:",
+            callback=sms_parser,
+            timeout=timeout
+        )
+    
+    def stop_monitor_sms(self, monitor_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Stop a running monitor_sms operation.
+        
+        Args:
+            monitor_result: The result dictionary returned by monitor_sms()
+            
+        Returns:
+            dict: Result of the stop operation
+        """
+        # This is the same as stopping monitor_log since monitor_sms uses it internally
+        return self.stop_monitor_log(monitor_result)
+
+    def send_sms(self, 
+                 phone_number: str = None,
+                 message: str = None,
+                 port: str = None) -> Optional[str]:
+        """Send an SMS message using the CLI.
+        
+        This method sends an SMS message using the CLI command with automatic port detection
+        if no port is specified. It finds the first connected modem and uses its port.
+        
+        Args:
+            phone_number: The phone number to send the SMS to
+            message: The message content to send
+            port: The modem port to use (default: None for auto-detection)
+            
+        Returns:
+            str: CLI command output, or None if an error occurred
+            
+        Example:
+            # Send SMS with auto-detected port
+            output = _cs_client.send_sms(phone_number="+1234567890", message="Hello from the router!")
+            
+            # Send SMS with specific port
+            output = _cs_client.send_sms(phone_number="+1234567890", message="Hello!", port="ttyUSB0")
+        """
+        try:
+            # Validate required parameters
+            if not phone_number:
+                self.log("phone_number is required for send_sms")
+                return None
+            if not message:
+                self.log("message is required for send_sms")
+                return None
+            
+            # Auto-detect port if not provided
+            if port is None:
+                port = self._get_first_connected_modem_port()
+                if port is None:
+                    self.log("No connected modem found for SMS sending")
+                    return None
+            
+            # Build and execute the SMS command
+            sms_command = f'sms {phone_number} {message} {port}'
+            return self.execute_cli(sms_command)
+            
+        except Exception as e:
+            self.log(f"Error sending SMS: {e}")
+            return None
+    
+    def _get_first_connected_modem_port(self) -> Optional[str]:
+        """Get the port of the first connected modem.
+        
+        Returns:
+            str: The port of the first connected modem, or None if none found
+        """
+        try:
+            # Get list of WAN devices
+            wan_devices = self.get('status/wan/devices')
+            if not wan_devices:
+                return None
+            
+            # Look for connected modems (mdm devices)
+            for device_id, device_info in wan_devices.items():
+                if device_id.startswith('mdm-'):
+                    # Check if device is connected
+                    device_status = self.get(f'status/wan/devices/{device_id}/info')
+                    if device_status and device_status.get('connected'):
+                        # Get the port
+                        port = device_status.get('port')
+                        if port:
+                            self.log(f"Found connected modem {device_id} on port {port}")
+                            return port
+            
+            self.log("No connected modems found")
+            return None
+            
+        except Exception as e:
+            self.log(f"Error detecting modem port: {e}")
+            return None
+
+    def execute_cli(self, 
+                   commands: str | list[str],
+                   timeout: int = 10,
+                   soft_timeout: int = 5,
+                   clean: bool = True) -> Optional[str]:
+        """Execute CLI commands and return the output.
+        
+        This method provides a simplified interface to execute CLI commands using the
+        config store terminal interface. It handles command execution, output capture,
+        and cleanup automatically.
+        
+        Args:
+            commands: Single command string or list of commands to execute
+            timeout: Absolute maximum number of seconds to wait for output (default: 10)
+            soft_timeout: Number of seconds to wait before sending interrupt (default: 5)
+            clean: Whether to remove terminal escape sequences from output (default: True)
+            
+        Returns:
+            str: Command output, or None if an error occurred
+            
+        Example:
+            # Single command
+            output = _cs_client.execute_cli("show version")
+            
+            # Multiple commands
+            output = _cs_client.execute_cli(["show version", "show interfaces"])
+            
+            # With custom timeout
+            output = _cs_client.execute_cli("show config", timeout=30)
+        """
+        import random
+        import re
+        
+        try:
+            # Validate inputs
+            if not commands:
+                self.log("No commands provided to execute_cli")
+                return None
+            
+            # Convert single command to list
+            if isinstance(commands, str):
+                commands = [commands]
+            
+            # Generate unique session ID
+            session_id = f"term-{random.randint(100000000, 999999999)}"
+            
+            # Add newlines to commands
+            commands_with_newlines = [cmd + '\n' for cmd in commands]
+            
+            # Calculate timeout intervals
+            interval = 0.3  # Polling interval
+            timeout_cycles = int(timeout / interval)
+            soft_timeout_cycles = int(soft_timeout / interval)
+            
+            # Execute commands
+            output = ''
+            command_iter = iter(commands_with_newlines)
+            current_command = next(command_iter)
+            
+            cycles_remaining = timeout_cycles
+            soft_timeout_remaining = soft_timeout_cycles
+            
+            while cycles_remaining > 0:
+                # Send command
+                command_data = {"k": current_command}
+                
+                self.put(f"/control/csterm/{session_id}", command_data)
+                
+                # Get response
+                response = self.get(f"/control/csterm/{session_id}")
+                if response and 'k' in response:
+                    output += response['k']
+                
+                # Check if we've sent all commands and got a prompt
+                if current_command == "" and not output.endswith('\n'):
+                    break
+                
+                # Move to next command
+                current_command = next(command_iter, None) or ""
+                cycles_remaining -= 1
+                
+                # Handle soft timeout
+                if cycles_remaining < (timeout_cycles - soft_timeout_remaining):
+                    # Send interrupt (Ctrl+C)
+                    interrupt_data = {"k": '\x03'}
+                    
+                    self.put(f"/control/csterm/{session_id}", interrupt_data)
+                    response = self.get(f"/control/csterm/{session_id}")
+                    if response and 'k' in response:
+                        output += response['k']
+                    soft_timeout_remaining = 0
+                
+                time.sleep(interval)
+            
+            # Clean up output if requested
+            if clean and output:
+                # Remove terminal escape sequences
+                output = re.sub(r'(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~])', '', output)
+                
+                # Remove prompt lines
+                lines = output.split('\n')
+                if lines:
+                    # Find the prompt (usually the last non-empty line)
+                    prompt = None
+                    for line in reversed(lines):
+                        if line.strip():
+                            prompt = line
+                            break
+                    
+                    if prompt:
+                        # Remove lines that start with the prompt
+                        lines = [line for line in lines if not line.startswith(prompt)]
+                        output = '\n'.join(lines)
+            
+            self.log(f"CLI execution completed for session {session_id}")
+            return output.strip()
+            
+        except Exception as e:
+            self.log(f"Error executing CLI commands: {e}")
+            return None
 
 
 def _get_app_name() -> str:
@@ -4184,7 +4875,7 @@ def get_device_firmware(include_build_info: bool = False) -> str:
     """
     try:
         fw_info = _cs_client.get('status/fw_info')
-        firmware = f"{fw_info.get('major')}.{fw_info.get('minor')}.{fw_info.get('patch')}-{fw_info.get('fw_release_tag')}"
+        firmware = f"{fw_info.get('major_version')}.{fw_info.get('minor_version')}.{fw_info.get('patch_version')}-{fw_info.get('fw_release_tag')}"
         
         if include_build_info:
             build_info = fw_info.get('build_info', '')
@@ -5247,11 +5938,11 @@ def get_signal_strength() -> Optional[Dict[str, Any]]:
         _cs_client.logger.exception(f"Error retrieving signal strength: {e}")
         return None
 
-def get_temperature(unit: str = 'celsius') -> Optional[float]:
+def get_temperature(unit: str = 'fahrenheit') -> Optional[float]:
     """Return device temperature information.
     
     Args:
-        unit (str): Temperature unit ('celsius' or 'fahrenheit'). Defaults to 'celsius'.
+        unit (str): Temperature unit ('celsius' or 'fahrenheit'). Defaults to 'fahrenheit'.
     
     Returns:
         float or None: Device temperature in the specified unit, or None if not available.
@@ -5262,7 +5953,7 @@ def get_temperature(unit: str = 'celsius') -> Optional[float]:
         if temp is None:
             return None
         
-        # Convert to Fahrenheit if requested
+        # Convert to Fahrenheit if requested (default), otherwise return Celsius
         if unit.lower() == 'fahrenheit':
             return (temp * 9/5) + 32
         return temp
@@ -6270,6 +6961,99 @@ def set_wan_device_bandwidth(device_id: str, ingress_kbps: int = None, egress_kb
     except Exception as e:
         _cs_client.logger.exception(f"Error setting bandwidth for {device_id}: {e}")
         return False
+
+def set_manual_apn(device_or_id: str, new_apn: str) -> Optional[Dict[str, Any]]:
+    """Set manual APN for a modem device or WAN rule.
+    
+    Args:
+        device_or_id (str): Either a modem device name (starts with 'mdm') or a WAN rule _id_
+        new_apn (str): The new APN to set
+        
+    Returns:
+        dict: Result with operation details including:
+            - device_id (str): The device identifier used
+            - rule_id (str): The WAN rule _id_ that was modified
+            - new_apn (str): The APN that was set
+            - success (bool): Whether the operation was successful
+    """
+    try:
+        return _cs_client.set_manual_apn(device_or_id, new_apn)
+    except Exception as e:
+        _cs_client.logger.exception(f"Error setting manual APN for {device_or_id}: {e}")
+        return {
+            'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+            'error': str(e),
+            'success': False
+        }
+
+def remove_manual_apn(device_or_id: str) -> Optional[Dict[str, Any]]:
+    """Remove manual APN configuration for a modem device or WAN rule.
+    
+    Args:
+        device_or_id (str): Either a modem device name (starts with 'mdm') or a WAN rule _id_
+        
+    Returns:
+        dict: Result with operation details including:
+            - device_id (str): The device identifier used
+            - rule_id (str): The WAN rule _id_ that was modified
+            - success (bool): Whether the operation was successful
+    """
+    try:
+        return _cs_client.remove_manual_apn(device_or_id)
+    except Exception as e:
+        _cs_client.logger.exception(f"Error removing manual APN for {device_or_id}: {e}")
+        return {
+            'device_id': device_or_id if device_or_id.startswith('mdm') else None,
+            'error': str(e),
+            'success': False
+        }
+
+def add_advanced_apn(carrier: str, apn: str) -> Optional[Dict[str, Any]]:
+    """Add an advanced APN configuration to the custom APNs list.
+    
+    Args:
+        carrier (str): Carrier name or PLMN identifier
+        apn (str): APN name to configure
+        
+    Returns:
+        dict: Result with operation details including:
+            - carrier (str): The carrier that was added
+            - apn (str): The APN that was added
+            - success (bool): Whether the operation was successful
+    """
+    try:
+        return _cs_client.add_advanced_apn(carrier, apn)
+    except Exception as e:
+        _cs_client.logger.exception(f"Error adding advanced APN for carrier {carrier} and APN {apn}: {e}")
+        return {
+            'carrier': carrier,
+            'apn': apn,
+            'error': str(e),
+            'success': False
+        }
+
+def delete_advanced_apn(carrier_or_apn: str) -> Optional[Dict[str, Any]]:
+    """Delete an advanced APN configuration from the custom APNs list.
+    
+    Args:
+        carrier_or_apn (str): Carrier name, PLMN identifier, or APN name to match and delete
+        
+    Returns:
+        dict: Result with operation details including:
+            - matched_entries (list): List of entries that were matched and deleted
+            - success (bool): Whether the operation was successful
+            - deleted_count (int): Number of entries deleted
+    """
+    try:
+        return _cs_client.delete_advanced_apn(carrier_or_apn)
+    except Exception as e:
+        _cs_client.logger.exception(f"Error deleting advanced APN matching {carrier_or_apn}: {e}")
+        return {
+            'matched_entries': [],
+            'deleted_count': 0,
+            'error': str(e),
+            'success': False
+        }
 
 def reorder_wan_profiles(device_priorities: Dict[str, float]) -> bool:
     """Reorder WAN profiles based on desired device priorities.
@@ -7736,4 +8520,220 @@ def packet_capture(iface: str = None,
         )
     except Exception as e:
         print(f"Error in packet capture: {e}")
+        return None
+
+
+def monitor_log(pattern: str = None,
+                callback: callable = None,
+                follow: bool = True,
+                max_lines: int = 0,
+                timeout: int = 0) -> Optional[Dict[str, Any]]:
+    """Monitor /var/log/messages and optionally match lines against a pattern, sending matches to a callback.
+    
+    This convenience function provides real-time log monitoring with pattern matching and callback handling.
+    It runs in a separate thread to avoid blocking the main application.
+    
+    Args:
+        pattern: Regex pattern to match against log lines (default: None for all lines)
+        callback: Function to call with matching lines (default: None for no callback)
+        follow: Whether to follow the file (like tail -f) (default: True)
+        max_lines: Maximum number of lines to process (0 = unlimited) (default: 0)
+        timeout: Timeout in seconds (0 = no timeout) (default: 0)
+        
+    Returns:
+        dict: Result with thread information and status
+        
+    Example:
+        # Simple monitoring with callback
+        def log_handler(line):
+            print(f"Log line: {line}")
+        
+        result = cp.monitor_log(pattern="ERROR", callback=log_handler)
+        
+        # Monitor with timeout and max lines
+        result = cp.monitor_log(
+            pattern="WARNING|ERROR",
+            max_lines=100,
+            timeout=30
+        )
+        
+        # Stop the monitor operation
+        cp.stop_monitor_log(result)
+    """
+    try:
+        return _cs_client.monitor_log(
+            pattern=pattern,
+            callback=callback,
+            follow=follow,
+            max_lines=max_lines,
+            timeout=timeout
+        )
+    except Exception as e:
+        print(f"Error in monitor_log: {e}")
+        return None
+
+
+def stop_monitor_log(monitor_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Stop a running monitor_log operation.
+    
+    Args:
+        monitor_result: The result dictionary returned by monitor_log()
+        
+    Returns:
+        dict: Result of the stop operation
+        
+    Example:
+        result = cp.monitor_log(pattern="ERROR", callback=my_handler)
+        # ... later ...
+        stop_result = cp.stop_monitor_log(result)
+    """
+    try:
+        return _cs_client.stop_monitor_log(monitor_result)
+    except Exception as e:
+        print(f"Error stopping monitor_log: {e}")
+        return None
+
+
+def execute_cli(commands: str | list[str],
+                timeout: int = 10,
+                soft_timeout: int = 5,
+                clean: bool = True) -> Optional[str]:
+    """Execute CLI commands and return the output.
+    
+    This convenience function provides a simplified interface to execute CLI commands
+    using the config store terminal interface. It handles command execution, output
+    capture, and cleanup automatically.
+    
+    Args:
+        commands: Single command string or list of commands to execute
+        timeout: Absolute maximum number of seconds to wait for output (default: 10)
+        soft_timeout: Number of seconds to wait before sending interrupt (default: 5)
+        clean: Whether to remove terminal escape sequences from output (default: True)
+        
+    Returns:
+        str: Command output, or None if an error occurred
+        
+    Example:
+        # Single command
+        output = cp.execute_cli("show version")
+        if output:
+            print(output)
+        
+        # Multiple commands
+        output = cp.execute_cli(["show version", "show interfaces"])
+        
+        # With custom timeout
+        output = cp.execute_cli("show config", timeout=30)
+        
+        # Raw output (with escape sequences)
+        output = cp.execute_cli("show status", clean=False)
+    """
+    try:
+        return _cs_client.execute_cli(
+            commands=commands,
+            timeout=timeout,
+            soft_timeout=soft_timeout,
+            clean=clean
+        )
+    except Exception as e:
+        print(f"Error executing CLI commands: {e}")
+        return None
+
+
+def monitor_sms(callback: callable,
+                timeout: int = 0) -> Optional[Dict[str, Any]]:
+    """Monitor SMS messages and send parsed data to a callback function.
+    
+    This convenience function monitors /var/log/messages for SMS received messages and 
+    automatically parses the phone number and message content, sending structured data 
+    to the callback.
+    
+    Args:
+        callback: Function to call with SMS data (phone_number, message, raw_line)
+        timeout: Timeout in seconds (0 = no timeout) (default: 0)
+        
+    Returns:
+        dict: Result with thread information and status
+        
+    Example:
+        def sms_handler(phone_number, message, raw_line):
+            print(f"SMS from {phone_number}: {message}")
+            # Auto-reply
+            output = cp.execute_cli(f'sms {phone_number} Thanks for your message!')
+            if output:
+                print(f"Auto-reply sent to {phone_number}")
+        
+        result = cp.monitor_sms(callback=sms_handler)
+        
+        # Stop monitoring
+        cp.stop_monitor_sms(result)
+    """
+    try:
+        return _cs_client.monitor_sms(callback=callback, timeout=timeout)
+    except Exception as e:
+        print(f"Error in monitor_sms: {e}")
+        return None
+
+
+def stop_monitor_sms(monitor_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Stop a running monitor_sms operation.
+    
+    Args:
+        monitor_result: The result dictionary returned by monitor_sms()
+        
+    Returns:
+        dict: Result of the stop operation
+        
+    Example:
+        result = cp.monitor_sms(callback=my_handler)
+        # ... later ...
+        stop_result = cp.stop_monitor_sms(result)
+    """
+    try:
+        return _cs_client.stop_monitor_sms(monitor_result)
+    except Exception as e:
+        print(f"Error stopping monitor_sms: {e}")
+        return None
+
+
+def send_sms(phone_number: str = None,
+             message: str = None,
+             port: str = None) -> Optional[str]:
+    """Send an SMS message using the CLI.
+    
+    This convenience function sends an SMS message using the CLI command with automatic 
+    port detection if no port is specified. It finds the first connected modem and uses its port.
+    
+    Args:
+        phone_number: The phone number to send the SMS to
+        message: The message content to send
+        port: The modem port to use (default: None for auto-detection)
+        
+    Returns:
+        str: CLI command output, or None if an error occurred
+        
+    Example:
+        # Send SMS with auto-detected port
+        output = cp.send_sms(phone_number="+1234567890", message="Hello from the router!")
+        if output:
+            print("SMS sent successfully")
+        
+        # Send SMS with specific port
+        output = cp.send_sms(phone_number="+1234567890", message="Hello!", port="ttyUSB0")
+        
+        # Use in SMS auto-reply
+        def sms_handler(phone_number, message, raw_line):
+            response = f"Thanks for your message: {message}"
+            output = cp.send_sms(phone_number=phone_number, message=response)
+            if output:
+                print(f"Auto-reply sent to {phone_number}")
+    """
+    try:
+        return _cs_client.send_sms(
+            phone_number=phone_number,
+            message=message,
+            port=port
+        )
+    except Exception as e:
+        print(f"Error sending SMS: {e}")
         return None
