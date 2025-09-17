@@ -1,4 +1,4 @@
-# Ericsson Cradlepoint NCOS SDK and Sample Applications. 
+# Ericsson Cradlepoint NCOS SDK and Sample Applications.
 
 ## Documentation
 
