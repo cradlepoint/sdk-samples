@@ -4131,7 +4131,7 @@ class EventingCSClient(CSClient):
                     return None
             
             # Build and execute the SMS command
-            sms_command = f'sms {phone_number} {message} {port}'
+            sms_command = f'sms {phone_number} "{message}" {port}'
             return self.execute_cli(sms_command)
             
         except Exception as e:
@@ -4170,7 +4170,7 @@ class EventingCSClient(CSClient):
             return None
 
     def execute_cli(self, 
-                   commands: str | list[str],
+                   commands: Union[str, List[str]],
                    timeout: int = 10,
                    soft_timeout: int = 5,
                    clean: bool = True) -> Optional[str]:
@@ -8594,7 +8594,7 @@ def stop_monitor_log(monitor_result: Dict[str, Any]) -> Optional[Dict[str, Any]]
         return None
 
 
-def execute_cli(commands: str | list[str],
+def execute_cli(commands: Union[str, List[str]],
                 timeout: int = 10,
                 soft_timeout: int = 5,
                 clean: bool = True) -> Optional[str]:
