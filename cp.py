@@ -425,13 +425,13 @@ class CSClient(object):
         else:
             formatted_value = value
             
-        if self.ncos:
+        if _cs_client.enable_logging:
             # Running in NCOS so write to the logger
             self.logger.info(formatted_value)
         elif self.ncos:
-            # Running in Linux (container?) so write to stdout
+            # Running in container so write to stdout
             with open('/dev/stdout', 'w') as log:
-                log.write(f'{self.app_name}: {formatted_value}\n')
+                log.write(f'{formatted_value}\n')
         else:
             # Running in a computer so just use print for the log.
             print(formatted_value)
@@ -1410,6 +1410,27 @@ class EventingCSClient(CSClient):
             self.log(f"Error getting ethernet info for {device_id}: {e}")
             return {"device_id": device_id, "error": str(e)}
 
+    def get_wan_connection_state(self) -> Dict[str, Any]:
+        """Get WAN connection state status.
+        
+        Returns:
+            dict: Dictionary containing WAN connection state information including:
+                - connection_state (str): Overall WAN connection state
+                - timestamp (str): Timestamp when the state was retrieved
+        """
+        try:
+            connection_state = self.get('status/wan/connection_state')
+            if connection_state is None:
+                return {"connection_state": "unknown", "timestamp": None}
+            
+            return {
+                "connection_state": connection_state,
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            self.log(f"Error getting WAN connection state: {e}")
+            return {"connection_state": "error", "error": str(e)}
+
     def get_lan_status(self) -> Dict[str, Any]:
         """Get LAN status and return detailed information.
         
@@ -2370,8 +2391,8 @@ class EventingCSClient(CSClient):
 
     def speed_test(self, host: str = "", interface: str = "", duration: int = 5, 
                    packet_size: int = 0, port: int = None, protocol: str = "tcp",
-                   direction: str = "recv") -> Optional[Dict[str, Any]]:
-        """Perform network speed test using netperf (based on UI implementation).
+                   direction: str = "both") -> Optional[Dict[str, Any]]:
+        """Perform comprehensive network speed test using netperf with both upload and download.
         
         Args:
             host: Target host for speed test (empty for auto-detect)
@@ -2380,10 +2401,10 @@ class EventingCSClient(CSClient):
             packet_size: Packet size in bytes (0 for default)
             port: Port number (None for default)
             protocol: Protocol to use - "tcp" or "udp" (default: "tcp")
-            direction: Test direction - "recv", "send", or "rr" (default: "recv")
+            direction: Test direction - "recv", "send", "both", or "rr" (default: "both")
             
         Returns:
-            dict: Speed test results including throughput in Mbps
+            dict: Speed test results with download_bps, upload_bps, and latency
         """
         
         try:
@@ -2392,17 +2413,22 @@ class EventingCSClient(CSClient):
                 primary_device = self.get_wan_primary_device()
                 if primary_device:
                     # Get the interface name for the primary device
-                    wan_status = self.get('status/wan')
-                    devices = wan_status.get('devices', {})
-                    if primary_device in devices:
-                        device_info = devices[primary_device].get('info', {})
-                        interface = device_info.get('iface', primary_device)
-                    else:
-                        interface = primary_device
+                    interface = self.get(f'status/wan/{primary_device}/info/iface')
                 else:
                     interface = "any"
             
-            # Build speedtest parameters matching UI format
+            # Initialize results
+            results = {
+                'download_bps': 0,
+                'upload_bps': 0,
+                'latency_ms': 0,
+                'test_duration': duration,
+                'interface': interface,
+                'host': host,
+                'protocol': protocol
+            }
+            
+            # Build base speedtest parameters
             speedtest_params = {
                 "input": {
                     "options": {
@@ -2416,15 +2442,71 @@ class EventingCSClient(CSClient):
                         "ifc_wan": interface,
                         "tcp": protocol == "tcp",
                         "udp": protocol == "udp",
-                        "send": direction == "send",
-                        "recv": direction == "recv",
-                        "rr": direction == "rr"
+                        "send": False,
+                        "recv": True,
+                        "rr": False
                     },
                     "tests": None
                 },
                 "run": 1
             }
             
+            # Clear any existing netperf state
+            self.put('/state/system/netperf', {"run_count": 0})
+            time.sleep(1)  # Give time for state to clear
+            
+            # Run download test if direction is "recv" or "both"
+            if direction in ["recv", "both"]:
+                self.log("Running download test...")
+                download_result = self._run_speed_test_with_params(speedtest_params)
+                if download_result and 'tcp_down' in download_result:
+                    tcp_down = download_result['tcp_down']
+                    if tcp_down and 'THROUGHPUT' in tcp_down:
+                        throughput = float(tcp_down.get('THROUGHPUT', 0))
+                        throughput_units = tcp_down.get('THROUGHPUT_UNITS', '')
+                        results['download_bps'] = self._convert_to_bps(throughput, throughput_units)
+                        self.log(f"Download result: {results['download_bps']} bps")
+                
+                # Add delay between tests to prevent caching issues
+                if direction == "both":
+                    time.sleep(3)  # Increased delay
+            
+            # Run upload test if direction is "send" or "both"
+            if direction in ["send", "both"]:
+                # Clear netperf state again before upload test
+                self.put('/state/system/netperf', {"run_count": 0})
+                time.sleep(1)  # Give time for state to clear
+                
+                # Modify parameters for upload test
+                speedtest_params["input"]["options"]["send"] = True
+                speedtest_params["input"]["options"]["recv"] = False
+                
+                self.log("Running upload test...")
+                upload_result = self._run_speed_test_with_params(speedtest_params)
+                if upload_result and 'tcp_up' in upload_result:
+                    tcp_up = upload_result['tcp_up']
+                    if tcp_up and 'THROUGHPUT' in tcp_up:
+                        throughput = float(tcp_up.get('THROUGHPUT', 0))
+                        throughput_units = tcp_up.get('THROUGHPUT_UNITS', '')
+                        results['upload_bps'] = self._convert_to_bps(throughput, throughput_units)
+                        self.log(f"Upload result: {results['upload_bps']} bps")
+            
+            return results
+            
+        except Exception as e:
+            self.log(f"Error performing speed test: {e}")
+            return {'error': str(e)}
+    
+    def _run_speed_test_with_params(self, speedtest_params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Run a speed test with the given parameters and return raw results.
+        
+        Args:
+            speedtest_params: Speed test parameters
+            
+        Returns:
+            dict: Raw speed test results
+        """
+        try:
             # Start speedtest
             start_result = self.put('control/netperf', speedtest_params)
             
@@ -2434,6 +2516,7 @@ class EventingCSClient(CSClient):
             # Wait for completion, checking status periodically
             result = None
             try_count = 0
+            duration = speedtest_params['input']['options']['limit']['time']
             max_tries = duration + 10  # Wait a bit longer than test duration
             
             while try_count < max_tries:
@@ -2446,93 +2529,43 @@ class EventingCSClient(CSClient):
             if try_count == max_tries:
                 return {'error': 'Speedtest timed out'}
             
+            if result.get('status') == 'error':
+                return {'error': 'Speedtest failed'}
+            
             # Get the results from the performance results path
             if result and result.get('results_path'):
                 results_path = result['results_path']
                 perf_results = self.get(results_path.lstrip('/'))
-            else:
-                perf_results = None
-            
-            if perf_results:
-                # Parse the performance results
-                speedtest_stats = {
-                    'parameters': speedtest_params,
-                    'start_result': start_result,
-                    'status': result.get('status'),
-                    'command': result.get('command'),
-                    'raw_results': perf_results
-                }
-                
-                # Extract throughput data from perf_results
-                if isinstance(perf_results, dict):
-                    # Check if perf_results contains test data directly (like "tcp_down")
-                    for test_name, test_data in perf_results.items():
-                        if isinstance(test_data, dict) and 'THROUGHPUT' in test_data:
-                            throughput = test_data.get('THROUGHPUT')
-                            throughput_units = test_data.get('THROUGHPUT_UNITS')
-                            elapsed_time = test_data.get('ELAPSED_TIME')
-                            
-                            if throughput and throughput_units:
-                                # Convert to Mbps if needed
-                                throughput_value = float(throughput)
-                                if '10^6bits/s' in throughput_units:
-                                    # Already in Mbps
-                                    speedtest_stats['throughput_mbps'] = throughput_value
-                                elif 'bits/s' in throughput_units:
-                                    # Convert from bits/s to Mbps
-                                    speedtest_stats['throughput_mbps'] = throughput_value / 1000000
-                                elif 'bytes/s' in throughput_units:
-                                    # Convert from bytes/s to Mbps
-                                    speedtest_stats['throughput_mbps'] = (throughput_value * 8) / 1000000
-                                
-                                speedtest_stats['test_type'] = test_name
-                                speedtest_stats['elapsed_time'] = elapsed_time
-                                speedtest_stats['raw_throughput'] = throughput
-                                speedtest_stats['throughput_units'] = throughput_units
-                                break
-                    
-                    # If no direct test data found, check for nested device structure
-                    if 'throughput_mbps' not in speedtest_stats:
-                        for device_name, device_data in perf_results.items():
-                            if isinstance(device_data, dict) and 'perf_results' in device_data:
-                                perf_data = device_data['perf_results']
-                                if perf_data:
-                                    speedtest_stats['device'] = device_name
-                                    speedtest_stats['performance'] = perf_data
-                                    
-                                    # Extract throughput metrics
-                                    for test_name, test_data in perf_data.items():
-                                        if isinstance(test_data, dict):
-                                            throughput = test_data.get('THROUGHPUT')
-                                            throughput_units = test_data.get('THROUGHPUT_UNITS')
-                                            elapsed_time = test_data.get('ELAPSED_TIME')
-                                            
-                                            if throughput and throughput_units:
-                                                # Convert to Mbps if needed
-                                                throughput_value = float(throughput)
-                                                if '10^6bits/s' in throughput_units:
-                                                    # Already in Mbps
-                                                    speedtest_stats['throughput_mbps'] = throughput_value
-                                                elif 'bits/s' in throughput_units:
-                                                    # Convert from bits/s to Mbps
-                                                    speedtest_stats['throughput_mbps'] = throughput_value / 1000000
-                                                elif 'bytes/s' in throughput_units:
-                                                    # Convert from bytes/s to Mbps
-                                                    speedtest_stats['throughput_mbps'] = (throughput_value * 8) / 1000000
-                                                
-                                                speedtest_stats['test_type'] = test_name
-                                                speedtest_stats['elapsed_time'] = elapsed_time
-                                                speedtest_stats['raw_throughput'] = throughput
-                                                speedtest_stats['throughput_units'] = throughput_units
-                                                break
-                
-                return speedtest_stats
+                return perf_results
             else:
                 return {'error': 'No performance results found'}
             
         except Exception as e:
             self.log(f"Error performing speed test: {e}")
             return {'error': str(e)}
+    
+    def _convert_to_bps(self, throughput: float, throughput_units: str) -> float:
+        """Convert throughput value to bits per second.
+        
+        Args:
+            throughput: Throughput value
+            throughput_units: Units of the throughput value
+            
+        Returns:
+            float: Throughput in bits per second
+        """
+        if '10^6bits/s' in throughput_units:
+            # Convert from Mbps to bps
+            return throughput * 1000000
+        elif 'bits/s' in throughput_units:
+            # Already in bps
+            return throughput
+        elif 'bytes/s' in throughput_units:
+            # Convert from bytes/s to bps
+            return throughput * 8
+        else:
+            # Default to treating as bps
+            return throughput
 
     def stop_speed_test(self) -> Optional[Dict[str, Any]]:
         """Stop any running speed test."""
@@ -7222,6 +7255,22 @@ def get_wan_primary_device() -> Optional[str]:
         print(f"Error retrieving WAN primary device: {e}")
         return None
 
+
+def get_wan_connection_state() -> Optional[Dict[str, Any]]:
+    """Get WAN connection state status.
+    
+    Returns:
+        dict or None: Dictionary containing WAN connection state information including:
+            - connection_state (str): Overall WAN connection state
+            - timestamp (str): Timestamp when the state was retrieved
+    """
+    try:
+        return _cs_client.get_wan_connection_state()
+    except Exception as e:
+        print(f"Error retrieving WAN connection state: {e}")
+        return None
+
+
 # ============================================================================
 # COMPREHENSIVE STATUS FUNCTION
 # ============================================================================
@@ -8168,20 +8217,20 @@ def traceroute_host(host: str, max_hops: int = 30, timeout: float = 5.0) -> Opti
 
 def speed_test(host: str = "", interface: str = "", duration: int = 5, 
                packet_size: int = 0, port: int = None, protocol: str = "tcp",
-               direction: str = "recv") -> Optional[Dict[str, Any]]:
-    """Perform network speed test using netperf.
+               direction: str = "both") -> Optional[Dict[str, Any]]:
+    """Perform comprehensive network speed test using netperf with both upload and download.
     
     Args:
-        host: Target host for speed test (empty for local test)
-        interface: Network interface to use (empty for auto)
+        host: Target host for speed test (empty for auto-detect)
+        interface: Network interface to use (empty for auto-detect)
         duration: Test duration in seconds (default: 5)
         packet_size: Packet size in bytes (0 for default)
         port: Port number (None for default)
         protocol: Protocol to use - "tcp" or "udp" (default: "tcp")
-        direction: Test direction - "recv", "send", or "rr" (default: "recv")
+        direction: Test direction - "recv", "send", "both", or "rr" (default: "both")
         
     Returns:
-        dict: Speed test results including throughput
+        dict: Speed test results with download_bps, upload_bps, and latency in simple bps
     """
     try:
         return _cs_client.speed_test(host, interface, duration, packet_size, port, protocol, direction)
@@ -8370,8 +8419,8 @@ def stop_ping() -> Optional[Dict[str, Any]]:
 
 def speed_test(host: str = "", interface: str = "", duration: int = 5, 
                packet_size: int = 0, port: int = None, protocol: str = "tcp",
-               direction: str = "recv") -> Optional[Dict[str, Any]]:
-    """Perform network speed test using netperf.
+               direction: str = "both") -> Optional[Dict[str, Any]]:
+    """Perform comprehensive network speed test using netperf with both upload and download.
     
     Args:
         host: Target host for speed test (empty for auto-detect)
@@ -8380,10 +8429,10 @@ def speed_test(host: str = "", interface: str = "", duration: int = 5,
         packet_size: Packet size in bytes (0 for default)
         port: Port number (None for default)
         protocol: Protocol to use - "tcp" or "udp" (default: "tcp")
-        direction: Test direction - "recv", "send", or "rr" (default: "recv")
+        direction: Test direction - "recv", "send", "both", or "rr" (default: "both")
         
     Returns:
-        dict: Speed test results including throughput in Mbps
+        dict: Speed test results with download_bps, upload_bps, and latency in simple bps
     """
     try:
         return _cs_client.speed_test(host, interface, duration, packet_size, port, protocol, direction)
