@@ -117,19 +117,21 @@ class CSClient(object):
             cls._instances[cls] = super().__new__(cls)
         return cls._instances[cls]
 
-    def __init__(self, app_name: str, init: bool = False, ncos: bool = False) -> None:
+    def __init__(self, app_name: str, init: bool = False, enable_logging: bool = False, ncos: bool = False) -> None:
         """Initialize the CSClient instance.
         
         Args:
             app_name (str): The name of the application using this client.
             init (bool): Flag to perform full initialization. If False, only
                         the singleton instance is returned without initialization.
+            enable_logging (bool): Whether to enable logging. Defaults to False.
             ncos (bool): Whether running on NCOS. Defaults to False.
         """
         if not init:
             return
         
         self.app_name = app_name
+        self.enable_logging = enable_logging
         self.ncos = ncos
 
         # Cache device access credentials to avoid reading config file on every API call
@@ -138,7 +140,7 @@ class CSClient(object):
         self._cached_password = None
         self._cached_auth = None
 
-        if self.ncos: 
+        if self.ncos and self.enable_logging: 
             handlers = [logging.StreamHandler()]
         
             handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
@@ -679,15 +681,16 @@ class EventingCSClient(CSClient):
     registry = {}
     eids = 1
 
-    def __init__(self, app_name: str, init: bool = True, ncos: bool = False) -> None:
+    def __init__(self, app_name: str, init: bool = True, enable_logging: bool = False, ncos: bool = False) -> None:
         """Initialize the EventingCSClient and set up aliases for register/unregister.
         
         Args:
             app_name (str): The name of the application using this client.
             init (bool): Flag to perform full initialization. Defaults to True.
+            enable_logging (bool): Whether to enable logging. Defaults to False.
             ncos (bool): Whether running on NCOS. Defaults to False.
         """
-        super().__init__(app_name, init, ncos)
+        super().__init__(app_name, init, enable_logging, ncos)
         self.on = self.register
         self.un = self.unregister
 
@@ -4318,9 +4321,21 @@ def _get_app_name() -> str:
         print(f"Error getting app name from package.ini: {e}")
         return 'SDK'
 
+def _cs_sock_connection() -> bool:
+    sock_path = '/var/tmp/cs.sock'
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+            sock.settimeout(2.0)
+            sock.connect(sock_path)
+        return True
+    except:
+        return False
+
+_enable_logging = '/var/mnt/sdk/' in os.getcwd()
+_is_ncos = _cs_sock_connection()
+
 # Create a single EventingCSClient instance with name from package.ini
-_is_ncos = '/var/mnt/sdk/' in os.getcwd()
-_cs_client = EventingCSClient(_get_app_name(), ncos=_is_ncos)
+_cs_client = EventingCSClient(_get_app_name(), enable_logging=_enable_logging, ncos=_is_ncos)
 
 def get_uptime() -> int:
     """Return the router uptime in seconds.
@@ -5248,10 +5263,10 @@ def log(value: Union[str, Dict[str, Any]] = '') -> None:
             it will be formatted as JSON with indentation. Defaults to empty string.
     """
     try:
-        if _is_ncos:
+        if _cs_client.enable_logging:
             return _cs_client.log(value)
         else:
-            print(value)
+            print(value + '\n')
     except Exception as e:
         print(f"Error in log request: {e}")
 
