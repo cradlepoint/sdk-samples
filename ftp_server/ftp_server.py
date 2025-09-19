@@ -16,8 +16,7 @@ from pyftpdlib.servers import FTPServer
 # This requires a USB compatible storage device plugged into
 # the router. It will mount to /var/media.
 if sys.platform == 'linux2':
-    # FTP_DIR = '/var/media'
-    FTP_DIR = './'
+    FTP_DIR = '/var/media'
 else:
     FTP_DIR = os.getcwd()
 
