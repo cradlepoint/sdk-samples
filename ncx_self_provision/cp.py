@@ -1,8 +1,7 @@
 """
 NCOS communication module for SDK applications.
 
-This module provides a comprehensive interface for communicating with NCOS (Network
-Control Operating System) routers. It includes classes and functions for:
+This module provides a comprehensive interface for communicating with NCOS (NetCloud Operating System) routers. It includes classes and functions for:
 
 - Direct communication with router configuration store
 - Event-driven programming with config store events
@@ -4429,17 +4428,20 @@ def wait_for_wan_connection(timeout: int = 300) -> bool:
         _cs_client.log(f"Error waiting for WAN connection: {e}")
         return False
 
-def get_appdata(name: str = '') -> Optional[str]:
+def get_appdata(name: str = '') -> Union[str, List[Dict[str, str]], None]:
     """Get value of appdata from NCOS Config by name.
     
     Args:
-        name (str): The name of the appdata to retrieve. Defaults to empty string.
+        name (str): The name of the appdata to retrieve. If empty, returns all appdata.
     
     Returns:
-        str or None: The value of the appdata, or None if not found or an error occurs.
+        str, list, or None: If name provided, returns the value string or None if not found.
+                           If no name provided, returns list of all appdata dicts.
     """
     try:
         appdata = _cs_client.get('config/system/sdk/appdata')
+        if not name:
+            return appdata
         return next(iter(x["value"] for x in appdata if x["name"] == name), None)
     except Exception as e:
         _cs_client.log(f"Error getting appdata for {name}: {e}")
@@ -5156,6 +5158,30 @@ def get_ncm_status(include_details: bool = False) -> Optional[str]:
         return _cs_client.get('status/ecm/state')
     except Exception as e:
         _cs_client.log(f"Error getting NCM status: {e}")
+        return None
+
+def get_ncm_router_id() -> Optional[int]:
+    """Return the NCM router ID.
+    
+    Returns:
+        int: The NCM router ID, or None if not available or an error occurs.
+    """
+    try:
+        return _cs_client.get('status/ecm/client_id')
+    except Exception as e:
+        _cs_client.log(f"Error getting NCM router ID: {e}")
+        return None
+
+def get_ncm_group_name() -> Optional[str]:
+    """Return the NCM group name.
+    
+    Returns:
+        str: The NCM group name, or None if not available or an error occurs.
+    """
+    try:
+        return _cs_client.get('status/ecm/info')['Group']
+    except Exception as e:
+        _cs_client.log(f"Error getting NCM router ID: {e}")
         return None
 
 def reboot_device(force: bool = False) -> None:
