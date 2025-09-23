@@ -79,6 +79,8 @@ This document lists all available methods when importing the `cp` module for NCO
 - `get_temperature(unit: str = 'celsius')` → `Optional[float]`
 - `get_power_usage(include_components: bool = True)` → `Optional[Dict[str, Any]]`
 - `get_ncm_status(include_details: bool = False)` → `Optional[str]`
+- `get_ncm_router_id()` → `Optional[int]`
+- `get_ncm_group_name()` → `Optional[str]`
 - `get_wan_devices_status()` → `Optional[Dict[str, Any]]`
 - `get_modem_status()` → `Optional[Dict[str, Any]]`
 - `get_signal_strength()` → `Optional[Dict[str, Any]]`
@@ -86,7 +88,7 @@ This document lists all available methods when importing the `cp` module for NCO
 ## Configuration Management Methods
 
 ### Appdata Management
-- `get_appdata(name: str = '')` → `Optional[str]`
+- `get_appdata(name: str = '')` → `Union[str, List[Dict[str, str]], None]`
 - `post_appdata(name: str = '', value: str = '')` → `None`
 - `put_appdata(name: str = '', value: str = '')` → `None`
 - `delete_appdata(name: str = '')` → `None`
