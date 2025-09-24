@@ -3840,6 +3840,60 @@ class EventingCSClient(CSClient):
             self.log(f"Error clearing DNS cache: {e}")
             return None
 
+    def get_ncm_router_id(self) -> Optional[Dict[str, Any]]:
+        """Get the router's NCM router ID (ECM client ID).
+        
+        Returns:
+            dict: Router ID information
+        """
+        try:
+            # Get ECM client ID
+            client_id = self.get('status/ecm/client_id')
+            
+            return {
+                'client_id': client_id,
+                'router_id': client_id  # Alias for convenience
+            }
+            
+        except Exception as e:
+            self.log(f"Error getting NCM router ID: {e}")
+            return None
+
+    def get_ncm_group_name(self) -> Optional[Dict[str, Any]]:
+        """Get the router's NCM group name.
+
+        Returns:
+            dict: Group name information
+        """
+        try:
+            # Get NCM group name
+            group_name = self.get('status/ecm/info/Group')
+
+            return {
+                'group_name': group_name
+            }
+
+        except Exception as e:
+            self.log(f"Error getting NCM group name: {e}")
+            return None
+
+    def get_ncm_account_name(self) -> Optional[Dict[str, Any]]:
+        """Get the router's NCM account name.
+
+        Returns:
+            dict: Account name information
+        """
+        try:
+            # Get NCM account name
+            account_name = self.get('status/ecm/info/Account')
+
+            return {
+                'account_name': account_name
+            }
+
+        except Exception as e:
+            self.log(f"Error getting NCM account name: {e}")
+            return None
     def stop_ping(self) -> Optional[Dict[str, Any]]:
         """Stop any running ping process.
         
@@ -4715,18 +4769,21 @@ def wait_for_wan_connection(timeout: int = 300) -> bool:
         _cs_client.log(f"Error waiting for WAN connection: {e}")
         return False
 
-def get_appdata(name: str = '') -> Optional[str]:
-    """Get value of appdata from NCOS Config by name.
-    
+def get_appdata(name: str = '') -> Optional[str] | Optional[list[dict]]:
+    """Get value of appdata from NCOS Config by name, or all appdata if no name is provided.
+
     Args:
-        name (str): The name of the appdata to retrieve. Defaults to empty string.
-    
+        name (str): The name of the appdata to retrieve. If empty, returns all appdata.
+
     Returns:
-        str or None: The value of the appdata, or None if not found or an error occurs.
+        str or None: The value of the appdata if name is provided, or None if not found or an error occurs.
+        list of dict or None: The list of all appdata if name is not provided, or None if an error occurs.
     """
     try:
         appdata = _cs_client.get('config/system/sdk/appdata')
-        return next(iter(x["value"] for x in appdata if x["name"] == name), None)
+        if not name:
+            return appdata
+        return next((x["value"] for x in appdata if x["name"] == name), None)
     except Exception as e:
         _cs_client.log(f"Error getting appdata for {name}: {e}")
         return None
@@ -9099,4 +9156,43 @@ def send_sms(phone_number: str = None,
         )
     except Exception as e:
         print(f"Error sending SMS: {e}")
+        return None
+
+
+def get_ncm_router_id() -> Optional[Dict[str, Any]]:
+    """Get the router's NCM router ID (ECM client ID).
+    
+    Returns:
+        dict: Router ID information with client_id and router_id fields
+    """
+    try:
+        return _cs_client.get_ncm_router_id()
+    except Exception as e:
+        print(f"Error getting NCM router ID: {e}")
+        return None
+
+
+def get_ncm_group_name() -> Optional[Dict[str, Any]]:
+    """Get the router's NCM group name.
+
+    Returns:
+        dict: Group name information
+    """
+    try:
+        return _cs_client.get_ncm_group_name()
+    except Exception as e:
+        print(f"Error getting NCM group name: {e}")
+        return None
+
+
+def get_ncm_account_name() -> Optional[Dict[str, Any]]:
+    """Get the router's NCM account name.
+
+    Returns:
+        dict: Account name information
+    """
+    try:
+        return _cs_client.get_ncm_account_name()
+    except Exception as e:
+        print(f"Error getting NCM account name: {e}")
         return None
