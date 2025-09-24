@@ -416,11 +416,10 @@ def search_data_recursively(data, current_path, search_term, max_depth=3, curren
 
 
 def start_server():
-    lan_ip = cp.get('config/lan/0/ip_address')
-    server_address = (lan_ip, 9002)
+    server_address = ('0.0.0.0', 9002)
     httpd = HTTPServer(server_address, RouterDataHandler)
     
-    cp.log(f'Starting CS Explorer on http://{lan_ip}:9002')
+    cp.log(f'Starting CS Explorer on http://0.0.0.0:9002')
     
     try:
         httpd.serve_forever()
