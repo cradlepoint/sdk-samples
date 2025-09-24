@@ -3844,17 +3844,11 @@ class EventingCSClient(CSClient):
         """Get the router's NCM router ID (ECM client ID).
         
         Returns:
-            dict: Router ID information
+            int: Router ID
         """
         try:
             # Get ECM client ID
-            client_id = self.get('status/ecm/client_id')
-            
-            return {
-                'client_id': client_id,
-                'router_id': client_id  # Alias for convenience
-            }
-            
+            return self.get('status/ecm/client_id')
         except Exception as e:
             self.log(f"Error getting NCM router ID: {e}")
             return None
@@ -3863,15 +3857,11 @@ class EventingCSClient(CSClient):
         """Get the router's NCM group name.
 
         Returns:
-            dict: Group name information
+            str: Group name
         """
         try:
             # Get NCM group name
-            group_name = self.get('status/ecm/info/Group')
-
-            return {
-                'group_name': group_name
-            }
+            return self.get('status/ecm/info/Group')
 
         except Exception as e:
             self.log(f"Error getting NCM group name: {e}")
@@ -3881,15 +3871,11 @@ class EventingCSClient(CSClient):
         """Get the router's NCM account name.
 
         Returns:
-            dict: Account name information
+            str: Account name
         """
         try:
             # Get NCM account name
-            account_name = self.get('status/ecm/info/Account')
-
-            return {
-                'account_name': account_name
-            }
+            return self.get('status/ecm/info/Account')
 
         except Exception as e:
             self.log(f"Error getting NCM account name: {e}")
@@ -3898,7 +3884,7 @@ class EventingCSClient(CSClient):
         """Stop any running ping process.
         
         Returns:
-            dict: Stop result
+            bool: Success
         """
         try:
             # Stop ping process
@@ -9163,7 +9149,7 @@ def get_ncm_router_id() -> Optional[Dict[str, Any]]:
     """Get the router's NCM router ID (ECM client ID).
     
     Returns:
-        dict: Router ID information with client_id and router_id fields
+        int: Router ID
     """
     try:
         return _cs_client.get_ncm_router_id()
@@ -9176,7 +9162,7 @@ def get_ncm_group_name() -> Optional[Dict[str, Any]]:
     """Get the router's NCM group name.
 
     Returns:
-        dict: Group name information
+        str: Group name
     """
     try:
         return _cs_client.get_ncm_group_name()
@@ -9189,7 +9175,7 @@ def get_ncm_account_name() -> Optional[Dict[str, Any]]:
     """Get the router's NCM account name.
 
     Returns:
-        dict: Account name information
+        str: Account name
     """
     try:
         return _cs_client.get_ncm_account_name()
