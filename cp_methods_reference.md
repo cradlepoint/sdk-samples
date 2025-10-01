@@ -274,7 +274,7 @@ This document lists all available methods when importing the `cp` module for NCO
 
 ### Certificate Management
 - `get_ncm_api_keys()` → `Dict[str, Optional[str]]`
-- `extract_cert_and_key(cert_name_or_uuid: str = '')` → `Tuple[Optional[str], Optional[str]]`
+- `extract_cert_and_key(cert_name_or_uuid: str = '', return_filenames: bool = True, return_cert_content: bool = False, return_key_content: bool = False)` → `Union[Tuple[Optional[str], Optional[str]], Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]]`
 - `get_certificates()` → `List[Dict[str, Any]]`
 - `get_certificate_by_name(cert_name: str)` → `Optional[Dict[str, Any]]`
 - `get_certificate_by_uuid(cert_uuid: str)` → `Optional[Dict[str, Any]]`

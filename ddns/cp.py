@@ -4797,17 +4797,33 @@ def get_ncm_api_keys() -> Dict[str, Optional[str]]:
         log("Error retrieving NCM API keys: {e}")
         return None
 
-def extract_cert_and_key(cert_name_or_uuid: str = '') -> Tuple[Optional[str], Optional[str]]:
+def extract_cert_and_key(cert_name_or_uuid: str = '', 
+                        return_filenames: bool = True,
+                        return_cert_content: bool = False,
+                        return_key_content: bool = False) -> Union[Tuple[Optional[str], Optional[str]], 
+                                                                  Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]]:
     """Extract and save the certificate and key to the local filesystem.
     
     Args:
         cert_name_or_uuid (str): The name or UUID of the certificate to extract.
                                 Defaults to empty string.
+        return_filenames (bool): Whether to return the filenames of saved files.
+                                Defaults to True.
+        return_cert_content (bool): Whether to return the actual x509 certificate content.
+                                   Defaults to False.
+        return_key_content (bool): Whether to return the decrypted key content.
+                                  Defaults to False.
     
     Returns:
-        Tuple[str, str] or Tuple[None, None]: A tuple containing the filenames
-        of the certificate and key files, or (None, None) if the certificate
-        is not found or an error occurs.
+        If return_filenames=True and return_cert_content=False and return_key_content=False:
+            Tuple[str, str] or Tuple[None, None]: A tuple containing the filenames
+            of the certificate and key files, or (None, None) if the certificate
+            is not found or an error occurs.
+        
+        If any content flags are True:
+            Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]: 
+            A tuple containing (cert_filename, key_filename, cert_content, key_content)
+            where None values indicate missing data or disabled flags.
     """
     try:
         cert_x509 = None
@@ -4842,23 +4858,46 @@ def extract_cert_and_key(cert_name_or_uuid: str = '') -> Tuple[Optional[str], Op
                     cert_x509 += "\n" + cert.get('x509')
                     ca_uuid = cert.get('ca_uuid')
 
+        # Prepare return values
+        cert_filename = f"{cert_name}.pem" if cert_x509 and return_filenames else None
+        key_filename = f"{cert_name}_key.pem" if cert_key and return_filenames else None
+        cert_content = cert_x509 if return_cert_content else None
+        key_content = cert_key if return_key_content else None
+        
         # Write the fullchain and privatekey .pem files
         if cert_x509 and cert_key:
             with open(f"{cert_name}.pem", "w") as fullchain_file:
                 fullchain_file.write(cert_x509)
             with open(f"{cert_name}_key.pem", "w") as privatekey_file:
                 privatekey_file.write(cert_key)
-            return f"{cert_name}.pem", f"{cert_name}_key.pem"
+            
+            # Return based on requested parameters
+            if return_cert_content or return_key_content:
+                return cert_filename, key_filename, cert_content, key_content
+            else:
+                return cert_filename, key_filename
+                
         elif cert_x509:
             with open(f"{cert_name}.pem", "w") as fullchain_file:
                 fullchain_file.write(cert_x509)
-            return f"{cert_name}.pem", None
+            
+            # Return based on requested parameters
+            if return_cert_content or return_key_content:
+                return cert_filename, None, cert_content, None
+            else:
+                return cert_filename, None
         else:
             _cs_client.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
-            return None, None
+            if return_cert_content or return_key_content:
+                return None, None, None, None
+            else:
+                return None, None
     except Exception as e:
         log("Error extracting certificate and key for {cert_name_or_uuid}: {e}")
-        return None, None
+        if return_cert_content or return_key_content:
+            return None, None, None, None
+        else:
+            return None, None
 
 def get_ipv4_wired_clients() -> List[Dict[str, Any]]:
     """Return a list of IPv4 wired clients and their details.
