@@ -147,6 +147,8 @@
 	- Monitor tunnels and if down, reset modem it egresses from.
 - **usb_alerts**
 	- Send alerts when USB devices are connected or disconnected.
+- **wan_dashboard**
+	- Live WAN interface utilization graphs in a web page.  Includes cumulative graph.
 
 ----------
 
