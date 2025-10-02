@@ -149,6 +149,8 @@
 	- Send alerts when USB devices are connected or disconnected.
 - **wan_dashboard**
 	- Live WAN interface utilization graphs in a web page.  Includes cumulative graph.
+- **wan_rate**
+	- Tracks WAN bandwidth rates over time and stores rolling averages in a configurable field.
 
 ----------
 
