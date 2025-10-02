@@ -1,4 +1,4 @@
-# Ericsson Cradlepoint SDK Application
+# WAN Rate Tracker - Monitors and tracks average WAN bandwidth rates over time
 import cp
 import time
 import json
@@ -52,15 +52,26 @@ def calculate_averages():
     
     return (avg_ibps, avg_obps)
 
+def format_bandwidth(bps):
+    """Format bandwidth with appropriate unit."""
+    if bps >= 1000000000:  # >= 1 Gbps
+        return f"{round(bps / 1000000000, 1)} Gbps"
+    elif bps >= 1000000:   # >= 1 Mbps
+        return f"{round(bps / 1000000, 1)} Mbps"
+    elif bps >= 1000:      # >= 1 Kbps
+        return f"{round(bps / 1000, 1)} Kbps"
+    else:
+        return f"{round(bps, 1)} Bps"
+
 def update_field(avg_ibps, avg_obps):
     """Update the configured field with average bandwidth data."""
     try:
-        # Convert bps to Kbps
-        avg_ibps_kbps = round(avg_ibps / 1000, 1)
-        avg_obps_kbps = round(avg_obps / 1000, 1)
+        # Format with appropriate units
+        ibps_formatted = format_bandwidth(avg_ibps)
+        obps_formatted = format_bandwidth(avg_obps)
         
         # Create human-readable format with Unicode arrows
-        human_readable = f"↓ {avg_ibps_kbps} Kbps, ↑ {avg_obps_kbps} Kbps"
+        human_readable = f"↓ {ibps_formatted}, ↑ {obps_formatted}"
         
         # Store in the configured field
         result = cp.put(field_path, human_readable)
