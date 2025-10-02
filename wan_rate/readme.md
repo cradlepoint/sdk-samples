@@ -2,8 +2,6 @@
 
 Tracks WAN bandwidth rates over time and stores rolling averages in a configurable field.
 
-> [Download the built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_rate.v1.0.0.tar.gz)
-
 ## What it does
 
 - Samples WAN inbound (ibps) and outbound (obps) rates at regular intervals
@@ -20,7 +18,9 @@ Tracks WAN bandwidth rates over time and stores rolling averages in a configurab
 
 ## Output Format
 
-Human-readable format with Unicode arrows:
+Human-readable format with Unicode arrows and appropriate units:
 ```
-↓ 1250.8 Kbps, ↑ 890.3 Kbps
+↓ 1.2 Gbps, ↑ 850.5 Mbps
+↓ 125.8 Mbps, ↑ 89.3 Mbps
+↓ 1.2 Kbps, ↑ 890.3 Bps
 ```
