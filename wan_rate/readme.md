@@ -9,7 +9,7 @@ Tracks WAN bandwidth rates over time and stores rolling averages in a configurab
 - Samples WAN inbound (ibps) and outbound (obps) rates at regular intervals
 - Maintains a rolling buffer of recent samples
 - Calculates averages from collected samples
-- Stores average rates in JSON format to a configurable system field
+- Stores average rates in human-readable format to a configurable system field
 
 ## Appdata Configuration
 
