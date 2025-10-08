@@ -905,6 +905,48 @@ class EventingCSClient(CSClient):
             self.log(f"Error analyzing GPS status: {e}")
             return None
 
+    def get_lat_long(self, max_retries: int = 5, retry_delay: float = 0.1) -> Tuple[Optional[float], Optional[float]]:
+        """Return latitude and longitude as floats.
+        
+        Args:
+            max_retries (int): Maximum number of retries to get GPS fix. Defaults to 5.
+            retry_delay (float): Delay between retries in seconds. Defaults to 0.1.
+        
+        Returns:
+            Tuple[float, float] or Tuple[None, None]: A tuple containing (latitude, longitude)
+            in decimal degrees, or (None, None) if GPS fix is not available.
+        """
+        try:
+            fix = self.get('status/gps/fix')
+            retries = 0
+            while not fix and retries < max_retries:
+                time.sleep(retry_delay)
+                fix = self.get('status/gps/fix')
+                retries += 1
+
+            if not fix:
+                return None, None
+
+            try:
+                lat_deg = fix['latitude']['degree']
+                lat_min = fix['latitude']['minute']
+                lat_sec = fix['latitude']['second']
+                long_deg = fix['longitude']['degree']
+                long_min = fix['longitude']['minute']
+                long_sec = fix['longitude']['second']
+                lat = dec(lat_deg, lat_min, lat_sec)
+                long = dec(long_deg, long_min, long_sec)
+                if lat is None or long is None:
+                    return None, None
+                lat = float(f"{float(lat):.6f}")
+                long = float(f"{float(long):.6f}")
+                return lat, long
+            except:
+                return None, None
+        except Exception as e:
+            self.log(f"Error getting latitude and longitude: {e}")
+            return None, None
+
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status and return detailed information.
         
@@ -4606,6 +4648,19 @@ _is_ncos = _cs_sock_connection()
 # Create a single EventingCSClient instance with name from package.ini
 _cs_client = EventingCSClient(_get_app_name(), enable_logging=_enable_logging, ncos=_is_ncos)
 
+def get_lat_long(max_retries: int = 5, retry_delay: float = 0.1) -> Tuple[Optional[float], Optional[float]]:
+    """Return latitude and longitude as floats.
+    
+    Args:
+        max_retries (int): Maximum number of retries to get GPS fix. Defaults to 5.
+        retry_delay (float): Delay between retries in seconds. Defaults to 0.1.
+    
+    Returns:
+        Tuple[float, float] or Tuple[None, None]: A tuple containing (latitude, longitude)
+        in decimal degrees, or (None, None) if GPS fix is not available.
+    """
+    return _cs_client.get_lat_long(max_retries, retry_delay)
+
 def get_uptime() -> int:
     """Return the router uptime in seconds.
     
@@ -4797,33 +4852,17 @@ def get_ncm_api_keys() -> Dict[str, Optional[str]]:
         log("Error retrieving NCM API keys: {e}")
         return None
 
-def extract_cert_and_key(cert_name_or_uuid: str = '', 
-                        return_filenames: bool = True,
-                        return_cert_content: bool = False,
-                        return_key_content: bool = False) -> Union[Tuple[Optional[str], Optional[str]], 
-                                                                  Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]]:
+def extract_cert_and_key(cert_name_or_uuid: str = '') -> Tuple[Optional[str], Optional[str]]:
     """Extract and save the certificate and key to the local filesystem.
     
     Args:
         cert_name_or_uuid (str): The name or UUID of the certificate to extract.
                                 Defaults to empty string.
-        return_filenames (bool): Whether to return the filenames of saved files.
-                                Defaults to True.
-        return_cert_content (bool): Whether to return the actual x509 certificate content.
-                                   Defaults to False.
-        return_key_content (bool): Whether to return the decrypted key content.
-                                  Defaults to False.
     
     Returns:
-        If return_filenames=True and return_cert_content=False and return_key_content=False:
-            Tuple[str, str] or Tuple[None, None]: A tuple containing the filenames
-            of the certificate and key files, or (None, None) if the certificate
-            is not found or an error occurs.
-        
-        If any content flags are True:
-            Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]: 
-            A tuple containing (cert_filename, key_filename, cert_content, key_content)
-            where None values indicate missing data or disabled flags.
+        Tuple[str, str] or Tuple[None, None]: A tuple containing the filenames
+        of the certificate and key files, or (None, None) if the certificate
+        is not found or an error occurs.
     """
     try:
         cert_x509 = None
@@ -4858,46 +4897,23 @@ def extract_cert_and_key(cert_name_or_uuid: str = '',
                     cert_x509 += "\n" + cert.get('x509')
                     ca_uuid = cert.get('ca_uuid')
 
-        # Prepare return values
-        cert_filename = f"{cert_name}.pem" if cert_x509 and return_filenames else None
-        key_filename = f"{cert_name}_key.pem" if cert_key and return_filenames else None
-        cert_content = cert_x509 if return_cert_content else None
-        key_content = cert_key if return_key_content else None
-        
         # Write the fullchain and privatekey .pem files
         if cert_x509 and cert_key:
             with open(f"{cert_name}.pem", "w") as fullchain_file:
                 fullchain_file.write(cert_x509)
             with open(f"{cert_name}_key.pem", "w") as privatekey_file:
                 privatekey_file.write(cert_key)
-            
-            # Return based on requested parameters
-            if return_cert_content or return_key_content:
-                return cert_filename, key_filename, cert_content, key_content
-            else:
-                return cert_filename, key_filename
-                
+            return f"{cert_name}.pem", f"{cert_name}_key.pem"
         elif cert_x509:
             with open(f"{cert_name}.pem", "w") as fullchain_file:
                 fullchain_file.write(cert_x509)
-            
-            # Return based on requested parameters
-            if return_cert_content or return_key_content:
-                return cert_filename, None, cert_content, None
-            else:
-                return cert_filename, None
+            return f"{cert_name}.pem", None
         else:
             _cs_client.log(f'Missing x509 certificate for "{cert_name_or_uuid}"')
-            if return_cert_content or return_key_content:
-                return None, None, None, None
-            else:
-                return None, None
+            return None, None
     except Exception as e:
         log("Error extracting certificate and key for {cert_name_or_uuid}: {e}")
-        if return_cert_content or return_key_content:
-            return None, None, None, None
-        else:
-            return None, None
+        return None, None
 
 def get_ipv4_wired_clients() -> List[Dict[str, Any]]:
     """Return a list of IPv4 wired clients and their details.
@@ -5043,47 +5059,8 @@ def dec(deg: float, min: float = 0.0, sec: float = 0.0) -> float:
         return round(dec_val, 6)
     except Exception as e:
         log("Error converting coordinates to decimal: {e}")
-        return 0.0
+        return None
 
-def get_lat_long(max_retries: int = 5, retry_delay: float = 0.1) -> Tuple[Optional[float], Optional[float]]:
-    """Return latitude and longitude as floats.
-    
-    Args:
-        max_retries (int): Maximum number of retries to get GPS fix. Defaults to 5.
-        retry_delay (float): Delay between retries in seconds. Defaults to 0.1.
-    
-    Returns:
-        Tuple[float, float] or Tuple[None, None]: A tuple containing (latitude, longitude)
-        in decimal degrees, or (None, None) if GPS fix is not available.
-    """
-    try:
-        fix = _cs_client.get('status/gps/fix')
-        retries = 0
-        while not fix and retries < max_retries:
-            time.sleep(retry_delay)
-            fix = _cs_client.get('status/gps/fix')
-            retries += 1
-
-        if not fix:
-            return None, None
-
-        try:
-            lat_deg = fix['latitude']['degree']
-            lat_min = fix['latitude']['minute']
-            lat_sec = fix['latitude']['second']
-            long_deg = fix['longitude']['degree']
-            long_min = fix['longitude']['minute']
-            long_sec = fix['longitude']['second']
-            lat = dec(lat_deg, lat_min, lat_sec)
-            long = dec(long_deg, long_min, long_sec)
-            lat = float(f"{float(lat):.6f}")
-            long = float(f"{float(long):.6f}")
-            return lat, long
-        except:
-            return None, None
-    except Exception as e:
-        log("Error getting latitude and longitude: {e}")
-        return None, None
 
 def get_connected_wans(max_retries: int = 10) -> List[str]:
     """Return list of connected WAN UIDs.
@@ -7750,30 +7727,13 @@ def factory_reset() -> bool:
         bool: True if factory reset was initiated successfully, False otherwise.
     """
     try:
-        _cs_client.put('control/system/factory_reset', 'factory_reset')
+        _cs_client.put('control/system/factory_reset', 1)
         _cs_client.log("Factory reset initiated")
         return True
     except Exception as e:
         log("Error performing factory reset: {e}")
         return False
 
-def restart_service(service_name: str, force: bool = False) -> bool:
-    """Restart a specific system service.
-    
-    Args:
-        service_name (str): Name of the service to restart.
-        force (bool, optional): Force restart even if service is critical. Defaults to False.
-    
-    Returns:
-        bool: True if service restart was initiated successfully, False otherwise.
-    """
-    try:
-        _cs_client.put(f'control/system/services/{service_name}/restart', 'restart')
-        _cs_client.log(f"Service {service_name} restart initiated")
-        return True
-    except Exception as e:
-        log("Error restarting service {service_name}: {e}")
-        return False
 
 def set_log_level(level: str = 'info') -> bool:
     """Set system logging level.
