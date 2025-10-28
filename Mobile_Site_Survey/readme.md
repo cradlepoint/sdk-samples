@@ -2,6 +2,13 @@
 
 Professional cellular network drive testing application with modern web interface and high-performance speed testing.
 
+Light Side:
+<img width="1408" height="829" alt="image" src="https://github.com/user-attachments/assets/bb93af70-1940-4131-b23c-d8d612ddd5de" />
+
+Dark Side:
+<img width="1408" height="829" alt="image" src="https://github.com/user-attachments/assets/f688ef69-bbc2-4443-a364-eb2ec2513873" />
+
+
 ## Key Features
 
 ### 🚀 **High-Speed Binary Testing**
@@ -39,7 +46,6 @@ Professional cellular network drive testing application with modern web interfac
 
 - Cellular modem with GPS antenna
 - GPS lock for location-based testing
-- Web browser for configuration interface
 
 ## Default Configuration
 
