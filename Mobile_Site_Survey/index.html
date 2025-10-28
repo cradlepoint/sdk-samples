@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile Site Survey</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <link rel="icon" href="favicon.png" type="image/x-icon"/>
+    <script src="jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                <h1 id="version">Mobile Site Survey</h1>
+                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAAApCAYAAABwQGa5AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyhpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuNi1jMTM4IDc5LjE1OTgyNCwgMjAxNi8wOS8xNC0wMTowOTowMSAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENDIDIwMTcgKE1hY2ludG9zaCkiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6NkQ0NUYyNDIwMTk3MTFFNzk2MTM5RDEzMEZENUE1RjQiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6NkQ0NUYyNDMwMTk3MTFFNzk2MTM5RDEzMEZENUE1RjQiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDpBNTE5MThBOTAxOTQxMUU3OTYxMzlEMTMwRkQ1QTVGNCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDpBNTE5MThBQTAxOTQxMUU3OTYxMzlEMTMwRkQ1QTVGNCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PgpJ3qIAAA0TSURBVHja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" alt="Logo" class="logo">
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <div class="content-grid">
+                <!-- Control Panel -->
+                <section class="control-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-cog"></i> Control Panel</h2>
+                        <div class="action-buttons">
+                            <button type="button" class="btn btn-primary" id="run-survey-btn">
+                                <i class="fas fa-play"></i> Run Survey Now
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="download-results-btn">
+                                <i class="fas fa-download"></i> Download Results
+                            </button>
+                            <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                                <i class="fas fa-moon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="mainForm" action="/submit" class="config-form">
+                        <!-- Tab Navigation -->
+                        <div class="tab-navigation">
+                            <button type="button" class="tab-btn active" data-tab="basic">
+                                <i class="fas fa-cog"></i> Basic Settings
+                            </button>
+                            <button type="button" class="tab-btn" data-tab="advanced">
+                                <i class="fas fa-sliders-h"></i> Advanced
+                            </button>
+                            <button type="button" class="tab-btn" data-tab="server">
+                                <i class="fas fa-cloud"></i> Server
+                            </button>
+                        </div>
+
+                        <!-- Basic Settings Tab -->
+                        <div class="tab-content active" id="basic-tab">
+                            <div class="form-section">
+                                <h3><i class="fas fa-map-marker-alt"></i> Test Configuration</h3>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="enabled" id="enabled" value="1">
+                                        <span class="checkmark"></span>
+                                        Run Distance Based Tests
+                                    </label>
+                                    <div class="form-field">
+                                        <label for="min_distance">Distance Between Tests (meters):</label>
+                                        <input type="number" name="min_distance" id="min_distance" class="form-input">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="enable_timer" id="enable_timer" value="1">
+                                        <span class="checkmark"></span>
+                                        Run Time Based Tests
+                                    </label>
+                                    <div class="form-field">
+                                        <label for="min_time">Time Between Tests (seconds):</label>
+                                        <input type="number" name="min_time" id="min_time" class="form-input">
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="all_wans" id="all_wans" value="1">
+                                        <span class="checkmark"></span>
+                                        Test Ethernet and Wifi-as-WAN
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3><i class="fas fa-tachometer-alt"></i> Test Options</h3>
+                                <div class="checkbox-grid">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="speedtests" id="speedtests" value="1">
+                                        <span class="checkmark"></span>
+                                        Run Speedtests
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="packet_loss" id="packet_loss" value="1">
+                                        <span class="checkmark"></span>
+                                        Monitor Packet Loss
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="write_csv" id="write_csv" value="1">
+                                        <span class="checkmark"></span>
+                                        Write to CSV
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Tab -->
+                        <div class="tab-content" id="advanced-tab">
+                            <div class="form-section">
+                                <h3><i class="fas fa-cogs"></i> Advanced Options</h3>
+                                <div class="checkbox-grid">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="full_diagnostics" id="full_diagnostics" value="1">
+                                        <span class="checkmark"></span>
+                                        Full Interface Diagnostics
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="debug" id="debug" value="1">
+                                        <span class="checkmark"></span>
+                                        Debug Logs
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3><i class="fas fa-network-wired"></i> Surveyors</h3>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="enable_surveyors" id="enable_surveyors" value="1">
+                                        <span class="checkmark"></span>
+                                        Enable Surveyors
+                                    </label>
+                                </div>
+                                <div class="form-field">
+                                    <label for="surveyors">IP Addresses (comma separated):</label>
+                                    <input type="text" name="surveyors" id="surveyors" class="form-input" placeholder="192.168.1.100, 192.168.1.101">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Server Tab -->
+                        <div class="tab-content" id="server-tab">
+                            <div class="form-section">
+                                <h3><i class="fas fa-cloud-upload-alt"></i> Server Integration</h3>
+                                <p class="section-description">Powered by <a href="https://5g-ready.io" target="_blank">5g-ready.io</a></p>
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="send_to_server" id="send_to_server" value="1">
+                                        <span class="checkmark"></span>
+                                        Enable Send to Server
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="include_logs" id="include_logs" value="1">
+                                        <span class="checkmark"></span>
+                                        Include Application Logs
+                                    </label>
+                                </div>
+                                <div class="form-field">
+                                    <label for="server_url">Server URL:</label>
+                                    <input type="text" name="server_url" id="server_url" value="https://5g-ready.io/injector" class="form-input">
+                                </div>
+                                <div class="form-field">
+                                    <label for="server_token">Server Token:</label>
+                                    <input type="text" name="server_token" id="server_token" class="form-input">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Save Configuration
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Results Panel -->
+                <section class="results-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-chart-line"></i> Survey Results</h2>
+                        <div class="action-buttons">
+                            <div class="status-item" id="gps-status">
+                                <i class="fas fa-satellite"></i>
+                                <span>GPS Lock</span>
+                            </div>
+                            <div class="status-item survey-indicator" id="survey-indicator" style="display: none;">
+                                <i class="fas fa-sync-alt fa-spin"></i>
+                                <span>Survey Active</span>
+                            </div>
+                            <button type="button" class="btn btn-warning" id="clear-results-btn">
+                                <i class="fas fa-trash"></i> Clear Results
+                            </button>
+                        </div>
+                    </div>
+                    <div class="results-container">
+                        <div class="results-header">
+                            <div class="result-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Tests Run:</span>
+                                    <span class="stat-value" id="test-count">0</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Last Test:</span>
+                                    <span class="stat-value" id="last-test">Never</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="results-content">
+                            <textarea id="results" name="results" readonly placeholder="Waiting for survey results..."></textarea>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Running Survey...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
