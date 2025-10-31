@@ -1,10 +1,14 @@
 # Power Dashboard
 
-A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface.  Optional power indicator message in asset ID.
+A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface.  Optional power indicator message in asset ID.  
 
 <img width="1392" height="808" alt="image" src="https://github.com/user-attachments/assets/1540199c-b2b8-4b94-9551-5baf1ccd0c11" />
 <img width="1392" height="837" alt="image" src="https://github.com/user-attachments/assets/53f9418c-7600-42ab-bcd6-fe923966a667" />
 
+## Known Supported Devices:
+**Total (W), Voltage (V), Current (A)**: R980  
+**Total (W) ONLY**: R920, R1900, IBR1700, IBR600C, E-series  
+**NOT SUPPORTED**: IBR900
 
 ## Features
 
