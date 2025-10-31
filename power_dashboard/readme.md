@@ -8,7 +8,7 @@ A comprehensive real-time power usage monitoring application for Cradlepoint rou
 <img width="1392" height="837" alt="image" src="https://github.com/user-attachments/assets/53f9418c-7600-42ab-bcd6-fe923966a667" />
 
 ## Known Supported Devices:
-**Total (W), Voltage (V), Current (A)**: R980  
+**Total (W), Voltage (V), Current (A)**: R980, S400  
 **Total (W) ONLY**: R920, R1900, IBR1700, IBR600C, E-series  
 **NOT SUPPORTED**: IBR900
 
