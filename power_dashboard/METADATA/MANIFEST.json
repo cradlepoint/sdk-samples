@@ -1,0 +1,29 @@
+{
+    "app": {
+        "auto_start": true,
+        "date": "2025-10-31T12:39:34.424253",
+        "files": {
+            "cp.py": "d964e7dd570b1f5f062044dbc267bf54d1f98c0e31ddd802e8eb60e14f3616ba",
+            "package.ini": "3519fb30db7634c3bbca828c8f22c353701b7011700c8d9c3a9e36c1ba02ff15",
+            "power_dashboard.py": "e53fe6571054344948311871e0145570c6491eba4a977874272d8bd5d141e4f7",
+            "readme.md": "6af5a06d3b03a95f22e7f8915a018f90abe749a5902b52fda3adad4d5d9c7d79",
+            "start.sh": "c62e3003e690d1183bb525c9bca893897bef42159ebf1977e7326cc55871139e"
+        },
+        "firmware_major": 7,
+        "firmware_minor": 25,
+        "name": "power_dashboard",
+        "notes": "SDK Application",
+        "reboot": true,
+        "restart": true,
+        "uuid": "0074e066-3e6f-4d84-8855-6c925f4cc67d",
+        "vendor": "Cradlepoint",
+        "version_major": 1,
+        "version_minor": 2,
+        "version_patch": 0
+    },
+    "pmf": {
+        "version_major": 1,
+        "version_minor": 0,
+        "version_patch": 0
+    }
+}
