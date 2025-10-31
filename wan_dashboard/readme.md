@@ -1,6 +1,6 @@
 # WAN Dashboard
 
-[Download the built-app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_dashboard.v1.0.0.tar.gz)
+[Download the built-app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_dashboard.v1.3.0.tar.gz)
 
 <img width="1257" height="793" alt="image" src="https://github.com/user-attachments/assets/ca55cbc2-28fd-4851-be8d-5f63eef2d652" />
 
