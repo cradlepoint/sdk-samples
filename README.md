@@ -103,6 +103,8 @@
     - Sets the device description to visually show the LAN/WAN/WWAN/Modem/IP Verify status.
 - **power_alert**
     - Sends alerts when external power is lost and restored.
+- **power_dashboard**
+    - A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface.  Optional power indicator message in asset ID.
 - **python_module_list**
     - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
 - **rate_limit**
