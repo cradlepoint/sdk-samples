@@ -2,6 +2,8 @@
 
 A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface.  Optional power indicator message in asset ID.  
 
+[Download the built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_dashboard.v1.2.0.tar.gz)  
+
 <img width="1392" height="808" alt="image" src="https://github.com/user-attachments/assets/1540199c-b2b8-4b94-9551-5baf1ccd0c11" />
 <img width="1392" height="837" alt="image" src="https://github.com/user-attachments/assets/53f9418c-7600-42ab-bcd6-fe923966a667" />
 
