@@ -21,7 +21,8 @@ A comprehensive real-time power usage monitoring application for Cradlepoint rou
 - **CSV Export**: Download complete historical data
 - **Responsive Design**: Works on desktop and mobile devices
 - **Auto-refresh**: Updates every 30 seconds without page reload
-- **NCM Visibility**: Optional power indicator message in asset ID field in NCM devices grid.
+- **NCM Visibility**: Optional power indicator message in asset ID field in NCM devices grid
+- **Voltage Alerts**: Automatic alerts when voltage crosses thresholds
 
 ## Installation
 
@@ -58,6 +59,19 @@ Use these appdata keys to configure voltage indicator "lights" in asset ID (🟢
 - `power_dashboard_med`: Medium voltage threshold (V). Default: 11.5 (below is low)
 
 Indicator in message: High `🟢`, Medium `🟡`, Low `🔴`, No data (None/0V) `⚫`.
+
+### Voltage Alerts
+
+The application automatically sends alerts via `cp.alert()` when voltage crosses thresholds:
+- **On startup**: Alerts if voltage is not high (low or medium only)
+- **During operation**: Alerts once each time voltage changes between high/medium/low thresholds
+
+Example alert messages:
+- `Power Dashboard: Low voltage alert - 11.20V (below 11.5V)`
+- `Power Dashboard: Medium voltage alert - 11.80V (below 12.1V)`
+- `Power Dashboard: Voltage dropped to medium - 11.85V (below 12.1V)`
+- `Power Dashboard: Voltage improved to medium - 11.60V`
+- `Power Dashboard: Voltage returned to high - 12.15V`
 
 ### Data Retention
 
