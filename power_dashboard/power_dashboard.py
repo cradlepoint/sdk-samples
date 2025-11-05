@@ -59,6 +59,9 @@ max_voltage_timestamp = None
 last_lights_update = None
 lights_interval = None
 
+# Global variable for tracking voltage threshold state for alerts
+previous_threshold_state = None
+
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully"""
     global shutdown_requested, web_server
@@ -97,16 +100,36 @@ def get_lights_interval():
         cp.log(f"Error getting lights interval: {e}")
         return 300  # Return default on error
 
+def get_web_server_port():
+    """Get web server port from appdata with default"""
+    try:
+        # Default port 8000
+        default_port = 8000
+        
+        try:
+            port_appdata = cp.get_appdata('power_dashboard_port')
+            if port_appdata:
+                return int(port_appdata)
+        except Exception as e:
+            cp.log(f"Error getting power dashboard port from appdata: {e}")
+        return default_port  # Return default on error
+    except Exception as e:
+        cp.log(f"Error getting web server port: {e}")
+        return default_port  # Return default on error
+
 def get_voltage_thresholds():
     """Get voltage thresholds from appdata with defaults"""
     try:     
+        # Initialize with defaults
+        high = HIGH_THRESHOLD
+        med = MED_THRESHOLD
+        
         # Check for appdata overrides
         try:
             high_appdata = cp.get_appdata('power_dashboard_high')
             if high_appdata:
                 high = float(high_appdata)
         except Exception as e:
-            high = HIGH_THRESHOLD
             cp.log(f"Error getting power_dashboard_high from appdata: {e}")
         
         try:
@@ -114,7 +137,6 @@ def get_voltage_thresholds():
             if med_appdata:
                 med = float(med_appdata)
         except Exception as e:
-            med = MED_THRESHOLD
             cp.log(f"Error getting power_dashboard_med from appdata: {e}")
         
         return high, med
@@ -132,6 +154,17 @@ def get_voltage_indicator(voltage, high_threshold, med_threshold):
         return "🟡"  # Medium voltage - yellow circle
     else:
         return "🔴"  # Low voltage - red circle
+
+def get_voltage_threshold_state(voltage, high_threshold, med_threshold):
+    """Get threshold state as string for comparison"""
+    if voltage is None or voltage == 0:
+        return "none"
+    elif voltage >= high_threshold:
+        return "high"
+    elif voltage >= med_threshold:
+        return "medium"
+    else:
+        return "low"
 
 def create_asset_id_message(power_info, voltage_indicator):
     """Create asset ID message with voltage indicator and power info"""
@@ -182,11 +215,24 @@ def get_power_info():
 def ensure_data_directory():
     """Ensure the data directory exists"""
     try:
+        # Create directory with parents if they don't exist
+        # This ensures tmp/ is created if it doesn't exist
+        os.makedirs(DATA_DIR, exist_ok=True)
+        # Verify it was created successfully
         if not os.path.exists(DATA_DIR):
-            os.makedirs(DATA_DIR, exist_ok=True)
-            cp.log(f"Created data directory: {DATA_DIR}")
+            raise Exception(f"Directory {DATA_DIR} still does not exist after creation attempt")
     except Exception as e:
         cp.log(f"Error creating data directory: {e}")
+        # Try to create tmp/ first if needed
+        try:
+            tmp_dir = "tmp"
+            if not os.path.exists(tmp_dir):
+                os.makedirs(tmp_dir, exist_ok=True)
+                cp.log(f"Created tmp directory: {tmp_dir}")
+            # Try creating DATA_DIR again
+            os.makedirs(DATA_DIR, exist_ok=True)
+        except Exception as e2:
+            cp.log(f"Error creating tmp directory: {e2}")
 
 def load_data_from_file(filename):
     """Load data from JSON file with corruption handling"""
@@ -224,9 +270,14 @@ def save_data_to_file(data, filename):
             return False
         
         # Ensure the directory exists before writing
+        # Create all parent directories including tmp/ if needed
         directory = os.path.dirname(filename)
-        if directory and not os.path.exists(directory):
+        if directory:
+            # Always ensure directory exists (os.makedirs handles parent directories)
             os.makedirs(directory, exist_ok=True)
+            # Verify it was created successfully before proceeding
+            if not os.path.exists(directory):
+                raise Exception(f"Directory {directory} does not exist and could not be created")
         
         # Create temporary file for atomic write
         temp_filename = filename + '.tmp'
@@ -388,6 +439,7 @@ def power_monitor():
     global min_total, max_total, min_total_timestamp, max_total_timestamp
     global min_voltage, max_voltage, min_voltage_timestamp, max_voltage_timestamp
     global power_data, last_lights_update, lights_interval, shutdown_requested
+    global previous_threshold_state
     
     # Ensure data directory exists
     ensure_data_directory()
@@ -445,6 +497,9 @@ def power_monitor():
     last_lights_update = None
     if is_lights_enabled():
         lights_path = cp.get_appdata('power_dashboard_lights_path') or 'config/system/asset_id'
+    
+    # Track if this is the first iteration (startup)
+    is_first_iteration = True
         
     while not shutdown_requested:
         try:
@@ -452,6 +507,57 @@ def power_monitor():
             power_info = get_power_info()
             
             if power_info:
+                # Get voltage thresholds for alerting
+                high_threshold, med_threshold = get_voltage_thresholds()
+                current_voltage = power_info['voltage']
+                current_threshold_state = get_voltage_threshold_state(current_voltage, high_threshold, med_threshold)
+                
+                # Handle voltage threshold alerts
+                try:
+                    if is_first_iteration:
+                        # On startup, send alert only if voltage is not high and not unavailable
+                        if current_threshold_state != "high" and current_threshold_state != "none":
+                            if current_voltage is not None and current_voltage != 0:
+                                voltage_str = f"{current_voltage:.2f}V"
+                            else:
+                                voltage_str = "N/A"
+                            
+                            if current_threshold_state == "low":
+                                alert_msg = f"Power Dashboard: Low voltage alert - {voltage_str} (below {med_threshold}V)"
+                            else:  # medium
+                                alert_msg = f"Power Dashboard: Medium voltage alert - {voltage_str} (below {high_threshold}V)"
+                            cp.alert(alert_msg)
+                            cp.log(f"Startup voltage alert sent: {alert_msg}")
+                        previous_threshold_state = current_threshold_state
+                        is_first_iteration = False
+                    else:
+                        # During regular operation, send alert only when threshold changes
+                        # Do not send alerts if voltage is unavailable (state "none")
+                        if previous_threshold_state is not None and current_threshold_state != previous_threshold_state and current_threshold_state != "none":
+                            if current_voltage is not None and current_voltage != 0:
+                                voltage_str = f"{current_voltage:.2f}V"
+                            else:
+                                voltage_str = "N/A"
+                            
+                            # Build alert message based on state transition
+                            if current_threshold_state == "high":
+                                alert_msg = f"Power Dashboard: Voltage returned to high - {voltage_str}"
+                            elif current_threshold_state == "medium":
+                                if previous_threshold_state == "high":
+                                    alert_msg = f"Power Dashboard: Voltage dropped to medium - {voltage_str} (below {high_threshold}V)"
+                                else:  # from low
+                                    alert_msg = f"Power Dashboard: Voltage improved to medium - {voltage_str}"
+                            elif current_threshold_state == "low":
+                                alert_msg = f"Power Dashboard: Low voltage alert - {voltage_str} (below {med_threshold}V)"
+                            
+                            cp.alert(alert_msg)
+                            cp.log(f"Voltage threshold change alert: {previous_threshold_state} -> {current_threshold_state}: {alert_msg}")
+                        
+                        # Always update previous state to track current threshold
+                        previous_threshold_state = current_threshold_state
+                except Exception as e:
+                    cp.log(f"Error sending voltage alert: {e}")
+                
                 # Check if lights are enabled and it's time to update
                 current_time = time.time()
                 
@@ -1445,8 +1551,11 @@ def create_html_page():
 
 
 def start_web_server():
-    """Start a simple HTTP server on port 8000"""
+    """Start a simple HTTP server on configured port (default 8000)"""
     global web_server, shutdown_requested
+    
+    # Get port from appdata, default to 8000
+    preferred_port = get_web_server_port()
     
     class PowerTrackerHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
@@ -1508,8 +1617,11 @@ def start_web_server():
     
     
 
-    # Try to bind to port 8000, if it fails, try other ports
-    for port in range(8000, 8100):
+    # Try to bind to preferred port first, then try next ports if needed
+    max_port = preferred_port + 100
+    ports_to_try = [preferred_port] + list(range(preferred_port + 1, max_port + 1))
+    
+    for port in ports_to_try:
         try:
             cp.log(f"Starting web server on port {port}")
             web_server = socketserver.TCPServer(("", port), PowerTrackerHandler)
