@@ -59,8 +59,16 @@ max_voltage_timestamp = None
 last_lights_update = None
 lights_interval = None
 
+# Global variables for signal functionality
+last_signal_update = None
+signal_interval = None
+
 # Global variable for tracking voltage threshold state for alerts
 previous_threshold_state = None
+
+# Global variable for router model
+router_model = None
+adc_channel_enabled = False
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully"""
@@ -82,6 +90,15 @@ def is_lights_enabled():
         cp.log(f"Error checking power_dashboard_lights: {e}")
         return False
 
+def is_signal_enabled():
+    """Check if signal functionality is enabled"""
+    try:
+        signal_appdata = cp.get_appdata('power_dashboard_signal')
+        return signal_appdata is not None
+    except Exception as e:
+        cp.log(f"Error checking power_dashboard_signal: {e}")
+        return False
+
 def get_lights_interval():
     """Get lights update interval from appdata with default"""
     try:
@@ -98,6 +115,24 @@ def get_lights_interval():
         return default_interval
     except Exception as e:
         cp.log(f"Error getting lights interval: {e}")
+        return 300  # Return default on error
+
+def get_signal_interval():
+    """Get signal update interval from appdata with default"""
+    try:
+        # Default 5 minutes (300 seconds)
+        default_interval = 300
+        
+        try:
+            interval_appdata = cp.get_appdata('power_dashboard_signal_interval')
+            if interval_appdata:
+                return int(interval_appdata)
+        except Exception as e:
+            cp.log(f"Error getting power_dashboard_signal_interval from appdata: {e}")
+        
+        return default_interval
+    except Exception as e:
+        cp.log(f"Error getting signal interval: {e}")
         return 300  # Return default on error
 
 def get_web_server_port():
@@ -166,6 +201,56 @@ def get_voltage_threshold_state(voltage, high_threshold, med_threshold):
     else:
         return "low"
 
+def get_signal_stats():
+    """Get modem signal statistics"""
+    try:
+        primary_device = cp.get_wan_primary_device()
+        if not primary_device:
+            return None
+        
+        diagnostics = cp.get_wan_modem_diagnostics(primary_device)
+        if not diagnostics:
+            return None
+        
+        # Extract signal stats
+        dbm = diagnostics.get('dbm', 'N/A')
+        sinr = diagnostics.get('sinr', 'N/A')
+        rsrp = diagnostics.get('rsrp', 'N/A')
+        rsrq = diagnostics.get('rsrq', 'N/A')
+        
+        return {
+            'dbm': dbm,
+            'sinr': sinr,
+            'rsrp': rsrp,
+            'rsrq': rsrq
+        }
+    except Exception as e:
+        cp.log(f"Error getting signal stats: {e}")
+        return None
+
+def format_signal_stats(signal_stats):
+    """Format signal stats as a pretty string"""
+    if not signal_stats:
+        return ""
+    
+    try:
+        dbm = signal_stats.get('dbm') or 'N/A'
+        sinr = signal_stats.get('sinr') or 'N/A'
+        rsrp = signal_stats.get('rsrp') or 'N/A'
+        rsrq = signal_stats.get('rsrq') or 'N/A'
+        
+        # Format as: DBM: -85dBm | SINR: 15dB | RSRP: -95dBm | RSRQ: -10dB
+        # Handle cases where values might already have units
+        dbm_str = str(dbm) if 'dBm' in str(dbm) or dbm == 'N/A' else f"{dbm}dBm"
+        sinr_str = str(sinr) if 'dB' in str(sinr) or sinr == 'N/A' else f"{sinr}dB"
+        rsrp_str = str(rsrp) if 'dBm' in str(rsrp) or rsrp == 'N/A' else f"{rsrp}dBm"
+        rsrq_str = str(rsrq) if 'dB' in str(rsrq) or rsrq == 'N/A' else f"{rsrq}dB"
+        
+        return f"DBM: {dbm_str} | SINR: {sinr_str} | RSRP: {rsrp_str} | RSRQ: {rsrq_str}"
+    except Exception as e:
+        cp.log(f"Error formatting signal stats: {e}")
+        return ""
+
 def create_asset_id_message(power_info, voltage_indicator):
     """Create asset ID message with voltage indicator and power info"""
     try:
@@ -191,8 +276,8 @@ def create_asset_id_message(power_info, voltage_indicator):
         cp.log(f"Error creating asset ID message: {e}")
         return f"{voltage_indicator} Power Dashboard"
 
-def get_power_info():
-    """Get current power information from router"""
+def get_power_info_r980_s400():
+    """Get power info for R980 and S400 models"""
     try:
         power_usage = None
         while not power_usage:
@@ -209,8 +294,81 @@ def get_power_info():
         }
         return result
     except Exception as e:
-        cp.log(f"Error getting power info: {e}")
+        cp.log(f"Error getting power info for R980/S400: {e}")
         return None
+
+def get_power_info_r920_r1900_s700_ibr1700_ibr600c_e3000():
+    """Get power info for R920, R1900, S700, IBR1700, IBR600C, E3000 models"""
+    try:
+        # Get watts from standard path
+        power_usage = None
+        while not power_usage:
+            power_usage = cp.get('status/power_usage')
+        total_power = power_usage.get('total', 0)
+        
+        # Try to get current from standard path (may not be available)
+        current = power_usage.get('current', 0)
+        
+        # Get voltage from ADC channel
+        voltage = None
+        try:
+            adc_voltage = cp.get('status/system/adc/channel/1/voltage')
+            if adc_voltage is not None:
+                voltage = adc_voltage
+        except Exception as e:
+            cp.log(f"Error getting voltage from ADC channel: {e}")
+            voltage = 0
+        
+        result = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'current': current,
+            'total': total_power,
+            'voltage': voltage
+        }
+        return result
+    except Exception as e:
+        cp.log(f"Error getting power info for R920/R1900/S700/IBR1700/IBR600C/E3000: {e}")
+        return None
+
+def get_power_info():
+    """Get current power information from router based on model"""
+    global router_model, adc_channel_enabled
+    
+    # Check if model is supported
+    if router_model == 'IBR900':
+        cp.log("Error: IBR900 model is not supported for power monitoring")
+        return None
+    
+    # Route to model-specific function
+    if router_model in ['R980', 'S400']:
+        return get_power_info_r980_s400()
+    elif router_model in ['R920', 'R1900', 'S700', 'IBR1700', 'IBR600C', 'E3000']:
+        # Enable ADC channel for models that use it (one-time setup)
+        if not adc_channel_enabled:
+            cp.put('config/system/adc/channel/1/enabled', True)
+            adc_channel_enabled = True
+        return get_power_info_r920_r1900_s700_ibr1700_ibr600c_e3000()
+    else:
+        # Unknown model - try default path
+        cp.log(f"Warning: Unknown router model {router_model}, trying default power_usage path")
+        try:
+            power_usage = None
+            while not power_usage:
+                power_usage = cp.get('status/power_usage')
+            total_power = power_usage.get('total', 0)
+            voltage = power_usage.get('voltage', 0)
+            current = power_usage.get('current', 0)
+            
+            result = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'current': current,
+                'total': total_power,
+                'voltage': voltage
+            }
+            return result
+        except Exception as e:
+            cp.log(f"Error getting power info with default path: {e}")
+            return None
 
 def ensure_data_directory():
     """Ensure the data directory exists"""
@@ -439,7 +597,7 @@ def power_monitor():
     global min_total, max_total, min_total_timestamp, max_total_timestamp
     global min_voltage, max_voltage, min_voltage_timestamp, max_voltage_timestamp
     global power_data, last_lights_update, lights_interval, shutdown_requested
-    global previous_threshold_state
+    global previous_threshold_state, last_signal_update, signal_interval
     
     # Ensure data directory exists
     ensure_data_directory()
@@ -452,6 +610,8 @@ def power_monitor():
             interval = int(appdata_value)
     except Exception as e:
         cp.log(f"Error getting appdata, using default interval: {e}")
+    
+    cp.log(f"Power monitoring interval set to {interval} seconds")
     
     # Check if interval has changed from saved value
     saved_interval = load_interval_from_file()
@@ -497,6 +657,12 @@ def power_monitor():
     last_lights_update = None
     if is_lights_enabled():
         lights_path = cp.get_appdata('power_dashboard_lights_path') or 'config/system/asset_id'
+    
+    # Initialize signal functionality
+    signal_interval = get_signal_interval()
+    last_signal_update = None
+    if is_signal_enabled():
+        signal_path = cp.get_appdata('power_dashboard_signal_path') or 'config/system/asset_id'
     
     # Track if this is the first iteration (startup)
     is_first_iteration = True
@@ -567,9 +733,29 @@ def power_monitor():
                         high_threshold, med_threshold = get_voltage_thresholds()
                         voltage_indicator = get_voltage_indicator(power_info['voltage'], high_threshold, med_threshold)
                         asset_id_msg = create_asset_id_message(power_info, voltage_indicator)
+                        
+                        # Append signal stats if signal is enabled
+                        if is_signal_enabled():
+                            signal_stats = get_signal_stats()
+                            if signal_stats:
+                                signal_str = format_signal_stats(signal_stats)
+                                if signal_str:
+                                    asset_id_msg = f"{asset_id_msg} | {signal_str}"
+                        
                         lights_path = cp.get_appdata('power_dashboard_lights_path') or 'config/system/asset_id'
                         cp.put(lights_path, asset_id_msg)
                         last_lights_update = current_time
+                
+                # Check if signal is enabled (but lights are not) and it's time to update
+                elif is_signal_enabled():
+                    if last_signal_update is None or (current_time - last_signal_update) >= signal_interval:
+                        signal_stats = get_signal_stats()
+                        if signal_stats:
+                            signal_msg = format_signal_stats(signal_stats)
+                            if signal_msg:
+                                signal_path = cp.get_appdata('power_dashboard_signal_path') or 'config/system/asset_id'
+                                cp.put(signal_path, signal_msg)
+                                last_signal_update = current_time
 
                 with data_lock:
                     # Store power data immediately
@@ -964,6 +1150,7 @@ def create_html_page():
         <div class="time-range-selector">
             <label for="timeRange">Time Range:</label>
             <select id="timeRange" onchange="updateTimeRange()">
+                <option value="live">Live</option>
                 <option value="hour">Hour</option>
                 <option value="day" selected>Day</option>
                 <option value="week">Week</option>
@@ -1385,12 +1572,35 @@ def create_html_page():
             const timeRange = document.getElementById('timeRange').value;
             console.log('Time range changed to:', timeRange);
             
-            // Fetch fresh data and update charts with filtered data
-            updateAllData();
+            // Clear any existing intervals
+            if (liveUpdateInterval) {
+                clearInterval(liveUpdateInterval);
+                liveUpdateInterval = null;
+            }
+            if (regularUpdateInterval) {
+                clearInterval(regularUpdateInterval);
+                regularUpdateInterval = null;
+            }
+            
+            if (timeRange === 'live') {
+                // Live mode: poll every 1 second
+                liveDataBuffer = []; // Clear buffer when switching to live
+                updateLiveData(); // Initial update
+                liveUpdateInterval = setInterval(updateLiveData, 1000);
+            } else {
+                // Regular mode: use saved data with 2 second polling
+                updateAllData(); // Initial update
+                regularUpdateInterval = setInterval(updateAllData, 2000);
+            }
         }
         
         function filterDataByTimeRange(data, timeRange) {
             if (!data || data.length === 0) return data;
+            
+            // Live mode should not use this function, but handle it gracefully
+            if (timeRange === 'live') {
+                return data;
+            }
             
             const now = new Date();
             let cutoffTime;
@@ -1466,10 +1676,47 @@ def create_html_page():
             }
         }
         
+        // Live data buffer (rolling buffer for last 5 minutes)
+        let liveDataBuffer = [];
+        const LIVE_BUFFER_SIZE = 300; // 5 minutes at 1 second intervals
+        let liveUpdateInterval = null;
+        let regularUpdateInterval = null;
+        
         // Fetch data from server
         // Fetch data from server (like WAN dashboard)
         function fetchData() {
             return fetch('/api/power-data').then(r => r.json());
+        }
+        
+        // Fetch live data from server (current power reading)
+        function fetchLiveData() {
+            return fetch('/api/live-power-data').then(r => r.json());
+        }
+        
+        // Update live data (1 second polling)
+        function updateLiveData() {
+            fetchLiveData().then(data => {
+                if (data && data.timestamp) {
+                    // Add new data point to buffer
+                    liveDataBuffer.push(data);
+                    
+                    // Keep only last LIVE_BUFFER_SIZE points
+                    if (liveDataBuffer.length > LIVE_BUFFER_SIZE) {
+                        liveDataBuffer = liveDataBuffer.slice(-LIVE_BUFFER_SIZE);
+                    }
+                    
+                    // Update charts with live buffer data
+                    updatePowerChart(liveDataBuffer);
+                    
+                    // Update stats with latest data point
+                    updateStats([data], null, null, null, null, null, null, null, null, null, null, null, null);
+                    
+                    // Update table with last 20 points from buffer
+                    updateTable(liveDataBuffer.slice(-20));
+                }
+            }).catch(error => {
+                console.error('Error fetching live data:', error);
+            });
         }
         
         // Update all data (charts, stats, table)
@@ -1533,10 +1780,16 @@ def create_html_page():
                     
                     // Wait a moment for charts to be ready, then load data
                     setTimeout(function() {
-                        updateAllData();
-                        
-                        // Live updates every 2 seconds (like WAN dashboard)
-                        setInterval(updateAllData, 2000);
+                        // Check initial time range and start appropriate polling
+                        const timeRange = document.getElementById('timeRange').value;
+                        if (timeRange === 'live') {
+                            liveDataBuffer = [];
+                            updateLiveData();
+                            liveUpdateInterval = setInterval(updateLiveData, 1000);
+                        } else {
+                            updateAllData();
+                            regularUpdateInterval = setInterval(updateAllData, 2000);
+                        }
                     }, 100);
                 };
                 document.head.appendChild(timeAdapterScript);
@@ -1586,6 +1839,16 @@ def start_web_server():
                         'is_loading': False
                     }
                 self.wfile.write(json.dumps(data).encode())
+            elif self.path == '/api/live-power-data':
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                # Get current power info directly from router (not from saved data)
+                power_info = get_power_info()
+                if power_info:
+                    self.wfile.write(json.dumps(power_info).encode())
+                else:
+                    self.wfile.write(json.dumps({'error': 'Could not get power info'}).encode())
             elif self.path == '/api/csv-report':
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -1657,6 +1920,25 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 cp.wait_for_uptime(min_uptime_seconds=30)
+
+# Check router model and verify support
+router_model = cp.get_product_type()
+while not router_model:
+    router_model = cp.get_product_type()
+router_model = router_model.split('-')[0]
+cp.log(f"Router model: {router_model}")
+if router_model == 'IBR900':
+    cp.log("Error: IBR900 model is not supported for power monitoring")
+    cp.log("Power Dashboard will not start on IBR900 routers")
+    sys.exit(1)
+elif router_model:
+    cp.log(f"Router model {router_model} is supported")
+    # Enable ADC channel for models that use it at startup
+    if router_model in ['R920', 'R1900']:
+        cp.put('config/system/adc/channel/1/enabled', True)
+        adc_channel_enabled = True
+else:
+    cp.log("Warning: Could not detect router model, continuing with default paths")
 
 # Start power monitoring in background thread
 monitor_thread = threading.Thread(target=power_monitor, daemon=True)
