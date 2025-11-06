@@ -956,218 +956,212 @@ class EventingCSClient(CSClient):
                 - uptime (int): System uptime in seconds
                 - temperature (float): System temperature
                 - cpu_usage (float): CPU usage percentage
-                - mem_usage (float): Memory usage percentage
-                - disk_usage (float): Disk usage percentage
                 - memory (dict): Memory usage statistics including:
                     - total_bytes (int): Total memory in bytes
                     - used_bytes (int): Used memory in bytes
                     - free_bytes (int): Free memory in bytes
+                    - percentage_used (float): Memory usage percentage
                 - disk (dict): Disk usage statistics including:
                     - total_bytes (int): Total disk space in bytes
                     - used_bytes (int): Used disk space in bytes
                     - free_bytes (int): Free disk space in bytes
+                    - percentage_used (float): Disk usage percentage
                 - services_running (int): Number of running services
                 - services_disabled (int): Number of disabled services
                 - internal_apps_running (int): Number of running internal applications
                 - external_apps_running (int): Number of running external applications
         """
         try:
-            # Gather system metrics, isolating each metrics gathering section for fault-tolerance
+            system_data = self.get('status/system')
+            if not system_data:
+                return {}
+            
+            # Get memory data
+            memory_data = system_data.get("memory", {})
+            mem_total = float(memory_data.get("memtotal", 0))
+            mem_available = float(memory_data.get("memavailable", 0))
+            mem_used = mem_total - mem_available
+            mem_percentage = round((mem_used / mem_total * 100) if mem_total > 0 else 0, 1)
+            
+            # Get disk usage data
+            disk_data = self.get('status/mount/disk_usage/')
+            disk_total = 0
+            disk_free = 0
+            disk_used = 0
+            disk_percentage = 0
+            
+            if disk_data:
+                disk_total = float(disk_data.get("total_bytes", 0))
+                disk_free = float(disk_data.get("free_bytes", 0))
+                disk_used = disk_total - disk_free
+                disk_percentage = round((disk_used / disk_total * 100) if disk_total > 0 else 0, 1)
+            
             analysis = {
-                "uptime": None,
-                "temperature": None,
-                "cpu_usage": None,
-                "mem_usage": None,
-                "disk_usage": None,
+                "uptime": system_data.get("uptime"),
+                "temperature": system_data.get("temperature"),
+                "cpu_usage": round(
+                        float(system_data.get("cpu", {}).get("nice", 0.0)) +
+                        float(system_data.get("cpu", {}).get("system", 0.0)) +
+                        float(system_data.get("cpu", {}).get("user", 0.0)) * 100
+                    ),
                 "memory": {
-                    "total_bytes": 0,
-                    "used_bytes": 0,
-                    "free_bytes": 0
+                    "total_bytes": int(mem_total),
+                    "used_bytes": int(mem_used),
+                    "free_bytes": int(mem_available),
+                    "percentage_used": mem_percentage
                 },
                 "disk": {
-                    "total_bytes": 0,
-                    "used_bytes": 0,
-                    "free_bytes": 0
+                    "total_bytes": int(disk_total),
+                    "used_bytes": int(disk_used),
+                    "free_bytes": int(disk_free),
+                    "percentage_used": disk_percentage
                 },
                 "services_running": 0,
                 "services_disabled": 0,
                 "internal_apps_running": 0,
                 "external_apps_running": 0
             }
-
-            try:
-                system_data = self.get('status/system')
-            except Exception as e:
-                self.log(f"Error retrieving system data: {e}")
-                return analysis
-
-            if not system_data:
-                return analysis
-
-            # Uptime and temperature
-            try:
-                analysis["uptime"] = system_data.get("uptime")
-            except Exception as e:
-                self.log(f"Error retrieving uptime: {e}")
-            try:
-                analysis["temperature"] = system_data.get("temperature")
-            except Exception as e:
-                self.log(f"Error retrieving temperature: {e}")                
-
-            # CPU Usage
-            try:
-                cpu = system_data.get("cpu", {})
-                analysis["cpu_usage"] = round(
-                    float(cpu.get("nice", 0.0)) +
-                    float(cpu.get("system", 0.0)) +
-                    float(cpu.get("user", 0.0)) * 100
-                )
-            except Exception as e:
-                self.log(f"Error retrieving cpu_usage: {e}")
-                analysis["cpu_usage"] = None
-
-            # Memory Section - safe
-            try:
-                memory_data = system_data.get("memory", {})
-                mem_total = float(memory_data.get("memtotal", 0))
-                mem_available = float(memory_data.get("memavailable", 0))
-                mem_used = mem_total - mem_available
-                mem_percentage = round((mem_used / mem_total * 100) if mem_total > 0 else 0, 1)
-                analysis["memory"] = {
-                    "total_bytes": int(mem_total),
-                    "used_bytes": int(mem_used),
-                    "free_bytes": int(mem_available)
-                }
-                # Add mem_usage to root level
-                analysis["mem_usage"] = float(mem_percentage)
-            except Exception as e:
-                self.log(f"Error retrieving memory metrics: {e}")
-
-            # Disk Section - safe
-            try:
-                disk_data = self.get('status/mount/disk_usage/')
-                if disk_data:
-                    disk_total = float(disk_data.get("total_bytes", 0))
-                    disk_free = float(disk_data.get("free_bytes", 0))
-                    disk_used = disk_total - disk_free
-                    disk_percentage = round((disk_used / disk_total * 100) if disk_total > 0 else 0, 1)
-                    analysis["disk"] = {
-                        "total_bytes": int(disk_total),
-                        "used_bytes": int(disk_used),
-                        "free_bytes": int(disk_free)
-                    }
-                    # Add disk_usage to root level
-                    analysis["disk_usage"] = float(disk_percentage)
-            except Exception as e:
-                self.log(f"Error retrieving disk metrics: {e}")
-
-            # Service Count Section - safe
-            try:
-                services = system_data.get("services", {})
-                for service, info in services.items():
-                    if isinstance(info, dict) and info.get("state") == "started":
-                        analysis["services_running"] += 1
-                    elif isinstance(info, dict) and info.get("state") == "disabled":
-                        analysis["services_disabled"] += 1
-            except Exception as e:
-                self.log(f"Error counting services: {e}")
-
-            # Internal SDK App Count - safe
-            try:
-                internal_apps = system_data.get("apps", [])
-                analysis["internal_apps_running"] = len([app for app in internal_apps if app.get("state") == "started"])
-            except Exception as e:
-                self.log(f"Error counting internal apps: {e}")
-
-            # External SDK App Count - safe
-            try:
-                sdk_data = system_data.get("sdk", {})
-                external_apps = sdk_data.get("apps", [])
-                analysis["external_apps_running"] = len([app for app in external_apps if app.get("state") == "started"])
-            except Exception as e:
-                self.log(f"Error counting external apps: {e}")
-
+            
+            services = system_data.get("services", {})
+            for service, info in services.items():
+                if isinstance(info, dict) and info.get("state") == "started":
+                    analysis["services_running"] += 1
+                elif isinstance(info, dict) and info.get("state") == "disabled":
+                    analysis["services_disabled"] += 1
+            
+            # Count internal apps (from system/apps)
+            internal_apps = system_data.get("apps", [])
+            analysis["internal_apps_running"] = len([app for app in internal_apps if app.get("state") == "started"])
+            
+            # Count external apps (from system/sdk/apps)
+            sdk_data = system_data.get("sdk", {})
+            external_apps = sdk_data.get("apps", [])
+            analysis["external_apps_running"] = len([app for app in external_apps if app.get("state") == "started"])
+            
             return analysis
         except Exception as e:
             self.log(f"Error analyzing system status: {e}")
             return None
 
-    def get_description(self) -> Optional[str]:
-        """
-        Retrieve the device description from the system configuration.
-
+    def get_description(self) -> Dict[str, Any]:
+        """Get device description from system configuration.
+        
         Returns:
-            str or None: The device description text as set in system configuration, or None if an error occurs.
+            Dict[str, Any]: Device description information including:
+                - description (str): Device description text
+                - timestamp (str): Timestamp when the description was retrieved
         """
         try:
-            return self.get('config/system/desc')
+            description = self.get('config/system/desc')
+            if description is None:
+                return {"description": "", "timestamp": None}
+            
+            return {
+                "description": description,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             self.log(f"Error getting device description: {e}")
             return None
 
-    def get_asset_id(self) -> Optional[str]:
+    def get_asset_id(self) -> Dict[str, Any]:
+        """Get device asset ID from system configuration.
+        
+        Returns:
+            Dict[str, Any]: Device asset ID information including:
+                - asset_id (str): Device asset ID
+                - timestamp (str): Timestamp when the asset ID was retrieved
+        """
         try:
-            return self.get('config/system/asset_id')
+            asset_id = self.get('config/system/asset_id')
+            if asset_id is None:
+                return {"asset_id": "", "timestamp": None}
+            
+            return {
+                "asset_id": asset_id,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             self.log(f"Error getting device asset ID: {e}")
             return None
 
-    def set_description(self, description: str) -> bool:
-        """
-        Set the device description in the system configuration.
-
+    def set_description(self, description: str) -> Dict[str, Any]:
+        """Set device description in system configuration.
+        
         Args:
-            description (str): The device description text to set.
-
+            description (str): The device description text to set
+            
         Returns:
-            bool: True if the description was set successfully, False otherwise.
+            dict: Dictionary containing the result of the operation including:
+                - success (bool): Whether the operation was successful
+                - description (str): The description that was set
+                - timestamp (str): Timestamp when the description was set
         """
         try:
             result = self.put('config/system/desc', description)
             if result is None:
-                return False
-            return True
+                return None
+            
+            return {
+                "success": True,
+                "description": description,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             self.log(f"Error setting device description: {e}")
-            return False
+            return None
 
-    def set_asset_id(self, asset_id: str) -> bool:
-        """
-        Set the device asset ID in the system configuration.
+    def set_asset_id(self, asset_id: str) -> Dict[str, Any]:
+        """Set device asset ID in system configuration.
         
         Args:
             asset_id (str): The device asset ID to set
             
         Returns:
-            bool: True if the asset ID was set successfully, False otherwise.
+            dict: Dictionary containing the result of the operation including:
+                - success (bool): Whether the operation was successful
+                - asset_id (str): The asset ID that was set
+                - timestamp (str): Timestamp when the asset ID was set
         """
         try:
             result = self.put('config/system/asset_id', asset_id)
             if result is None:
-                return False
-            return True
+                return None
+            
+            return {
+                "success": True,
+                "asset_id": asset_id,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             self.log(f"Error setting device asset ID: {e}")
-            return False
+            return None
 
-    def set_name(self, name: str) -> bool:
+    def set_name(self, name: str) -> Dict[str, Any]:
         """Set device name in system configuration.
         
         Args:
             name (str): The device name to set
             
         Returns:
-            bool: True if the name was set successfully, False otherwise.
+            dict: Dictionary containing the result of the operation including:
+                - success (bool): Whether the operation was successful
+                - name (str): The name that was set
+                - timestamp (str): Timestamp when the name was set
         """
         try:
             result = self.put('config/system/system_id', name)
             if result is None:
-                return False
+                return None
             
-            return True
+            return {
+                "success": True,
+                "name": name,
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             self.log(f"Error setting device name: {e}")
-            return False
+            return None
 
     def get_wlan_status(self) -> Dict[str, Any]:
         """Get WLAN status and return detailed information.
@@ -1186,9 +1180,9 @@ class EventingCSClient(CSClient):
                     - txpower (int): Transmission power
                     - region_code (int): Regulatory region code
                     - reconnecting (bool): Whether radio is reconnecting
+                    - bss_count (int): Number of BSS (Basic Service Sets)
                     - clients_count (int): Number of clients on this radio
                     - survey_data (int): Number of survey data points
-                    - ssids (list): List of SSIDs configured for this radio's BSS
                 - clients_connected (int): Total number of connected clients across all radios
         """
         try:
@@ -1205,17 +1199,6 @@ class EventingCSClient(CSClient):
             radios = wlan_data.get("radio", [])
             total_clients = 0
             for i, radio in enumerate(radios):
-                # Get SSIDs from config for this radio's BSS
-                ssids = []
-                try:
-                    bss_config = self.get(f'config/wlan/radio/{i}/bss')
-                    if bss_config:
-                        for bss_id, bss_data in bss_config.items():
-                            if isinstance(bss_data, dict) and 'ssid' in bss_data:
-                                ssids.append(bss_data['ssid'])
-                except Exception as e:
-                    self.log(f"Error retrieving SSIDs for radio {i}: {e}")
-                
                 radio_info = {
                     "radio_id": i,
                     "band": radio.get("band"),
@@ -1226,9 +1209,9 @@ class EventingCSClient(CSClient):
                     "txpower": radio.get("txpower"),
                     "region_code": radio.get("region_code"),
                     "reconnecting": radio.get("reconnecting"),
+                    "bss_count": len(radio.get("bss", [])),
                     "clients_count": len(radio.get("clients", [])),
-                    "survey_data": len(radio.get("survey", [])),
-                    "ssids": ssids
+                    "survey_data": len(radio.get("survey", []))
                 }
                 analysis["radios"].append(radio_info)
                 total_clients += radio_info["clients_count"]
@@ -1255,18 +1238,6 @@ class EventingCSClient(CSClient):
                     - cellular_health (str): Cellular health category
                     - ip_address (str): Device IP address
                     - uptime (int): Device uptime in seconds
-                    - type (str): Device type
-                    - stats (dict): Device statistics including:
-                        - collisions (int): Collision count
-                        - idrops (int): Input drop count
-                        - ierrors (int): Input error count
-                        - in_bytes (int): Input bytes
-                        - ipackets (int): Input packet count
-                        - multicast (int): Multicast count
-                        - odrops (int): Output drop count
-                        - oerrors (int): Output error count
-                        - opackets (int): Output packet count
-                        - out_bytes (int): Output bytes
                     - For modem devices (uid starts with "mdm"), additional fields:
                         - active_apn (str): Active APN name
                         - carrier_id (str): Carrier identifier
@@ -1294,12 +1265,26 @@ class EventingCSClient(CSClient):
                         - rsrp_5g (str): 5G RSRP value
                         - rsrq_5g (str): 5G RSRQ value
                         - sinr_5g (str): 5G SINR value
+                        - stats (dict): Device statistics including:
+                            - collisions (int): Collision count
+                            - idrops (int): Input drop count
+                            - ierrors (int): Input error count
+                            - in_bytes (int): Input bytes
+                            - ipackets (int): Input packet count
+                            - multicast (int): Multicast count
+                            - odrops (int): Output drop count
+                            - oerrors (int): Output error count
+                            - opackets (int): Output packet count
+                            - out_bytes (int): Output bytes
                     - For ethernet devices (uid starts with "ethernet"), additional fields:
+                        - capabilities (str): Device capabilities
+                        - config_id (str): Configuration identifier
                         - interface (str): Interface name
                         - mac_address (str): MAC address
                         - mtu (int): Maximum transmission unit
                         - port (str): Port number
                         - port_name (dict): Port name mapping
+                        - type (str): Device type
         """
         try:
             wan_data = self.get('status/wan')
@@ -1321,30 +1306,8 @@ class EventingCSClient(CSClient):
                     "signal_strength": device_info.get("status", {}).get("signal_strength"),
                     "cellular_health": device_info.get("status", {}).get("cellular_health_category"),
                     "ip_address": device_info.get("status", {}).get("ipinfo", {}).get("ip_address"),
-                    "uptime": device_info.get("status", {}).get("uptime"),
-                    "type": device_info.get("type")
+                    "uptime": device_info.get("status", {}).get("uptime")
                 }
-                
-                # Add stats for all devices
-                try:
-                    stats = self.get(f'status/wan/devices/{device_id}/stats')
-                    if stats:
-                        device_analysis.update({
-                            "stats": {
-                                "collisions": stats.get("collisions"),
-                                "idrops": stats.get("idrops"),
-                                "ierrors": stats.get("ierrors"),
-                                "in_bytes": stats.get("in"),
-                                "ipackets": stats.get("ipackets"),
-                                "multicast": stats.get("multicast"),
-                                "odrops": stats.get("odrops"),
-                                "oerrors": stats.get("oerrors"),
-                                "opackets": stats.get("opackets"),
-                                "out_bytes": stats.get("out")
-                            }
-                        })
-                except Exception as e:
-                    self.log(f"Error getting stats for {device_id}: {e}")
                 
                 # Add modem diagnostics for modem devices
                 if device_id.startswith("mdm"):
@@ -1380,6 +1343,23 @@ class EventingCSClient(CSClient):
                                 "sinr_5g": diagnostics.get("SINR_5G")
                             })
                         
+                        # Add modem statistics
+                        stats = self.get(f'status/wan/devices/{device_id}/stats')
+                        if stats:
+                            device_analysis.update({
+                                "stats": {
+                                    "collisions": stats.get("collisions"),
+                                    "idrops": stats.get("idrops"),
+                                    "ierrors": stats.get("ierrors"),
+                                    "in_bytes": stats.get("in"),
+                                    "ipackets": stats.get("ipackets"),
+                                    "multicast": stats.get("multicast"),
+                                    "odrops": stats.get("odrops"),
+                                    "oerrors": stats.get("oerrors"),
+                                    "opackets": stats.get("opackets"),
+                                    "out_bytes": stats.get("out")
+                                }
+                            })
                     except Exception as e:
                         self.log(f"Error getting modem diagnostics for {device_id}: {e}")
                 
@@ -1389,11 +1369,14 @@ class EventingCSClient(CSClient):
                         info = self.get(f'status/wan/devices/{device_id}/info')
                         if info:
                             device_analysis.update({
+                                "capabilities": info.get("capabilities"),
+                                "config_id": info.get("config_id"),
                                 "interface": info.get("iface"),
                                 "mac_address": info.get("mac"),
                                 "mtu": info.get("mtu"),
                                 "port": info.get("port"),
-                                "port_name": info.get("port_name")
+                                "port_name": info.get("port_name"),
+                                "type": info.get("type")
                             })
                     except Exception as e:
                         self.log(f"Error getting ethernet info for {device_id}: {e}")
@@ -1409,6 +1392,47 @@ class EventingCSClient(CSClient):
             return analysis
         except Exception as e:
             self.log(f"Error analyzing WAN status: {e}")
+            return None
+
+    def get_wan_devices(self) -> Dict[str, Any]:
+        """Get WAN device information only.
+        
+        Returns:
+            Dict[str, Any]: WAN device information including:
+                - primary_device (str): Primary WAN device identifier
+                - devices (list): List of WAN device information including:
+                    - uid (str): Device unique identifier
+                    - connection_state (str): Device connection state
+                    - signal_strength (str): Signal strength indicator
+                    - cellular_health (str): Cellular health category
+                    - ip_address (str): Device IP address
+                    - uptime (int): Device uptime in seconds
+        """
+        try:
+            wan_data = self.get('status/wan')
+            if not wan_data:
+                return {}
+            
+            devices = wan_data.get("devices", {})
+            device_list = []
+            
+            for device_id, device_info in devices.items():
+                device_analysis = {
+                    "uid": device_id,
+                    "connection_state": device_info.get("status", {}).get("connection_state"),
+                    "signal_strength": device_info.get("status", {}).get("signal_strength"),
+                    "cellular_health": device_info.get("status", {}).get("cellular_health_category"),
+                    "ip_address": device_info.get("status", {}).get("ipinfo", {}).get("ip_address"),
+                    "uptime": device_info.get("status", {}).get("uptime")
+                }
+                device_list.append(device_analysis)
+            
+            return {
+                "primary_device": wan_data.get("primary_device"),
+                "devices": device_list
+            }
+        except Exception as e:
+            self.log(f"Error analyzing WAN devices: {e}")
             return None
 
     def get_wan_modem_diagnostics(self, device_id: str) -> Dict[str, Any]:
@@ -1486,14 +1510,14 @@ class EventingCSClient(CSClient):
             self.log(f"Error getting modem diagnostics for {device_id}: {e}")
             return None
 
-    def get_wan_devices_stats(self, device_id: str) -> Dict[str, Any]:
-        """Get interface statistics for a specific WAN device.
+    def get_wan_modem_stats(self, device_id: str) -> Dict[str, Any]:
+        """Get modem statistics for a specific WAN device.
         
         Args:
             device_id (str): WAN device identifier to get statistics for
             
         Returns:
-            Dict[str, Any]: Interface statistics including:
+            Dict[str, Any]: Modem statistics including:
                 - collisions (int): Collision count
                 - idrops (int): Input drop count
                 - ierrors (int): Input error count
@@ -1506,6 +1530,9 @@ class EventingCSClient(CSClient):
                 - out_bytes (int): Output bytes
         """
         try:
+            if not device_id.startswith("mdm"):
+                return None
+            
             stats = self.get(f'status/wan/devices/{device_id}/stats')
             if not stats:
                 return None
@@ -1523,26 +1550,7 @@ class EventingCSClient(CSClient):
                 "out_bytes": stats.get("out")
             }
         except Exception as e:
-            self.log(f"Error getting WAN device stats for {device_id}: {e}")
-            return None
-
-    # Backward compatibility: alias old name to the new generic method
-    def get_wan_modem_stats(self, device_id: str) -> Dict[str, Any]:
-        return self.get_wan_devices_stats(device_id)
-
-    def get_wan_stats(self) -> Dict[str, Any]:
-        """Get aggregate WAN statistics across all WAN devices.
-        
-        Returns:
-            Dict[str, Any]: WAN statistics including keys like:
-                bps, collisions, ibps, idrops, ierrors, imcasts,
-                in, ipackets, noproto, obps, oerrors, omcasts,
-                opackets, out, ts
-        """
-        try:
-            return self.get('status/wan/stats')
-        except Exception as e:
-            self.log(f"Error getting WAN stats: {e}")
+            self.log(f"Error getting modem stats for {device_id}: {e}")
             return None
 
     def get_wan_ethernet_info(self, device_id: str) -> Dict[str, Any]:
@@ -3440,11 +3448,24 @@ class EventingCSClient(CSClient):
                 "username": username
             }
             
-            return self.post('config/system/users/', user_data)
+            result = self.post('config/system/users/', user_data)
+            
+            if isinstance(result, tuple):
+                result = result[1] if len(result) > 1 else result[0]
+                
+            return {
+                'success': True,
+                'username': username,
+                'group': group,
+                'result': result
+            }
             
         except Exception as e:
-            self.log(f"Error creating user: {e}")
-            return None
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
 
     def get_users(self) -> dict:
         """Get list of all users on the router.
@@ -3453,10 +3474,21 @@ class EventingCSClient(CSClient):
             dict: List of users and their information
         """
         try:
-            return self.get('config/system/users/')
+            result = self.get('config/system/users/')
+            
+            if isinstance(result, tuple):
+                result = result[1] if len(result) > 1 else result[0]
+                
+            return {
+                'success': True,
+                'users': result
+            }
+            
         except Exception as e:
-            self.log(f"Error getting users: {e}")
-            return None
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     def delete_user(self, username: str) -> dict:
         """Delete a user from the router.
@@ -3469,14 +3501,56 @@ class EventingCSClient(CSClient):
         """
         try:
             # First get the user to find their _id_
-            users = self.get_users()
-            for user in users:
-                if user.get('username') == username:
-                    return self.delete(f'config/system/users/{user.get("_id_")}')
-            return None
+            users_result = self.get_users()
+            if not users_result.get('success'):
+                return users_result
+                
+            users = users_result.get('users', [])
+            user_to_delete = None
+            
+            if isinstance(users, list):
+                for i, user in enumerate(users):
+                    if isinstance(user, dict) and user.get('username') == username:
+                        user_to_delete = {'user': user, 'index': i, '_id_': user.get('_id_')}
+                        break
+            
+            if not user_to_delete:
+                return {
+                    'success': False,
+                    'error': f'User {username} not found',
+                    'username': username
+                }
+            
+            # Try deleting by _id_ first, then by index
+            user_id = user_to_delete['_id_']
+            index = user_to_delete['index']
+            
+            # Try by _id_ first
+            result = self.delete(f'config/system/users/{user_id}')
+            
+            if isinstance(result, tuple):
+                result = result[1] if len(result) > 1 else result[0]
+            
+            # If that fails, try by index
+            if not result.get('success', True):
+                result = self.delete(f'config/system/users/{index}')
+                if isinstance(result, tuple):
+                    result = result[1] if len(result) > 1 else result[0]
+                
+            return {
+                'success': True,
+                'username': username,
+                'user_id': user_id,
+                'index': index,
+                'result': result
+            }
+            
         except Exception as e:
-            self.log(f"Error deleting user: {e}")
-            return None
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
 
     def ensure_user_exists(self, username: str, password: str, group: str = "admin") -> dict:
         """Ensure a user exists, creating it if it doesn't.
@@ -3491,21 +3565,43 @@ class EventingCSClient(CSClient):
         """
         try:
             # First check if user exists
-            users = self.get_users()
+            users_result = self.get_users()
+            if not users_result.get('success'):
+                return users_result
+                
+            users = users_result.get('users', [])
             existing_user = None
-            for user in users:
-                if user.get('username') == username:
-                    existing_user = user
-                    break
+            
+            if isinstance(users, list):
+                for user in users:
+                    if isinstance(user, dict) and user.get('username') == username:
+                        existing_user = user
+                        break
+            elif isinstance(users, dict):
+                # Handle case where users might be a dict with usernames as keys
+                if username in users:
+                    existing_user = users[username]
                     
-            if not existing_user:
-                return self.create_user(username, password, group)
+            if existing_user:
+                return {
+                    'success': True,
+                    'username': username,
+                    'action': 'exists',
+                    'user': existing_user
+                }
             else:
-                return existing_user
+                # User doesn't exist, create it
+                create_result = self.create_user(username, password, group)
+                if create_result.get('success'):
+                    create_result['action'] = 'created'
+                return create_result
                 
         except Exception as e:
-            self.log(f"Error ensuring user exists: {e}")
-            return None
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
 
     def _generate_random_password(self, length: int = 16) -> str:
         """Generate a random password with mixed characters.
@@ -3553,23 +3649,31 @@ class EventingCSClient(CSClient):
         try:
             # First, try to delete the user if it exists
             delete_result = self.delete_user(username)
-            if not delete_result:
-                self.log(f"Error deleting user '{username}': {delete_result.get('error', 'Unknown')}")
-                return None
+            if delete_result.get('success'):
+                self.log(f"Deleted existing user '{username}'")
+            else:
+                self.log(f"User '{username}' did not exist or deletion failed: {delete_result.get('error', 'Unknown')}")
             
             # Generate a random password
             password = self._generate_random_password()
             
             # Create the user with the new password
             create_result = self.create_user(username, password, group)
-            if not create_result:
-                self.log(f"Error creating user '{username}': {create_result.get('error', 'Unknown')}")
-                return None
-            
+            if create_result.get('success'):
+                create_result['password'] = password
+                create_result['action'] = 'created_fresh'
+                self.log(f"Created fresh user '{username}' with random password")
+            else:
+                create_result['password'] = password
+                
             return create_result
+                
         except Exception as e:
-            self.log(f"Error ensuring fresh user: {e}")
-            return None
+            return {
+                'success': False,
+                'error': str(e),
+                'username': username
+            }
 
     def packet_capture(self, 
                       iface: str = None,
@@ -4650,7 +4754,7 @@ def wait_for_wan_connection(timeout: int = 300) -> bool:
         return False
 
 def get_appdata(name: str = '') -> Union[Optional[str], Optional[List[Dict[str, Any]]]]:
-    """Get value of appdata from NCOS Config by name (case-insensitive), or all appdata if no name is provided.
+    """Get value of appdata from NCOS Config by name, or all appdata if no name is provided.
 
     Args:
         name (str): The name of the appdata to retrieve. If empty, returns all appdata.
@@ -4665,7 +4769,7 @@ def get_appdata(name: str = '') -> Union[Optional[str], Optional[List[Dict[str, 
             return appdata
         return next((x["value"] for x in appdata if x["name"].lower() == name.lower()), None)
     except Exception as e:
-        log(f"Error getting appdata for {name}: {e}")
+        log("Error getting appdata for {name}: {e}")
         return None
 
 def post_appdata(name: str = '', value: str = '') -> None:
@@ -5294,7 +5398,7 @@ def reboot_device(force: bool = False) -> None:
         force (bool): Whether to force the reboot. Defaults to False.
     """
     try:
-        _cs_client.put('control/system/reboot', True)
+        _cs_client.put('control/system/reboot', 'reboot hypmgr')
     except Exception as e:
         log("Error rebooting device: {e}")
     
@@ -5621,6 +5725,22 @@ def get_wan_status() -> Dict[str, Any]:
     """
     return _cs_client.get_wan_status()
 
+def get_wan_devices() -> Dict[str, Any]:
+    """Get WAN device information only.
+    
+    Returns:
+        Dict[str, Any]: WAN device information including:
+            - primary_device (str): Primary WAN device identifier
+            - devices (list): List of WAN device information including:
+                - uid (str): Device unique identifier
+                - connection_state (str): Device connection state
+                - signal_strength (str): Signal strength indicator
+                - cellular_health (str): Cellular health category
+                - ip_address (str): Device IP address
+                - uptime (int): Device uptime in seconds
+    """
+    return _cs_client.get_wan_devices()
+
 def get_wan_modem_diagnostics(device_id: str) -> Dict[str, Any]:
     """Get modem diagnostics for a specific WAN device.
     
@@ -5658,32 +5778,26 @@ def get_wan_modem_diagnostics(device_id: str) -> Dict[str, Any]:
     """
     return _cs_client.get_wan_modem_diagnostics(device_id)
 
-def get_wan_stats() -> Dict[str, Any]:
-    """Get aggregate WAN statistics across all WAN devices.
-    
-    Returns:
-        Dict[str, Any]: WAN statistics with keys like bps, collisions, ibps, idrops,
-        ierrors, imcasts, in, ipackets, noproto, obps, oerrors, omcasts, opackets,
-        out, ts
-    """
-    return _cs_client.get_wan_stats()
-
-def get_wan_devices_stats(device_id: str) -> Dict[str, Any]:
-    """Get interface statistics for a specific WAN device.
+def get_wan_modem_stats(device_id: str) -> Dict[str, Any]:
+    """Get modem statistics for a specific WAN device.
     
     Args:
         device_id (str): WAN device identifier to get statistics for
         
     Returns:
-        Dict[str, Any]: Interface statistics including:
-            collisions, idrops, ierrors, in_bytes, ipackets, multicast,
-            odrops, oerrors, opackets, out_bytes
+        Dict[str, Any]: Modem statistics including:
+            - collisions (int): Collision count
+            - idrops (int): Input drop count
+            - ierrors (int): Input error count
+            - in_bytes (int): Input bytes
+            - ipackets (int): Input packet count
+            - multicast (int): Multicast count
+            - odrops (int): Output drop count
+            - oerrors (int): Output error count
+            - opackets (int): Output packet count
+            - out_bytes (int): Output bytes
     """
-    return _cs_client.get_wan_devices_stats(device_id)
-
-# Backward compatibility wrapper
-def get_wan_modem_stats(device_id: str) -> Dict[str, Any]:
-    return get_wan_devices_stats(device_id)
+    return _cs_client.get_wan_modem_stats(device_id)
 
 def get_wan_ethernet_info(device_id: str) -> Dict[str, Any]:
     """Get ethernet device information for a specific WAN device.
@@ -5968,6 +6082,28 @@ def get_dhcp_status() -> Dict[str, Any]:
 # ============================================================================
 # STATUS MONITORING FUNCTIONS
 # ============================================================================
+
+def get_wan_devices_status() -> Optional[Dict[str, Any]]:
+    """Return detailed status information for all WAN devices.
+    
+    Returns:
+        dict or None: Dictionary containing all WAN devices with keys like 'mdm-{id}', 'eth-{id}', etc.
+              Each device contains:
+              - config (dict): Device configuration
+              - diagnostics (dict): Detailed diagnostic information
+              - info (dict): Device information (model, carrier, firmware, etc.)
+              - ob_upgrade (dict): Over-the-air upgrade information
+              - remote_upgrade (dict): Remote upgrade status
+              - stats (dict): Device statistics
+              - status (dict): Connection status with GPS and signal information
+    """
+    try:
+        wan_devices = _cs_client.get('status/wan/devices')
+        return wan_devices
+    except Exception as e:
+        log("Error retrieving WAN devices status: {e}")
+        return None
+
 
 def get_signal_strength(uid: str, include_backlog: bool = False) -> Optional[Dict[str, Any]]:
     """Return signal strength information for a specific cellular modem.
