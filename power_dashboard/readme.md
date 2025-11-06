@@ -2,10 +2,10 @@
 
 A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface.  Optional power indicator message in asset ID.  
 
-[Download the built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_dashboard.v1.3.0.tar.gz)  
+[Download the built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_dashboard.v1.4.0.tar.gz)  
 
-<img width="1392" height="808" alt="image" src="https://github.com/user-attachments/assets/1540199c-b2b8-4b94-9551-5baf1ccd0c11" />
-<img width="1392" height="837" alt="image" src="https://github.com/user-attachments/assets/53f9418c-7600-42ab-bcd6-fe923966a667" />
+<img width="1334" height="808" alt="image" src="https://github.com/user-attachments/assets/bcf7ae9a-0194-4db1-a7e6-a7e6a54d89d3" />
+<img width="1334" height="849" alt="image" src="https://github.com/user-attachments/assets/1963d7be-d660-4078-9b22-6e0339f9cbd5" />
 
 ## Known Supported Devices:
 **Total (W), Voltage (V), Current (A)**: R980, S400  
@@ -14,15 +14,18 @@ A comprehensive real-time power usage monitoring application for Cradlepoint rou
 
 ## Features
 
-- **Real-time Power Monitoring**: Current (A), Total Energy (Wh), Voltage (V) tracking
+- **Real-time Power Monitoring**: Current (A), Total Energy (W), Voltage (V) tracking
 - **Interactive Dashboard**: Web interface with live charts and statistics
+- **Live Mode**: Real-time power monitoring with 1-second polling (separate from regular data collection)
 - **Historical Data**: 30 days retention with configurable polling intervals
 - **Min/Max Tracking**: Historical minimum and maximum values with timestamps
 - **CSV Export**: Download complete historical data
 - **Responsive Design**: Works on desktop and mobile devices
-- **Auto-refresh**: Updates every 30 seconds without page reload
+- **Auto-refresh**: Updates every 2 seconds without page reload
 - **NCM Visibility**: Optional power indicator message in asset ID field in NCM devices grid
+- **Signal Stats**: Optional modem signal statistics (DBM, SINR, RSRP, RSRQ) in asset ID
 - **Voltage Alerts**: Automatic alerts when voltage crosses thresholds
+- **Router Model Support**: Automatic detection and model-specific API path handling
 
 ## Installation
 
@@ -42,15 +45,38 @@ A comprehensive real-time power usage monitoring application for Cradlepoint rou
   - **Host**: 127.0.0.1
   - **Port**: 8000
 
+## Router Model Support
+
+The application automatically detects the router model and uses the appropriate API paths:
+
+### Supported Models
+
+**R980, S400:**
+- Watts: `status/power_usage/total`
+- Voltage: `status/power_usage/voltage`
+- Amperage: `status/power_usage/current`
+
+**R920, R1900, S700, IBR1700, IBR600C, E3000:**
+- Watts: `status/power_usage/total`
+- Voltage: `status/system/adc/channel/1/voltage` (ADC channel automatically enabled for R920/R1900)
+- Amperage: `status/power_usage/current` (if available)
+
+**IBR900:**
+- Not supported - application will exit gracefully if detected
+
+For unknown models, the application will attempt to use default paths and log warnings.
+
 ## Configuration
 
 ### Appdata Fields
 
-Use these appdata keys to configure behavior:
-
+**Core Configuration:**
 - `power_dashboard_interval`: Polling interval in seconds. Default: 300 (5 minutes)
+- `power_dashboard_port`: Web server port. Default: 8000
 
-Use these appdata keys to configure voltage indicator "lights" in asset ID (🟢 12.17V | 0.44A | 5.34W):
+**Voltage Indicator "Lights" in Asset ID:**
+
+Use these appdata keys to configure voltage indicator message (🟢 12.17V | 0.44A | 5.34W):
 
 - `power_dashboard_lights`: If present (even empty), enables writing a voltage indicator message
 - `power_dashboard_lights_interval`: Seconds between indicator writes. Default: 300
@@ -59,6 +85,20 @@ Use these appdata keys to configure voltage indicator "lights" in asset ID (🟢
 - `power_dashboard_med`: Medium voltage threshold (V). Default: 11.5 (below is low)
 
 Indicator in message: High `🟢`, Medium `🟡`, Low `🔴`, No data (None/0V) `⚫`.
+
+**Signal Statistics in Asset ID:**
+
+Use these appdata keys to configure modem signal statistics display:
+
+- `power_dashboard_signal`: If present (even empty), enables signal statistics
+  - If `power_dashboard_lights` is also enabled: Signal stats are appended to the power message
+  - If `power_dashboard_lights` is not enabled: Signal stats are displayed as a standalone message
+- `power_dashboard_signal_interval`: Seconds between signal updates. Default: 300
+- `power_dashboard_signal_path`: Config path to write the message. Default: `config/system/asset_id`
+
+Signal stats format: `DBM: -85dBm | SINR: 15dB | RSRP: -95dBm | RSRQ: -10dB`
+
+Example combined message (lights + signal): `🟢 12.17V | 0.44A | 5.34W | DBM: -85dBm | SINR: 15dB | RSRP: -95dBm | RSRQ: -10dB`
 
 ### Voltage Alerts
 
@@ -73,6 +113,17 @@ Example alert messages:
 - `Power Dashboard: Voltage improved to medium - 11.60V`
 - `Power Dashboard: Voltage returned to high - 12.15V`
 
+### Web Interface Features
+
+**Time Range Selection:**
+- **Live**: Real-time monitoring with 1-second polling (data not saved to files)
+- **Hour**: Last hour of historical data
+- **Day**: Last 24 hours of historical data (default)
+- **Week**: Last 7 days of historical data
+- **Month**: Last 30 days of historical data
+
+**Note**: The background monitoring thread continues collecting and saving data at the configured interval regardless of which time range is selected in the web interface. This ensures all historical data is available when switching between time ranges.
+
 ### Data Retention
 
 - **In-Memory**: Last 24 hours of data for fast web interface access
@@ -81,4 +132,6 @@ Example alert messages:
   - 5-minute intervals: 8,640 points for 30 days
   - 1-minute intervals: 43,200 points for 30 days
   - 10-minute intervals: 4,320 points for 30 days
+
+**Live Mode**: Live mode data is displayed in real-time but is not saved to files. The regular monitoring thread continues collecting data in the background, so switching back to historical views will show all collected data.
 
