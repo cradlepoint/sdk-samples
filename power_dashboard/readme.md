@@ -8,8 +8,9 @@ A comprehensive real-time power usage monitoring application for Cradlepoint rou
 <img width="1334" height="849" alt="image" src="https://github.com/user-attachments/assets/1963d7be-d660-4078-9b22-6e0339f9cbd5" />
 
 ## Known Supported Devices:
-**Total (W), Voltage (V), Current (A)**: R980, S400  
-**Total (W) ONLY**: R920, R1900, S700, IBR1700, IBR600C, E-series  
+**Total (W), Voltage (V), Current (A)**: R980, S400
+**Total (W), Voltage (V)**: R920, R1900
+**Total (W) ONLY**: S700, IBR1700, IBR600C, E-series  
 **NOT SUPPORTED**: IBR900
 
 ## Features
@@ -79,24 +80,20 @@ For unknown models, the application will attempt to use default paths and log wa
 Use these appdata keys to configure voltage indicator message (🟢 12.17V | 0.44A | 5.34W):
 
 - `power_dashboard_lights`: If present (even empty), enables writing a voltage indicator message
-- `power_dashboard_lights_interval`: Seconds between indicator writes. Default: 300
 - `power_dashboard_lights_path`: Config path to write the message. Default: `config/system/asset_id`
 - `power_dashboard_high`: High voltage threshold (V). Default: 12.1
 - `power_dashboard_med`: Medium voltage threshold (V). Default: 11.5 (below is low)
+
+**Note**: Lights and signal updates use the same interval as power monitoring (`power_dashboard_interval`). They update once at startup, then follow the configured interval.
 
 Indicator in message: High `🟢`, Medium `🟡`, Low `🔴`, No data (None/0V) `⚫`.
 
 **Signal Statistics in Asset ID:**
 
-Use these appdata keys to configure modem signal statistics display:
-
-- `power_dashboard_signal`: If present (even empty), enables signal statistics
-  - If `power_dashboard_lights` is also enabled: Signal stats are appended to the power message
-  - If `power_dashboard_lights` is not enabled: Signal stats are displayed as a standalone message
-- `power_dashboard_signal_interval`: Seconds between signal updates. Default: 300
-- `power_dashboard_signal_path`: Config path to write the message. Default: `config/system/asset_id`
-
-Signal stats format: `DBM: -85dBm | SINR: 15dB | RSRP: -95dBm | RSRQ: -10dB`
+- `power_dashboard_signal`: If present (even empty), appends modem signal statistics to the power indicator message
+  - Only works when `power_dashboard_lights` is also enabled
+  - Uses the same interval as power monitoring (`power_dashboard_interval`)
+  - Signal stats format: `DBM: -85dBm | SINR: 15dB | RSRP: -95dBm | RSRQ: -10dB`
 
 Example combined message (lights + signal): `🟢 12.17V | 0.44A | 5.34W | DBM: -85dBm | SINR: 15dB | RSRP: -95dBm | RSRQ: -10dB`
 
