@@ -153,7 +153,9 @@
 	- Live WAN interface utilization graphs in a web page.  Includes cumulative graph.
 - **wan_rate**
 	- Tracks WAN bandwidth rates over time and stores rolling averages in a configurable field.
-
+- **wan_ip_change_alert**
+	- Tracks the WAN IP address and sends an alert when it changes. Includes a confirmation delay to prevent false alerts from temporary IP changes.
+   
 ----------
 
 ## `cp.py` Usage Example
