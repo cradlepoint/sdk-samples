@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Power Dashboard for Cradlepoint Router
-Comprehensive power usage tracking with web interface on port 8000
+Comprehensive power usage tracking with web interface.
 """
 
 import cp
@@ -57,11 +57,6 @@ max_voltage_timestamp = None
 
 # Global variables for lights functionality
 last_lights_update = None
-lights_interval = None
-
-# Global variables for signal functionality
-last_signal_update = None
-signal_interval = None
 
 # Global variable for tracking voltage threshold state for alerts
 previous_threshold_state = None
@@ -98,42 +93,6 @@ def is_signal_enabled():
     except Exception as e:
         cp.log(f"Error checking power_dashboard_signal: {e}")
         return False
-
-def get_lights_interval():
-    """Get lights update interval from appdata with default"""
-    try:
-        # Default 5 minutes (300 seconds)
-        default_interval = 300
-        
-        try:
-            interval_appdata = cp.get_appdata('power_dashboard_lights_interval')
-            if interval_appdata:
-                return int(interval_appdata)
-        except Exception as e:
-            cp.log(f"Error getting power_dashboard_lights_interval from appdata: {e}")
-        
-        return default_interval
-    except Exception as e:
-        cp.log(f"Error getting lights interval: {e}")
-        return 300  # Return default on error
-
-def get_signal_interval():
-    """Get signal update interval from appdata with default"""
-    try:
-        # Default 5 minutes (300 seconds)
-        default_interval = 300
-        
-        try:
-            interval_appdata = cp.get_appdata('power_dashboard_signal_interval')
-            if interval_appdata:
-                return int(interval_appdata)
-        except Exception as e:
-            cp.log(f"Error getting power_dashboard_signal_interval from appdata: {e}")
-        
-        return default_interval
-    except Exception as e:
-        cp.log(f"Error getting signal interval: {e}")
-        return 300  # Return default on error
 
 def get_web_server_port():
     """Get web server port from appdata with default"""
@@ -596,8 +555,8 @@ def power_monitor():
     global min_current, max_current, min_current_timestamp, max_current_timestamp
     global min_total, max_total, min_total_timestamp, max_total_timestamp
     global min_voltage, max_voltage, min_voltage_timestamp, max_voltage_timestamp
-    global power_data, last_lights_update, lights_interval, shutdown_requested
-    global previous_threshold_state, last_signal_update, signal_interval
+    global power_data, last_lights_update, shutdown_requested
+    global previous_threshold_state
     
     # Ensure data directory exists
     ensure_data_directory()
@@ -653,19 +612,24 @@ def power_monitor():
     cp.log(f"Data retention updated: MAX_DATA_POINTS={MAX_DATA_POINTS}, IN_MEMORY_POINTS={IN_MEMORY_POINTS}")
     
     # Initialize lights functionality
-    lights_interval = get_lights_interval()
     last_lights_update = None
-    if is_lights_enabled():
-        lights_path = cp.get_appdata('power_dashboard_lights_path') or 'config/system/asset_id'
+    lights_enabled = is_lights_enabled()
+    signal_enabled = is_signal_enabled()
     
-    # Initialize signal functionality
-    signal_interval = get_signal_interval()
-    last_signal_update = None
-    if is_signal_enabled():
-        signal_path = cp.get_appdata('power_dashboard_signal_path') or 'config/system/asset_id'
+    if lights_enabled:
+        lights_path = cp.get_appdata('power_dashboard_lights_path') or 'config/system/asset_id'
+        cp.log(f"Lights enabled: using power_dashboard_interval={interval}s, path={lights_path}")
+    else:
+        cp.log("Lights disabled")
+    
+    if signal_enabled:
+        cp.log("Signal stats enabled (will append to lights message)")
+    else:
+        cp.log("Signal stats disabled")
     
     # Track if this is the first iteration (startup)
     is_first_iteration = True
+    lights_updated_at_startup = False
         
     while not shutdown_requested:
         try:
@@ -727,15 +691,25 @@ def power_monitor():
                 # Check if lights are enabled and it's time to update
                 current_time = time.time()
                 
-                if is_lights_enabled():
-                    if last_lights_update is None or (current_time - last_lights_update) >= lights_interval:
+                if lights_enabled or signal_enabled:
+                    # Update once at startup, then follow the interval
+                    should_update = False
+                    if not lights_updated_at_startup:
+                        # First update at startup
+                        should_update = True
+                        lights_updated_at_startup = True
+                    elif last_lights_update is None or (current_time - last_lights_update) >= interval:
+                        # Subsequent updates follow the interval
+                        should_update = True
+                    
+                    if should_update:
                         # Get voltage thresholds and create asset ID message
                         high_threshold, med_threshold = get_voltage_thresholds()
                         voltage_indicator = get_voltage_indicator(power_info['voltage'], high_threshold, med_threshold)
                         asset_id_msg = create_asset_id_message(power_info, voltage_indicator)
                         
                         # Append signal stats if signal is enabled
-                        if is_signal_enabled():
+                        if signal_enabled:
                             signal_stats = get_signal_stats()
                             if signal_stats:
                                 signal_str = format_signal_stats(signal_stats)
@@ -745,17 +719,6 @@ def power_monitor():
                         lights_path = cp.get_appdata('power_dashboard_lights_path') or 'config/system/asset_id'
                         cp.put(lights_path, asset_id_msg)
                         last_lights_update = current_time
-                
-                # Check if signal is enabled (but lights are not) and it's time to update
-                elif is_signal_enabled():
-                    if last_signal_update is None or (current_time - last_signal_update) >= signal_interval:
-                        signal_stats = get_signal_stats()
-                        if signal_stats:
-                            signal_msg = format_signal_stats(signal_stats)
-                            if signal_msg:
-                                signal_path = cp.get_appdata('power_dashboard_signal_path') or 'config/system/asset_id'
-                                cp.put(signal_path, signal_msg)
-                                last_signal_update = current_time
 
                 with data_lock:
                     # Store power data immediately
