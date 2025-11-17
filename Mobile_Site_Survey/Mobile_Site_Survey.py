@@ -33,7 +33,7 @@ class TestHandler(tornado.web.RequestHandler):
             time.sleep(1)
             # Set timestamp immediately for manual tests so indicator shows
             if dispatcher:
-                dispatcher.timestamp = datetime.datetime.utcnow().timestamp()
+                dispatcher.timestamp = time.time()  # time.time() always returns UTC timestamp
 
         if dispatcher:
             dispatcher.manual = True
@@ -75,8 +75,15 @@ class ConfigHandler(tornado.web.RequestHandler):
             # Add survey running status
             if dispatcher:
                 config["survey_running"] = dispatcher.timestamp is not None
+                # Calculate total data used across all modems
+                total_data_mb = 0.0
+                if dispatcher.total_bytes:
+                    total_bytes_sum = sum(dispatcher.total_bytes.values())
+                    total_data_mb = round(total_bytes_sum / 1000 / 1000, 2)
+                config["total_data_used_mb"] = total_data_mb
             else:
                 config["survey_running"] = False
+                config["total_data_used_mb"] = 0.0
                 
             self.write(json.dumps(config))
             return
@@ -264,7 +271,7 @@ class Dispatcher:
         cp.log('---> Starting Survey <---')
         self._initialize_modems()
         if self.timestamp is None:  # If not triggered remotely
-            self.timestamp = datetime.datetime.utcnow().timestamp()
+            self.timestamp = time.time()  # time.time() always returns UTC timestamp
             self._start_surveyors()
         self._run_tests_on_modems()
         cp.log('---> Survey Complete <---')
@@ -287,10 +294,8 @@ class Dispatcher:
             routing_tables = cp.get('config/routing/tables')
             with concurrent.futures.ThreadPoolExecutor(len(self.modems)) as executor:
                 executor.map(run_tests, self.modems)
-            # Convert UTC timestamp to local time for display
-            utc_time = datetime.datetime.utcfromtimestamp(self.timestamp)
-            local_time = utc_time.replace(tzinfo=datetime.timezone.utc).astimezone()
-            pretty_timestamp = local_time.strftime('%H:%M:%S  %m/%d/%Y')
+            # Format UTC timestamp for display
+            pretty_timestamp = time.strftime('%H:%M:%S  %m/%d/%Y', time.gmtime(self.timestamp))
             pretty_lat = '{:.6f}'.format(float(self.lat)) if self.lat is not None else '0.000000'
             pretty_lon = '{:.6f}'.format(float(self.long)) if self.long is not None else '0.000000'
             # Title will be added with the detailed results in run_tests function
@@ -469,10 +474,10 @@ def debug_log(msg):
 
 def log_all(msg, logs):
     """Write consistent messages across all logs"""
-    logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
     cp.log(msg)
     logs.append(f'{logstamp} {msg}')
-    dispatcher.results = f'{msg}\n\n' + dispatcher.results
+    dispatcher.results = f'{msg}\n\n' + dispatcher.results[:32000]
 
 
 def ping(host, iface):
@@ -707,12 +712,7 @@ def run_tests(modem):
         product = modem
         cur_plmn = None
 
-    # Latency test:
-    pong = ping('8.8.8.8', iface)
-    if pong.get('loss') == 100.0:
-        latency = 'FAIL'
-    else:
-        latency = round(pong.get('avg'))
+    latency = None
 
     # Calculate packet loss
     try:
@@ -755,17 +755,17 @@ def run_tests(modem):
                     retries += 1
                     cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
 
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
             cp.log(f'Starting Download Test on {product} {carrier}.')
             ookla.download()  # Ookla Download Test
             if wan_type == 'mdm':  # Capture CA Bands for modems
                 diagnostics = cp.get(f'status/wan/devices/{modem}/diagnostics')
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
             cp.log(f'Starting Upload Test on {product} {carrier}.')
             ookla.upload(pre_allocate=False)  # Ookla upload test
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
             cp.log(f'Speedtest Complete on {product} {carrier}.')
 
@@ -789,8 +789,9 @@ def run_tests(modem):
             log_all(msg, logs)
 
     # SEND TO SERVER:
-    pretty_timestamp = datetime.datetime.utcfromtimestamp(dispatcher.timestamp).strftime('%Y-%m-%d %H:%M:%S')
-    post_success = ''
+    # Use time.gmtime() to ensure UTC time regardless of system timezone
+    pretty_timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(dispatcher.timestamp))
+    post_success = '✓ Done'
     if dispatcher.config.get("send_to_server"):
         try:
             post_success = '⇪ 5g-ready:❌   '
@@ -924,15 +925,13 @@ def run_tests(modem):
                          serdis, rfband, rfband_5g, scell0, scell1, scell2, scell3]
         debug_log(f'ROW: {row}')
         text = ','.join(str(x) for x in row) + '\n'
-        logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
         logs.append(f'{logstamp} Results: {text}')
         cp.log(f'Results: {text}')
         # cp.put('config/system/desc', text[:1000])
         # Get timestamp and coordinates for the title
         if dispatcher:
-            utc_time = datetime.datetime.utcfromtimestamp(dispatcher.timestamp)
-            local_time = utc_time.replace(tzinfo=datetime.timezone.utc).astimezone()
-            pretty_timestamp = local_time.strftime('%H:%M:%S  %m/%d/%Y')
+            pretty_timestamp = time.strftime('%H:%M:%S  %m/%d/%Y', time.gmtime(dispatcher.timestamp))
             pretty_lat = '{:.6f}'.format(float(dispatcher.lat)) if dispatcher.lat is not None else '0.000000'
             pretty_lon = '{:.6f}'.format(float(dispatcher.long)) if dispatcher.long is not None else '0.000000'
             
@@ -944,7 +943,7 @@ def run_tests(modem):
         pretty_results = title + f' ┣┅┅┅  ☏{carrier} {cur_plmn}  ⇄ {packet_loss_percent}% loss ({tx - rx} of {tx})\n' \
                          f' ┣┅┅┅  ↓{download}Mbps  ↑{upload}Mbps  ⏱{latency}ms\n' \
                          f' ┣┅┅┅  ⛁ {server}\n' \
-                         f' ┗┅┅┅  {post_success}⛗{total_mb_used}MB total used.'
+                         f' ┗┅┅┅  {post_success}'
         log_all(pretty_results, logs)
     except Exception as e:
         msg = f'Exception formatting results: {e}'
@@ -965,7 +964,7 @@ def run_tests(modem):
         # CREATE CSV IF IT DOESN'T EXIST:
         debug_log(' '.join(os.listdir(results_dir)))
         if not os.path.isfile(f'{results_dir}/{filename}'):
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} {filename} not found.')
             cp.log(f'{filename} not found.')
             with open(f'{results_dir}/{filename}', 'wt') as f:
@@ -980,7 +979,7 @@ def run_tests(modem):
                                            'RF Band 5G', 'SCELL0', 'SCELL1', 'SCELL2', 'SCELL3']
                 line = ','.join(header) + '\n'
                 f.write(line)
-            logstamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Created new {filename} file.')
             cp.log(f'Created new {filename} file.')
 
