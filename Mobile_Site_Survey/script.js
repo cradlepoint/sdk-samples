@@ -147,6 +147,7 @@ class MobileSiteSurvey {
             const config = await response.json();
             this.populateForm(config);
             this.updateResults(config.results);
+            this.updateTotalDataUsed(config.total_data_used_mb);
             this.showToast('Configuration loaded successfully', 'success');
         } catch (error) {
             console.error('Error loading config:', error);
@@ -204,6 +205,17 @@ class MobileSiteSurvey {
 
         document.getElementById('test-count').textContent = this.testCount;
         document.getElementById('last-test').textContent = this.lastTestTime || 'Never';
+    }
+
+    updateTotalDataUsed(totalDataMb) {
+        const element = document.getElementById('total-data-used');
+        if (element) {
+            if (totalDataMb !== undefined && totalDataMb !== null) {
+                element.textContent = `${totalDataMb.toFixed(2)} MB`;
+            } else {
+                element.textContent = '0.00 MB';
+            }
+        }
     }
 
     async runSurvey() {
@@ -350,6 +362,7 @@ class MobileSiteSurvey {
             this.updateResults(config.results);
             this.updateStatusIndicators();
             this.updateSurveyStatus(config);
+            this.updateTotalDataUsed(config.total_data_used_mb);
         } catch (error) {
             console.error('Polling error:', error);
             // Don't show error toasts for polling failures to avoid spam
