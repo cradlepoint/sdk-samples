@@ -69,6 +69,8 @@
     - Set GPIO out high when any wan (not just modems) is connected.
 - **gpio_sample**
     - Demonstrates GPIO (General Purpose Input/Output) functionality.
+- **gpio_wlan_control**
+    - Monitors the GPIO connector input and sets `control/wlan/enabled` to match the GPIO value.
 - **hello_world**
     - Outputs a 'Hello World!' log every 10 seconds.
 - **hspt**
