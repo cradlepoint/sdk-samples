@@ -4642,7 +4642,7 @@ def _cs_sock_connection() -> bool:
     except:
         return False
 
-_enable_logging = '/var/mnt/sdk/' in os.getcwd()
+_enable_logging = '/mnt/sdk/' in os.getcwd()
 _is_ncos = _cs_sock_connection()
 
 # Create a single EventingCSClient instance with name from package.ini
