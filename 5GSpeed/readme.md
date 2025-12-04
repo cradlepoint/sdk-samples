@@ -2,7 +2,7 @@ Application Name
 ================
 5GSpeed  
 
-[Download built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.tar.gz)
+[Download the built app from our releases page!](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)
 
 
 Application Purpose
