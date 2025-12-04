@@ -1,11 +1,8 @@
-Installer_UI
-============
+# Installer_UI
 
-**Provide a simple web interface for installers to configure WiFi and run speedtests.**  
+Installer_UI provides a simple web interface for installers to configure WiFi settings and run speedtests on the router.
 
-The application runs a tornado webserver on port 8000.  
-The application adds a zone firewall forwarding from the Primary LAN Zone to the Router Zone to allow access to the UI.  
-Installers can either connect to WiFi or connect to the LAN port and browse to http://192.168.0.1:8000  
+[Download the built app from our releases page!](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)
 
 ![image](https://github.com/user-attachments/assets/a0af6ae2-a9dd-46de-a294-10c8468cec8d)
 
@@ -13,11 +10,25 @@ Installers can either connect to WiFi or connect to the LAN port and browse to h
 
 ![image](https://github.com/user-attachments/assets/2a74cdae-491c-42d6-9502-7436e3058d97)
 
-* The UI displays the current WiFi SSID.  
-* The UI allows a user to configure the WiFi SSID and password.  User must enter the "Installer Password" to make changes.  
-* The "Signal Monitor" button takes you to the Cellular Signal Monitor page.  
-* The "Run Speedtest" button runs an Ookla speedtest.  
-* The "Installer Password" defaults to the serial number of the device and is stored in System > SDK Data where it can be
-changed by admin users.  
+## Access
 
-Customizable index.html  
+The web interface is available on port 8000. Access it by:
+- Connecting to WiFi or LAN port and browsing to `http://192.168.0.1:8000` or `cp:8000/`
+- The application automatically configures firewall forwarding from Primary LAN Zone to Router Zone
+
+## Features
+
+- **WiFi Configuration**: View current SSID and configure WiFi SSID and password
+- **Speedtest**: Run Ookla speedtests to measure download/upload speeds
+- **Signal Monitor**: View signal quality metrics (RSSI, SINR, RSRP, RSRQ)
+- **QR Code**: Generate QR codes for WiFi network credentials
+
+## SDK Appdata Configuration
+
+Configure these settings in System > SDK Data:
+
+- **installer_password** - Password required to make changes. Defaults to device serial number if not set.
+
+## Usage
+
+All configuration changes require entering the installer password. The password defaults to the device serial number and can be changed in System > SDK Data.
