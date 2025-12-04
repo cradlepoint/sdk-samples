@@ -2,7 +2,7 @@
 
 Professional cellular network drive testing application with modern web interface and high-performance speed testing.  
 
-[Get the built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.0.0.tar.gz)
+[Download the built app from our releases page!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps)
 
 Light Side:
 <img width="1409" height="852" alt="image" src="https://github.com/user-attachments/assets/712a198b-4930-49f9-9e6a-0c6acb1ae96b" />
