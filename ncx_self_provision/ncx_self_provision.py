@@ -5,7 +5,7 @@ import time
 
 # Validate router firmware 
 def validate_readiness():
-    device_name = cp.get_device_name()
+    device_name = cp.get_name()
     
     # Get static configuration data once
     staging_group_id = cp.get_appdata('staging_group_id')
