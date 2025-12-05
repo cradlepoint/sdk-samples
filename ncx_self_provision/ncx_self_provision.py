@@ -5,7 +5,7 @@ import time
 
 # Validate router firmware 
 def validate_readiness():
-    device_name = cp.get_device_name()
+    device_name = cp.get_name()
     
     # Get static configuration data once
     staging_group_id = cp.get_appdata('staging_group_id')
@@ -27,7 +27,7 @@ def validate_readiness():
 
     def get_device_firmware_id(product_id):
         """Helper function to get device firmware ID"""
-        device_firmware = cp.get_device_firmware().split('-')[0]
+        device_firmware = cp.get_firmware_version().split('-')[0]
         
         return n2.get_firmware_for_product_id_by_version(product_id=product_id, firmware_name=device_firmware)['id']
 
