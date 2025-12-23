@@ -31,5 +31,7 @@ if __name__ == "__main__":
     elif command == "tshostname":
         hostname = cs.get_appdata('tshostname')
         if not hostname:
-            hostname = cs.get("/config/system/system_id").replace(" ", "-").replace("_", "-")
+            bad = set(r" _\/:*!?|,")
+            hostname = cs.get("/config/system/system_id")
+            hostname = "".join(c if c not in bad else "-" for c in hostname)
         print(hostname)
