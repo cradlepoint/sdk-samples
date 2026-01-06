@@ -68,8 +68,8 @@ def rotate_files():
     logfiles = [f for f in os.listdir('logs') if isfile(join('logs', f))]
     logfiles = sorted(logfiles, reverse=True, key=lambda item: (int(item.partition(' ')[0])
                                                   if item[0].isdigit() else float('inf'), item))
-    if len(logfiles) == backup_count:
-        os.remove(f'logs/{logfiles[-1]}')
+    while len(logfiles) >= backup_count:
+        os.remove(f'logs/{logfiles.pop()}')
 
 cp.log(f'Download logs via NCM LAN Manager - HTTP 127.0.0.1 port 8000')
 mac = cp.get('status/product_info/mac0').replace(':', '').upper()
