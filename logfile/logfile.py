@@ -65,8 +65,7 @@ def write_logs():
 
 def rotate_files():
     logfiles = [f for f in os.listdir('logs') if os.path.isfile(os.path.join('logs', f))]
-    logfiles = sorted(logfiles, reverse=True, key=lambda item: (int(item.partition(' ')[0])
-                                                  if item[0].isdigit() else float('inf'), item))
+    logfiles = sorted(logfiles, key=lambda f: os.path.getmtime(os.path.join('logs', f)), reverse=True)
     while len(logfiles) >= backup_count:
         os.remove(f'logs/{logfiles.pop()}')
 
