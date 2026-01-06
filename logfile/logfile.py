@@ -20,7 +20,6 @@ from subprocess import Popen, PIPE
 import datetime
 import time
 import os
-from os.path import isfile, join
 
 max_file_size = 104857600
 backup_count = 10
@@ -65,7 +64,7 @@ def write_logs():
         cp.log(f'Exception! {e}')
 
 def rotate_files():
-    logfiles = [f for f in os.listdir('logs') if isfile(join('logs', f))]
+    logfiles = [f for f in os.listdir('logs') if os.path.isfile(os.path.join('logs', f))]
     logfiles = sorted(logfiles, reverse=True, key=lambda item: (int(item.partition(' ')[0])
                                                   if item[0].isdigit() else float('inf'), item))
     while len(logfiles) >= backup_count:
