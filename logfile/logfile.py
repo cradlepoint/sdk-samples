@@ -75,5 +75,5 @@ cp.log(f'Download logs via NCM LAN Manager - HTTP 127.0.0.1 port 8000')
 mac = cp.get('status/product_info/mac0').replace(':', '').upper()
 
 while True:
-    write_logs()
     rotate_files()
+    write_logs()
