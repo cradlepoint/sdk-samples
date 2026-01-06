@@ -1,4 +1,4 @@
-# Ericsson Cradlepoint NCOS SDK and Sample Applications.
+# Ericsson Cradlepoint NCOS SDK and Sample Applications
 
 ## Documentation
 
@@ -9,6 +9,28 @@
 
 - **Pre-built Ready-to-Use Sample Applications can be downloaded here:**
     - **https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps**
+
+## Building Apps
+
+To build an SDK application package, use the `make.py` tool with `uv`:
+
+```bash
+# Build a specific app (e.g., logfile)
+uv run make.py build logfile
+
+# Build any app by name
+uv run make.py build <app_directory_name>
+```
+
+Built packages will be created in the `built_apps/` directory as `.tar.gz` files ready for deployment to NCOS devices.
+
+Other available `make.py` actions:
+- `create` - Create a new application from template
+- `install` - Install app to connected device in DEV mode
+- `uninstall` - Uninstall app from connected device
+- `start` / `stop` - Start or stop app on connected device
+- `purge` - Remove app and all data from connected device
+- `update` - Update files from GitHub repository
 
 ## Files
 

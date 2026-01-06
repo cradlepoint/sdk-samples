@@ -1,0 +1,10 @@
+[project]
+name = "sdk-samples"
+version = "0.1.0"
+description = "Ericsson Cradlepoint NCOS SDK and Sample Applications"
+requires-python = ">=3.8"
+dependencies = [
+    "requests",
+    "pyopenssl",
+    "urllib3",
+]
