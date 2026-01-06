@@ -22,7 +22,7 @@ uv run make.py build logfile
 uv run make.py build <app_directory_name>
 ```
 
-Built packages will be created in the `built_apps/` directory as `.tar.gz` files ready for deployment to NCOS devices.
+Built packages will be created in the root directory as `.tar.gz` files ready for deployment to NCOS devices.
 
 Other available `make.py` actions:
 - `create` - Create a new application from template
