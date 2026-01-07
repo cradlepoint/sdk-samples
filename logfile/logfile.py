@@ -20,7 +20,6 @@ from subprocess import Popen, PIPE
 import datetime
 import time
 import os
-from os.path import isfile, join
 
 max_file_size = 104857600
 backup_count = 10
@@ -65,15 +64,14 @@ def write_logs():
         cp.log(f'Exception! {e}')
 
 def rotate_files():
-    logfiles = [f for f in os.listdir('logs') if isfile(join('logs', f))]
-    logfiles = sorted(logfiles, reverse=True, key=lambda item: (int(item.partition(' ')[0])
-                                                  if item[0].isdigit() else float('inf'), item))
-    if len(logfiles) == backup_count:
-        os.remove(f'logs/{logfiles[-1]}')
+    logfiles = [f for f in os.listdir('logs') if os.path.isfile(os.path.join('logs', f))]
+    logfiles = sorted(logfiles, key=lambda f: os.path.getmtime(os.path.join('logs', f)), reverse=True)
+    while len(logfiles) >= backup_count:
+        os.remove(f'logs/{logfiles.pop()}')
 
 cp.log(f'Download logs via NCM LAN Manager - HTTP 127.0.0.1 port 8000')
 mac = cp.get('status/product_info/mac0').replace(':', '').upper()
 
 while True:
-    write_logs()
     rotate_files()
+    write_logs()
