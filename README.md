@@ -3,7 +3,7 @@
 ## Documentation
 
 - **NCOS SDK Developers Guide**
-    - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers-Guide**
+    - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide**
 
 ## Built Apps
 
