@@ -1,14 +1,76 @@
 # Ericsson Cradlepoint NCOS SDK and Sample Applications.
 
+## Built Apps
+
+- **Pre-built Ready-to-Use Sample Applications can be downloaded here:**
+    - **https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps**
+
 ## Documentation
 
 - **NCOS SDK Developers Guide**
     - **https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide**
 
-## Built Apps
+### Quick Start - make.py
 
-- **Pre-built Ready-to-Use Sample Applications can be downloaded here:**
-    - **https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps**
+**Usage:**
+
+```bash
+python make.py <action> [app_name]
+```
+
+**Actions:**
+
+- **create**
+  - Create a new application from the `app_template` directory.
+  - Provide a desired application name: `python3 make.py create my_new_app`.
+  - If no name is provided, a name will be generated automatically based on the requested functionality.
+
+- **build**
+  - Produce a distributable application archive (`.tar.gz`).
+
+- **install**
+  - Securely copy the built application archive to a locally connected NCOS device.
+  - The target device must be in SDK DEV mode (registered and licensed via NCM) and reachable via SSH.
+
+- **status**
+  - Retrieve and print the current status of the app on a locally connected NCOS device.
+
+- **uninstall**
+  - Remove the application from the locally connected NCOS device.
+
+- **purge**
+  - Remove all installed applications from the locally connected NCOS device.
+
+- **update**
+  - Update core SDK helper files from the upstream GitHub repository.
+  - Files updated include: `cp.py`, `cp_methods_reference.md`, `make.py`, and `app_template/cp.py`.
+
+
+**Examples:**
+
+- Create a new app with an explicit name:
+```bash
+    python3 make.py create my_new_app
+```
+- Build the archive for a single app:
+```bash
+    python3 make.py build my_new_app
+```
+- Build archives for every app in the repository:
+```bash
+    python3 make.py build all
+```
+- Clean artifacts for all apps:
+```bash
+    python3 make.py clean all
+```
+**Prerequisites and Notes:**
+
+- Python 3 is required.
+- SSH access (scp/ssh) to the target NCOS device is required for `install`, `start`, `stop`, `uninstall`, `purge`, and `status` commands.
+- The NCOS device must be placed into SDK DEV mode via registration and licensing with NCM before deployment operations will succeed.
+- Any directory containing a `package.ini` file is treated as an application for `build`, `clean`, and related actions.
+- Use `python3 make.py help` to print this help information from the tool itself.
 
 ## Files
 
