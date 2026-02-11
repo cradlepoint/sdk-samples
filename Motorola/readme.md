@@ -12,6 +12,8 @@ Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP 
 
 Open **http://&lt;router-ip&gt;:&lt;port&gt;/** in a browser. Default port is 8000. Use the **Motorola_port** appdata field to override.
 
+<img width="815" height="692" alt="image" src="https://github.com/user-attachments/assets/4e374d86-4119-4d21-b4f0-66a98e11c902" />
+
 ## Appdata (Configuration)
 
 Set these in the router UI under **System > SDK Data** (or in NCM under the device's SDK app configuration):
