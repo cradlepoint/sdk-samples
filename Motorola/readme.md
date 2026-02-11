@@ -31,15 +31,3 @@ Beacon settings (interval, UDP port, networks) are configured through the web UI
 | Interval | 5 seconds |
 | UDP Port | 21010 |
 | Networks | First LAN enabled |
-
-## External Requirements
-
-Motorola Radio (or compatible) to receive the UDP beacons.
-
-## Troubleshooting
-
-| Issue | What to check |
-|-------|----------------|
-| No broadcasts received | Verify LAN networks are enabled in the web UI; check firewall allows UDP on the beacon port |
-| Web UI not loading | Confirm **Motorola_port** is not blocked; default is 8000 |
-| Config not saving | Ensure router has SDK appdata write access |
