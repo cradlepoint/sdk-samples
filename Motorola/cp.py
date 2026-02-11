@@ -4642,7 +4642,7 @@ def _cs_sock_connection() -> bool:
     except:
         return False
 
-_enable_logging = '/var/mnt/sdk/' in os.getcwd()
+_enable_logging = '/mnt/sdk/' in os.getcwd()
 _is_ncos = _cs_sock_connection()
 
 # Create a single EventingCSClient instance with name from package.ini
@@ -4767,7 +4767,7 @@ def get_appdata(name: str = '') -> Union[Optional[str], Optional[List[Dict[str, 
         appdata = _cs_client.get('config/system/sdk/appdata')
         if not name:
             return appdata
-        return next((x["value"] for x in appdata if x["name"] == name), None)
+        return next((x["value"] for x in appdata if x["name"].lower() == name.lower()), None)
     except Exception as e:
         log("Error getting appdata for {name}: {e}")
         return None
