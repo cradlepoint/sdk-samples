@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motorola SmartConnect</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <h1 id="app-title">Motorola SmartConnect</h1>
+            </div>
+        </header>
+        <main class="content-area">
+            <div class="content-panel">
+                <div class="control-panel">
+                    <div class="panel-header">
+                        <h2>Configuration</h2>
+                        <button type="button" id="dark-mode-toggle" class="dark-mode-btn" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
+                    </div>
+                    <div class="panel-content">
+                        <form id="mainForm" action="/submit">
+                            <div class="form-field">
+                                <label for="interval">Broadcast Interval (seconds)</label>
+                                <input type="number" name="interval" id="interval" class="form-input" min="1">
+                            </div>
+                            <div class="form-field">
+                                <label for="udp_port">UDP Port</label>
+                                <input type="number" name="udp_port" id="udp_port" class="form-input" min="1" max="65535">
+                            </div>
+                            <div class="form-field networks-group">
+                                <label>Enable broadcasts on networks:</label>
+                                <div id="networks"></div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
