@@ -95,6 +95,8 @@ python make.py <action> [app_name]
     - Provide a web interface for installers to configure WiFi and run speedtests.
 - **Mobile_Site_Survey**
     - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
+- **Motorola**
+    - Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs.
 - **app_template**
     - A template for the creation of a new application utilizing the csclient library.
 - **app_holder**
