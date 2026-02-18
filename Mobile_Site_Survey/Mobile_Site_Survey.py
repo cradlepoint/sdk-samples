@@ -302,6 +302,7 @@ class Dispatcher:
 
             cp.put('config/routing/policies', routing_policies)
             cp.put('config/routing/tables', routing_tables)
+            cleanup_mss_routing()
 
 class Surveyor:
     """Sends HTTP Requests to remote router"""
@@ -521,61 +522,131 @@ def ping(host, iface):
         cp.log(f'Exception in PING: {e}')
 
 
+def _normalize_to_list(obj):
+    """Normalize API response to list for iteration. Handles dict (id-keyed) or list."""
+    if obj is None:
+        return []
+    if isinstance(obj, list):
+        return obj
+    if isinstance(obj, dict):
+        return list(obj.values()) if obj else []
+    return []
+
+
+def cleanup_mss_routing():
+    """Remove all MSS-related route tables and policies from previous runs.
+    Must delete policies that reference MSS tables first, then delete the tables."""
+    try:
+        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
+        route_policies = _normalize_to_list(cp.get('config/routing/policies'))
+
+        # Find MSS route table IDs by name (e.g. MSS-mdm-75613315)
+        mss_table_ids = set()
+        for table in route_tables:
+            if not isinstance(table, dict):
+                continue
+            name = table.get("name")
+            if name and "MSS" in name:
+                table_id = table.get("_id_")
+                if table_id is not None:
+                    mss_table_ids.add(table_id)
+
+        # Delete policies that reference MSS tables first (required before deleting tables)
+        for policy in route_policies:
+            if not isinstance(policy, dict):
+                continue
+            if policy.get("table") not in mss_table_ids:
+                continue
+            policy_id = policy.get("_id_")
+            if policy_id is not None:
+                try:
+                    cp.delete(f'config/routing/policies/{policy_id}')
+                    time.sleep(0.1)
+                except Exception as e:
+                    cp.log(f'Failed to delete MSS policy {policy_id}: {e}')
+
+        # Re-get tables after policy deletion
+        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
+
+        # Delete MSS route tables
+        for table in route_tables:
+            if not isinstance(table, dict):
+                continue
+            name = table.get("name")
+            if name and "MSS" in name:
+                table_id = table.get("_id_")
+                if table_id is not None:
+                    try:
+                        cp.delete(f'config/routing/tables/{table_id}')
+                        time.sleep(0.1)
+                    except Exception as e:
+                        cp.log(f'Failed to delete MSS table {table_id}: {e}')
+
+        if mss_table_ids:
+            cp.log('Cleaned up MSS route tables and policies from previous run')
+    except Exception as e:
+        cp.log(f'Exception in cleanup_mss_routing(): {e}')
+
+
 def cleanup_duplicate_routing():
     """Clean up duplicate routing policies and tables, keeping only one per unique identifier."""
     try:
-        # Get all policies and tables
-        route_policies = cp.get('config/routing/policies')
-        route_tables = cp.get('config/routing/tables')
-        
+        route_policies = _normalize_to_list(cp.get('config/routing/policies'))
+        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
+
         # Clean up duplicate policies - keep only one per table
-        # This ensures each table has exactly one policy
         seen_tables = set()
         policies_to_delete = []
-        
+
         for policy in route_policies:
+            if not isinstance(policy, dict):
+                continue
             table_id = policy.get("table")
+            policy_id = policy.get("_id_")
+            if policy_id is None:
+                continue
             if table_id and table_id in seen_tables:
-                # Found duplicate table - mark for deletion
-                policies_to_delete.append(policy["_id_"])
+                policies_to_delete.append(policy_id)
             elif table_id:
-                # First time seeing this table - keep it
                 seen_tables.add(table_id)
-        
-        # Delete duplicate policies
+
         for policy_id in policies_to_delete:
             try:
                 cp.delete(f'config/routing/policies/{policy_id}')
                 time.sleep(0.1)
             except Exception as e:
                 cp.log(f'Failed to delete policy {policy_id}: {e}')
-        
+
         # Clean up duplicate tables - keep only one per table name
-        # This ensures each modem device has exactly one table
         seen_names = set()
         tables_to_delete = []
-        
+
         for table in route_tables:
+            if not isinstance(table, dict):
+                continue
             table_name = table.get("name")
+            table_id = table.get("_id_")
+            if table_id is None:
+                continue
             if table_name and table_name in seen_names:
-                tables_to_delete.append(table["_id_"])
+                tables_to_delete.append(table_id)
             elif table_name:
                 seen_names.add(table_name)
-        
-        # Delete duplicate tables
+
         for table_id in tables_to_delete:
             try:
                 cp.delete(f'config/routing/tables/{table_id}')
                 time.sleep(0.1)
             except Exception as e:
                 cp.log(f'Failed to delete table {table_id}: {e}')
-                
+
     except Exception as e:
         cp.log(f'Exception in cleanup_duplicate_routing(): {e}')
 
 def initialize_routing():
-    """Initialize routing by cleaning up duplicates once at startup."""
+    """Initialize routing by cleaning up MSS leftovers and duplicates at startup."""
     try:
+        cleanup_mss_routing()
         cleanup_duplicate_routing()
         cp.log("Routing cleanup completed - ready for device-specific routing")
     except Exception as e:
@@ -602,18 +673,27 @@ def source_route(sim):
         }
 
         # Check if this route table exists by name
-        route_tables = cp.get('config/routing/tables')
+        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
         route_table_id = None
         for table in route_tables:
-            if table.get("name") == f'MSS-{sim}':
-                route_table_id = table["_id_"]
+            if isinstance(table, dict) and table.get("name") == f'MSS-{sim}':
+                route_table_id = table.get("_id_")
                 break
 
         # If not found, create it
         if not route_table_id:
             req = cp.post('config/routing/tables/', route_table)
+            if not req:
+                raise Exception("Failed to create route table - post returned None")
             route_table_index = req.get("data")
-            route_table_id = cp.get(f'config/routing/tables/{route_table_index}/_id_')
+            if route_table_index is None:
+                raise Exception("Failed to create route table - no data in response")
+            table_response = cp.get(f'config/routing/tables/{route_table_index}')
+            if not table_response or not isinstance(table_response, dict):
+                raise Exception("Failed to retrieve created route table")
+            route_table_id = table_response.get("_id_")
+            if route_table_id is None:
+                raise Exception("Created route table does not have _id_ field")
             time.sleep(1)
 
         # Now prepare the desired route policy
@@ -625,12 +705,11 @@ def source_route(sim):
         }
 
         # Check if a policy already exists for this table and update/create as needed
-        # This ensures we update the existing policy for this modem even if IP changed
-        route_policies = cp.get('config/routing/policies')
+        route_policies = _normalize_to_list(cp.get('config/routing/policies'))
         existing_policy_id = None
         for policy in route_policies:
-            if policy.get("table") == route_table_id:
-                existing_policy_id = policy["_id_"]
+            if isinstance(policy, dict) and policy.get("table") == route_table_id:
+                existing_policy_id = policy.get("_id_")
                 break
 
         # If policy exists, update it; if not, create it
