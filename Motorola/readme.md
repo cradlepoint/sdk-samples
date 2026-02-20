@@ -31,3 +31,7 @@ Beacon settings (interval, UDP port, networks) are configured through the web UI
 | Interval | 5 seconds |
 | UDP Port | 21010 |
 | Networks | First LAN enabled |
+
+## More Information
+
+[Motorola SmartConnect Homepage](https://www.motorolasolutions.com/en_us/products/p25-products/apx-mission-critical-applications/smartconnect.html)
