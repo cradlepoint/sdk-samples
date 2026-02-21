@@ -127,11 +127,15 @@ jobs:
   run-make:
     needs: update-cp-py
     runs-on: ${{matrix.os}}
+    permissions:
+      contents: write  # Needed to push README updates
     strategy:
       matrix:
         os: [ubuntu-24.04]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check each app has a readme.txt
         run: |
           chmod +x ./.github/workflows/check_for_readme.sh
@@ -174,3 +178,16 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ./built_apps/README.md
           name: "Built Apps"
+      - name: Update README with release download links
+        if: github.event_name == 'push'
+        run: |
+          python3 .github/workflows/update_readme_links.py
+          if git diff --quiet README.md; then
+            echo "No README changes"
+          else
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add README.md
+            git commit -m "Add release download links to app descriptions in README"
+            git push origin HEAD:${{ github.ref_name }}
+          fi

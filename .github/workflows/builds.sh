@@ -1,4 +1,5 @@
 #!/bin/bash
+mkdir -p built_apps
 declare -a commands=("python3 make.py build" "python3 make.py build all" "cp *.tar.gz built_apps" "python3 make.py clean" "python3 make.py clean all")
 for cmds in "${commands[@]}";
 do
