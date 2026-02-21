@@ -181,8 +181,6 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **serial_temp**
     - This is a test application to serial data from the data logger connected.
     - **Download:** [serial_temp v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/serial_temp.v2.0.0.tar.gz)
-- **serial_vibration_test**
-    - This is a test developed for the Cradlepoint Serial Device (CSD) to be used during vibration testing of the CSD. The application is a simple serial echo server that opens a port on the router. Data is sent to the application and is echoed back to the client over the serial port. A LAN device is connected and communicates with the router via port 5556. When the vibration test is running, the LAN client will be notified if the serial cable is disconnected or connected.
 - **signal_alert**
     - Monitors modem signal metrics on all connected modems and sends NetCloud alerts with GPS when any metric goes below its threshold. Sends one alert when signal crosses below and one when it recovers (after 60 seconds above threshold).
     - **Download:** [signal_alert v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/signal_alert.v0.1.0.tar.gz)
