@@ -18,9 +18,11 @@ def get_built_apps(built_apps_dir: str) -> dict:
     for f in Path(built_apps_dir).glob("*.tar.gz"):
         # Remove .tar.gz
         base = f.name[:-7]
-        # Extract app name: "5GSpeed v1.0.0" -> "5GSpeed", "hello_world" -> "hello_world"
-        if " v" in base:
-            app_base = base.split(" v", 1)[0]
+        # Extract app name: "5GSpeed v1.0.0" or "5GSpeed\xa0v1.0.0" (nb space) -> "5GSpeed"
+        for sep in (" v", "\u00a0v", ".v"):  # space, non-breaking space, or dot (GitHub converts spaces)
+            if sep in base:
+                app_base = base.split(sep, 1)[0]
+                break
         else:
             app_base = base
         key = app_base.lower()

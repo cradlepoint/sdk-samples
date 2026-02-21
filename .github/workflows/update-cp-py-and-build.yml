@@ -151,6 +151,12 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
+      - name: Update README with release download links
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: python3 .github/workflows/update_readme_links.py
+      - name: Generate release body
+        if: github.event_name == 'push'
+        run: python3 .github/workflows/generate_release_body.py
       - name: Tag
         if: github.event_name == 'push'
         uses: actions/github-script@v3
@@ -178,10 +184,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ./built_apps/README.md
           name: "Built Apps"
-      - name: Update README with release download links
+      - name: Commit and push README updates
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          python3 .github/workflows/update_readme_links.py
           if git diff --quiet README.md; then
             echo "No README changes"
           else

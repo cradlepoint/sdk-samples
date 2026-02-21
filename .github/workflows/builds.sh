@@ -16,20 +16,4 @@ do
 	fi
 done
 
-# Format the README file
-regex_pattern="## Sample Application Descriptions"
-file_path="README.md"
-
-cat << EOF > built_apps/README.md
-These files are sample SDK Applications that are ready to use for testing and do not require modification or "building" of the app from source files.  
-
-## How to use these files: ##
-Download the .tar.gz file, then upload to your NetCloud Manager account and assign to groups.
-
-Additional documentation:
-https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps
-
-----------
-EOF
-
-sed -n "/$regex_pattern/,\$p" "$file_path" >> built_apps/README.md
+# Release body (built_apps/README.md) is created by workflow after update_readme_links runs
