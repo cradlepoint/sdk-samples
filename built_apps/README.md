@@ -1,1 +1,0 @@
-You can find the already compiled sample applications under the Github releases tab:  https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps
