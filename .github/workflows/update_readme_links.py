@@ -7,6 +7,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 
 def get_built_apps(built_apps_dir: str) -> dict:
@@ -98,7 +99,7 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
             # After description, add download link if this app was built and doesn't have one
             if app_key in built and not has_download_link:
                 filename = built[app_key]
-                url = f"{release_base_url}/{filename}"
+                url = f"{release_base_url}/{quote(filename)}"
                 # Use same indent as description lines (4 spaces)
                 link_line = f"    - **Download:** [{filename}]({url})"
                 result.append(link_line)
