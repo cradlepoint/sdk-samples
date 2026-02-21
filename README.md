@@ -22,7 +22,7 @@ The NCOS SDK enables developers to build and deploy Python applications that run
 |----------|------|
 | **Pre-built sample apps** | [Releases — built_apps](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps) |
 | **NCOS SDK Developers Guide** | [Documentation](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide) |
-| **NetCloud Manager — SDK apps** | [Tools Tab](https://customer.cradlepoint.com/s/article/NetCloud-Manager-Tools-Tab#sdk_apps) |
+| **NetCloud Manager — SDK apps** | [Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
 
 ---
 
