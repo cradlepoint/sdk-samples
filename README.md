@@ -44,7 +44,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - Provide a web interface for installers to configure WiFi and run speedtests.
     - **Download:** [Installer_UI v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.1.0.tar.gz)
 - **Mobile_Site_Survey**
-    - Robust Site Survey app with cloud aggregating and reporting via 5g-ready.io
+    - Field survey tool that runs speedtests and collects modem diagnostics with GPS locations, uploading results for network coverage and throughput analysis to 5g-ready.io
     - **Download:** [Mobile_Site_Survey v3.0.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.0.2.tar.gz)
 - **Motorola**
     - Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs.
