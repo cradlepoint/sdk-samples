@@ -179,7 +179,7 @@ jobs:
           body_path: ./built_apps/README.md
           name: "Built Apps"
       - name: Update README with release download links
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           python3 .github/workflows/update_readme_links.py
           if git diff --quiet README.md; then

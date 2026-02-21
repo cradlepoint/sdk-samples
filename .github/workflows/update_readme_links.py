@@ -32,6 +32,7 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
     if not built:
         print("No built apps found, skipping README update")
         return False
+    print(f"Found {len(built)} built apps")
 
     with open(readme_path, "r", encoding="utf-8") as f:
         content = f.read()
@@ -91,6 +92,7 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
                 link_line = f"    - **Download:** [{filename}]({url})"
                 result.append(link_line)
                 modified = True
+                print(f"  Added link for {app_name_readme}")
             i -= 1  # We consumed one extra - backtrack so next iteration sees the header
         i += 1
 
