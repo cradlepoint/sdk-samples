@@ -10,12 +10,20 @@ from pathlib import Path
 
 
 def get_built_apps(built_apps_dir: str) -> dict:
-    """Return dict mapping lowercase app name -> actual filename (e.g. AutoInstall.tar.gz)."""
+    """Return dict mapping lowercase app name -> actual filename.
+    Handles versioned names like '5GSpeed v1.0.0.tar.gz' - maps to base name '5gspeed'.
+    """
     built = {}
     for f in Path(built_apps_dir).glob("*.tar.gz"):
-        # stem would give "App.tar" for "App.tar.gz" - extract app name correctly
-        app_name = f.name[:-7]  # remove ".tar.gz"
-        built[app_name.lower()] = f.name
+        # Remove .tar.gz
+        base = f.name[:-7]
+        # Extract app name: "5GSpeed v1.0.0" -> "5GSpeed", "hello_world" -> "hello_world"
+        if " v" in base:
+            app_base = base.split(" v", 1)[0]
+        else:
+            app_base = base
+        key = app_base.lower()
+        built[key] = f.name
     return built
 
 
