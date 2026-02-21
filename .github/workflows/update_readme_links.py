@@ -7,7 +7,6 @@ import os
 import re
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 
 def get_built_apps(built_apps_dir: str) -> dict:
@@ -99,7 +98,9 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
             # Always add/replace download link if this app was built
             if app_key in built:
                 filename = built[app_key]
-                url = f"{release_base_url}/{quote(filename)}"
+                # GitHub converts " v" to ".v" in release assets - use dot in URL for working links
+                url_filename = filename.replace(" v", ".v")
+                url = f"{release_base_url}/{url_filename}"
                 link_line = f"    - **Download:** [{filename}]({url})"
                 result.append(link_line)
                 modified = True
