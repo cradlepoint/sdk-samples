@@ -48,6 +48,9 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
     i = 0
     modified = False
     in_app_section = False
+    links_added = 0
+    skipped_has_link = 0
+    skipped_not_built = 0
 
     while i < len(lines):
         line = lines[i]
@@ -55,7 +58,7 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
         # Only process app headers within Sample Application Descriptions section
         if line.strip() == "## Sample Application Descriptions":
             in_app_section = True
-        elif in_app_section and (line.strip() == "----------" or line.startswith("## ")):
+        elif in_app_section and (line.strip() == "----------" or (line.startswith("## ") and "Sample Application Descriptions" not in line)):
             in_app_section = False
         m = app_header.match(line) if in_app_section else None
         if m:
@@ -92,10 +95,16 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
                 link_line = f"    - **Download:** [{filename}]({url})"
                 result.append(link_line)
                 modified = True
+                links_added += 1
                 print(f"  Added link for {app_name_readme}")
+            elif app_key in built and has_download_link:
+                skipped_has_link += 1
+            elif app_key not in built:
+                skipped_not_built += 1
             i -= 1  # We consumed one extra - backtrack so next iteration sees the header
         i += 1
 
+    print(f"Summary: added {links_added}, skipped (already has link) {skipped_has_link}, skipped (not built) {skipped_not_built}")
     if modified:
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write("\n".join(result) + "\n")
