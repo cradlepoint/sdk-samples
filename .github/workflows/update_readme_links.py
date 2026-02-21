@@ -58,7 +58,6 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
     modified = False
     in_app_section = False
     links_added = 0
-    skipped_has_link = 0
     skipped_not_built = 0
 
     while i < len(lines):
@@ -87,33 +86,33 @@ def update_readme(readme_path: str, built_apps_dir: str, release_base_url: str) 
                     result.append(next_line)
                     i += 1
                     continue
-                # Keep existing download lines (idempotent - don't add duplicate)
+                # Skip existing download lines - we'll replace with correct link below
                 if "**Download:**" in next_line:
                     has_download_link = True
-                    result.append(next_line)
                     i += 1
                     continue
                 # This is part of the description
                 result.append(next_line)
                 i += 1
-            # After description, add download link if this app was built and doesn't have one
-            if app_key in built and not has_download_link:
+            # Always add/replace download link if this app was built
+            if app_key in built:
                 filename = built[app_key]
                 url = f"{release_base_url}/{quote(filename)}"
-                # Use same indent as description lines (4 spaces)
                 link_line = f"    - **Download:** [{filename}]({url})"
                 result.append(link_line)
                 modified = True
-                links_added += 1
-                print(f"  Added link for {app_name_readme}")
-            elif app_key in built and has_download_link:
-                skipped_has_link += 1
-            elif app_key not in built:
+                if has_download_link:
+                    links_added += 1
+                    print(f"  Replaced link for {app_name_readme}")
+                else:
+                    links_added += 1
+                    print(f"  Added link for {app_name_readme}")
+            else:
                 skipped_not_built += 1
             i -= 1  # We consumed one extra - backtrack so next iteration sees the header
         i += 1
 
-    print(f"Summary: added {links_added}, skipped (already has link) {skipped_has_link}, skipped (not built) {skipped_not_built}")
+    print(f"Summary: added/replaced {links_added}, skipped (not built) {skipped_not_built}")
     if modified:
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write("\n".join(result) + "\n")
