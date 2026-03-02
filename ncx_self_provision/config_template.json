@@ -1,0 +1,82 @@
+[
+  {
+    "lan": {
+      "00000000-0d93-319d-8220-4a1fb0372b51": {
+        "dhcpd": {
+          "cur6_hop_limit": 64,
+          "dad_transmits": 1,
+          "dhcp6_mode": "slaacdhcp",
+          "lease6_time": 3600,
+          "max_rtr_adv_interval": 600,
+          "min_rtr_adv_interval": 3,
+          "ns_retransmit_interval": 1000,
+          "options": [],
+          "ra6_advr_interval": 600,
+          "ra_mtu": 1500,
+          "reachable6_time": 30000,
+          "router_lifetime": 1800,
+          "valid6_lifetime": 3600
+        },
+        "ip_address": "{{primary_lan_ip}}",
+        "stp": {
+          "priority": 32768
+        },
+        "vrrp": {
+          "advert_int": 1,
+          "auth_type": "none",
+          "init_state": "master",
+          "ipverify": {
+            "test_id": ""
+          },
+          "priority": 100,
+          "vrid": 10
+        },
+        "wired_8021x": {
+          "eap": {
+            "reauth_period": 3600
+          },
+          "radius": {
+            "auth_servers": {
+              "0": {
+                "ip_address": "127.0.0.1",
+                "mac": "00:00:00:00:00:00",
+                "port": 1812
+              },
+              "1": {
+                "ip_address": "127.0.0.1",
+                "mac": "00:00:00:00:00:00",
+                "port": 1812
+              }
+            },
+            "acct_servers": {
+              "0": {
+                "ip_address": "127.0.0.1",
+                "mac": "00:00:00:00:00:00",
+                "port": 1813
+              },
+              "1": {
+                "ip_address": "127.0.0.1",
+                "mac": "00:00:00:00:00:00",
+                "port": 1813
+              }
+            },
+            "allowed_macs": {
+              "0": {
+                "enabled": false,
+                "macs": []
+              }
+            }
+          }
+        },
+        "ip6_prefixlen": 64,
+        "passthrough_cycle_time": 10,
+        "_id_": "00000000-0d93-319d-8220-4a1fb0372b51"
+      }
+    },
+    "system": {
+      "system_id": "{{name}}",
+      "asset_id": "{{asset_id}}"
+    }
+  },
+  []
+]

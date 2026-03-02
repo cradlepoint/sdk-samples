@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCX / NCS Staging Wizard</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">NCX / NCS Staging Wizard</h1>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <ul class="nav-list">
+                        <li><a href="#home" class="nav-item active" data-section="home-section">
+                            <i class="fas fa-home" style="color: #6b7280;"></i> Home
+                        </a></li>
+                        <li><a href="#api-keys" class="nav-item" data-section="api-keys-section">
+                            <i class="fas fa-key" style="color: #4f46e5;"></i> API Keys
+                        </a></li>
+                        <li><a href="#required" class="nav-item" data-section="required-section">
+                            <i class="fas fa-asterisk" style="color: #dc2626;"></i> Required Parameters
+                        </a></li>
+                        <li><a href="#optional" class="nav-item" data-section="optional-section">
+                            <i class="fas fa-sliders-h" style="color: #f59e0b;"></i> Optional Parameters
+                        </a></li>
+                        <li><a href="#tags" class="nav-item" data-section="tags-section">
+                            <i class="fas fa-tags" style="color: #8b5cf6;"></i> Global Tags
+                        </a></li>
+                        <li><a href="#bulk-config" class="nav-item" data-section="bulk-config-section">
+                            <i class="fas fa-file-csv" style="color: #0284c7;"></i> Bulk Configuration
+                        </a></li>
+                        <li><a href="#summary" class="nav-item" data-section="summary-section">
+                            <i class="fas fa-check-circle" style="color: #059669;"></i> Review & Apply
+                        </a></li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel">
+                    <!-- Home Section -->
+                    <section class="element-section active" id="home-section">
+                        <div class="welcome-hero">
+                            <div>
+                                <p class="welcome-lead">This step-by-step wizard configures your NCM staging group for automatic device provisioning to NCX or NCS (SASE) networks. Use the navigation menu to progress through each configuration step, validate your settings, and apply the complete configuration to your staging group.</p>
+                                <div class="welcome-checklist" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 2rem;">
+                                    <li><i class="far fa-circle" style="color: #4f46e5;"></i> NCM v2 and v3 API key configuration</li>
+                                    <li><i class="far fa-circle" style="color: #4f46e5;"></i> Real-time API connectivity validation</li>
+                                    <li><i class="far fa-circle" style="color: #dc2626;"></i> Staging and production group configuration</li>
+                                    <li><i class="far fa-circle" style="color: #dc2626;"></i> Exchange network, license, and DNS setup</li>
+                                    <li><i class="far fa-circle" style="color: #f59e0b;"></i> Optional licenses and resource creation</li>
+                                    <li><i class="far fa-circle" style="color: #f59e0b;"></i> Global Force DNS with per-device CSV override</li>
+                                    <li><i class="far fa-circle" style="color: #8b5cf6;"></i> Global site and resource tagging support</li>
+                                    <li><i class="far fa-circle" style="color: #8b5cf6;"></i> Automatic tag merging and deduplication</li>
+                                    <li><i class="far fa-circle" style="color: #0284c7;"></i> CSV/JSON bulk device configuration</li>
+                                    <li><i class="far fa-circle" style="color: #0284c7;"></i> Built-in file editor with CSV grid view</li>
+                                    <li><i class="far fa-circle" style="color: #059669;"></i> Comprehensive pre-deployment validation</li>
+                                    <li><i class="far fa-circle" style="color: #059669;"></i> One-click configuration deployment</li>
+                                </div>
+                            </div>
+                            <div style="background: var(--card-bg); border: 2px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.5rem; display: flex; flex-direction: column; justify-content: center;">
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 1rem;">
+                                        <!-- Row 1 -->
+                                        <div style="text-align: center;">
+                                            <div style="width: 3.5rem; height: 3.5rem; margin: 0 auto 0.5rem auto; background: linear-gradient(135deg, #4f46e5, #4338ca); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+                                                <i class="fas fa-key"></i>
+                                            </div>
+                                            <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-primary);">API Keys</div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="width: 3.5rem; height: 3.5rem; margin: 0 auto 0.5rem auto; background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);">
+                                                <i class="fas fa-asterisk"></i>
+                                            </div>
+                                            <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-primary);">Required</div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="width: 3.5rem; height: 3.5rem; margin: 0 auto 0.5rem auto; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                                                <i class="fas fa-sliders-h"></i>
+                                            </div>
+                                            <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-primary);">Optional</div>
+                                        </div>
+                                        <!-- Row 2 -->
+                                        <div style="text-align: center;">
+                                            <div style="width: 3.5rem; height: 3.5rem; margin: 0 auto 0.5rem auto; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+                                                <i class="fas fa-tags"></i>
+                                            </div>
+                                            <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-primary);">Global Tags</div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="width: 3.5rem; height: 3.5rem; margin: 0 auto 0.5rem auto; background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);">
+                                                <i class="fas fa-file-csv"></i>
+                                            </div>
+                                            <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-primary);">Bulk Config</div>
+                                        </div>
+                                        <div style="text-align: center;">
+                                            <div style="width: 3.5rem; height: 3.5rem; margin: 0 auto 0.5rem auto; background: linear-gradient(135deg, #059669, #047857); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);">
+                                                <i class="fas fa-check-circle"></i>
+                                            </div>
+                                            <div style="font-size: 0.75rem; font-weight: 500; color: var(--text-primary);">Review & Apply</div>
+                                        </div>
+                                    </div>
+                                    <div style="padding-top: 1rem; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 0.875rem; display: flex; justify-content: center; gap: 2rem;">
+                                        <div><i class="fas fa-clock"></i> Configuration time: ~5 minutes</div>
+                                        <div><i class="fas fa-rocket"></i> Deployment time: 2-5 minutes</div>
+                                    </div>
+                                </div>
+                            </div>
+                        
+                        <div class="welcome-highlights">
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon" style="background: rgba(79, 70, 229, 0.12); color: #4f46e5;"><i class="fas fa-key"></i></div>
+                                <h3>Step 1: API Keys</h3>
+                                <p>Enter your NCM API credentials (v2 and v3) and test connectivity to ensure proper authentication with your NCM instance.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon" style="background: rgba(220, 38, 38, 0.12); color: #dc2626;"><i class="fas fa-asterisk"></i></div>
+                                <h3>Step 2: Required Parameters</h3>
+                                <p>Configure essential settings including group IDs, exchange network ID, Secure Connect license, and DNS options.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b;"><i class="fas fa-sliders-h"></i></div>
+                                <h3>Step 3: Optional Parameters</h3>
+                                <p>Select add-on licenses (SD-WAN, HMF, AI) and enable automatic resource creation for LAN subnets, FQDN hosts, and wildcard domains.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon" style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6;"><i class="fas fa-tags"></i></div>
+                                <h3>Step 4: Global Tags</h3>
+                                <p>Define global tags that will be automatically applied to all sites and resources created during the provisioning process.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon" style="background: rgba(2, 132, 199, 0.12); color: #0284c7;"><i class="fas fa-file-csv"></i></div>
+                                <h3>Step 5: Bulk Configuration</h3>
+                                <p>Enable bulk device provisioning with CSV/JSON templates. Upload or edit files directly in the browser with grid view support.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon" style="background: rgba(5, 150, 105, 0.12); color: #059669;"><i class="fas fa-check-circle"></i></div>
+                                <h3>Step 6: Review & Apply</h3>
+                                <p>Review your complete configuration summary, run final validation checks, and apply all settings to your staging group.</p>
+                            </article>
+                        </div>
+                    </section>
+
+                    <!-- API Keys Section -->
+                    <section class="element-section" id="api-keys-section">
+                        <div class="control-panel">
+                            <div class="panel-content">
+                                <div id="api-key-validation-status" style="margin-bottom: 1.5rem;"></div>
+                                <div style="display: grid; grid-template-columns: calc(50% - 1rem - 1px) calc(50% - 1rem - 1px);">
+                                    <div style="padding-right: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">NCM API v2 Keys</h3>
+                                        <div class="form-field">
+                                            <label for="x-cp-api-id">X-CP-API-ID *</label>
+                                            <div style="position: relative;">
+                                                <input type="password" id="x-cp-api-id" class="form-input" style="padding-right: 3rem;" required>
+                                                <button type="button" class="password-toggle" onclick="togglePassword('x-cp-api-id')" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.5rem;">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="x-cp-api-key">X-CP-API-KEY *</label>
+                                            <div style="position: relative;">
+                                                <input type="password" id="x-cp-api-key" class="form-input" style="padding-right: 3rem;" required>
+                                                <button type="button" class="password-toggle" onclick="togglePassword('x-cp-api-key')" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.5rem;">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="x-ecm-api-id">X-ECM-API-ID *</label>
+                                            <div style="position: relative;">
+                                                <input type="password" id="x-ecm-api-id" class="form-input" style="padding-right: 3rem;" required>
+                                                <button type="button" class="password-toggle" onclick="togglePassword('x-ecm-api-id')" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.5rem;">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="x-ecm-api-key">X-ECM-API-KEY *</label>
+                                            <div style="position: relative;">
+                                                <input type="password" id="x-ecm-api-key" class="form-input" style="padding-right: 3rem;" required>
+                                                <button type="button" class="password-toggle" onclick="togglePassword('x-ecm-api-key')" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.5rem;">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="border-left: 2px solid var(--border-color); padding-left: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">NCM API v3 Token</h3>
+                                        <div class="form-field">
+                                            <label for="bearer-token">Bearer Token *</label>
+                                            <div style="position: relative;">
+                                                <input type="password" id="bearer-token" class="form-input" style="padding-right: 3rem;" required>
+                                                <button type="button" class="password-toggle" onclick="togglePassword('bearer-token')" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.5rem;">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 1.5rem;">
+                                    <button type="button" class="btn btn-primary" id="validate-api-keys-btn">
+                                        <i class="fas fa-check"></i> Validate API Keys
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Required Parameters Section -->
+                    <section class="element-section" id="required-section">
+                        <div class="control-panel">
+                            <div class="panel-content">
+                                <div id="required-validation-status" style="margin-bottom: 1.5rem;"></div>
+                                <div style="display: grid; grid-template-columns: calc(33.33% - 1.33rem - 0.67px) calc(33.33% - 1.33rem - 0.67px) calc(33.33% - 1.33rem - 0.67px);">
+                                    <div style="padding-right: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Group Settings</h3>
+                                        <div class="form-field">
+                                            <label for="staging-group-id">Staging Group ID *</label>
+                                            <input type="text" id="staging-group-id" class="form-input" placeholder="e.g. 596836" required>
+                                            <small class="text-secondary">NCM group ID where devices are initially placed</small>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="prod-group-id">Production Group ID *</label>
+                                            <input type="text" id="prod-group-id" class="form-input" placeholder="e.g. 596838" required>
+                                            <small class="text-secondary">NCM group ID where devices are moved after provisioning</small>
+                                        </div>
+                                    </div>
+                                    <div style="border-left: 2px solid var(--border-color); padding-left: 1rem; padding-right: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">NCX / NCS Settings</h3>
+                                        <div class="form-field">
+                                            <label for="exchange-network-id">Exchange Network ID *</label>
+                                            <input type="text" id="exchange-network-id" class="form-input" placeholder="e.g. 01GQFWVHYDEWNNCJGBXXJFRHMF" required>
+                                            <small class="text-secondary">NCX/SASE exchange network ID for site creation</small>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="secure-connect-lic">Secure Connect License *</label>
+                                            <select id="secure-connect-lic" class="form-select" required>
+                                                <option value="">Select license...</option>
+                                            </select>
+                                            <small class="text-secondary">Required Secure Connect license type</small>
+                                        </div>
+                                    </div>
+                                    <div style="border-left: 2px solid var(--border-color); padding-left: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">DNS Settings</h3>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="lan-as-dns">
+                                                <span class="checkmark"></span>
+                                                <span>Enable LAN as DNS</span>
+                                            </label>
+                                            <small class="text-secondary" style="display: block; margin-top: 0.25rem;">Configure Primary LAN interface as DNS server for exchange sites (mutually exclusive with Custom DNS Servers)</small>
+                                        </div>
+                                        <div class="form-field" id="local-domain-field" style="display: none;">
+                                            <label for="local-domain">Local Domain *</label>
+                                            <input type="text" id="local-domain" class="form-input" placeholder="e.g. ncx.net" required>
+                                            <small class="text-secondary">Domain suffix for site FQDNs (required if LAN as DNS is enabled)</small>
+                                        </div>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="custom-dns-enabled">
+                                                <span class="checkmark"></span>
+                                                <span>Custom DNS Servers</span>
+                                            </label>
+                                            <small class="text-secondary" style="display: block; margin-top: 0.25rem;">Configure custom DNS servers for exchange sites (mutually exclusive with LAN as DNS)</small>
+                                        </div>
+                                        <div class="form-field" id="primary-dns-field" style="display: none;">
+                                            <label for="primary-dns">Primary DNS Server</label>
+                                            <input type="text" id="primary-dns" class="form-input" placeholder="e.g. 8.8.8.8">
+                                            <small class="text-secondary">Primary DNS server IP address</small>
+                                        </div>
+                                        <div class="form-field" id="secondary-dns-field" style="display: none;">
+                                            <label for="secondary-dns">Secondary DNS Server</label>
+                                            <input type="text" id="secondary-dns" class="form-input" placeholder="e.g. 8.8.4.4">
+                                            <small class="text-secondary">Secondary DNS server IP address (optional)</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 1.5rem;">
+                                    <button type="button" class="btn btn-primary" id="validate-required-btn">
+                                        <i class="fas fa-check"></i> Validate Required Parameters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Optional Parameters Section -->
+                    <section class="element-section" id="optional-section">
+                        <div class="control-panel">
+                            <div class="panel-content">
+                                <div id="disable-force-dns-warning" style="margin-bottom: 1.5rem; display: none;"></div>
+                                <div id="hmf-warning" style="margin-bottom: 1.5rem; display: none;"></div>
+                                <div id="optional-validation-status" style="margin-bottom: 1.5rem;"></div>
+                                <div style="display: grid; grid-template-columns: calc(33.33% - 1.33rem - 0.67px) calc(33.33% - 1.33rem - 0.67px) calc(33.33% - 1.33rem - 0.67px);">
+                                    <div style="padding-right: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Add-on Licenses</h3>
+                                        <div class="form-field">
+                                            <label for="sdwan-lic">SD-WAN License</label>
+                                            <select id="sdwan-lic" class="form-select">
+                                                <option value="">None</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="hmf-lic">HMF License</label>
+                                            <select id="hmf-lic" class="form-select">
+                                                <option value="">None</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-field">
+                                            <label for="ai-lic">AI Insights License</label>
+                                            <select id="ai-lic" class="form-select">
+                                                <option value="">None</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div style="border-left: 2px solid var(--border-color); padding-left: 1rem; padding-right: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Resource Creation</h3>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="create-lan-resource">
+                                                <span class="checkmark"></span>
+                                                <span>Create Primary LAN Resources (e.g. 192.168.103.0/24)</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="create-cp-host-resource">
+                                                <span class="checkmark"></span>
+                                                <span>Create CP Host FQDN Resources (e.g. cp.site-3.ncx.net)</span>
+                                            </label>
+                                            <small id="fqdn-dns-required-note" class="text-secondary" style="display: block; margin-top: 0.25rem;">Requires LAN as DNS or Custom DNS Servers to be enabled</small>
+                                        </div>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="create-wildcard-resource">
+                                                <span class="checkmark"></span>
+                                                <span>Create Wildcard FQDN Resources (e.g. *.site-3.ncx.net)</span>
+                                            </label>
+                                            <small id="wildcard-dns-required-note" class="text-secondary" style="display: block; margin-top: 0.25rem;">Requires LAN as DNS or Custom DNS Servers to be enabled</small>
+                                        </div>
+                                    </div>
+                                    <div style="border-left: 2px solid var(--border-color); padding-left: 1rem;">
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Force DNS</h3>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="disable-force-dns">
+                                                <span class="checkmark"></span>
+                                                <span>Disable Force All DNS Requests to Router</span>
+                                            </label>
+                                            <small class="text-secondary" style="display: block; margin-top: 0.25rem;">Disable Force All DNS Requests to Router for all devices (can be overridden per-device using bulk configuration CSV)</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 1.5rem;">
+                                    <button type="button" class="btn btn-primary" id="validate-optional-btn">
+                                        <i class="fas fa-check"></i> Validate Optional Parameters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Bulk Configuration Section -->
+                    <section class="element-section" id="bulk-config-section">
+                        <div class="control-panel">
+                            <div class="panel-content">
+                                <div id="bulk-config-warning" style="margin-bottom: 1.5rem; display: none;"></div>
+                                <div id="bulk-config-validation-status" style="margin-bottom: 1.5rem;"></div>
+                                <div style="display: grid; grid-template-columns: 20% 80%; gap: 2rem;">
+                                    <div>
+                                        <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Bulk Device Configuration</h3>
+                                        <div class="form-field">
+                                            <label class="checkbox-label" style="display: inline-flex;">
+                                                <input type="checkbox" id="self-bulk-config">
+                                                <span class="checkmark"></span>
+                                                <span>Enable Bulk Configuration</span>
+                                            </label>
+                                            <small class="text-secondary" style="display: block; margin-top: 0.25rem;">Apply device-specific configurations from CSV file using JSON template</small>
+                                        </div>
+                                        <div class="form-field" id="bulk-config-file-field" style="display: none;">
+                                            <label for="bulk-config-file-upload">Bulk Config File (CSV)</label>
+                                            <input type="file" id="bulk-config-file-upload" class="file-input-hidden" accept=".csv">
+                                            <button type="button" class="btn btn-secondary" onclick="$('#bulk-config-file-upload').click()">
+                                                <i class="fas fa-upload"></i> Upload CSV File
+                                            </button>
+                                            <div id="bulk-config-file-status" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);"></div>
+                                        </div>
+                                        <div class="form-field" id="config-template-file-field" style="display: none;">
+                                            <label for="config-template-file-upload">Config Template File (JSON)</label>
+                                            <input type="file" id="config-template-file-upload" class="file-input-hidden" accept=".json">
+                                            <button type="button" class="btn btn-secondary" onclick="$('#config-template-file-upload').click()">
+                                                <i class="fas fa-upload"></i> Upload JSON File
+                                            </button>
+                                            <div id="config-template-file-status" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);"></div>
+                                        </div>
+                                        <div style="margin-top: 1.5rem;">
+                                            <button type="button" class="btn btn-primary" id="validate-bulk-config-btn">
+                                                <i class="fas fa-check"></i> Validate Bulk Configuration
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="file-editor-panel" style="display: none; border-left: 2px solid var(--border-color); padding-left: 2rem; padding-right: 2rem; max-width: 100%;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                            <h3 style="margin: 0; color: var(--primary-color);">File Editor <span style="background: var(--info-color); color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">BETA</span></h3>
+                                            <div>
+                                                <button type="button" class="btn btn-secondary btn-sm" id="load-files-btn" style="margin-right: 0.5rem;">
+                                                    <i class="fas fa-sync"></i> Load Files
+                                                </button>
+                                                <button type="button" class="btn btn-success btn-sm" id="save-files-btn">
+                                                    <i class="fas fa-save"></i> Save Files
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-field">
+                                            <label style="display: block; margin-bottom: 0.5rem;">CSV File (router_grid.csv)</label>
+                                            <button type="button" class="btn btn-secondary btn-sm" id="toggle-csv-view" style="margin-bottom: 0.5rem;">
+                                                <i class="fas fa-table"></i> Grid View
+                                            </button>
+                                            <textarea id="csv-editor" class="form-input" style="font-family: monospace; min-height: 200px; resize: vertical;"></textarea>
+                                            <div id="csv-grid" style="display: none; overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md); max-height: 400px; overflow-y: auto;">
+                                                <table id="csv-table" style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+                                                    <!-- Grid will be populated by JavaScript -->
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="form-field">
+                                            <label>JSON Template (config_template.json)</label>
+                                            <textarea id="json-editor" class="form-input" style="font-family: monospace; min-height: 300px; resize: vertical; background: linear-gradient(to right, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%); background-size: 0 0; background-repeat: no-repeat;"></textarea>
+                                            <style>
+                                                #json-editor::selection {
+                                                    background: rgba(59, 130, 246, 0.3);
+                                                }
+                                            </style>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tags Section -->
+                    <section class="element-section" id="tags-section">
+                        <div class="control-panel">
+                            <div class="panel-content">
+                                <div id="tags-validation-status" style="margin-bottom: 1.5rem;"></div>
+                                <div id="tag-requirements-box" style="margin-bottom: 1.5rem;"></div>
+                                <script>
+                                    $(document).ready(function() {
+                                        const content = `
+                                            <ul style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+                                                <li>Tags must be comma or semicolon separated</li>
+                                                <li>Tags must be at least 2 characters long</li>
+                                                <li>Tags must contain only lowercase letters and numbers</li>
+                                                <li>Resource tags are only available when resource creation is enabled in Optional Parameters</li>
+                                            </ul>
+                                        `;
+                                        $('#tag-requirements-box').html(makeCollapsible(content, 'Tag Requirements', 'info', true));
+                                    });
+                                </script>
+                                <div id="resource-tags-info" style="padding: 1rem; background: rgba(2, 132, 199, 0.1); border: 1px solid var(--info-color); border-radius: var(--radius-md); margin-bottom: 1.5rem; display: none;">
+                                    <p style="margin: 0; color: var(--info-color); font-weight: 500;">
+                                        <i class="fas fa-info-circle"></i> Enable Resource Creation in Optional Parameters to configure Global Resource Tags
+                                    </p>
+                                </div>
+                                <div id="tags-fields-container">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                                        <div>
+                                            <h3 style="margin-bottom: 1rem; color: var(--primary-color);">Site Tags</h3>
+                                            <div class="form-field">
+                                                <label for="site-tags">Global Site Tags</label>
+                                                <input type="text" id="site-tags" class="form-input" placeholder="e.g. production,east or production;east">
+                                                <small class="text-secondary">Comma or semicolon separated tags. These tags will be applied to all sites</small>
+                                            </div>
+                                        </div>
+                                        <div id="resource-tags-column">
+                                            <h3 id="resource-tags-title" style="margin-bottom: 1rem; color: var(--primary-color); display: none;">Resource Tags</h3>
+                                            <div class="form-field" id="lan-tags-field" style="display: none;">
+                                                <label for="lan-resource-tags">Global Primary LAN Resource Tags</label>
+                                                <input type="text" id="lan-resource-tags" class="form-input" placeholder="e.g. network,secure or network;secure">
+                                                <small class="text-secondary">Comma or semicolon separated tags. These tags will be applied to all Primary LAN resources</small>
+                                            </div>
+                                            <div class="form-field" id="cp-host-tags-field" style="display: none;">
+                                                <label for="cp-host-tags">Global CP Host FQDN Resource Tags</label>
+                                                <input type="text" id="cp-host-tags" class="form-input" placeholder="e.g. cp or cp,host">
+                                                <small class="text-secondary">Comma or semicolon separated tags. These tags will be applied to all CP host resources</small>
+                                            </div>
+                                            <div class="form-field" id="wildcard-tags-field" style="display: none;">
+                                                <label for="wildcard-tags">Global Wildcard FQDN Resource Tags</label>
+                                                <input type="text" id="wildcard-tags" class="form-input" placeholder="e.g. wildcard or wildcard,domain">
+                                                <small class="text-secondary">Comma or semicolon separated tags. These tags will be applied to all wildcard resources</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top: 1.5rem;">
+                                    <button type="button" class="btn btn-primary" id="validate-tags-btn">
+                                        <i class="fas fa-check"></i> Validate Global Tags
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Summary Section -->
+                    <section class="element-section" id="summary-section">
+                        <div class="control-panel">
+                            <div class="panel-content">
+                                <div id="validation-info" style="padding: 1rem; background: rgba(2, 132, 199, 0.1); border: 1px solid var(--info-color); border-radius: var(--radius-md); margin-bottom: 1.5rem;">
+                                    <p style="margin: 0; color: var(--info-color); font-weight: 500;">
+                                        <i class="fas fa-info-circle"></i> Please validate your configuration before applying
+                                    </p>
+                                </div>
+                                <div id="validation-results" style="margin-bottom: 1.5rem;"></div>
+                                <div id="config-summary" style="margin-bottom: 1.5rem;">
+                                    <!-- Summary will be populated by JavaScript -->
+                                </div>
+                                <div style="display: flex; gap: 1rem;">
+                                    <button type="button" class="btn btn-primary" id="validate-btn">
+                                        <i class="fas fa-check"></i> Validate Configuration
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="apply-btn" data-validated="false">
+                                        <i class="fas fa-paper-plane"></i> Apply Configuration
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7) !important; z-index: 10000;">
+        <div class="modal-content-box">
+            <div class="spinner-circle" style="margin: 0 auto 1.5rem auto;"></div>
+            <p id="loading-message" style="margin: 0; font-weight: 500; font-size: 1.125rem;">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7) !important; z-index: 10000;">
+        <div class="modal-content-box" style="min-width: 500px;">
+            <h3 style="margin: 0 0 1rem 0;"><i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> Confirm Configuration</h3>
+            <p id="confirm-message" style="margin: 0 0 1.5rem 0; opacity: 0.8;"></p>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-ok">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="static/js/script.js"></script>
+    <script src="static/js/config.js"></script>
+</body>
+</html>

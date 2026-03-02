@@ -1,0 +1,2 @@
+id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags,cp_host_tags,wildcard_resource_tags
+5088306,site-3,NYC,12345,value 1,value 2,192.168.103.1,branch;retail,lan;network,,
