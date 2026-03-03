@@ -231,8 +231,10 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [wan_rate v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/wan_rate.v1.0.0.tar.gz)
 - **wan_ip_change_alert**
     - Tracks the WAN IP address and sends an alert when it changes. Includes a confirmation delay to prevent false alerts from temporary IP changes.
-
     - **Download:** [wan_ip_change_alert v1.4.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/wan_ip_change_alert.v1.4.0.tar.gz)
+- **web_app_template**
+    - An interactive style guide and component library for building dashboards and internal tools. Use it as a visual reference, copy/paste-ready HTML source, or a playground to explore layout ideas.
+
 ----------
 
 ---
