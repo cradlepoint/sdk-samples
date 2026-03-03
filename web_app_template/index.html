@@ -1,0 +1,2250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web App Template - Style Guide</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header Banner -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">Web App Template - Style Guide <span class="beta-tag">BETA</span></h1>
+                </div>
+                <div class="header-actions">
+                    <div class="search-container search-with-clear">
+                        <input type="text" id="search-input" class="search-input" placeholder="Search elements...">
+                        <i class="fas fa-search search-icon"></i>
+                        <button type="button" class="search-clear" id="header-search-clear" title="Clear search">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home"></i> Homepage</a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li class="nav-parent">
+                            <a href="#resources" class="nav-item" data-element="resources">
+                                <i class="fas fa-rocket"></i> Starter Templates
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="resources" data-sub-element="your-web-app-template">Your Web App</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#buttons" class="nav-item" data-element="buttons">
+                                <i class="fas fa-hand-pointer"></i> Buttons
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="buttons" data-sub-element="button-builder">Button Builder</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#forms" class="nav-item" data-element="forms">
+                                <i class="fas fa-edit"></i> Form Elements
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="text-input">Text Input</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="number-input">Number Input</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="checkbox">Checkbox</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="textarea">Textarea</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="radio-buttons">Radio Buttons</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="slider">Slider (Range Input)</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="dropdown-select">Dropdown (Select)</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="forms" data-sub-element="toggle-switch">Toggle Switch</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#tabs" class="nav-item" data-element="tabs">
+                                <i class="fas fa-folder"></i> Tabs
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="tabs" data-sub-element="tabs-example">Tabs</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#cards" class="nav-item" data-element="cards">
+                                <i class="fas fa-square"></i> Cards & Panels
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="cards" data-sub-element="card-panel">Card Panel</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="cards" data-sub-element="results-panel">Results Panel</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#typography" class="nav-item" data-element="typography">
+                                <i class="fas fa-font"></i> Typography
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="typography" data-sub-element="typography-headings">Typography</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#colors" class="nav-item" data-element="colors">
+                                <i class="fas fa-palette"></i> Colors
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-primary">Primary</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-success">Success</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-warning">Warning</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-danger">Danger</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-info">Info</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-secondary">Secondary</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="colors" data-sub-element="color-text">Text</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#status" class="nav-item" data-element="status">
+                                <i class="fas fa-info-circle"></i> Status Indicators
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="gps-status">GPS</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="network-status">Network</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="modem-status">Modem</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="signal-status">Signal Strength</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="generic-status-indicators">Connectivity</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="power-status">Power</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="disk-status">Disk</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="cpu-status">CPU</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="memory-status">Memory</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="battery-status">Battery</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="temperature-status">Temperature</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="ethernet-status">Ethernet</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="vpn-status">VPN</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="ntp-status">NTP</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="gpio-status">GPIO</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="status" data-sub-element="stat-item">Generic</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#notifications" class="nav-item" data-element="notifications">
+                                <i class="fas fa-bell"></i> Notifications
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="notifications" data-sub-element="success-toast">Success Toast</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="notifications" data-sub-element="warning-toast">Warning Toast</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="notifications" data-sub-element="error-toast">Error Toast</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="notifications" data-sub-element="info-toast">Info Toast</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#loading" class="nav-item" data-element="loading">
+                                <i class="fas fa-spinner"></i> Loading States
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="loading" data-sub-element="loading-spinner-circular">Loading Spinner (Circular)</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="loading" data-sub-element="loading-spinner-icon">Loading Spinner (Icon)</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="loading" data-sub-element="loading-overlay-example">Loading Overlay</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="loading" data-sub-element="running-indicator">Running Indicator</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#progress" class="nav-item" data-element="progress">
+                                <i class="fas fa-tasks"></i> Progress Bars
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="progress" data-sub-element="basic-progress-bar">Basic Progress Bar</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="progress" data-sub-element="progress-bar-with-label">Progress Bar with Label</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="progress" data-sub-element="success-progress">Success Progress</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="progress" data-sub-element="warning-progress">Warning Progress</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="progress" data-sub-element="danger-progress">Danger Progress</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="progress" data-sub-element="animated-progress">Animated Progress</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#search" class="nav-item" data-element="search">
+                                <i class="fas fa-search"></i> Search
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="search" data-sub-element="basic-search-input">Basic Search Input</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="search" data-sub-element="search-with-clear-button">Search with Clear Button</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-parent">
+                            <a href="#charts" class="nav-item" data-element="charts">
+                                <i class="fas fa-chart-bar"></i> Charts
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="charts" data-sub-element="bar-chart">Bar Chart</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="charts" data-sub-element="line-chart">Line Chart</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="charts" data-sub-element="pie-chart">Pie Chart</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="charts" data-sub-element="area-chart">Area Chart</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="charts" data-sub-element="horizontal-bar-chart">Horizontal Bar Chart</a></li>
+                                <li><a href="#" class="nav-sub-item" data-element="charts" data-sub-element="donut-chart">Donut Chart</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+                    <!-- Welcome/Homepage Section -->
+                    <section class="element-section active" id="homepage">
+                        <div class="welcome-hero">
+                            <div class="welcome-hero-content">
+                                <h2 class="section-title">Welcome to the Web App Template Style Guide</h2>
+                                <p class="welcome-lead">This interactive style guide showcases a complete component library for dashboards and internal tools. Use it as your visual reference, copy/paste ready HTML, or a playground to explore layout ideas.</p>
+                                <div class="welcome-actions">
+                                    <button type="button" class="btn btn-primary" data-action="browse-components">
+                                        <i class="fas fa-compass"></i> Browse Components
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-action="preview-themes">
+                                        <i class="fas fa-adjust"></i> Preview Themes
+                                    </button>
+                                </div>
+                                <ul class="welcome-checklist">
+                                    <li><i class="fas fa-check-circle"></i> Snapshot of production-ready UI patterns</li>
+                                    <li><i class="fas fa-check-circle"></i> Dark-mode friendly palettes, icons, and states</li>
+                                    <li><i class="fas fa-check-circle"></i> Copyable markup structured for rapid prototyping</li>
+                                </ul>
+                            </div>
+                            <div class="welcome-hero-visual">
+                                <div class="welcome-icon-cluster">
+                                    <span class="cluster-icon primary"><i class="fas fa-layer-group"></i></span>
+                                    <span class="cluster-icon success"><i class="fas fa-microchip"></i></span>
+                                    <span class="cluster-icon warning"><i class="fas fa-chart-line"></i></span>
+                                    <span class="cluster-icon danger"><i class="fas fa-bolt"></i></span>
+                                    <span class="cluster-icon info"><i class="fas fa-sliders-h"></i></span>
+                                </div>
+                                <p class="welcome-visual-caption">Mix and match components to assemble full experiences in minutes.</p>
+                            </div>
+                        </div>
+
+                        <div class="welcome-highlights">
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon"><i class="fas fa-rocket"></i></div>
+                                <h3>Kickstart Projects Faster</h3>
+                                <p>Use the template as scaffolding for internal portals, admin consoles, and monitoring dashboards without starting from scratch.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon"><i class="fas fa-balance-scale"></i></div>
+                                <h3>Consistent Visual Language</h3>
+                                <p>Every component follows the same spacing, typography, and color system so new views feel cohesive by default.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon"><i class="fas fa-tools"></i></div>
+                                <h3>Copy, Adapt, Deploy</h3>
+                                <p>Each example includes markup snippets and contextual notes to help you adapt interactions for your application.</p>
+                            </article>
+                        </div>
+
+                        <div class="welcome-nav-overview">
+                            <h3>What You&rsquo;ll Find in the Sidebar</h3>
+                            <p class="welcome-nav-intro">Each section groups related UI building blocks. Expand a category to preview individual elements and copy their HTML structure.</p>
+                            <div class="welcome-nav-grid">
+                                <article class="welcome-nav-card" data-element="buttons" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-hand-pointer"></i></div>
+                                    <div>
+                                        <h4>Buttons</h4>
+                                        <p>Primary, secondary, status, and toggle actions for CTAs and toolbars.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="forms" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-edit"></i></div>
+                                    <div>
+                                        <h4>Form Elements</h4>
+                                        <p>Inputs, selectors, toggles, and validation-ready controls.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="tabs" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-folder"></i></div>
+                                    <div>
+                                        <h4>Tabs</h4>
+                                        <p>Organize dense content with accessible tabbed navigation.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="cards" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-square"></i></div>
+                                    <div>
+                                        <h4>Cards &amp; Panels</h4>
+                                        <p>Containers for summaries, analytics, and data-driven dashboards.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="typography" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-font"></i></div>
+                                    <div>
+                                        <h4>Typography</h4>
+                                        <p>Heading hierarchy and text treatments to keep content readable.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="colors" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-palette"></i></div>
+                                    <div>
+                                        <h4>Colors</h4>
+                                        <p>Semantic palette references with accessible contrast values.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="status" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-info-circle"></i></div>
+                                    <div>
+                                        <h4>Status Indicators</h4>
+                                        <p>Uniform feedback patterns for health, connectivity, and telemetry.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="notifications" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-bell"></i></div>
+                                    <div>
+                                        <h4>Notifications</h4>
+                                        <p>Toast alerts and inline messaging for system communication.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="loading" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-spinner"></i></div>
+                                    <div>
+                                        <h4>Loading States</h4>
+                                        <p>Spinners, overlays, and progress cues during async work.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="progress" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-tasks"></i></div>
+                                    <div>
+                                        <h4>Progress Bars</h4>
+                                        <p>Linear indicators for completion, success, warning, and danger.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="search" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-search"></i></div>
+                                    <div>
+                                        <h4>Search</h4>
+                                        <p>Global and inline search patterns with clear affordances.</p>
+                                    </div>
+                                </article>
+                                <article class="welcome-nav-card" data-element="charts" role="button" tabindex="0">
+                                    <div class="nav-card-icon"><i class="fas fa-chart-bar"></i></div>
+                                    <div>
+                                        <h4>Charts</h4>
+                                        <p>Starter visualizations for trend, comparison, and distribution insights.</p>
+                                    </div>
+                                </article>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Buttons Section -->
+                    <section class="element-section" id="buttons">
+                        <h2 class="section-title">Buttons</h2>
+                        <div class="element-grid">
+                            <div class="element-example button-control button-builder" id="button-builder">
+                                <h3>Button Builder</h3>
+                                <p>Create a single source of truth for every button variant by mixing palette, icon, text, and presentation options.</p>
+                                <div class="button-control-field-grid">
+                                    <div class="button-control-field">
+                                        <label for="button-builder-color">Button Color Palette</label>
+                                        <div class="color-selector" id="button-builder-color-selector">
+                                            <button type="button" class="color-swatch-btn color-swatch-primary" data-color="primary" title="Primary"></button>
+                                            <button type="button" class="color-swatch-btn color-swatch-secondary" data-color="secondary" title="Secondary"></button>
+                                            <button type="button" class="color-swatch-btn color-swatch-success" data-color="success" title="Success"></button>
+                                            <button type="button" class="color-swatch-btn color-swatch-warning" data-color="warning" title="Warning"></button>
+                                            <button type="button" class="color-swatch-btn color-swatch-danger" data-color="danger" title="Danger"></button>
+                                            <button type="button" class="color-swatch-btn color-swatch-info" data-color="info" title="Info"></button>
+                                            <button type="button" class="color-swatch-btn color-swatch-text" data-color="text" title="Text"></button>
+                                        </div>
+                                        <select class="form-select" id="button-builder-color" style="display: none;">
+                                            <option value="primary">Primary</option>
+                                            <option value="secondary">Secondary</option>
+                                            <option value="success">Success</option>
+                                            <option value="warning">Warning</option>
+                                            <option value="danger">Danger</option>
+                                            <option value="info">Info</option>
+                                            <option value="text">Text</option>
+                                        </select>
+                                    </div>
+                                    <div class="button-control-field">
+                                        <label for="button-builder-icon">Button icon</label>
+                                        <select class="form-select" id="button-builder-icon">
+                                            <option value="none">No icon</option>
+                                            <option value="start">Start (Play)</option>
+                                            <option value="restart">Restart</option>
+                                            <option value="stop">Stop</option>
+                                            <option value="pause">Pause</option>
+                                            <option value="success">Success (Check)</option>
+                                            <option value="warning">Warning</option>
+                                            <option value="failed">Failed</option>
+                                            <option value="upload">Upload</option>
+                                            <option value="download">Download</option>
+                                            <option value="light">Light mode</option>
+                                            <option value="dark">Dark mode</option>
+                                        </select>
+                                    </div>
+                                    <div class="button-control-field">
+                                        <label for="button-builder-label">Button label</label>
+                                        <input type="text" class="form-input" id="button-builder-label" placeholder="Enter custom label">
+                                    </div>
+                                    <div class="button-control-field">
+                                        <label for="button-builder-tooltip-text">Button tooltip</label>
+                                        <input type="text" class="form-input" id="button-builder-tooltip-text" placeholder="Enter tooltip text">
+                                    </div>
+                                    <div class="button-control-field">
+                                        <label for="button-builder-notification-text">Button notification</label>
+                                        <input type="text" class="form-input" id="button-builder-notification-text" placeholder="Enter notification text">
+                                    </div>
+                                </div>
+                                <div class="button-toggle-controls status-toggle-controls eight-column">
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Background</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="background" data-group="background-border" checked>
+                                            Background
+                                        </label>
+                                        <div class="gradient-slider" data-gradient-control>
+                                            <label for="button-builder-gradient">Background gradient</label>
+                                            <input type="range" id="button-builder-gradient" min="0" max="100" value="50" data-button-control="gradient-depth">
+                                            <span class="gradient-value" id="button-builder-gradient-value">50%</span>
+                                        </div>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Border</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="border" data-group="background-border">
+                                            Border
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="color-border" disabled>
+                                            Colorized border
+                                        </label>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Hover animation</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="hover-animation" checked>
+                                            Hover animation
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="color-animation">
+                                            Colorized animation
+                                        </label>
+                                        <div class="animation-slider" data-animation-control>
+                                            <label for="button-builder-hover">Animation gradient</label>
+                                            <input type="range" id="button-builder-hover" min="0" max="100" value="50" data-button-control="hover-depth">
+                                            <span class="animation-value" id="button-builder-hover-value">50%</span>
+                                        </div>
+                                        <div class="animation-slider" data-animation-speed-control>
+                                            <label for="button-builder-animation-speed">Animation speed</label>
+                                            <input type="range" id="button-builder-animation-speed" min="0" max="100" value="50" data-button-control="animation-speed">
+                                            <span class="animation-value" id="button-builder-animation-speed-value">50%</span>
+                                        </div>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Icon</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="color-icon" disabled>
+                                            Colorized icon
+                                        </label>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Label</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="text" checked>
+                                            Text
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="color-text">
+                                            Colorized text
+                                        </label>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Click Animation</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="click-animation" data-group="click-animations" value="none" checked>
+                                            None
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="click-animation" data-group="click-animations" value="scale">
+                                            Scale
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="click-animation" data-group="click-animations" value="bounce">
+                                            Bounce
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="click-animation" data-group="click-animations" value="shake">
+                                            Shake
+                                        </label>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Tooltip</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="tooltip" data-group="tooltip-placement" value="none" checked>
+                                            None
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="tooltip" data-group="tooltip-placement" value="top">
+                                            Top
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="tooltip" data-group="tooltip-placement" value="bottom">
+                                            Bottom
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="tooltip" data-group="tooltip-placement" value="left">
+                                            Left
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="tooltip" data-group="tooltip-placement" value="right">
+                                            Right
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="color-tooltip-text">
+                                            Colorized text
+                                        </label>
+                                        <div class="animation-slider" data-tooltip-delay-control>
+                                            <label for="button-builder-tooltip-delay">Delay</label>
+                                            <input type="range" id="button-builder-tooltip-delay" min="0" max="1000" value="500" step="10" data-button-control="tooltip-delay">
+                                            <span class="animation-value" id="button-builder-tooltip-delay-value">500ms</span>
+                                        </div>
+                                    </div>
+                                    <div class="toggle-column">
+                                        <h4 class="column-header">Notification</h4>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="notification" data-group="notification-type" value="none" checked>
+                                            None
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="notification" data-group="notification-type" value="success">
+                                            Success
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="notification" data-group="notification-type" value="warning">
+                                            Warning
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="notification" data-group="notification-type" value="error">
+                                            Error
+                                        </label>
+                                        <label class="status-toggle-option">
+                                            <input type="checkbox" data-button-control="notification" data-group="notification-type" value="info">
+                                            Info
+                                        </label>
+                                        <div class="animation-slider" data-notification-position-control>
+                                            <label for="button-builder-notification-position">Vertical position</label>
+                                            <input type="range" id="button-builder-notification-position" min="10" max="90" value="10" step="1" data-button-control="notification-position">
+                                            <span class="animation-value" id="button-builder-notification-position-value">10%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="button-preview">
+                                    <button type="button" class="btn btn-primary" id="button-builder-preview">Primary Button</button>
+                                </div>
+                                <code class="code-block"></code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Forms Section -->
+                    <section class="element-section" id="forms">
+                        <h2 class="section-title">Form Elements</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="text-input">
+                                <h3>Text Input</h3>
+                                <div class="form-field">
+                                    <label for="example-text">Text Input:</label>
+                                    <input type="text" id="example-text" class="form-input" placeholder="Enter text...">
+                                </div>
+                                <code class="code-block">&lt;input type="text" class="form-input" placeholder="Enter text..."&gt;</code>
+                            </div>
+                            <div class="element-example" id="number-input">
+                                <h3>Number Input</h3>
+                                <div class="form-field">
+                                    <label for="example-number">Number Input:</label>
+                                    <input type="number" id="example-number" class="form-input" placeholder="0">
+                                </div>
+                                <code class="code-block">&lt;input type="number" class="form-input"&gt;</code>
+                            </div>
+                            <div class="element-example" id="checkbox">
+                                <h3>Checkbox</h3>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="example-checkbox" value="1">
+                                    <span class="checkmark"></span>
+                                    Checkbox Option
+                                </label>
+                                <code class="code-block">&lt;label class="checkbox-label"&gt;&lt;input type="checkbox"&gt;&lt;span class="checkmark"&gt;&lt;/span&gt;Label&lt;/label&gt;</code>
+                            </div>
+                            <div class="element-example" id="textarea">
+                                <h3>Textarea</h3>
+                                <div class="form-field">
+                                    <label for="example-textarea">Textarea:</label>
+                                    <textarea id="example-textarea" class="form-input" rows="4" placeholder="Enter text..."></textarea>
+                                </div>
+                                <code class="code-block">&lt;textarea class="form-input" rows="4"&gt;&lt;/textarea&gt;</code>
+                            </div>
+                            <div class="element-example" id="radio-buttons">
+                                <h3>Radio Buttons</h3>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="example-radio" value="option1" checked>
+                                        <span class="radio-mark"></span>
+                                        Option 1
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="example-radio" value="option2">
+                                        <span class="radio-mark"></span>
+                                        Option 2
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="example-radio" value="option3">
+                                        <span class="radio-mark"></span>
+                                        Option 3
+                                    </label>
+                                </div>
+                                <code class="code-block">&lt;label class="radio-label"&gt;&lt;input type="radio" name="radio"&gt;&lt;span class="radio-mark"&gt;&lt;/span&gt;Label&lt;/label&gt;</code>
+                            </div>
+                            <div class="element-example" id="slider">
+                                <h3>Slider (Range Input)</h3>
+                                <div class="form-field">
+                                    <label for="example-slider">Value: <span id="slider-value">50</span></label>
+                                    <input type="range" id="example-slider" class="form-slider" min="0" max="100" value="50" step="1">
+                                </div>
+                                <code class="code-block">&lt;input type="range" class="form-slider" min="0" max="100" value="50"&gt;</code>
+                            </div>
+                            <div class="element-example" id="dropdown-select">
+                                <h3>Dropdown (Select)</h3>
+                                <div class="form-field">
+                                    <label for="example-select">Select Option:</label>
+                                    <select id="example-select" class="form-select">
+                                        <option value="">Choose an option...</option>
+                                        <option value="option1">Option 1</option>
+                                        <option value="option2">Option 2</option>
+                                        <option value="option3">Option 3</option>
+                                    </select>
+                                </div>
+                                <code class="code-block">&lt;select class="form-select"&gt;&lt;option&gt;Option&lt;/option&gt;&lt;/select&gt;</code>
+                            </div>
+                            <div class="element-example" id="toggle-switch">
+                                <h3>Toggle Switch</h3>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-enabled" checked>
+                                    <span class="toggle-slider"></span>
+                                    <span class="toggle-label">Enable Feature</span>
+                                </label>
+                                <code class="code-block"></code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tabs Section -->
+                    <section class="element-section" id="tabs">
+                        <h2 class="section-title">Tabs</h2>
+                        <div class="element-example" id="tabs-example">
+                            <div class="tab-navigation">
+                                <button type="button" class="tab-btn active" data-tab="tab1">
+                                    <i class="fas fa-cog"></i> Tab 1
+                                </button>
+                                <button type="button" class="tab-btn" data-tab="tab2">
+                                    <i class="fas fa-sliders-h"></i> Tab 2
+                                </button>
+                                <button type="button" class="tab-btn" data-tab="tab3">
+                                    <i class="fas fa-cloud"></i> Tab 3
+                                </button>
+                            </div>
+                            <div class="tab-content-example">
+                                <div class="tab-content active" id="tab1-content">Content for Tab 1</div>
+                                <div class="tab-content" id="tab2-content">Content for Tab 2</div>
+                                <div class="tab-content" id="tab3-content">Content for Tab 3</div>
+                            </div>
+                            <code class="code-block">
+&lt;div class="tab-navigation"&gt;
+  &lt;button class="tab-btn active"&gt;Tab 1&lt;/button&gt;
+  &lt;button class="tab-btn"&gt;Tab 2&lt;/button&gt;
+&lt;/div&gt;
+                            </code>
+                        </div>
+                    </section>
+
+                    <!-- Cards Section -->
+                    <section class="element-section" id="cards">
+                        <h2 class="section-title">Cards & Panels</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="card-panel">
+                                <h3>Card Panel</h3>
+                                <div class="control-panel">
+                                    <div class="panel-header">
+                                        <h2><i class="fas fa-cog"></i> Panel Header</h2>
+                                    </div>
+                                    <div class="panel-content">
+                                        <p>This is a card panel with a header and content area.</p>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="control-panel"&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="results-panel">
+                                <h3>Results Panel</h3>
+                                <div class="results-panel">
+                                    <div class="panel-header">
+                                        <h2><i class="fas fa-chart-line"></i> Results</h2>
+                                    </div>
+                                    <div class="results-container">
+                                        <div class="results-content">
+                                            <p>Results panel content goes here.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="results-panel"&gt;...&lt;/div&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Typography Section -->
+                    <section class="element-section" id="typography">
+                        <h2 class="section-title">Typography</h2>
+                        <div class="element-example" id="typography-headings">
+                            <h1>Heading 1</h1>
+                            <h2>Heading 2</h2>
+                            <h3>Heading 3</h3>
+                            <p>This is a paragraph with regular text. It demonstrates the default typography styling.</p>
+                            <p class="text-secondary">This is secondary text color.</p>
+                            <p class="text-light">This is light text color.</p>
+                            <code class="code-block">
+&lt;h1&gt;Heading 1&lt;/h1&gt;
+&lt;h2&gt;Heading 2&lt;/h2&gt;
+&lt;p&gt;Paragraph text&lt;/p&gt;
+                            </code>
+                        </div>
+                    </section>
+
+                    <!-- Colors Section -->
+                    <section class="element-section" id="colors">
+                        <h2 class="section-title">Color Palette</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="color-primary">
+                                <h3>Primary</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch" style="background: var(--primary-color);"></div>
+                                        <div class="color-info">
+                                            <strong>Primary</strong>
+                                            <code>#4f46e5</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#4f46e5</code>
+                            </div>
+                            <div class="element-example" id="color-success">
+                                <h3>Success</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch" style="background: var(--success-color);"></div>
+                                        <div class="color-info">
+                                            <strong>Success</strong>
+                                            <code>#059669</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#059669</code>
+                            </div>
+                            <div class="element-example" id="color-warning">
+                                <h3>Warning</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch" style="background: var(--warning-color);"></div>
+                                        <div class="color-info">
+                                            <strong>Warning</strong>
+                                            <code>#d97706</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#d97706</code>
+                            </div>
+                            <div class="element-example" id="color-danger">
+                                <h3>Danger</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch" style="background: var(--danger-color);"></div>
+                                        <div class="color-info">
+                                            <strong>Danger</strong>
+                                            <code>#dc2626</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#dc2626</code>
+                            </div>
+                            <div class="element-example" id="color-info">
+                                <h3>Info</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch" style="background: var(--info-color);"></div>
+                                        <div class="color-info">
+                                            <strong>Info</strong>
+                                            <code>#0284c7</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#0284c7</code>
+                            </div>
+                            <div class="element-example" id="color-secondary">
+                                <h3>Secondary</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch" style="background: var(--secondary-color);"></div>
+                                        <div class="color-info">
+                                            <strong>Secondary</strong>
+                                            <code>#6b7280</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#6b7280</code>
+                            </div>
+                            <div class="element-example" id="color-text">
+                                <h3>Text</h3>
+                                <div class="color-grid">
+                                    <div class="color-item">
+                                        <div class="color-swatch text-color-swatch"></div>
+                                        <div class="color-info">
+                                            <strong>Text</strong>
+                                            <code>#111827</code>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">#111827</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Status Indicators Section -->
+                    <section class="element-section" id="status">
+                        <h2 class="section-title">Status Indicators</h2>
+                        <div class="element-grid">
+                            <div class="element-example status-control" id="gps-status">
+                                <h3>GPS</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>GPS Lock</strong>
+                                            <span>Signal acquired and tracking</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-location-arrow"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Searching</strong>
+                                            <span>Acquiring satellite fix</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-map-pin"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>No GPS</strong>
+                                            <span>Signal unavailable</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-map-marker-alt&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;div class=&quot;status-indicator-text&quot;&gt;...&lt;/div&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="network-status">
+                                <h3>Network</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-network-wired"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Connected</strong>
+                                            <span>Link established</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-circle-notch fa-spin"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Connecting</strong>
+                                            <span>Negotiating connection</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-unlink"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Disconnected</strong>
+                                            <span>No link detected</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-network-wired&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="modem-status">
+                                <h3>Modem</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-wifi"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Connected</strong>
+                                            <span>Modem online and stable</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-circle-notch fa-spin"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Connecting</strong>
+                                            <span>Synchronizing with ISP</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-ban"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Disconnected</strong>
+                                            <span>No modem signal detected</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="status-indicator status-indicator-success"&gt;&lt;span class="status-indicator-icon"&gt;&lt;i class="fas fa-wifi"&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="signal-status">
+                                <h3>Signal Strength</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon signal-bars-icon">
+                                            <span class="bar bar-1 active"></span>
+                                            <span class="bar bar-2 active"></span>
+                                            <span class="bar bar-3 active"></span>
+                                            <span class="bar bar-4 active"></span>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Excellent</strong>
+                                            <span>Strong signal quality</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon signal-bars-icon">
+                                            <span class="bar bar-1 active"></span>
+                                            <span class="bar bar-2 active"></span>
+                                            <span class="bar bar-3 active"></span>
+                                            <span class="bar bar-4"></span>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Good</strong>
+                                            <span>Reliable connectivity</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon signal-bars-icon">
+                                            <span class="bar bar-1 active"></span>
+                                            <span class="bar bar-2 active"></span>
+                                            <span class="bar bar-3"></span>
+                                            <span class="bar bar-4"></span>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Fair</strong>
+                                            <span>Monitor for degradation</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon signal-bars-icon">
+                                            <span class="bar bar-1 active"></span>
+                                            <span class="bar bar-2"></span>
+                                            <span class="bar bar-3"></span>
+                                            <span class="bar bar-4"></span>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Poor</strong>
+                                            <span>Unreliable signal</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator&quot;&gt;&lt;span class=&quot;status-indicator-icon signal-bars-icon&quot;&gt;&lt;span class=&quot;bar bar-1 active&quot;&gt;&lt;/span&gt;...&lt;/span&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="generic-status-indicators">
+                                <h3>Connectivity</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-check-circle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Online</strong>
+                                            <span>Successful connection</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Warning</strong>
+                                            <span>Connectivity issue</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-times-circle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Offline</strong>
+                                            <span>No connectivity</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-check-circle&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="power-status">
+                                <h3>Power</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-bolt"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Low Usage</strong>
+                                            <span>Within expected range</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-bolt"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Elevated</strong>
+                                            <span>Power draw increasing</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-bolt"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Critical</strong>
+                                            <span>Immediate action required</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-bolt&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="disk-status">
+                                <h3>Disk</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-hdd"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Normal</strong>
+                                            <span>Under 70% capacity used</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-hdd"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>High Usage</strong>
+                                            <span>70%-90% capacity used</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-hdd"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Critical</strong>
+                                            <span>Above 90% capacity used</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-hdd&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="cpu-status">
+                                <h3>CPU</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-microchip"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Low</strong>
+                                            <span>&lt; 40% utilization</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-microchip"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Medium</strong>
+                                            <span>40%-80% utilization</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-microchip"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>High</strong>
+                                            <span>&gt; 80% utilization</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-microchip&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="memory-status">
+                                <h3>Memory</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-memory"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Low</strong>
+                                            <span>&lt; 60% allocation</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-memory"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Medium</strong>
+                                            <span>60%-85% allocation</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-memory"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>High</strong>
+                                            <span>&gt; 85% allocation</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-memory&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="battery-status">
+                                <h3>Battery</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-battery-full"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>High</strong>
+                                            <span>80% or greater remaining</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-battery-half"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Medium</strong>
+                                            <span>30%-79% remaining</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-battery-quarter"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Low</strong>
+                                            <span>Below 30% remaining</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-battery-full&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="temperature-status">
+                                <h3>Temperature</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-thermometer-empty"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Normal</strong>
+                                            <span>&lt; 60°C operating temp</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-thermometer-half"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Elevated</strong>
+                                            <span>60°C - 79°C</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-thermometer-full"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>High</strong>
+                                            <span>&ge; 80°C</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-thermometer-empty&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="ethernet-status">
+                                <h3>Ethernet</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-network-wired"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Connected</strong>
+                                            <span>Link up and passing traffic</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-exchange-alt"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Negotiating</strong>
+                                            <span>Waiting for link confirmation</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-plug"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Disconnected</strong>
+                                            <span>Cable unplugged or no signal</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-network-wired&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="vpn-status">
+                                <h3>VPN</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-shield-alt"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Active</strong>
+                                            <span>Tunnel established</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-shield"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Connecting</strong>
+                                            <span>Authenticating tunnel</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-shield"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Inactive</strong>
+                                            <span>No secure connection</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-shield-alt&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="ntp-status">
+                                <h3>NTP</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-clock"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Synced</strong>
+                                            <span>Clock aligned with pool</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-clock"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Drift Detected</strong>
+                                            <span>Adjusting to reference</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-ban"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Unsynced</strong>
+                                            <span>No valid time source</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-clock&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="gpio-status">
+                                <h3>GPIO</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-success">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-arrow-up"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Pin High</strong>
+                                            <span>Input/output is high</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-danger">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-arrow-down"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Pin Low</strong>
+                                            <span>Input/output is low</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator status-indicator-success&quot;&gt;&lt;span class=&quot;status-indicator-icon&quot;&gt;&lt;i class=&quot;fas fa-arrow-up&quot;&gt;&lt;/i&gt;&lt;/span&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example status-control" id="stat-item">
+                                <h3>Generic</h3>
+                                <div class="status-toggle-controls">
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="background" checked>
+                                        Background color
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="border" checked>
+                                        Border
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="main" checked>
+                                        Main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="description" checked>
+                                        Descriptive text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-main" checked>
+                                        Colorized main text
+                                    </label>
+                                    <label class="status-toggle-option">
+                                        <input type="checkbox" data-control="color-description">
+                                        Colorized desc. text
+                                    </label>
+                                </div>
+                                <div class="status-indicator-group">
+                                    <div class="status-indicator status-indicator-primary-state">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-circle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Primary</strong>
+                                            <span>Neutral display value</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-secondary-state">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-circle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Secondary</strong>
+                                            <span>Alternate reference reading</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-acceptable-state">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-check-circle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Acceptable</strong>
+                                            <span>Operating within goal</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-warning-state">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Warning</strong>
+                                            <span>Approaching threshold</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-indicator status-indicator-alarm-state">
+                                        <span class="status-indicator-icon">
+                                            <i class="fas fa-exclamation-circle"></i>
+                                        </span>
+                                        <div class="status-indicator-text">
+                                            <strong>Alarm</strong>
+                                            <span>Immediate action required</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class=&quot;status-indicator&quot;&gt;...&lt;/div&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Notifications Section -->
+                    <section class="element-section" id="notifications">
+                        <h2 class="section-title">Notifications & Toasts</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="success-toast">
+                                <h3>Success Toast</h3>
+                                <button type="button" class="btn btn-success" onclick="showExampleToast('success')">
+                                    Show Success Toast
+                                </button>
+                                <code class="code-block">&lt;div class="toast success"&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="warning-toast">
+                                <h3>Warning Toast</h3>
+                                <button type="button" class="btn btn-warning" onclick="showExampleToast('warning')">
+                                    Show Warning Toast
+                                </button>
+                                <code class="code-block">&lt;div class="toast warning"&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="error-toast">
+                                <h3>Error Toast</h3>
+                                <button type="button" class="btn btn-danger" onclick="showExampleToast('error')">
+                                    Show Error Toast
+                                </button>
+                                <code class="code-block">&lt;div class="toast error"&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="info-toast">
+                                <h3>Info Toast</h3>
+                                <button type="button" class="btn btn-secondary" onclick="showExampleToast('info')">
+                                    Show Info Toast
+                                </button>
+                                <code class="code-block">&lt;div class="toast"&gt;...&lt;/div&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Loading States Section -->
+                    <section class="element-section" id="loading">
+                        <h2 class="section-title">Loading States</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="loading-spinner-circular">
+                                <h3>Loading Spinner (Circular)</h3>
+                                <div class="loading-spinner">
+                                    <div class="spinner-circle"></div>
+                                    <p>Loading...</p>
+                                </div>
+                                <code class="code-block">&lt;div class="loading-spinner"&gt;&lt;div class="spinner-circle"&gt;&lt;/div&gt;&lt;p&gt;Loading...&lt;/p&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="loading-spinner-icon">
+                                <h3>Loading Spinner (Icon)</h3>
+                                <div class="loading-spinner">
+                                    <i class="fas fa-circle-notch fa-spin"></i>
+                                    <p>Loading...</p>
+                                </div>
+                                <code class="code-block">&lt;div class="loading-spinner"&gt;&lt;i class="fas fa-circle-notch fa-spin"&gt;&lt;/i&gt;&lt;p&gt;Loading...&lt;/p&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="loading-overlay-example">
+                                <h3>Loading Overlay</h3>
+                                <button type="button" class="btn btn-primary" onclick="showExampleLoading()">
+                                    Show Loading Overlay
+                                </button>
+                                <code class="code-block">&lt;div class="loading-overlay"&gt;...&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="running-indicator">
+                                <h3>Running Indicator</h3>
+                                <div class="status-item survey-indicator">
+                                    <i class="fas fa-sync-alt fa-spin"></i>
+                                    <span>Running</span>
+                                </div>
+                                <code class="code-block">&lt;div class="status-item survey-indicator"&gt;&lt;i class="fas fa-sync-alt fa-spin"&gt;&lt;/i&gt;&lt;span&gt;Running&lt;/span&gt;&lt;/div&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Progress Bars Section -->
+                    <section class="element-section" id="progress">
+                        <h2 class="section-title">Progress Bars</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="basic-progress-bar">
+                                <h3>Basic Progress Bar</h3>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 45%;"></div>
+                                </div>
+                                <code class="code-block">&lt;div class="progress-bar"&gt;&lt;div class="progress-fill" style="width: 45%;"&gt;&lt;/div&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="progress-bar-with-label">
+                                <h3>Progress Bar with Label</h3>
+                                <div class="progress-bar-container">
+                                    <div class="progress-label">
+                                        <span>Loading...</span>
+                                        <span>45%</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 45%;"></div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="progress-bar-container"&gt;&lt;div class="progress-bar"&gt;&lt;div class="progress-fill"&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="success-progress">
+                                <h3>Success Progress</h3>
+                                <div class="progress-bar">
+                                    <div class="progress-fill progress-success" style="width: 100%;"></div>
+                                </div>
+                                <code class="code-block">&lt;div class="progress-fill progress-success"&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="warning-progress">
+                                <h3>Warning Progress</h3>
+                                <div class="progress-bar">
+                                    <div class="progress-fill progress-warning" style="width: 60%;"></div>
+                                </div>
+                                <code class="code-block">&lt;div class="progress-fill progress-warning"&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="danger-progress">
+                                <h3>Danger Progress</h3>
+                                <div class="progress-bar">
+                                    <div class="progress-fill progress-danger" style="width: 25%;"></div>
+                                </div>
+                                <code class="code-block">&lt;div class="progress-fill progress-danger"&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="animated-progress">
+                                <h3>Animated Progress</h3>
+                                <button type="button" class="btn btn-primary" onclick="animateProgress()">
+                                    Start Animation
+                                </button>
+                                <div class="progress-bar" id="animated-progress" style="margin-top: 1rem;">
+                                    <div class="progress-fill" id="animated-fill" style="width: 0%;"></div>
+                                </div>
+                                <code class="code-block">Use JavaScript to animate progress bars</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Tooltips Section -->
+                    <section class="element-section" id="tooltips">
+                        <h2 class="section-title">Tooltips</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="top-tooltip">
+                                <h3>Top Tooltip</h3>
+                                <button type="button" class="btn btn-primary tooltip-trigger" data-tooltip="This is a tooltip on top" data-position="top">
+                                    Hover for Tooltip (Top)
+                                </button>
+                                <code class="code-block">&lt;button class="tooltip-trigger" data-tooltip="Tooltip text" data-position="top"&gt;Button&lt;/button&gt;</code>
+                            </div>
+                            <div class="element-example" id="right-tooltip">
+                                <h3>Right Tooltip</h3>
+                                <button type="button" class="btn btn-secondary tooltip-trigger" data-tooltip="This is a tooltip on the right" data-position="right">
+                                    Hover for Tooltip (Right)
+                                </button>
+                                <code class="code-block">&lt;button class="tooltip-trigger" data-tooltip="Tooltip text" data-position="right"&gt;Button&lt;/button&gt;</code>
+                            </div>
+                            <div class="element-example" id="bottom-tooltip">
+                                <h3>Bottom Tooltip</h3>
+                                <button type="button" class="btn btn-success tooltip-trigger" data-tooltip="This is a tooltip on the bottom" data-position="bottom">
+                                    Hover for Tooltip (Bottom)
+                                </button>
+                                <code class="code-block">&lt;button class="tooltip-trigger" data-tooltip="Tooltip text" data-position="bottom"&gt;Button&lt;/button&gt;</code>
+                            </div>
+                            <div class="element-example" id="left-tooltip">
+                                <h3>Left Tooltip</h3>
+                                <button type="button" class="btn btn-warning tooltip-trigger" data-tooltip="This is a tooltip on the left" data-position="left">
+                                    Hover for Tooltip (Left)
+                                </button>
+                                <code class="code-block">&lt;button class="tooltip-trigger" data-tooltip="Tooltip text" data-position="left"&gt;Button&lt;/button&gt;</code>
+                            </div>
+                            <div class="element-example" id="tooltip-on-icon">
+                                <h3>Tooltip on Icon</h3>
+                                <div style="display: flex; gap: 1rem; align-items: center;">
+                                    <i class="fas fa-info-circle tooltip-trigger" data-tooltip="Information available" data-position="top" style="font-size: 2rem; color: var(--info-color); cursor: pointer;"></i>
+                                    <i class="fas fa-question-circle tooltip-trigger" data-tooltip="Need some help?" data-position="top" style="font-size: 2rem; color: var(--primary-color); cursor: pointer;"></i>
+                                    <i class="fas fa-exclamation-circle tooltip-trigger" data-tooltip="Warning detected" data-position="top" style="font-size: 2rem; color: var(--warning-color); cursor: pointer;"></i>
+                                    <i class="fas fa-radiation-alt tooltip-trigger" data-tooltip="Alarm triggered" data-position="top" style="font-size: 2rem; color: var(--danger-color); cursor: pointer;"></i>
+                                </div>
+                                <code class="code-block">&lt;i class="fas fa-icon tooltip-trigger" data-tooltip="Tooltip text"&gt;&lt;/i&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Search Section -->
+                    <section class="element-section" id="search">
+                        <h2 class="section-title">Search</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="basic-search-input">
+                                <h3>Basic Search Input</h3>
+                                <div class="search-container">
+                                    <input type="text" class="search-input" placeholder="Search...">
+                                    <i class="fas fa-search search-icon"></i>
+                                </div>
+                                <code class="code-block">&lt;div class="search-container"&gt;&lt;input type="text" class="search-input" placeholder="Search..."&gt;&lt;i class="fas fa-search search-icon"&gt;&lt;/i&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="search-with-clear-button">
+                                <h3>Search with Clear Button</h3>
+                                <div class="search-container search-with-clear">
+                                    <input type="text" class="search-input" placeholder="Search..." value="Example search">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <button type="button" class="search-clear" title="Clear search">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <code class="code-block">&lt;div class="search-container search-with-clear"&gt;&lt;input type="text" class="search-input"&gt;&lt;i class="fas fa-search search-icon"&gt;&lt;/i&gt;&lt;button class="search-clear"&gt;&lt;i class="fas fa-times"&gt;&lt;/i&gt;&lt;/button&gt;&lt;/div&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Charts Section -->
+                    <section class="element-section" id="charts">
+                        <h2 class="section-title">Charts</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="bar-chart">
+                                <h3>Bar Chart</h3>
+                                <div class="chart-container">
+                                    <div class="chart-bar-wrapper">
+                                        <div class="chart-bar-item">
+                                            <div class="chart-bar-label">Jan</div>
+                                            <div class="chart-bar">
+                                                <div class="chart-bar-fill" style="height: 65%;"></div>
+                                            </div>
+                                            <div class="chart-bar-value">65</div>
+                                        </div>
+                                        <div class="chart-bar-item">
+                                            <div class="chart-bar-label">Feb</div>
+                                            <div class="chart-bar">
+                                                <div class="chart-bar-fill" style="height: 80%;"></div>
+                                            </div>
+                                            <div class="chart-bar-value">80</div>
+                                        </div>
+                                        <div class="chart-bar-item">
+                                            <div class="chart-bar-label">Mar</div>
+                                            <div class="chart-bar">
+                                                <div class="chart-bar-fill" style="height: 45%;"></div>
+                                            </div>
+                                            <div class="chart-bar-value">45</div>
+                                        </div>
+                                        <div class="chart-bar-item">
+                                            <div class="chart-bar-label">Apr</div>
+                                            <div class="chart-bar">
+                                                <div class="chart-bar-fill" style="height: 90%;"></div>
+                                            </div>
+                                            <div class="chart-bar-value">90</div>
+                                        </div>
+                                        <div class="chart-bar-item">
+                                            <div class="chart-bar-label">May</div>
+                                            <div class="chart-bar">
+                                                <div class="chart-bar-fill" style="height: 70%;"></div>
+                                            </div>
+                                            <div class="chart-bar-value">70</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="chart-bar-wrapper"&gt;&lt;div class="chart-bar-item"&gt;&lt;div class="chart-bar"&gt;&lt;div class="chart-bar-fill" style="height: 65%;"&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="line-chart">
+                                <h3>Line Chart</h3>
+                                <div class="chart-container">
+                                    <div class="chart-line-wrapper">
+                                        <svg class="chart-line" viewBox="0 0 300 150" preserveAspectRatio="none">
+                                            <polyline
+                                                points="0,120 30,100 60,80 90,60 120,70 150,50 180,40 210,30 240,20 270,10 300,0"
+                                                fill="none"
+                                                stroke="var(--primary-color)"
+                                                stroke-width="3"
+                                            />
+                                            <polyline
+                                                points="0,120 30,90 60,70 90,50 120,40 150,30 180,25 210,20 240,15 270,10 300,5"
+                                                fill="none"
+                                                stroke="var(--success-color)"
+                                                stroke-width="3"
+                                            />
+                                        </svg>
+                                        <div class="chart-line-labels">
+                                            <span>Jan</span>
+                                            <span>Feb</span>
+                                            <span>Mar</span>
+                                            <span>Apr</span>
+                                            <span>May</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;svg class="chart-line"&gt;&lt;polyline points="..." stroke="var(--primary-color)"&gt;&lt;/polyline&gt;&lt;/svg&gt;</code>
+                            </div>
+                            <div class="element-example" id="pie-chart">
+                                <h3>Pie Chart</h3>
+                                <div class="chart-container">
+                                    <div class="chart-pie-wrapper">
+                                        <div class="chart-pie" style="background: conic-gradient(
+                                            var(--primary-color) 0% 40%,
+                                            var(--success-color) 40% 70%,
+                                            var(--warning-color) 70% 90%,
+                                            var(--info-color) 90% 100%
+                                        );"></div>
+                                        <div class="chart-pie-legend">
+                                            <div class="chart-legend-item">
+                                                <span class="chart-legend-color" style="background: var(--primary-color);"></span>
+                                                <span>Series 1 (40%)</span>
+                                            </div>
+                                            <div class="chart-legend-item">
+                                                <span class="chart-legend-color" style="background: var(--success-color);"></span>
+                                                <span>Series 2 (30%)</span>
+                                            </div>
+                                            <div class="chart-legend-item">
+                                                <span class="chart-legend-color" style="background: var(--warning-color);"></span>
+                                                <span>Series 3 (20%)</span>
+                                            </div>
+                                            <div class="chart-legend-item">
+                                                <span class="chart-legend-color" style="background: var(--info-color);"></span>
+                                                <span>Series 4 (10%)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="chart-pie" style="background: conic-gradient(...);"&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="area-chart">
+                                <h3>Area Chart</h3>
+                                <div class="chart-container">
+                                    <div class="chart-area-wrapper">
+                                        <svg class="chart-area" viewBox="0 0 300 150" preserveAspectRatio="none">
+                                            <defs>
+                                                <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                    <stop offset="0%" style="stop-color:var(--primary-color);stop-opacity:0.8" />
+                                                    <stop offset="100%" style="stop-color:var(--primary-color);stop-opacity:0.1" />
+                                                </linearGradient>
+                                            </defs>
+                                            <path
+                                                d="M 0,120 L 30,100 L 60,80 L 90,60 L 120,70 L 150,50 L 180,40 L 210,30 L 240,20 L 270,10 L 300,0 L 300,150 L 0,150 Z"
+                                                fill="url(#areaGradient)"
+                                                stroke="var(--primary-color)"
+                                                stroke-width="2"
+                                            />
+                                        </svg>
+                                        <div class="chart-line-labels">
+                                            <span>Jan</span>
+                                            <span>Feb</span>
+                                            <span>Mar</span>
+                                            <span>Apr</span>
+                                            <span>May</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;svg class="chart-area"&gt;&lt;path d="..." fill="url(#areaGradient)"&gt;&lt;/path&gt;&lt;/svg&gt;</code>
+                            </div>
+                            <div class="element-example" id="horizontal-bar-chart">
+                                <h3>Horizontal Bar Chart</h3>
+                                <div class="chart-container">
+                                    <div class="chart-horizontal-bar-wrapper">
+                                        <div class="chart-horizontal-bar-item">
+                                            <span class="chart-horizontal-label">Product A</span>
+                                            <div class="chart-horizontal-bar">
+                                                <div class="chart-horizontal-fill" style="width: 75%;"></div>
+                                            </div>
+                                            <span class="chart-horizontal-value">75%</span>
+                                        </div>
+                                        <div class="chart-horizontal-bar-item">
+                                            <span class="chart-horizontal-label">Product B</span>
+                                            <div class="chart-horizontal-bar">
+                                                <div class="chart-horizontal-fill" style="width: 60%;"></div>
+                                            </div>
+                                            <span class="chart-horizontal-value">60%</span>
+                                        </div>
+                                        <div class="chart-horizontal-bar-item">
+                                            <span class="chart-horizontal-label">Product C</span>
+                                            <div class="chart-horizontal-bar">
+                                                <div class="chart-horizontal-fill" style="width: 90%;"></div>
+                                            </div>
+                                            <span class="chart-horizontal-value">90%</span>
+                                        </div>
+                                        <div class="chart-horizontal-bar-item">
+                                            <span class="chart-horizontal-label">Product D</span>
+                                            <div class="chart-horizontal-bar">
+                                                <div class="chart-horizontal-fill" style="width: 45%;"></div>
+                                            </div>
+                                            <span class="chart-horizontal-value">45%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="chart-horizontal-bar-item"&gt;&lt;div class="chart-horizontal-bar"&gt;&lt;div class="chart-horizontal-fill" style="width: 75%;"&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;</code>
+                            </div>
+                            <div class="element-example" id="donut-chart">
+                                <h3>Donut Chart</h3>
+                                <div class="chart-container">
+                                    <div class="chart-donut-wrapper">
+                                        <div class="chart-donut" style="background: conic-gradient(
+                                            var(--primary-color) 0% 35%,
+                                            var(--success-color) 35% 60%,
+                                            var(--warning-color) 60% 85%,
+                                            var(--info-color) 85% 100%
+                                        );">
+                                            <div class="chart-donut-center">
+                                                <span class="chart-donut-value">68%</span>
+                                                <span class="chart-donut-label">Total</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <code class="code-block">&lt;div class="chart-donut" style="background: conic-gradient(...);"&gt;&lt;/div&gt;</code>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="element-section" id="resources">
+                        <h2 class="section-title">Starter Templates</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="your-web-app-template">
+                                <h3>Your Web App</h3>
+                                <p>
+                                    Kick off a new project with a clean slate. This blank template mirrors the layout and wiring of the main demo but leaves the body minimal so you can paste in the components you need.
+                                </p>
+                                <div class="template-actions">
+                                    <a class="btn btn-primary" href="your_web_app.html" target="_blank" rel="noopener">
+                                        <i class="fas fa-external-link-alt"></i> Open Template
+                                    </a>
+                                    <a class="btn btn-secondary" href="your_web_app.html" download>
+                                        <i class="fas fa-download"></i> Download HTML
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner-circle"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="static/js/script.js"></script>
+</body>
+</html>
+

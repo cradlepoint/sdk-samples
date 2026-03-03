@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Web App</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">Your Web App</h1>
+                </div>
+                <div class="header-actions">
+                    <div class="search-container search-with-clear">
+                        <input type="text" id="search-input" class="search-input" placeholder="Search">
+                        <i class="fas fa-search search-icon"></i>
+                        <button type="button" class="search-clear" id="header-search-clear" title="Clear search">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home"></i> Homepage</a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <!-- Example top-level section -->
+                        <li class="nav-parent">
+                            <a href="#section-1" class="nav-item" data-element="section-1">
+                                <i class="fas fa-layer-group"></i> Section 1
+                                <i class="fas fa-chevron-down nav-arrow"></i>
+                            </a>
+                            <ul class="nav-sub-list" style="display: none;">
+                                <li><a href="#" class="nav-sub-item" data-element="section-1" data-sub-element="section-1-example">Example Item</a></li>
+                            </ul>
+                        </li>
+                        <!-- Duplicate the structure above for additional sections -->
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+                    <!-- Homepage / Welcome Section -->
+                    <section class="element-section active" id="homepage">
+                        <div class="welcome-hero">
+                            <div class="welcome-hero-content">
+                                <h2 class="section-title">Welcome to Your Web App</h2>
+                                <p class="welcome-lead">Start from a clean slate that already understands your design system. Copy patterns from the style guide or drop in your own components to build pages quickly.</p>
+                                <div class="welcome-actions">
+                                    <button type="button" class="btn btn-secondary" data-action="preview-themes">
+                                        <i class="fas fa-adjust"></i> Preview Themes
+                                    </button>
+                                </div>
+                                <ul class="welcome-checklist">
+                                    <li><i class="fas fa-check-circle"></i> Uses the same typography, color tokens, and spacing as the style guide.</li>
+                                    <li><i class="fas fa-check-circle"></i> Sidebar navigation is ready for your own sections and sub-items.</li>
+                                    <li><i class="fas fa-check-circle"></i> Dark mode toggle and search bar are wired up out of the box.</li>
+                                </ul>
+                            </div>
+                            <div class="welcome-hero-visual">
+                                <div class="welcome-icon-cluster">
+                                    <span class="cluster-icon primary"><i class="fas fa-layer-group"></i></span>
+                                    <span class="cluster-icon success"><i class="fas fa-columns"></i></span>
+                                    <span class="cluster-icon warning"><i class="fas fa-chart-line"></i></span>
+                                    <span class="cluster-icon danger"><i class="fas fa-bolt"></i></span>
+                                    <span class="cluster-icon info"><i class="fas fa-sliders-h"></i></span>
+                                </div>
+                                <p class="welcome-visual-caption">Drop in cards, forms, or status tiles to build your custom experience.</p>
+                            </div>
+                        </div>
+
+                        <div class="welcome-highlights">
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon"><i class="fas fa-layer-group"></i></div>
+                                <h3>Modular Layout</h3>
+                                <p>Add or remove sections in the sidebar to map your app information architecture.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon"><i class="fas fa-clone"></i></div>
+                                <h3>Copy Friendly</h3>
+                                <p>Paste markup from <code>index.html</code> directly and adjust copy or data bindings.</p>
+                            </article>
+                            <article class="welcome-highlight">
+                                <div class="highlight-icon"><i class="fas fa-moon"></i></div>
+                                <h3>Theme Ready</h3>
+                                <p>Light and dark themes stay in sync with the main template&rsquo;s design tokens.</p>
+                            </article>
+                        </div>
+                    </section>
+
+                    <!-- Example Section Wrapper -->
+                    <section class="element-section" id="section-1">
+                        <h2 class="section-title">Section 1</h2>
+                        <div class="element-grid">
+                            <div class="element-example" id="section-1-example">
+                                <h3>Example Element</h3>
+                                <p>Replace this element with your own component. You can import markup from <code>index.html</code> and adjust labels, icons, or behavior as needed.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Add more sections here following the pattern above -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="static/js/script.js"></script>
+</body>
+</html>
