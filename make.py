@@ -538,19 +538,16 @@ def package_application(app_root, pkey):
 def package(app=None):
     app_name = app or g_app_name
     print("Packaging {}".format(app_name))
-    success = True
     app_path = os.path.join(app_name)
     scan_for_cr(app_path)
     setup_script(app_path)
 
     try:
-        # Call package_application directly instead of via subprocess
-        package_application(app_path, None)  # pkey=None for no signing
+        package_application(app_path, None)
+        return True
     except Exception as err:
         print('Error packaging {}: {}'.format(app_name, err))
-        success = False
-    finally:
-        return success
+        return False
 
 
 # Package all the app files in the directory into a tar.gz archives.
