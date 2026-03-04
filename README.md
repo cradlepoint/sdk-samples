@@ -144,7 +144,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [mqtt_azure_tls v2.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/mqtt_azure_tls.v2.0.0.tar.gz)
 - **ncx_self_provision**
     - Script and accompanying SDK application to allow devices to 'sef-provision' to an NCX/SASE network.
-    - **Download:** [ncx_self_provision v2.5.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ncx_self_provision.v2.5.0.tar.gz)
+    - **Download:** [ncx_self_provision v2.6.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ncx_self_provision.v2.6.0.tar.gz)
 - **OBDII_monitor**
     - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
     - **Download:** [OBDII_monitor v1.0.2.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/OBDII_monitor.v1.0.2.tar.gz)
@@ -338,6 +338,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
