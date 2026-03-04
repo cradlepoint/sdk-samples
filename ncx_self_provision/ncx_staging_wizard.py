@@ -43,6 +43,7 @@ Wizard Steps:
        - Special column detection: id, name, primary_lan_ip, desc, custom1/2, tags, disable_force_dns
        - Template placeholder detection: any non-special column as {{column_name}}
        - Missing 'id' column warning (required for router matching)
+       - Hostname validation: 'name' column values must be max 50 chars, alphanumeric + hyphens only
     
     6. Review & Apply - Configuration summary and deployment
        - Comprehensive configuration summary
@@ -71,6 +72,7 @@ Key Features:
     - Real-time API key connectivity testing
     - License type validation with automatic NCX/SASE prefix matching
     - Tag format validation (min 2 chars, lowercase alphanumeric)
+    - Hostname validation (max 50 chars, alphanumeric + hyphens only)
     - IP address validation (no netmask notation allowed)
     - FQDN validation for local domain
     - CSV/JSON file validation (column/placeholder matching)
@@ -103,6 +105,7 @@ CSV Column Types:
     Special columns (processed by app logic, not template placeholders):
     - id: Router ID for matching (required)
     - name: System name (optional, cached for site creation, fallback to device)
+           Must be hostname compliant: max 50 chars, alphanumeric + hyphens only
     - primary_lan_ip: Primary LAN IP (optional, cached for site/resource, fallback to device)
     - desc: Description (optional, injected into device config)
     - custom1, custom2: NCM custom fields (optional)
@@ -116,12 +119,22 @@ CSV Column Types:
     - Any non-special column can be used as {{column_name}} in config_template.json
 
 Usage:
+    # Install dependencies (required for wizard only)
+    pip install -r requirements.txt
+    
+    # Run the wizard
     python ncx_staging_wizard.py
     # Open browser to http://localhost:8000
     # Complete 6-step wizard
     # Apply configuration to staging group
     # Build SDK package: python make.py build ncx_self_provision
     # Upload to NCM and assign to staging group
+
+Requirements:
+    - Python 3.6 or higher
+    - requests library (install via: pip install -r requirements.txt)
+    - ncm.py library (included in project)
+    - Web browser for wizard interface
 
 Security:
     - NEVER deploy this file to routers
@@ -142,6 +155,7 @@ Files Never Deployed (Local Use Only):
     - ncx_staging_wizard.py (this file)
     - index.html (wizard web interface)
     - static/ (wizard CSS/JS/assets)
+    - requirements.txt (Python dependencies)
     - README.md (documentation)
 
 Port Configuration:
@@ -257,6 +271,34 @@ def validate_ip_address(ip: str) -> bool:
             return False
     
     return True
+
+
+def validate_hostname(hostname: str) -> tuple:
+    """Validate hostname compliance (alphanumeric + hyphens, max 50 chars).
+    
+    Args:
+        hostname: Hostname string to validate.
+    
+    Returns:
+        Tuple of (is_valid: bool, message: str).
+        Returns (True, "Valid") if hostname is compliant or empty.
+        Returns (False, error_message) if hostname is non-compliant.
+    
+    Validation Rules:
+        - Maximum 50 characters
+        - Only alphanumeric characters and hyphens allowed
+        - Empty hostnames are considered valid (will be skipped)
+    """
+    if not hostname or hostname.strip() == '':
+        return True, "Valid"
+    
+    if len(hostname) > 50:
+        return False, f"Hostname exceeds 50 characters ({len(hostname)} chars)"
+    
+    if not all(c.isalnum() or c == '-' for c in hostname):
+        return False, "Hostname must contain only alphanumeric characters and hyphens"
+    
+    return True, "Valid"
 
 
 def validate_fqdn(domain: str) -> tuple:
@@ -547,6 +589,17 @@ class ConfigurationHandler(http.server.SimpleHTTPRequestHandler):
                                     errors.append(f'CSV must contain "id" column. Found: {", ".join(csv_columns)}')
                                 if len(csv_columns) < 2:
                                     errors.append('CSV must contain at least 2 columns (id + 1 other)')
+                                
+                                # Validate hostname compliance for 'name' column values
+                                if 'name' in csv_columns:
+                                    csv_reader = csv.DictReader(lines)
+                                    for row in csv_reader:
+                                        name_value = row.get('name', '').strip()
+                                        router_id = row.get('id', 'unknown')
+                                        if name_value:
+                                            valid, msg = validate_hostname(name_value)
+                                            if not valid:
+                                                errors.append(f"Router ID {router_id}: name '{name_value}' - {msg}")
                             else:
                                 errors.append('CSV file is empty')
                     except Exception as e:
@@ -865,6 +918,17 @@ class ConfigurationHandler(http.server.SimpleHTTPRequestHandler):
                                     errors.append(f'CSV must contain "id" column. Found: {", ".join(csv_columns)}')
                                 if len(csv_columns) < 2:
                                     errors.append('CSV must contain at least 2 columns (id + 1 other)')
+                                
+                                # Validate hostname compliance for 'name' column values
+                                if 'name' in csv_columns:
+                                    csv_reader = csv.DictReader(lines)
+                                    for row in csv_reader:
+                                        name_value = row.get('name', '').strip()
+                                        router_id = row.get('id', 'unknown')
+                                        if name_value:
+                                            valid, msg = validate_hostname(name_value)
+                                            if not valid:
+                                                errors.append(f"Router ID {router_id}: name '{name_value}' - {msg}")
                             else:
                                 errors.append('CSV file is empty')
                         except Exception as e:

@@ -22,7 +22,7 @@
 - [Best Practices](#best-practices)
 - [FAQ](#faq)
 
-## Overview (v2.5)
+## Overview (v2.6)
 
 The NCX Self-Provisioning SDK Application enables Ericsson routers to automatically provision themselves to an NCX or SASE network when moved into a staging group. The application executes a 9-step zero-touch provisioning workflow with state management and automatic recovery:
 
@@ -134,6 +134,12 @@ Additional cached data for recovery:
 4. **Licenses**: Valid Secure Connect license (SD-WAN, HMF, and AI optional)
    - See [Supported License Types](#supported-license-types) for valid license values
 
+### Staging Wizard Requirements (Local Machine)
+1. **Python**: Python 3.6 or higher
+2. **Dependencies**: requests library (install via `pip install -r requirements.txt`)
+3. **Web Browser**: Modern web browser (Chrome, Firefox, Safari, Edge)
+4. **Network Access**: Ability to connect to NCM API endpoints
+
 ### Device Requirements
 1. **Firmware**: Compatible firmware version in both staging and production groups
 2. **Certificates**: API keys stored as certificates on devices
@@ -143,6 +149,7 @@ Additional cached data for recovery:
 ### File Requirements
 - `router_grid.csv`: Device configuration data (if using bulk config)
 - `config_template.json`: Configuration template (if using bulk config)
+- `requirements.txt`: Python dependencies for staging wizard (requests library)
 
 ### Supported License Types
 
@@ -181,7 +188,18 @@ The installation process consists of three main steps:
 
 The NCX Staging Wizard is a web-based configuration tool that must be run before deployment to configure the staging group with all required application data and API keys.
 
-1. **Launch the NCX Staging Wizard**:
+**Prerequisites:**
+- Python 3.6 or higher
+- requests library (install via: `pip install -r requirements.txt`)
+- Web browser
+
+1. **Install Python dependencies**:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. **Launch the NCX Staging Wizard**:
 
 ```bash
 python ncx_staging_wizard.py
@@ -194,13 +212,13 @@ Starting NCX Staging Wizard on http://localhost:8000
 Press Ctrl+C to stop the server
 ```
 
-2. **Open your web browser** and navigate to:
+3. **Open your web browser** and navigate to:
 
 ```
 http://localhost:8000
 ```
 
-3. **Complete the 6-step wizard**:
+4. **Complete the 6-step wizard**:
 
    **Step 1: API Keys**
    - Enter your NCM API v2 credentials (X-CP-API-ID, X-CP-API-KEY, X-ECM-API-ID, X-ECM-API-KEY)
@@ -235,13 +253,14 @@ http://localhost:8000
    - Upload or edit `router_grid.csv` and `config_template.json` files
    - Use the built-in file editor with grid view for CSV editing
    - Validate files to check column/placeholder matching
+   - Hostname validation: 'name' column values checked for compliance (max 50 chars, alphanumeric + hyphens)
 
    **Step 6: Review & Apply**
    - Review your complete configuration summary
    - Click "Validate Configuration" to check all settings
    - Click "Apply Configuration" to push settings to staging group
 
-4. **Verify configuration was applied**:
+5. **Verify configuration was applied**:
 
 You should see a success message:
 
@@ -260,6 +279,7 @@ Next Steps:
 - Validates all required configuration parameters
 - Validates API key connectivity with real-time testing
 - Validates tag format (min 2 chars, lowercase alphanumeric) and FQDN compliance
+- Validates hostname compliance for 'name' column (max 50 chars, alphanumeric + hyphens)
 - Validates IP addresses (no netmask notation allowed)
 - Validates bulk configuration files (CSV/JSON matching)
 - Validates license types with automatic NCX/SASE prefix matching
@@ -271,6 +291,7 @@ Next Steps:
 - Collapsible warning messages for bulk configuration issues
 
 **Troubleshooting:**
+- If you see "ModuleNotFoundError: No module named 'requests'", run `pip install -r requirements.txt`
 - If you see validation errors, check that all required fields are filled correctly
 - If API key validation fails, verify your credentials are correct
 - Ensure you have permissions to modify the staging group in NCM
@@ -477,7 +498,7 @@ id,name,asset_id,primary_lan_ip,custom1,custom2
 | CSV Column | Required | Usage | Description |
 |------------|----------|-------|-------------|
 | `id` | **YES** | Router matching | Router ID - MUST match device's NCM router ID to find the correct row. Without this column, bulk configuration will fail. |
-| `name` | No | Site creation | System name - cached during bulk config (Step 4) and used for exchange site creation (Step 6). If missing or router not in CSV, falls back to device's current system_id from running config. |
+| `name` | No | Site creation | System name - cached during bulk config (Step 4) and used for exchange site creation (Step 6). If missing or router not in CSV, falls back to device's current system_id from running config. Must be hostname compliant: max 50 chars, alphanumeric + hyphens only. |
 | `primary_lan_ip` | No | Site/resource creation | Primary LAN IP - cached during bulk config (Step 4) and used for site DNS configuration (Step 6) and LAN resource creation (Step 7). If missing or router not in CSV, falls back to device's current LAN IP from running config. |
 | `desc` | No | Device configuration | Description - injected into device configuration via NCM API during bulk config (Step 4). Not used in template. |
 | `custom1` | No | NCM custom field | Custom field 1 - set via NCM API during bulk config (Step 4), not in template. Visible in NCM device list. |
@@ -664,6 +685,7 @@ id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags
 
 #### Step 6: Exchange Site Creation
 - Create site with router hostname (from bulk config if available)
+- Validate hostname compliance (max 50 chars, alphanumeric + hyphens)
 - Apply site tags as list (if configured)
 - Configure LAN as DNS (if enabled) OR custom DNS servers (if provided)
 - Set local domain (if LAN as DNS)
@@ -906,6 +928,7 @@ View current provisioning state in NCM:
 - Verify exchange network ID is correct
 - Confirm network exists and is accessible
 - Check for duplicate site names
+- Verify hostname is compliant (max 50 chars, alphanumeric + hyphens only)
 - Review NCM exchange network settings
 
 ### Log Analysis
@@ -1008,6 +1031,7 @@ For large deployments:
 | `ncx_staging_wizard.py` | Web-based staging configuration tool | No (local use only) |
 | `index.html` | Wizard web interface | No (local use only) |
 | `static/` | Wizard CSS/JS/assets | No (local use only) |
+| `requirements.txt` | Python dependencies for wizard | No (local use only) |
 | `cp.py` | Router interaction library | Yes |
 | `ncm.py` | NCM API client library | Yes |
 | `start.sh` | Application startup script | Yes |
@@ -1168,6 +1192,14 @@ For issues or questions:
 4. Contact your NCM administrator
 
 ## Version History
+
+### Version 2.6
+- Added hostname validation for 'name' column in CSV files
+- Wizard validates hostnames during CSV upload/validation (max 50 chars, alphanumeric + hyphens)
+- Provisioning script validates hostname before exchange site creation
+- Non-compliant hostnames generate validation errors with router ID and hostname details
+- Added requirements.txt for Python dependencies (requests library)
+- Updated documentation to reflect hostname compliance requirements and wizard dependencies
 
 ### Version 2.5
 - Fixed CP host and wildcard FQDN resource creation failing silently when no DNS option configured

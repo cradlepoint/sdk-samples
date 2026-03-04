@@ -247,17 +247,31 @@ def sanitize_log(message: str) -> str:
 def validate_hostname(hostname: str) -> None:
     """Validate hostname format for FQDN compliance.
 
-    Hostname must contain only letters, numbers, and hyphens.
+    Hostname must contain only letters, numbers, and hyphens, and be max 50 chars.
+    This validation ensures hostnames are compliant for use as exchange site names.
 
     Args:
         hostname: Hostname to validate.
 
     Raises:
-        ValueError: If hostname is invalid.
+        ValueError: If hostname is empty, exceeds 50 characters, or contains
+                   invalid characters (only alphanumeric and hyphens allowed).
+    
+    Validation Rules:
+        - Cannot be empty
+        - Maximum 50 characters
+        - Only alphanumeric characters and hyphens allowed
+        - Used for exchange site creation (Step 6)
 
     """
     if not hostname:
         raise ValueError("Hostname cannot be empty")
+    
+    if len(hostname) > 50:
+        raise ValueError(
+            f"Hostname '{hostname}' exceeds 50 characters ({len(hostname)} chars). "
+            f"Maximum length is 50 characters."
+        )
 
     for char in hostname:
         if not (char.isalnum() or char == '-'):
@@ -810,15 +824,19 @@ def apply_license(n3_client: ncm.NcmClientv3) -> None:
 def create_exchange_site(n3_client: ncm.NcmClientv3,
                          csv_row: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """Create exchange site.
+    
+    Validates hostname compliance before creating the site. Site name is sourced
+    from bulk config CSV (if available) or device's current system_id.
 
     Args:
         n3_client: NCM v3 API client.
         csv_row: Matched CSV row from bulk config (optional).
 
     Returns:
-        Dict[str, Any]: Site information.
+        Dict[str, Any]: Site information including site ID.
 
     Raises:
+        ValueError: If hostname validation fails (max 50 chars, alphanumeric + hyphens only).
         Exception: If site creation fails.
 
     """
@@ -1204,8 +1222,11 @@ def cleanup_state() -> None:
     for key in state_keys:
         try:
             clear_state(key)
-        except Exception:
-            pass  # Ignore errors if key doesn't exist
+        except Exception as e:
+            cp.log(f"Warning: Failed to clear state key '{key}': {e}")
+    
+    # Brief sleep to allow appdata deletions to propagate
+    time.sleep(2)
 
 
 if __name__ == "__main__":
@@ -1268,9 +1289,9 @@ if __name__ == "__main__":
 
         current_step += 1
         log_progress(current_step, total_steps, "Moving to production group")
+        cp.log('NCX Self Provisioning Complete - All steps successful')
         move_router_to_prod_group(n2)
 
-        cp.log('NCX Self Provisioning Complete - All steps successful')
         time.sleep(COMPLETION_WAIT_SECONDS)
 
     except Exception as e:
