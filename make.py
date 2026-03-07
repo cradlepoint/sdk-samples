@@ -838,7 +838,7 @@ if __name__ == "__main__":
         # Load the settings from the sdk_settings.ini file.
         if not init(option):
             sys.exit(0)
-        if utility_name != 'install':
+        if utility_name not in ['install', 'purge']:
             get_app_uuid()
 
     if utility_name == 'clean':
