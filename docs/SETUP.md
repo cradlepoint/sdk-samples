@@ -8,7 +8,7 @@
 ## Quick Start (5 minutes)
 
 1. **Install**: VS Code + Amazon Q extension, sign in
-2. **Clone**: `Cmd+Shift+P` → "Git: Clone" → paste repo URL
+2. **Clone**: `Cmd+Shift+P` → "Git: Clone" → paste repo URL (https://github.com/phate999/sdk-samples)
 3. **Configure**: Edit `sdk_settings.ini` with router IP/credentials
 4. **Test**: Ask Amazon Q: "Create hello_router app that logs every 5 seconds" then "Deploy and show logs"
 
