@@ -1,5 +1,10 @@
 # VS Code + Amazon Q Setup for Cradlepoint SDK
 
+## Prerequisites
+
+1. **VS Code**: Download from [code.visualstudio.com](https://code.visualstudio.com/)
+2. **Amazon Q**: Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AmazonWebServices.amazon-q-vscode) or Extensions panel
+
 ## Quick Start (5 minutes)
 
 1. **Install**: VS Code + Amazon Q extension, sign in
