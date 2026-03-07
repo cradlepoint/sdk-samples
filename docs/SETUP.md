@@ -32,30 +32,13 @@ Show me how @5GSpeed handles speedtest data
 ✅ Use relative paths (`tmp/` not `/tmp`)  
 ✅ Deploy with `deploy.sh`
 
-## VS Code Settings
-
-Add to `.vscode/settings.json`:
-
-```json
-{
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Args": ["--max-line-length=100"],
-    "editor.rulers": [100],
-    "editor.tabSize": 4,
-    "files.exclude": {
-        "**/*.tar.gz": true,
-        "**/__pycache__": true
-    }
-}
-```
-
 ## Recommended Extensions
 
-```bash
-code --install-extension amazonwebservices.amazon-q-vscode
-code --install-extension ms-python.python
-code --install-extension ms-python.vscode-pylance
-```
+Open VS Code Extensions panel (`Cmd+Shift+X` or `Ctrl+Shift+X`) and install:
+
+- **Amazon Q** - amazonwebservices.amazon-q-vscode
+- **Python** - ms-python.python
+- **Pylance** - ms-python.vscode-pylance
 
 ## Troubleshooting
 
