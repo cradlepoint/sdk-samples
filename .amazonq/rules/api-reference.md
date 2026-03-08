@@ -77,6 +77,23 @@ clients = cp.get('status/lan/clients')  # [{'ip_address': str, 'mac': str, 'host
 
 # Client usage - detailed bandwidth tracking (requires client usage monitoring enabled)
 usage = cp.get('status/client_usage')  # {'enabled': bool, 'stats': [{'mac': str, 'ip': str, 'up_bytes': int, 'down_bytes': int, ...}]}
+
+# Firewall conntrack - list of connection tracking entries
+fw = cp.get('status/firewall')  # {'conntrack': [...], 'state_entry_count': int}
+conntrack = fw.get('conntrack', [])  # [{'id': int, 'orig_src': str, 'orig_dst': str, 'orig_bytes': int, 'reply_bytes': int, 'tcp_state': str, ...}]
+# CRITICAL: Track by connection 'id' field to avoid double-counting stale entries
+# CRITICAL: Connections persist in conntrack after traffic stops - check byte increments for activity
+# CRITICAL: Initialize global tracker with zero bytes, calculate deltas each cycle - only deltas count as activity
+# CRITICAL: Filter out closing TCP states (TIME_WAIT, CLOSE_WAIT, FIN_WAIT*, LAST_ACK, CLOSING)
+# CRITICAL: Track by MAC address not IP when correlating with clients - IPs can change (DHCP renewal)
+# CRITICAL: Resolve all IPs for a domain - CDNs/load balancers use multiple IPs (use socket.getaddrinfo with AF_INET for IPv4 only)
+# PATTERN: Global conn tracker: {conn_id: {'tx': bytes, 'rx': bytes, 'last_seen': time}}
+# PATTERN: Per-cycle deltas: delta = current_bytes - tracker[conn_id]['bytes'], then update tracker
+# PATTERN: Activity detection: only count as active when delta > 0, not just when connection exists
+
+# DHCP leases - hostname, network, SSID info for clients
+dhcpd = cp.get('status/dhcpd')  # {'leases': [{'ip_address': str, 'mac': str, 'hostname': str, 'network': str, 'ssid': str, ...}]}
+
 # QoS - dict with queues and rules arrays
 qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 # CRITICAL: Must put entire qos object, cannot update rules/queues separately
@@ -87,5 +104,6 @@ qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 
 **CRITICAL: status/lan/clients does NOT have rx_bytes/tx_bytes - use status/client_usage for bandwidth data**
 **CRITICAL: QoS rules do NOT support MAC addresses - only IP addresses via lipaddr/lmask fields**
+**CRITICAL: Firewall conntrack entries have unique 'id' field - track by ID to avoid counting stale connections**
 
 **See @docs/ncos-api/README.md for full examples and all API paths**

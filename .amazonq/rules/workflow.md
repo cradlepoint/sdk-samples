@@ -47,11 +47,11 @@ This generates all required files from app_template (package.ini, start.sh, cp.p
 
 **NEVER overwrite package.ini, start.sh, or cp.py after creation** - these are auto-generated and correct.
 
-**ALWAYS deploy after creating or modifying an app** - use `./deploy.sh {app_name}` immediately after code changes.
+**ALWAYS deploy after creating or modifying an app** - use `bash deploy.sh {app_name}` immediately after code changes.
 
 ## Deploy to Router
 
-**ALWAYS use deploy.sh script** - `./deploy.sh {app_name}`
+**ALWAYS use deploy.sh script** - `bash deploy.sh {app_name}`{app_name}`
 
 This script handles:
 - Building the app package

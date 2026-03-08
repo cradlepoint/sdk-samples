@@ -18,6 +18,7 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **No screen** - use `cp.log()` for all output (never print())
 - **No keyboard** - never use `input()` or `KeyboardInterrupt`
 - **Relative paths only** - use `tmp/`, never absolute like `/tmp`
+- **Create directories before writing** - use `os.makedirs('tmp', exist_ok=True)` before writing to tmp/
 - **Python is "cppython"** - start.sh must use `cppython`
 - **Static apps** - no .pyc or .so files
 - **Boot logging** - `cp.log('Starting...')` ASAP at startup
@@ -63,6 +64,7 @@ except Exception as e:
 - **Default port: 8000** - use port 8000 for web applications unless there's a conflict
 - **ALWAYS set SO_REUSEADDR** before binding: `server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)`
 - **Port conflicts on redeployment** - SO_REUSEADDR doesn't prevent "Address in use" errors when redeploying without router reboot. If port 8000 is in use, either reboot router or use a different port (8001, 8002, etc.)
+- **Dynamic download filenames** - use router hostname and timestamp: `cp.get('config/system/system_id')` + `datetime.now().strftime('%Y%m%d_%H%M%S')`
 - **ALWAYS use ES5 JavaScript syntax** - NO arrow functions `=>`, NO template literals - Python 3.8 environment doesn't support ES6
 - **Use `function(){}` instead of `()=>{}`** for all functions
 - **Use string concatenation `'text'+var+'more'` instead of template literals**

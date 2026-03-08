@@ -7,8 +7,26 @@
 - Did I discover an API returns different data than documented?
 - Did I find a field that doesn't exist or works differently?
 - Did I make wrong assumptions that should be prevented?
-- Did I learn a better pattern or workflow?
+- Did I learn a better pattern or workflow for router/API interaction?
 - What rule would have prevented my mistakes?
+- Is this learning GENERAL (applies to all apps) or SPECIFIC (only this app)?
+
+## CRITICAL: Only document GENERAL learnings
+
+**DO update rules for:**
+- API behavior and data structures
+- Router environment constraints
+- Common SDK patterns and best practices
+- File system behavior
+- Network/connectivity patterns
+- General web development on routers
+
+**DO NOT update rules for:**
+- App-specific logic or algorithms
+- Business logic for a particular app
+- Feature-specific implementations
+- UI/UX decisions for one app
+- App-specific data processing
 
 ## Explore APIs before documenting:
 
@@ -44,3 +62,4 @@ This shows the ACTUAL API response with all fields - use it to verify structures
 - Keep rules concise - point to docs for details
 - Add examples to docs - show don't tell
 - Prevent future mistakes - make it impossible to fail
+- Only document GENERAL patterns, not app-specific logic
