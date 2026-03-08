@@ -204,15 +204,23 @@ def monitor_connections():
                         
                         try:
                             import os
-                            log_size_limit = int(get_appdata('log_size_limit', 104857600))
+                            log_size_limit = int(get_appdata('log_size_limit', 10485760))
                             csv_path = 'tmp/sessions.csv'
                             csv_exists = os.path.exists(csv_path)
                             
                             if csv_exists:
                                 file_size = os.path.getsize(csv_path)
                                 if file_size > log_size_limit:
-                                    os.rename(csv_path, f'{csv_path}.old')
-                                    csv_exists = False
+                                    with open(csv_path, 'r') as f:
+                                        lines = f.readlines()
+                                    header = lines[0] if lines else ''
+                                    rows = lines[1:] if len(lines) > 1 else []
+                                    avg_row_size = file_size // max(len(rows), 1)
+                                    keep_count = max(1, (log_size_limit - len(header)) // avg_row_size)
+                                    with open(csv_path, 'w') as f:
+                                        f.write(header)
+                                        f.writelines(rows[-keep_count:])
+                                    csv_exists = True
                             
                             with open(csv_path, 'a') as f:
                                 if not csv_exists:
@@ -320,8 +328,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
 <title>Client Session Monitor</title>
 <style>
 body{margin:0;font-family:system-ui,sans-serif;background:#0f1419;color:#e6edf3}
-.header{background:#161b22;padding:16px 24px;border-bottom:1px solid #30363d}
+.header{background:#161b22;padding:16px 24px;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center}
 h1{margin:0;font-size:20px;font-weight:600}
+.header-left{flex:1}
+.header-right{display:flex;align-items:center;gap:12px}
+.theme-toggle{background:#21262d;border:1px solid #30363d;border-radius:6px;padding:8px;cursor:pointer;color:#8b949e;transition:all 0.2s}
+.theme-toggle:hover{background:#30363d;color:#e6edf3}
 .info{color:#8b949e;font-size:14px;margin-top:4px}
 .container{padding:24px}
 .section{background:#161b22;border:1px solid #30363d;border-radius:6px;margin-bottom:24px;padding:16px}
@@ -364,10 +376,35 @@ tr:hover{background:#0d1117}
 .gear-btn:hover{color:#58a6ff}
 .modal-buttons{display:flex;gap:8px;margin-top:24px;padding-top:16px;border-top:1px solid #30363d}
 .modal-buttons .btn{flex:1}
+[data-theme="light"]{background:#f6f8fa;color:#24292f}
+[data-theme="light"] .header{background:#fff;border-bottom:1px solid #d0d7de}
+[data-theme="light"] h1{color:#24292f}
+[data-theme="light"] .container{background:#f6f8fa}
+[data-theme="light"] .section{background:#fff;border-color:#d0d7de}
+[data-theme="light"] h2{color:#24292f}
+[data-theme="light"] th{color:#57606a;border-bottom-color:#d0d7de}
+[data-theme="light"] td{border-bottom-color:#d8dee4}
+[data-theme="light"] tr:hover{background:#f6f8fa}
+[data-theme="light"] .time{color:#57606a}
+[data-theme="light"] .theme-toggle{background:#f6f8fa;border-color:#d0d7de;color:#24292f}
+[data-theme="light"] .theme-toggle:hover{background:#eaeef2}
+[data-theme="light"] .url-list{background:#f6f8fa}
+[data-theme="light"] .modal{background:rgba(31,35,40,0.5)}
+[data-theme="light"] .modal-content{background:#fff;border-color:#d0d7de}
+[data-theme="light"] .setting-input{background:#f6f8fa;border-color:#d0d7de;color:#24292f}
+[data-theme="light"] .url-item{background:#f6f8fa;border-color:#d0d7de}
+[data-theme="light"] .url-item.editing input{background:#fff;border-color:#d0d7de}
+[data-theme="light"] .icon-btn{color:#57606a}
+[data-theme="light"] .icon-btn:hover{color:#0969da}
 </style></head><body>
-<div class="header"><h1>Client Session Monitor</h1>
-<div class="info"><span>Timeout: <span id="timeout">60</span>s</span> | <span class="collapse" id="urlToggle" onclick="toggleUrls()">Monitored Domains</span><button class="gear-btn" onclick="showSettings()" title="Settings...">⚙</button></div>
-<ul class="url-list" id="urlList" style="display:none"></ul></div>
+<div class="header">
+<div class="header-left"><h1>Client Session Monitor</h1>
+<div class="info"><span>Timeout: <span id="timeout">60</span>s</span> | <span class="collapse" id="urlToggle" onclick="toggleUrls()">Monitored Domains</span><button class="gear-btn" onclick="showSettings()" title="Settings...">⚙</button></div></div>
+<div class="header-right">
+<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">☼</button>
+</div>
+</div>
+<ul class="url-list" id="urlList" style="display:none"></ul>
 <div class="container">
 <div class="section"><div class="section-header"><h2>Active Sessions</h2></div>
 <table id="active"><thead><tr><th>Client</th><th>Hostname</th><th>Network / SSID</th><th>Domain</th><th>Start</th><th>Duration</th><th>TX/RX/Total</th></tr></thead>
@@ -397,6 +434,8 @@ tr:hover{background:#0d1117}
 <script>
 var currentUrls=[];
 var editingIndex=-1;
+function toggleTheme(){var t=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';document.documentElement.setAttribute('data-theme',t);localStorage.setItem('theme',t);}
+(function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();
 function toggleUrls(){var l=document.getElementById('urlList');var t=document.getElementById('urlToggle');if(l.style.display==='none'){l.style.display='block';t.classList.add('open');}else{l.style.display='none';t.classList.remove('open');}}
 function showSettings(){fetch('/api/data').then(function(r){return r.json()}).then(function(d){currentUrls=d.urls.slice();document.getElementById('timeoutInput').value=d.timeout;editingIndex=-1;renderEditor();document.getElementById('settingsModal').classList.add('show');});}
 function closeSettings(){document.getElementById('settingsModal').classList.remove('show');}

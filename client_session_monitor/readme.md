@@ -18,7 +18,7 @@ Monitors client connections to specific domains by tracking firewall connection 
 
 - **monitored_domains** (string, default: "example.com") - Comma-separated list of domains/URLs to monitor
 - **session_timeout** (integer, default: 60) - Seconds of inactivity before session ends
-- **log_size_limit** (integer, default: 104857600) - Maximum CSV log file size in bytes (default 100MB)
+- **log_size_limit** (integer, default: 10485760) - Maximum CSV log file size in bytes (default 10MB)
 
 ## Usage
 
@@ -39,8 +39,7 @@ Monitors client connections to specific domains by tracking firewall connection 
 
 ## Notes
 
-- Requires firewall connection tracking (enabled by default)
 - Tracks sessions by MAC address to survive DHCP IP changes
 - Resolves all IPs for domains to handle CDN/load balancer scenarios
-- CSV file rotates when size limit is reached (old file saved as .old)
+- CSV file trims oldest rows when size limit is reached (default 10MB)
 - Session history kept in memory (last 100 sessions)
