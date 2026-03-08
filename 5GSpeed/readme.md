@@ -7,7 +7,7 @@ Application Name
 
 Application Purpose
 ===================
-5GSpeed runs Ookla speedtests and puts results into configurable field.  Designed to enable NCM API support for Ookla speedtests.
+5GSpeed runs Ookla speedtests using the official Ookla CLI binary and puts results into configurable field. Designed to enable NCM API support for Ookla speedtests.
 
 Steps to use:
 =============
@@ -24,7 +24,7 @@ Clear the results by performing any of the following:
 put {results_path} ""  
 
 Sample result:  
-DL:52.54Mbps - UL:16.55Mbps - Ping:9.715ms - Server:Telstra - ISP:Vocus Communications - TimeGMT:2023-04-11T01:06:43.758382Z - URL:http://www.speedtest.net/result/14595594656.png  
+DL:23.47Mbps UL:9.02Mbps Ping:47.02ms Server:XMission ISP:Verizon Wireless Time:2026-03-07T19:54:30.875162Z  
 
 Retrieve Results via NCM API:
 =============================

@@ -15,18 +15,26 @@
 ## Common Prompts
 
 ```
-Create app "my_app" that collects GPS every 60 seconds
+Make a system status dashboard
 
-Add temperature sensor to @my_app using ADC API
+Make a vpn dashboard
 
-Deploy my_app and show me the logs
+Make a speedtest web app
 
-Add web dashboard to @my_app on port 8000
+Make a web dashboard to monitor and throttle client bandwidth with 10 Mbps default limit.
 
-Review @my_app for Python 3.8 compliance
+Add dashboard to @my_app
 
 Show me how @5GSpeed handles speedtest data
 ```
+
+## Workflow Commands
+
+| Command | Description |
+|---------|-------------|
+| **deploy** | Deploy app to router using deploy.sh |
+| **learn** | Update rules/docs based on what was learned |
+| **rtfm** | Verify API paths/fields with curl before coding |
 
 ## What Amazon Q Knows Automatically
 

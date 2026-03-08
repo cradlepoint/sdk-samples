@@ -7,7 +7,7 @@ The app can be manually triggered again by clearing out the description field in
 App settings can be configured in System > SDK Data."""
 
 import cp
-from speedtest import Speedtest
+from speedtest_ookla import Speedtest
 import time
 import datetime
 import json
@@ -57,7 +57,7 @@ class AutoInstall(object):
     sims = {}
 
     def __init__(self):
-        self.speedtest = Speedtest()
+        self.speedtest = Speedtest(timeout=90)
 
     def get_config(self, name):
         """Return config from /config/system/sdk/appdata."""
@@ -237,15 +237,11 @@ class AutoInstall(object):
 
     def do_speedtest(self, sim):
         """Run Ookla speedtests and return TCP down and TCP up in Mbps."""
-        servers = []
-        self.speedtest.get_servers(servers)
-        self.speedtest.get_best_server()
-        cp.log(f'Running TCP Download test on {sim}...')
-        self.speedtest.download()
-        cp.log(f'Running TCP Upload test on {sim}...')
-        self.speedtest.upload(pre_allocate=False)
-        down = self.speedtest.results.download / 1000 / 1000
-        up = self.speedtest.results.upload / 1000 / 1000
+        cp.log(f'Running speedtest on {sim}...')
+        self.speedtest.start()
+        r = self.speedtest.results
+        down = r.download / 1000 / 1000
+        up = r.upload / 1000 / 1000
         cp.log(f'Speedtest complete for {sim}.')
         return down, up
 

@@ -4,7 +4,7 @@ import time
 import json
 from datetime import datetime
 import cp
-from speedtest import Speedtest
+from speedtest_ookla import Speedtest
 
 # Hours of day to run speedtests. 24-hour format.  Default is 8am, 12pm, 4pm.
 testing_hours = [8, 12, 16]
@@ -27,13 +27,12 @@ def run_speedtest():
     cp.log(f'Daily speedtest hours: {testing_hours} -- Running now...')
     wan = cp.get('status/wan/primary_device')
     wan_ip = cp.get(f'status/wan/devices/{wan}/status/ipinfo/ip_address')
-    speedtest = Speedtest(source_address=wan_ip)
-    speedtest.get_best_server()
-    speedtest.download()
-    speedtest.upload(pre_allocate=False)
-    down = '{:.2f}'.format(speedtest.results.download / 1000 / 1000)
-    up = '{:.2f}'.format(speedtest.results.upload / 1000 / 1000)
-    latency = int(speedtest.results.ping)
+    speedtest = Speedtest(source_address=wan_ip, timeout=90)
+    speedtest.start()
+    r = speedtest.results
+    down = '{:.2f}'.format(r.download / 1000 / 1000)
+    up = '{:.2f}'.format(r.upload / 1000 / 1000)
+    latency = int(r.ping)
     results_text = f'{down}Mbps Down / {up}Mbps Up / {latency}ms'
     cp.log(results_text)
     cp.put(results_field, results_text)

@@ -22,6 +22,9 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Static apps** - no .pyc or .so files
 - **Boot logging** - `cp.log('Starting...')` ASAP at startup
 - **Wait for connectivity** - use `cp.wait_for_wan_connection()` if internet is needed
+- **NEVER modify packaged files** - Apps have digital signatures (MANIFEST.json). Router deletes app if any packaged file is modified. Write to NEW files only (e.g., `tmp/data.csv`, `logs/output.txt`)
+- **Persist application state** - Save state to survive reboots. Use `tmp/state.json` for runtime state, or appdata for user-configurable values
+- **Router architecture is ARM64 (aarch64) with musl libc** - when downloading binaries, use aarch64/arm64 versions, NOT x86_64
 
 ## Python Libraries and Dependencies
 
@@ -45,10 +48,21 @@ except Exception as e:
     cp.log(f"Error getting system status: {e}")
 ```
 
+## Speedtest Implementation
+
+- **ALWAYS use production wrapper from 5GSpeed** - Copy `speedtest_ookla.py` and `ookla` binary from @5GSpeed
+- **Import**: `from speedtest_ookla import Speedtest`
+- **Usage**: `s = Speedtest(timeout=90); s.start(); results = s.results`
+- **Results**: `results.download` (bps), `results.upload` (bps), `results.ping` (ms), `results.server`, `results.isp`
+- **Features**: Real-time monitoring, retry logic, partial results, interface binding, timeout handling
+- **Multi-modem testing**: Use Mobile_Site_Survey's `speedtest.py` wrapper for simultaneous tests across multiple modems with source routing
+- **NEVER write custom speedtest code** - always use existing wrappers
+
 ## Web Development
 
 - **Default port: 8000** - use port 8000 for web applications unless there's a conflict
 - **ALWAYS set SO_REUSEADDR** before binding: `server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)`
+- **Port conflicts on redeployment** - SO_REUSEADDR doesn't prevent "Address in use" errors when redeploying without router reboot. If port 8000 is in use, either reboot router or use a different port (8001, 8002, etc.)
 - **ALWAYS use ES5 JavaScript syntax** - NO arrow functions `=>`, NO template literals - Python 3.8 environment doesn't support ES6
 - **Use `function(){}` instead of `()=>{}`** for all functions
 - **Use string concatenation `'text'+var+'more'` instead of template literals**
