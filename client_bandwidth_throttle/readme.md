@@ -2,6 +2,8 @@
 
 Web-based QoS bandwidth limiting for individual LAN clients.
 
+<img width="1457" height="428" alt="image" src="https://github.com/user-attachments/assets/30798d71-913c-4e68-9ab5-c8203f7e3231" />
+
 ## Features
 
 - Real-time client detection and bandwidth monitoring
