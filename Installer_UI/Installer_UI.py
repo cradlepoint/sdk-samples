@@ -3,7 +3,7 @@
 import cp
 import tornado.web
 import json
-from speedtest import Speedtest
+from speedtest_ookla import Speedtest
 
 class MainHandler(tornado.web.RequestHandler):
     """Handles / endpoint requests."""
@@ -85,25 +85,18 @@ class SignalHandler(tornado.web.RequestHandler):
 def run_speedtest():
     try:
         cp.log('Starting Speedtest...')
-        s = Speedtest()
-        threads = 24
-        s.get_servers()
-        server = s.get_best_server()
-        cp.log(f'Found Best Ookla Server: {server["sponsor"]}')
-        cp.log("Performing Ookla Download Test...")
-        d = s.download(threads=threads)
-        cp.log("Performing Ookla Upload Test...")
-        u = s.upload(threads=threads, pre_allocate=False)
-        download = '{:.2f}'.format(d / 1000 / 1000)
-        upload = '{:.2f}'.format(u / 1000 / 1000)
+        s = Speedtest(timeout=90)
+        s.start()
+        r = s.results
+        download = '{:.2f}'.format(r.download / 1000 / 1000)
+        upload = '{:.2f}'.format(r.upload / 1000 / 1000)
         cp.log('Ookla Speedtest Complete! Results:')
-        cp.log(f'Client ISP: {s.results.client["isp"]}')
-        cp.log(f'Ookla Server: {s.results.server["sponsor"]}')
-        cp.log(f'Ping: {s.results.ping}ms')
+        cp.log(f'Client ISP: {r.isp}')
+        cp.log(f'Ookla Server: {r.server.get("name", "Unknown")}')
+        cp.log(f'Ping: {r.ping}ms')
         cp.log(f'Download Speed: {download}Mb/s')
-        cp.log(f'Upload Speed: {upload} Mb/s')
-        cp.log(f'Ookla Results Image: {s.results.share()}')
-        text = f'Carrier: {s.results.client["isp"]}\nServer: {s.results.server["sponsor"]}\nDL:{download}Mbps\nUL:{upload}Mbps\nPing:{s.results.ping:.0f}ms'
+        cp.log(f'Upload Speed: {upload}Mb/s')
+        text = f'Carrier: {r.isp}\nServer: {r.server.get("name", "Unknown")}\nDL:{download}Mbps\nUL:{upload}Mbps\nPing:{r.ping:.0f}ms'
         return text
     except Exception as e:
         cp.logger.exception(e)
