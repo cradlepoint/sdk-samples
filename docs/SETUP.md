@@ -21,8 +21,6 @@ Make a vpn dashboard
 
 Make a speedtest web app
 
-Make a web dashboard to monitor and throttle client bandwidth with 10 Mbps default limit.
-
 Add dashboard to @my_app
 
 Show me how @5GSpeed handles speedtest data
