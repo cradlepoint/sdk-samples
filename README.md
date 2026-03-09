@@ -36,16 +36,16 @@ Ready-to-use applications you can install from the [releases page](https://githu
 
 - **5GSpeed**
     - Run Ookla speedtests via NCM API. Results are put in asset_id field (configurable in SDK Data). Clearing the results starts a new test. This can be done easily via NCM API v2 /routers/ endpoint.
-    - **Download:** [5GSpeed v0.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.v0.2.0.tar.gz)
+    - **Download:** [5GSpeed v0.3.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.v0.3.0.tar.gz)
 - **Autoinstall**
     - Automatically choose fastest SIM on install. On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed. Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.
-    - **Download:** [AutoInstall v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.0.0.tar.gz)
+    - **Download:** [AutoInstall v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.0.1.tar.gz)
 - **Installer_UI**
     - Provide a web interface for installers to configure WiFi and run speedtests.
-    - **Download:** [Installer_UI v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.1.0.tar.gz)
+    - **Download:** [Installer_UI v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.2.0.tar.gz)
 - **Mobile_Site_Survey**
     - Field survey tool that runs speedtests and collects modem diagnostics with GPS locations, uploading results for network coverage and throughput analysis to 5g-ready.io
-    - **Download:** [Mobile_Site_Survey v3.0.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.0.2.tar.gz)
+    - **Download:** [Mobile_Site_Survey v3.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.0.3.tar.gz)
 - **Motorola**
     - Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs.
     - **Download:** [Motorola v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Motorola.v1.2.0.tar.gz)
@@ -63,11 +63,13 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [clients v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/clients.v1.0.0.tar.gz)
 - **client_bandwidth_throttle**
     - Web-based QoS bandwidth limiting for individual LAN clients.
+    - **Download:** [client_bandwidth_throttle v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_bandwidth_throttle.v1.0.0.tar.gz)
 - **client_rssi_monitor**
     - Gets the mac address and rssi of connected wlan clients and puts them in the asset_id field.
     - **Download:** [client_rssi_monitor v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_rssi_monitor.v1.0.0.tar.gz)
 - **client_session_monitor**
     - Monitors client connections to specific domains by tracking firewall connection table entries. Logs session start/end times, duration, and bandwidth usage.
+    - **Download:** [client_session_monitor v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_session_monitor.v1.0.0.tar.gz)
 - **cp_shell**
     - Web interface for running linux shell commands.
     - **Download:** [cp_shell v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cp_shell.v0.1.0.tar.gz)
@@ -342,6 +344,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
