@@ -353,7 +353,7 @@ tr:hover{background:#0d1117}
 .collapse{cursor:pointer;user-select:none}
 .collapse:after{content:' ▼';font-size:10px}
 .collapse.open:after{content:' ▲'}
-.url-list{margin:8px 0;padding:8px;background:#0d1117;border-radius:4px;font-size:13px;list-style:none}
+.url-list{margin:8px 0;padding:8px;background:#0d1117;border:1px solid #30363d;border-radius:4px;font-size:13px;list-style:none}
 .url-list li{padding:4px 0}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1000}
 .modal.show{display:flex;align-items:center;justify-content:center}
@@ -383,16 +383,22 @@ tr:hover{background:#0d1117}
 [data-theme="light"] .section{background:#fff;border-color:#d0d7de}
 [data-theme="light"] h2{color:#24292f}
 [data-theme="light"] th{color:#57606a;border-bottom-color:#d0d7de}
-[data-theme="light"] td{border-bottom-color:#d8dee4}
+[data-theme="light"] td{border-bottom-color:#d8dee4;color:#24292f}
 [data-theme="light"] tr:hover{background:#f6f8fa}
 [data-theme="light"] .time{color:#57606a}
 [data-theme="light"] .theme-toggle{background:#f6f8fa;border-color:#d0d7de;color:#24292f}
 [data-theme="light"] .theme-toggle:hover{background:#eaeef2}
-[data-theme="light"] .url-list{background:#f6f8fa}
+[data-theme="light"] .url-list{background:#fff;border-color:#d0d7de}
+[data-theme="light"] body{background:#f6f8fa}
+[data-theme="light"] .url-list li{color:#24292f}
 [data-theme="light"] .modal{background:rgba(31,35,40,0.5)}
 [data-theme="light"] .modal-content{background:#fff;border-color:#d0d7de}
+[data-theme="light"] .modal-content h2{color:#24292f}
+[data-theme="light"] .modal-content h3{color:#24292f}
+[data-theme="light"] .setting-label{color:#57606a}
 [data-theme="light"] .setting-input{background:#f6f8fa;border-color:#d0d7de;color:#24292f}
 [data-theme="light"] .url-item{background:#f6f8fa;border-color:#d0d7de}
+[data-theme="light"] .url-item input{color:#24292f}
 [data-theme="light"] .url-item.editing input{background:#fff;border-color:#d0d7de}
 [data-theme="light"] .icon-btn{color:#57606a}
 [data-theme="light"] .icon-btn:hover{color:#0969da}

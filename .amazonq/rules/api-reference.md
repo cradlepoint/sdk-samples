@@ -36,6 +36,8 @@
 5. **VERIFY fields** - Only use fields that actually exist in the response
 6. **THEN code** - Write code based on verified structure
 
+**CRITICAL: ALWAYS use REST API with basic auth (curl -u admin:pass), NEVER use SSH for API validation**
+
 **If you skip these steps, you WILL create broken code.**
 
 **NEVER EVER:**
@@ -43,6 +45,7 @@
 - Make up API structures based on what "should" be there
 - Prioritize speed over correctness
 - Write code first and test later
+- Use SSH for API validation - always use REST with basic auth
 
 ## When to Use Helpers vs Direct API Calls
 
