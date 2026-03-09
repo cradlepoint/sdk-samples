@@ -3,6 +3,8 @@ Client Session Monitor
 
 Monitors client connections to specific domains by tracking firewall connection table entries. Logs session start/end times, duration, and bandwidth usage.
 
+<img width="1457" height="853" alt="image" src="https://github.com/user-attachments/assets/bc489c17-30b8-42c9-b82c-eabd80e9c338" />
+
 ## Features
 
 - Multi-domain monitoring with DNS resolution to track destination IPs
