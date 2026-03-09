@@ -31,23 +31,17 @@
 3. **Update rules** - add guardrails to prevent the mistake from happening again
 4. **Keep it minimal** - only add what's necessary to prevent future errors
 
-## MANDATORY: End of Task Review
+## MANDATORY: Automatic Reflection (See auto-reflection.md)
 
-**Before completing ANY task, STOP and ask:**
-- Did I verify ALL API paths/fields with curl BEFORE coding?
-- Did I search docs BEFORE assuming an API structure?
-- Did I make up ANY field names (rx_bytes, tx_bytes, etc.) without testing?
-- Did I prioritize speed over correctness?
+**After completing ANY task, automatic reflection runs:**
+1. Self-assess: Did I make mistakes? Learn something new?
+2. Determine: Does this warrant a rule/doc update?
+3. Update: Silently fix docs/rules if needed
+4. Inform: Tell user what was learned (if anything)
 
-**If you answered YES to any question, you FAILED. Stop and fix it NOW.**
+**This happens automatically - you don't need to be reminded.**
 
-**Then ask:**
-- Did I make wrong assumptions about an API?
-- Did I misuse a function that should be documented?
-- What rule would have prevented my mistakes?
-- Did I learn something that contradicts existing rules?
-
-**If yes to any, update rules/docs immediately - do NOT wait to be reminded.**
+See `auto-reflection.md` for full details on the reflection process.
 
 ## Example
 

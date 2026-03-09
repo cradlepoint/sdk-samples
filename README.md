@@ -61,9 +61,13 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **clients**
     - Puts the LAN clients in the asset_id field, or specify another field in SDK Appdata.
     - **Download:** [clients v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/clients.v1.0.0.tar.gz)
+- **client_bandwidth_throttle**
+    - Web-based QoS bandwidth limiting for individual LAN clients.
 - **client_rssi_monitor**
     - Gets the mac address and rssi of connected wlan clients and puts them in the asset_id field.
     - **Download:** [client_rssi_monitor v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_rssi_monitor.v1.0.0.tar.gz)
+- **client_session_monitor**
+    - Monitors client connections to specific domains by tracking firewall connection table entries. Logs session start/end times, duration, and bandwidth usage.
 - **cp_shell**
     - Web interface for running linux shell commands.
     - **Download:** [cp_shell v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cp_shell.v0.1.0.tar.gz)
