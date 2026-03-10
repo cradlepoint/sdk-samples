@@ -196,9 +196,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **simple_web_server**
     - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
     - **Download:** [simple_web_server v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/simple_web_server.v2.0.0.tar.gz)
-- **splunk_conntrack**
-    - This app tails the conntrack table and sends new connections to Splunk.
-    - **Download:** [splunk_conntrack v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_conntrack.v1.1.1.tar.gz)
+- **speedtest_scheduled_custom1**
+    - Run Ookla speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
 - **splunk_log_filter**
     - This app tails /var/log/messages and sends filtered lines to Splunk.
     - **Download:** [splunk_log_filter v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_log_filter.v1.0.0.tar.gz)
