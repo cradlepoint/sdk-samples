@@ -198,8 +198,10 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [simple_web_server v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/simple_web_server.v2.0.0.tar.gz)
 - **speedtest_scheduled_custom1**
     - Run Ookla speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
+    - **Download:** [speedtest_scheduled_custom1 v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.0.0.tar.gz)
 - **splunk_conntrack**
     - This app monitors the conntrack table and sends new connections to Splunk.
+    - **Download:** [splunk_conntrack v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_conntrack.v1.1.1.tar.gz)
 - **splunk_log_filter**
     - This app tails /var/log/messages and sends filtered lines to Splunk.
     - **Download:** [splunk_log_filter v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_log_filter.v1.0.0.tar.gz)
@@ -345,6 +347,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
