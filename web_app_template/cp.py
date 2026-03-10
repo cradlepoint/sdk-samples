@@ -4841,10 +4841,7 @@ def get_ncm_api_keys() -> Dict[str, Optional[str]]:
                 if key in cert_name:
                     api_keys[key] = _cs_client.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
 
-        # Log warning for any missing keys
-        missing = [k for k, v in api_keys.items() if v is None]
-        if missing:
-            _cs_client.log(f"Missing API keys: {', '.join(missing)}")
+
 
         return api_keys
         
