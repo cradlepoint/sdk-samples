@@ -198,6 +198,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [simple_web_server v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/simple_web_server.v2.0.0.tar.gz)
 - **speedtest_scheduled_custom1**
     - Run Ookla speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
+- **splunk_conntrack**
+    - This app monitors the conntrack table and sends new connections to Splunk.
 - **splunk_log_filter**
     - This app tails /var/log/messages and sends filtered lines to Splunk.
     - **Download:** [splunk_log_filter v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_log_filter.v1.0.0.tar.gz)
