@@ -110,8 +110,24 @@ def put_custom1(result_text):
             return
         ncm.set_api_keys(keys)
         router_id = cp.get('status/ecm/client_id')
-        ncm.set_custom1(router_id, result_text)
-        cp.log('Custom1 updated successfully')
+        
+        # Check if custom2 appdata exists
+        use_custom2 = False
+        try:
+            appdata = cp.get('config/system/sdk/appdata')
+            for item in appdata:
+                if item['name'] == 'custom2':
+                    use_custom2 = True
+                    break
+        except Exception:
+            pass
+        
+        if use_custom2:
+            ncm.set_custom2(router_id, result_text)
+            cp.log('Custom2 updated successfully')
+        else:
+            ncm.set_custom1(router_id, result_text)
+            cp.log('Custom1 updated successfully')
     except Exception as e:
         cp.log(f'NCM update error: {e}')
 

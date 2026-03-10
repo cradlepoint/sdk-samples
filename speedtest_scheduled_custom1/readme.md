@@ -8,6 +8,7 @@ Runs Ookla speedtests on a cron schedule and writes results to the NCM `custom1`
 |------|---------|-------------|
 | `schedule` | `0 12 * * *` | Cron expression (see examples below). Defaults to daily at 12:00 if missing or invalid. |
 | `ncm_keys` | `{}` | NCM API v2 keys as JSON (see below). |
+| `custom2` | (none) | If this field exists (any value), results are written to `custom2` instead of `custom1`. |
 
 ## Schedule Examples
 
