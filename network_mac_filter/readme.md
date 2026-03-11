@@ -2,7 +2,7 @@
 
 Enforces MAC address limits per network using deny rules in firewall filter policies. When the MAC limit is reached on a specific network, the app automatically adds deny rules for any new reachable MACs seen on that network.
 
-<img width="1458" height="851" alt="image" src="https://github.com/user-attachments/assets/0d590f4c-d11d-4efb-8148-b8e2bbe8e88a" />
+<img width="1458" height="851" alt="image" src="https://github.com/user-attachments/assets/05aee15f-524e-4fdd-a74e-1a838f7d344a" />
 
 ## Features
 
