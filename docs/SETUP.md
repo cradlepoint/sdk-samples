@@ -36,6 +36,9 @@
 ### 4. Create with Amazon Q
 
 - Click **Amazon Q icon** (Q logo) in left sidebar OR press `Cmd+Shift+Q` / `Ctrl+Shift+Q`
+
+**Note:** Amazon Q is a separate extension by AWS, not the same as VS Code's built-in Chat feature. If it says "Chat" at the top, it's the wrong one.
+
 - In the **chat panel** at bottom, make your request.  For example:
   ```
   Make a router dashboard
