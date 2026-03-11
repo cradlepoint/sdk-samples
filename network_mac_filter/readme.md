@@ -1,160 +1,91 @@
 # Network MAC Filter
 
-Enforces MAC address limits per network using deny rules in firewall filter policies. When the MAC limit is reached on a specific network, the app automatically adds deny rules for any new reachable MACs seen on that network.
+Enforces MAC address limits per network using Zone-Based Firewall deny rules. Automatically blocks new devices when limits are reached, with support for whitelisted MAC prefixes and manual blocking.
 
 <img width="1458" height="851" alt="image" src="https://github.com/user-attachments/assets/05aee15f-524e-4fdd-a74e-1a838f7d344a" />
 
 ## Features
 
-- **Per-network configuration** - Each LAN can have its own MAC limit and allowed prefixes
-- **Monitors ARP table** (`status/routing/cli/arpdump`) for REACHABLE and STALE IPv4 MAC addresses every 2 seconds
-- **Grace period** - MACs must be missing for 6 seconds (3 cycles) before removal to handle ARP cache fluctuations
-- **Known/Unknown MAC tracking** - MACs matching configured OUI prefixes are marked as "known" and don't count toward limits
-- **Dynamic prefix re-evaluation** - Changing prefixes immediately updates known/unknown status for all tracked MACs
-- **Automatic enforcement** - When unknown MAC limit is reached, new MACs are automatically blocked via firewall deny rules
-- **Manual blocking** - Manually blocked MACs persist across disconnects and reboots until explicitly unblocked
-- **Color-coded status** - Green (ALLOWED), Orange (OVER LIMIT), Red (BLOCKED)
-- **Web interface** (default port 8000) for viewing and managing allowed/blocked MAC addresses per network
-- **Settings modal** - Configure limits and prefixes per network via gear icon
-- **Real-time toggle** - Manually allow/block individual MAC addresses
-- **Filter policy validation** - Warns when Zone-Based Firewall filter policies are missing
-- **State persistence** - Survives router reboots
+- **Per-network limits** - Configure max unknown hosts per LAN (0 = unlimited)
+- **MAC prefix whitelist** - Known OUI prefixes don't count toward limits
+- **Auto-blocking** - New MACs blocked when limit reached (🟠 OVER LIMIT)
+- **Manual blocking** - Persist blocks across disconnects/reboots (🔴 BLOCKED)
+- **Dynamic tracking** - Monitors REACHABLE and STALE ARP entries every 2 seconds
+- **Grace period** - 6-second delay before removing disconnected MACs
+- **Web interface** - Real-time view and control at port 8000
+- **Color-coded status** - 🟢 ALLOWED, 🟠 OVER LIMIT, 🔴 BLOCKED
+
+## Quick Start
+
+1. **Install app** via NetCloud Manager
+2. **Create Zone-Based Firewall filter policies** - Policy name must match LAN name exactly (e.g., "Primary LAN")
+3. **Access web UI** at `http://{router_ip}:8000/`
+4. **Configure** via gear icon:
+   - Set max hosts per network
+   - Add allowed MAC prefixes (e.g., `00:11:22,AA:BB:CC`)
+5. **Monitor and manage** MACs in real-time
 
 ## How It Works
 
-1. **Monitoring**: Every 2 seconds, the app reads the ARP table to discover REACHABLE and STALE IPv4 devices
-2. **Grace Period**: MACs must be missing for 6 seconds (3 consecutive cycles) before being removed from tracking
-3. **Classification**: Each MAC is checked against its network's allowed prefixes every cycle
-   - **Known MACs**: Match configured prefixes, don't count toward limits, always allowed
-   - **Unknown MACs**: Don't match prefixes, count toward limits, subject to enforcement
-   - Prefix changes immediately re-classify all tracked MACs
-4. **Enforcement**: When a new unknown MAC appears and the network has reached its limit, a firewall deny rule is automatically created
-5. **Manual Blocking**: MACs blocked via the web interface are saved to `tmp/manual_blocks.json` and remain blocked even after disconnecting
-6. **Management**: The web interface allows manual override of allow/block status for any tracked MAC
+**Monitoring**: Checks ARP table every 2 seconds for REACHABLE/STALE IPv4 devices
 
-## Firewall Integration
+**Classification**: 
+- **Known MACs** - Match configured prefixes, always allowed, don't count toward limits
+- **Unknown MACs** - Don't match prefixes, count toward limits
+- Prefix changes immediately re-classify all MACs
 
-The app integrates with NCOS Zone-Based Firewall (ZFW) filter policies:
+**Enforcement**:
+- **Auto-block** (🟠 OVER LIMIT) - When limit reached, new MACs get firewall deny rules. Freed when disconnected.
+- **Manual block** (🔴 BLOCKED) - Click Block button. Saved to `tmp/manual_blocks.json`, persists until unblocked.
 
-1. Gets the network name from `status/lan/networks/{interface}/info/name`
-2. Finds the matching filter policy in `config/security/zfw/filter_policies/` by name
-3. Adds/removes deny rules with MAC address matching in the `src.mac` field
-4. Deny rules are named `Deny-{mac_address}` for easy identification
-
-**Important**: Each LAN must have a matching Zone-Based Firewall filter policy with the same name. If a policy is missing, the app will display a warning and disable block/allow buttons for that network.
+**Grace Period**: MACs must be missing for 6 seconds (3 cycles) before removal
 
 ## Configuration
 
-All configuration is done via the web interface settings modal (gear icon):
+### Via Web Interface (Gear Icon)
 
-### Per-Network Settings
+**Per-Network Settings:**
+- **Max Hosts** - Maximum unknown hosts (0 = unlimited)
+- **Allowed MAC Prefixes** - Comma-separated OUI prefixes: `00:11:22,AA:BB:CC,DD:EE:FF`
 
-Each network can be configured independently:
+### Via Appdata (Optional)
 
-- **Max Hosts** - Maximum number of unknown hosts allowed (0 = unlimited)
-- **Allowed MAC Prefixes** - Comma-separated OUI prefixes (first 6 hex characters) that are always allowed
+- `network_config` - JSON: `{"Network Name": {"max_hosts": 5, "allowed_prefixes": ["001122", "AABBCC"]}}`
+- `custom_mac_filter_port` - Web port (default: 8000)
 
-Configuration is saved to appdata field `network_config` as JSON.
+## Example
 
-### Global Settings
+**Scenario**: Guest network with 5-device limit, excluding company devices
 
-- **custom_mac_filter_port** (Optional) - TCP port for web interface (default: 8000)
+1. Gear icon → Find "Guest LAN"
+2. Max Hosts: `5`
+3. Allowed MAC Prefixes: `00:11:22,AA:BB:CC`
+4. Save
 
-## Web Interface
+**Result**: Company devices (00:11:22*, AA:BB:CC*) always allowed. Up to 5 other devices allowed. 6th device auto-blocked.
 
-Access at `http://{router_ip}:{port}/` (default: `http://192.168.1.4:8000/`)
+## Firewall Integration
 
-### Main View
+Requires Zone-Based Firewall filter policy per LAN:
+- Policy name must match LAN name exactly
+- Default action "allow" (app adds specific deny rules)
+- Deny rules named `Deny-{mac_address}`
 
-- Networks listed in config/lan order
-- Each network shows:
-  - Known MAC count (matching prefixes)
-  - Unknown MAC count vs limit
-  - Configured prefixes
-  - Warning if filter policy is missing
-  - Table of all tracked MACs with:
-    - MAC address
-    - IP address
-    - Prefix status (Known/Unknown)
-    - Current status with color-coded pills:
-      - 🟢 **ALLOWED** - Green (allowed MACs)
-      - 🟠 **OVER LIMIT** - Orange (auto-blocked due to limit, freed when disconnected)
-      - 🔴 **BLOCKED** - Red (manually blocked, persists until unblocked)
-    - Block/Allow button (disabled if no filter policy)
-
-### Settings Modal (Gear Icon)
-
-- Configure max hosts per network
-- Configure allowed MAC prefixes per network
-- Changes take effect immediately after saving
-
-### Theme Toggle (Sun/Moon Icon)
-
-- Switch between light and dark mode
-- Preference saved to browser localStorage
-
-## Example Configuration
-
-**Scenario**: Guest network with 5-device limit, excluding company infrastructure
-
-1. Click gear icon to open settings
-2. Find "Guest LAN" network
-3. Set **Max Hosts**: `5`
-4. Set **Allowed MAC Prefixes**: `00:11:22,AA:BB:CC,DD:EE:FF`
-5. Click "Save Settings"
-
-**Result**:
-- Devices with MACs starting with `00:11:22`, `AA:BB:CC`, or `DD:EE:FF` are always allowed (marked as "Known")
-- Up to 5 additional unknown devices are allowed
-- The 6th unknown device triggers a firewall deny rule
-- All activity is visible in the web interface
-
-## Setup
-
-1. Install the app via NetCloud Manager
-2. Create Zone-Based Firewall filter policies for each LAN:
-   - Policy name must match LAN name exactly (e.g., "Primary LAN", "Guest LAN")
-   - Default action "allow" (app adds specific deny rules)
-3. Access web interface at `http://{router_ip}:8000/`
-4. Click gear icon to configure limits and prefixes per network
-5. Monitor and manage MACs in real-time
-
-## Logs
-
-The app logs important events:
-- Startup and configuration loading
-- Filter policy status for each network
-- New MACs discovered and blocked when limits are reached
-- Firewall rule additions/removals
-- Web server status
-
-View logs in NetCloud Manager or via the router's local logs.
-
-## Appdata Fields
-
-- `network_config` - JSON object with per-network configuration: `{network_name: {max_hosts: int, allowed_prefixes: [str]}}`
-- `custom_mac_filter_port` - Web interface port (default: 8000)
+If policy missing, web UI shows warning and disables Block/Allow buttons.
 
 ## State Files
 
-- `tmp/state.json` - Current tracked MACs (cleared on removal after grace period)
-- `tmp/manual_blocks.json` - Manually blocked MACs (persists across disconnects and reboots)
+- `tmp/state.json` - Current tracked MACs
+- `tmp/manual_blocks.json` - Manually blocked MACs (persists across reboots)
 
 ## Troubleshooting
 
-**Block/Allow buttons are disabled**
-- A Zone-Based Firewall filter policy matching the network name is missing
-- Create a filter policy with the exact same name as the LAN network
+**Block/Allow buttons disabled** - Create Zone-Based Firewall filter policy matching LAN name
 
-**MACs not being blocked**
-- Check that max_hosts is set > 0 for the network
-- Verify the MAC doesn't match any configured prefixes
-- Check logs for errors
+**MACs not being blocked** - Check max_hosts > 0 and MAC doesn't match prefixes
 
-**MACs flickering in/out of the list**
-- This should not happen with the 6-second grace period and STALE tracking
-- If it does, check for ARP table issues or network instability
+**MACs flickering** - Shouldn't happen with 6-second grace period and STALE tracking. Check ARP stability.
 
-**Manually blocked MAC reconnected**
-- Manually blocked MACs (red BLOCKED status) stay blocked until you click Allow
-- Auto-blocked MACs (orange OVER LIMIT status) free up slots when they disconnect
+**Manual vs Auto-blocking**:
+- 🟠 OVER LIMIT - Auto-blocked, frees slot when disconnected
+- 🔴 BLOCKED - Manually blocked, stays blocked until you click Allow
