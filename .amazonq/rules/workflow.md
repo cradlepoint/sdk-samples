@@ -51,7 +51,7 @@ This generates all required files from app_template (package.ini, start.sh, cp.p
 
 ## Deploy to Router
 
-**ALWAYS use deploy.sh script** - `bash deploy.sh {app_name}`{app_name}`
+**ALWAYS use deploy.sh script** - `bash deploy.sh {app_name}`
 
 This script handles:
 - Building the app package
@@ -61,6 +61,8 @@ This script handles:
 - Showing status and logs
 
 **NEVER use make.py install directly** - always use deploy.sh for deployment.
+
+**deploy.sh output is sufficient** - if logs show app started successfully (e.g., "Starting app_name", "Web server started"), DO NOT run status or logs commands again. The deployment verification is already complete.
 
 ## Other Commands
 

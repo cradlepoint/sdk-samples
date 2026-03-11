@@ -23,6 +23,8 @@ Make a speedtest web app
 
 Add dashboard to @my_app
 
+Save state of @my_app to persist reboots
+
 Show me how @5GSpeed handles speedtest data
 ```
 
