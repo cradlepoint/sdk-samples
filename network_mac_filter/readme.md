@@ -83,9 +83,10 @@ If policy missing, web UI shows warning and disables Block/Allow buttons.
 
 **Block/Allow buttons disabled** - Create Zone-Based Firewall filter policy matching LAN name
 
-**MACs not being blocked** - Check max_hosts > 0 and MAC doesn't match prefixes
-
-**MACs flickering** - Shouldn't happen with 6-second grace period and STALE tracking. Check ARP stability.
+**MACs not being blocked** - Check:
+- max_hosts > 0
+- MAC doesn't match prefixes
+- Filter policy is applied to correct zone forwarding (e.g., LAN → WAN)
 
 **Manual vs Auto-blocking**:
 - 🟠 OVER LIMIT - Auto-blocked, frees slot when disconnected
