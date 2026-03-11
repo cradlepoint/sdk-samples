@@ -86,6 +86,43 @@ def check_filter_policies():
         cp.log(f"Error checking filter policies: {e}")
 
 
+def cleanup_orphaned_deny_rules():
+    """Remove all Deny-* rules from filter policies on startup."""
+    try:
+        policies = cp.get('config/security/zfw/filter_policies')
+        if not policies:
+            return
+        
+        total_removed = 0
+        for policy in policies:
+            policy_id = policy.get('_id_')
+            policy_name = policy.get('name')
+            if not policy_id:
+                continue
+            
+            rules = cp.get(f'config/security/zfw/filter_policies/{policy_id}/rules') or []
+            
+            # Filter out all Deny-* rules
+            new_rules = []
+            removed_count = 0
+            for rule in rules:
+                rule_name = rule.get('name', '')
+                if rule_name.startswith('Deny-'):
+                    removed_count += 1
+                else:
+                    new_rules.append(rule)
+            
+            if removed_count > 0:
+                cp.put(f'config/security/zfw/filter_policies/{policy_id}/rules', new_rules)
+                cp.log(f"Removed {removed_count} orphaned deny rules from {policy_name}")
+                total_removed += removed_count
+        
+        if total_removed > 0:
+            cp.log(f"Startup cleanup: Removed {total_removed} total orphaned deny rules")
+    except Exception as e:
+        cp.log(f"Error cleaning up orphaned deny rules: {e}")
+
+
 def get_filter_policy_id(network_name):
     """Get filter policy _id_ for network name."""
     try:
@@ -736,6 +773,9 @@ def main():
     global network_config, web_port
     
     cp.log("Starting network_mac_filter")
+    
+    # Clean up orphaned deny rules from previous runs
+    cleanup_orphaned_deny_rules()
     
     # Load saved state
     load_state()
