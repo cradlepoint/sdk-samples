@@ -465,6 +465,11 @@ def retry_on_failure(func, *args, max_retries: int = MAX_RETRIES,
 
 def validate_readiness(n2_client: ncm.NcmClientv2) -> bool:
     """Validate router firmware and group assignment.
+    
+    Validates that:
+    1. Router is in the staging group
+    2. Staging and production groups have matching target firmware
+    3. Router's actual firmware matches its target firmware (waits if needed)
 
     Args:
         n2_client: NCM v2 API client.
@@ -487,24 +492,25 @@ def validate_readiness(n2_client: ncm.NcmClientv2) -> bool:
         prod_group = n2_client.get_group_by_id(group_id=prod_group_id)
         prod_group_firmware_id = prod_group['target_firmware'].split('/')[6]
 
+        # Validate that staging and production groups have the same target firmware
+        if staging_group_firmware_id != prod_group_firmware_id:
+            msg = (
+                f"ERROR: Staging group firmware ({staging_group_firmware_id}) "
+                f"does not match production group firmware ({prod_group_firmware_id})"
+            )
+            cp.log(msg)
+            return False
+        
+        cp.log(f"Staging and production groups have matching target firmware: {staging_group_firmware_id}")
+
         def get_router_data() -> Dict[str, str]:
             """Get current router data."""
             router_info = n2_client.get_router_by_name(router_name=device_name)
             return {
-                'product_id': router_info['product'].split('/')[6],
                 'actual_firmware': router_info['actual_firmware'].split('/')[6],
                 'target_firmware': router_info['target_firmware'].split('/')[6],
                 'group_id': router_info['group'].split('/')[6]
             }
-
-        def get_device_firmware_id(product_id: str) -> str:
-            """Get device firmware ID."""
-            device_firmware = cp.get_firmware_version().split('-')[0]
-            firmware_info = n2_client.get_firmware_for_product_id_by_version(
-                product_id=product_id,
-                firmware_name=device_firmware
-            )
-            return firmware_info['id']
 
         router_data = get_router_data()
 
@@ -537,30 +543,6 @@ def validate_readiness(n2_client: ncm.NcmClientv2) -> bool:
         )
         cp.log(msg)
 
-        device_firmware_id = get_device_firmware_id(router_data['product_id'])
-        start_time = time.time()
-        while (device_firmware_id != staging_group_firmware_id or
-               device_firmware_id != prod_group_firmware_id):
-            if time.time() - start_time > FIRMWARE_CHECK_TIMEOUT:
-                cp.log("ERROR: Firmware ID match timeout exceeded")
-                return False
-            msg = (
-                f"Device firmware ID ({device_firmware_id}) does not match "
-                f"staging ({staging_group_firmware_id}) or production "
-                f"({prod_group_firmware_id}) group firmware IDs. "
-                f"Waiting {FIRMWARE_CHECK_INTERVAL}s..."
-            )
-            cp.log(msg)
-            time.sleep(FIRMWARE_CHECK_INTERVAL)
-            device_firmware_id = get_device_firmware_id(
-                router_data['product_id']
-            )
-
-        msg = (
-            f"Device firmware ID ({device_firmware_id}) matches both "
-            f"staging and production group firmware IDs"
-        )
-        cp.log(msg)
         set_state(STATE_READINESS, 'complete')
         return True
 
