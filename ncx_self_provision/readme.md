@@ -1,5 +1,7 @@
 # NCX Self-Provisioning SDK Application
 
+![NCX Self-Provisioning Header](docs/images/wizard-header.png)
+
 ## Table of Contents
 - [Overview](#overview)
 - [Features](#features)
@@ -22,7 +24,7 @@
 - [Best Practices](#best-practices)
 - [FAQ](#faq)
 
-## Overview (v2.6)
+## Overview (v2.7)
 
 The NCX Self-Provisioning SDK Application enables Ericsson routers to automatically provision themselves to an NCX or SASE network when moved into a staging group. The application executes a 9-step zero-touch provisioning workflow with state management and automatic recovery:
 
@@ -42,8 +44,18 @@ For experienced users, here's the condensed setup process:
 
 1. **Configure staging group** (MUST be done first):
    ```bash
+   # Install Python dependencies
+   # Windows:
+   pip install -r requirements.txt
+   # macOS/Linux:
+   pip3 install -r requirements.txt
+   
    # Launch the web-based configuration wizard
+   # Windows:
    python ncx_staging_wizard.py
+   # macOS/Linux:
+   python3 ncx_staging_wizard.py
+   
    # Open browser to http://localhost:8000
    # Complete the 6-step wizard and apply configuration
    ```
@@ -55,7 +67,11 @@ For experienced users, here's the condensed setup process:
 
 3. **Build and deploy**:
    ```bash
+   # Windows:
    python make.py build ncx_self_provision
+   # macOS/Linux:
+   python3 make.py build ncx_self_provision
+   
    # Upload to NCM and assign to staging group
    ```
 
@@ -135,8 +151,8 @@ Additional cached data for recovery:
    - See [Supported License Types](#supported-license-types) for valid license values
 
 ### Staging Wizard Requirements (Local Machine)
-1. **Python**: Python 3.6 or higher
-2. **Dependencies**: requests library (install via `pip install -r requirements.txt`)
+1. **Python**: Python 3.8 or higher
+2. **Dependencies**: requests and pyopenssl libraries (install via `pip install -r requirements.txt`)
 3. **Web Browser**: Modern web browser (Chrome, Firefox, Safari, Edge)
 4. **Network Access**: Ability to connect to NCM API endpoints
 
@@ -149,7 +165,7 @@ Additional cached data for recovery:
 ### File Requirements
 - `router_grid.csv`: Device configuration data (if using bulk config)
 - `config_template.json`: Configuration template (if using bulk config)
-- `requirements.txt`: Python dependencies for staging wizard (requests library)
+- `requirements.txt`: Python dependencies for staging wizard (requests and pyopenssl libraries)
 
 ### Supported License Types
 
@@ -188,21 +204,30 @@ The installation process consists of three main steps:
 
 The NCX Staging Wizard is a web-based configuration tool that must be run before deployment to configure the staging group with all required application data and API keys.
 
-**Prerequisites:**
-- Python 3.6 or higher
-- requests library (install via: `pip install -r requirements.txt`)
+![NCX Staging Wizard Overview](docs/images/wizard-overview.png)
+*NCX Staging Wizard - 6-step configuration interface*
+
+**Prerequisites:****
+- Python 3.8 or higher
+- requests and pyopenssl libraries (install via: `pip install -r requirements.txt`)
 - Web browser
 
 1. **Install Python dependencies**:
 
 ```bash
+# Windows:
 pip install -r requirements.txt
+# macOS/Linux:
+pip3 install -r requirements.txt
 ```
 
 2. **Launch the NCX Staging Wizard**:
 
 ```bash
+# Windows:
 python ncx_staging_wizard.py
+# macOS/Linux:
+python3 ncx_staging_wizard.py
 ```
 
 You should see output similar to:
@@ -221,11 +246,19 @@ http://localhost:8000
 4. **Complete the 6-step wizard**:
 
    **Step 1: API Keys**
+   
+   ![API Keys Configuration](docs/images/wizard-step1-api-keys.png)
+   *Step 1: Enter NCM API credentials and validate connectivity*
+   
    - Enter your NCM API v2 credentials (X-CP-API-ID, X-CP-API-KEY, X-ECM-API-ID, X-ECM-API-KEY)
    - Enter your NCM API v3 Bearer Token
    - Click "Validate API Keys" to test connectivity
 
    **Step 2: Required Parameters**
+   
+   ![Required Parameters](docs/images/wizard-step2-required.png)
+   *Step 2: Configure core provisioning settings*
+   
    - Enter Staging Group ID and Production Group ID
    - Enter Exchange Network ID
    - Select Secure Connect License type
@@ -235,6 +268,10 @@ http://localhost:8000
      - Note: LAN as DNS and Custom DNS Servers are mutually exclusive
 
    **Step 3: Optional Parameters**
+   
+   ![Optional Parameters](docs/images/wizard-step3-optional.png)
+   *Step 3: Configure optional licenses and resource creation*
+   
    - Select optional licenses (SD-WAN, HMF, AI)
    - Enable resource creation options:
      - Create Primary LAN Resource
@@ -244,11 +281,19 @@ http://localhost:8000
    - Configure global Force DNS setting (can be overridden per-device in CSV)
 
    **Step 4: Global Tags**
+   
+   ![Global Tags Configuration](docs/images/wizard-step4-tags.png)
+   *Step 4: Configure global tags for sites and resources*
+   
    - Enter global tags for sites (comma or semicolon-separated)
    - Enter global tags for resources (if resource creation enabled)
    - Tags must be at least 2 characters, lowercase letters and numbers only
 
    **Step 5: Bulk Configuration**
+   
+   ![Bulk Configuration](docs/images/wizard-step5-bulk-config.png)
+   *Step 5: Upload and validate bulk configuration files*
+   
    - Enable bulk configuration if needed
    - Upload or edit `router_grid.csv` and `config_template.json` files
    - Use the built-in file editor with grid view for CSV editing
@@ -256,11 +301,18 @@ http://localhost:8000
    - Hostname validation: 'name' column values checked for compliance (max 50 chars, alphanumeric + hyphens)
 
    **Step 6: Review & Apply**
+   
+   ![Review and Apply](docs/images/wizard-step6-review.png)
+   *Step 6: Review configuration summary and apply to staging group*
+   
    - Review your complete configuration summary
    - Click "Validate Configuration" to check all settings
    - Click "Apply Configuration" to push settings to staging group
 
 5. **Verify configuration was applied**:
+
+![Configuration Applied Successfully](docs/images/wizard-applied-success.png)
+*Success message after configuration is applied*
 
 You should see a success message:
 
@@ -291,7 +343,7 @@ Next Steps:
 - Collapsible warning messages for bulk configuration issues
 
 **Troubleshooting:**
-- If you see "ModuleNotFoundError: No module named 'requests'", run `pip install -r requirements.txt`
+- If you see "ModuleNotFoundError: No module named 'requests'" or "No module named 'OpenSSL'", run `pip install -r requirements.txt` (Windows) or `pip3 install -r requirements.txt` (macOS/Linux)
 - If you see validation errors, check that all required fields are filled correctly
 - If API key validation fails, verify your credentials are correct
 - Ensure you have permissions to modify the staging group in NCM
@@ -307,9 +359,8 @@ If using bulk configuration, you can prepare files before running the wizard or 
 1. **Create router_grid.csv** with your device data:
 
 ```csv
-id,name,asset_id,desc,primary_lan_ip,2ghz_ssid,5ghz_ssid,custom1,custom2,disable_force_dns
-12345,Router-Site-A,ASSET-001,Branch Office A,192.168.1.1,WiFi-2G,WiFi-5G,Location-A,Region-West,false
-12346,Router-Site-B,ASSET-002,Branch Office B,192.168.2.1,WiFi-2G,WiFi-5G,Location-B,Region-East,true
+id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags,cp_host_tags,wildcard_resource_tags
+5088306,site-3,NYC,12345,value 1,value 2,192.168.103.1,branch;retail,lan;network,,
 ```
 
 2. **Customize config_template.json** with `{{column_name}}` placeholders
@@ -327,7 +378,10 @@ id,name,asset_id,desc,primary_lan_ip,2ghz_ssid,5ghz_ssid,custom1,custom2,disable
 1. **Build the SDK package**:
 
 ```bash
+# Windows:
 python make.py build ncx_self_provision
+# macOS/Linux:
+python3 make.py build ncx_self_provision
 ```
 
 This creates a package containing:
@@ -664,8 +718,8 @@ id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags
 
 #### Step 3: Readiness Validation
 - Verify device in staging group
+- Validate staging and production groups have matching target firmware
 - Wait for firmware sync (actual == target)
-- Confirm firmware compatibility with both groups
 - Timeout: 3600s (configurable)
 
 #### Step 4: Bulk Configuration (Optional)
@@ -851,7 +905,6 @@ Delete only the state markers for steps you want to re-run.
 2. **Log Sanitization**: Sensitive data redacted from logs
 3. **Secure Transport**: All API calls use HTTPS
 4. **No Hardcoded Secrets**: Credentials retrieved at runtime
-5. **Staging Script Security**: ncx_staging.py contains API credentials and must NEVER be included in SDK package or deployed to devices
 
 ### Sanitized Logging
 
@@ -934,13 +987,20 @@ View current provisioning state in NCM:
 ### Log Analysis
 
 #### Successful Provisioning Log Pattern
+
+![Successful Provisioning Logs - Part 1](docs/images/logs-successful-completion-1.png)
+*Device logs showing successful provisioning completion (part 1)*
+
+![Successful Provisioning Logs - Part 2](docs/images/logs-successful-completion-2.png)
+*Device logs showing successful provisioning completion (part 2)*
+
 ```
 [Step 1/9] Waiting for system readiness
 [Step 2/9] Building API keys
 API keys retrieved successfully
 [Step 3/9] Validating readiness
-Router actual firmware matches target firmware
-Device firmware ID matches both staging and production group firmware IDs
+Staging and production groups have matching target firmware: 18366
+Router actual firmware (18366) matches target firmware (18366)
 [Step 4/9] Applying bulk configuration
 Found router 12345 in router_grid.csv
 Successfully patched config to router: 12345
@@ -1046,9 +1106,10 @@ For large deployments:
 
 ### Documentation
 
-| File | Purpose |
-|------|---------|
-| `README.md` | This documentation |
+| File | Purpose | Required |
+|------|---------|----------|
+| `README.md` | This documentation | No (reference only) |
+| `docs/images/` | Screenshot assets for README | No (documentation only, not required to build/run app) |
 
 ## API Reference
 
@@ -1193,12 +1254,30 @@ For issues or questions:
 
 ## Version History
 
+### Version 2.7
+- Added comprehensive screenshot placeholders for wizard and device logs
+- Updated firmware validation to only check actual vs target firmware from NCM
+- Added validation to ensure staging and production groups have matching target firmware
+- Removed local device firmware check and group firmware compatibility validation
+- Added 2-second sleep after cleanup to allow appdata deletions to propagate before group move
+- Moved completion log message before group move to ensure visibility in logs
+- Enhanced cleanup error logging to diagnose appdata deletion issues
+- Updated all documentation to reflect revised firmware validation behavior
+- Added Windows and macOS command examples for all Python commands
+- Updated minimum Python version requirement to 3.8
+- Added pyopenssl to requirements.txt and documentation
+
 ### Version 2.6
 - Added hostname validation for 'name' column in CSV files
 - Wizard validates hostnames during CSV upload/validation (max 50 chars, alphanumeric + hyphens)
 - Provisioning script validates hostname before exchange site creation
 - Non-compliant hostnames generate validation errors with router ID and hostname details
-- Added requirements.txt for Python dependencies (requests library)
+- Added requirements.txt for Python dependencies (requests and pyopenssl libraries)
+- Simplified firmware validation to only check actual vs target firmware from NCM
+- Added validation to ensure staging and production groups have matching target firmware
+- Removed local device firmware check and group firmware compatibility validation
+- Added 2-second sleep after cleanup to allow appdata deletions to propagate
+- Moved completion log message before group move to ensure visibility in logs
 - Updated documentation to reflect hostname compliance requirements and wizard dependencies
 
 ### Version 2.5

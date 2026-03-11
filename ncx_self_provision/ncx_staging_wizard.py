@@ -132,7 +132,7 @@ Usage:
 
 Requirements:
     - Python 3.6 or higher
-    - requests library (install via: pip install -r requirements.txt)
+    - requests and pyopenssl libraries (install via: pip install -r requirements.txt)
     - ncm.py library (included in project)
     - Web browser for wizard interface
 

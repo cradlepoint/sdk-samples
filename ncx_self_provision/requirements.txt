@@ -1,1 +1,2 @@
 requests>=2.25.0
+pyopenssl>=21.0.0
