@@ -151,6 +151,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **ncx_self_provision**
     - Script and accompanying SDK application to allow devices to 'sef-provision' to an NCX/SASE network.
     - **Download:** [ncx_self_provision v2.6.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ncx_self_provision.v2.6.0.tar.gz)
+- **network_mac_filter**
+    - Enforces MAC address limits per network using deny rules in firewall filter policies. When the MAC limit is reached on a specific network, the app automatically adds deny rules for any new reachable MACs seen on that network.
 - **OBDII_monitor**
     - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
     - **Download:** [OBDII_monitor v1.0.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/OBDII_monitor.v1.0.2.tar.gz)
