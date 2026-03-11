@@ -72,6 +72,9 @@ disk = data.get('disk_usage', {})  # {'total_bytes': int, 'free_bytes': int}
 
 # WAN - dict keyed by device name
 data = cp.get('status/wan/devices')  # {'ethernet-wan': {...}, 'mdm-xxx': {...}}
+# Each device has nested structure: device['info']['type'], device['diagnostics'], device['status']
+# Check device type: device.get('info', {}).get('type') == 'mdm'
+# Modem diagnostics: device.get('diagnostics', {}) contains RSRP, RSRQ, SINR, RFBAND, CARRID, etc.
 state = cp.get('status/wan/connection_state')  # 'connected' or 'disconnected' string
 primary = cp.get('status/wan/primary_device')  # device name string like 'mdm-41949674'
 
@@ -97,6 +100,34 @@ conntrack = fw.get('conntrack', [])  # [{'id': int, 'orig_src': str, 'orig_dst':
 # DHCP leases - hostname, network, SSID info for clients
 dhcpd = cp.get('status/dhcpd')  # {'leases': [{'ip_address': str, 'mac': str, 'hostname': str, 'network': str, 'ssid': str, ...}]}
 
+# ARP table - raw text output from system ARP cache
+arpdump = cp.get('status/routing/cli/arpdump')  # String with lines: "Type Interface State Link_Address IP_Address"
+# CRITICAL: Parse line by line, split by whitespace
+# CRITICAL: Only REACHABLE entries are active connections
+# CRITICAL: Check for IPv4 by testing if ':' NOT in IP (IPv6 has colons)
+# CRITICAL: Interface names have trailing digits (primarylan3) - strip with re.sub(r'\d+$', '', interface)
+# PATTERN: parts = line.split(); if parts[0]=='ethernet' and parts[2]=='REACHABLE' and ':'not in parts[4]
+
+# LAN networks - get network info by interface name
+info = cp.get('status/lan/networks/{interface}/info')  # {'name': str, 'vlan_id': int, ...}
+# CRITICAL: Interface name must NOT have trailing digit (use 'primarylan' not 'primarylan3')
+# CRITICAL: Network 'name' field is used to match firewall filter policies
+
+# LAN config - array of LAN configurations
+lans = cp.get('config/lan')  # [{'_id_': str, 'name': str, 'ip_address': str, 'netmask': str, 'enabled': bool, ...}]
+# CRITICAL: Returns array of dicts, NOT dict keyed by path
+# CRITICAL: Each LAN has 'name' field that matches filter policy names
+
+# Firewall filter policies - ZFW MAC/IP filtering
+policies = cp.get('config/security/zfw/filter_policies')  # [{'_id_': str, 'name': str, 'default_action': str, 'rules': [...]}]
+# CRITICAL: Match policy by 'name' field to network name from status/lan/networks
+# CRITICAL: Must get/put entire rules array - cannot update individual rules
+# CRITICAL: MAC filtering uses src.mac array: [{'identity': 'aa:bb:cc:dd:ee:ff'}]
+# PATTERN: Get rules, modify array, put back: cp.put(f'config/security/zfw/filter_policies/{_id_}/rules', rules)
+# Rule structure: {'action': 'deny'|'allow', 'name': str, 'priority': int, 'ip_version': 'ip4'|'ip6',
+#                  'src': {'ip': [], 'mac': [{'identity': str}], 'port': []},
+#                  'dst': {'ip': [], 'port': []}, 'protocols': [], 'app_sets': []}
+
 # QoS - dict with queues and rules arrays
 qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 # CRITICAL: Must put entire qos object, cannot update rules/queues separately
@@ -108,5 +139,7 @@ qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 **CRITICAL: status/lan/clients does NOT have rx_bytes/tx_bytes - use status/client_usage for bandwidth data**
 **CRITICAL: QoS rules do NOT support MAC addresses - only IP addresses via lipaddr/lmask fields**
 **CRITICAL: Firewall conntrack entries have unique 'id' field - track by ID to avoid counting stale connections**
+**CRITICAL: ARP dump interface names have trailing digits - strip them before looking up network info**
+**CRITICAL: Firewall filter policies require full rules array put - cannot update individual rules**
 
 **See @docs/ncos-api/README.md for full examples and all API paths**

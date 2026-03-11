@@ -1,93 +1,63 @@
 # Automatic Reflection System
 
-## MANDATORY: After Every Task Completion
+## MANDATORY WORKFLOW - NO EXCEPTIONS
 
-**When a task is complete (code works, question answered, problem solved), AUTOMATICALLY run this reflection:**
+**STOP. Before responding "task complete" or ending ANY response where you:**
+- Deployed code
+- Fixed an error
+- Answered a technical question
+- Made any API call
 
-### Step 1: Self-Assessment (Internal - Don't Show User)
+**YOU MUST:**
 
-Ask yourself:
-1. Did I verify API paths/fields with curl BEFORE coding?
-2. Did I search docs BEFORE assuming structures?
-3. Did I make assumptions that turned out wrong?
-4. Did I encounter an error that required fixing?
-5. Did I learn something that contradicts existing rules/docs?
-6. What would have prevented my mistakes?
+1. **Ask yourself**: Did I make ANY mistake, assumption, or learn something new?
+2. **If YES**: Update the relevant rule/doc file BEFORE responding
+3. **If NO**: Proceed with response
 
-### Step 2: Determine If Update Needed
+---
 
-**Update rules/docs if ANY of these are true:**
-- You made an incorrect assumption about an API
-- You discovered a field/structure not documented
-- You made a mistake that a rule could prevent
-- You found contradictory information in existing docs
-- You learned a pattern worth capturing
-- You had to correct your approach mid-task
+## Quick Reflection (30 seconds)
 
-**Skip update if:**
-- Task was straightforward with no issues
-- You followed existing rules perfectly
-- No new information was discovered
+**Did I:**
+- ❌ Code first, then fix? → Update rules with correct pattern
+- ❌ Assume API structure without checking? → Update api-reference.md
+- ❌ Get an error? → Add guardrail to prevent it
+- ❌ Find docs were wrong? → Fix them
+- ✅ Follow rules perfectly with no issues? → No update needed
 
-### Step 3: Auto-Update (If Needed)
+**If ANY ❌, update files NOW before responding.**
 
-**Silently update the relevant files:**
-- Update `docs/ncos-api/` with corrected examples
-- Update `.amazonq/rules/` with new guardrails
-- Keep changes minimal and focused
+---
 
-**Then inform user:**
-"✓ Task complete. Updated [file] with [brief description of learning]."
+## What to Document
 
-### Step 4: Major Learning Detection
+**DO document:**
+- API structures and field locations (e.g., `device['info']['type']` not `device['type']`)
+- Common mistakes and how to avoid them (e.g., "always check DTD first")
+- Workflow improvements (e.g., "curl before coding")
+- Patterns that apply to multiple apps (e.g., "all modem diagnostics are nested")
 
-**If you discover something CRITICAL (API completely wrong, major workflow flaw), inform user:**
-"⚠️ Task complete. Found critical issue: [description]. Updated [files]. You may want to review."
+**DON'T document:**
+- App-specific logic
+- One-off solutions that won't apply elsewhere
+- Implementation details of a single app
+- Anything that only matters for one specific use case
 
-## Examples
+**Test: Would this help me build a DIFFERENT app correctly? If no, don't document it.**
 
-### Example 1: Minor Learning (Silent Update)
-```
-Task: Get CPU usage
-Issue: Forgot CPU is in fractions, not percentages
-Action: Update api-reference.md with conversion example
-Output: "✓ Task complete. Updated api-reference.md with CPU conversion note."
-```
+---
 
-### Example 2: No Learning (No Update)
-```
-Task: Get WAN status
-Issue: None, followed existing rules
-Action: None
-Output: "✓ Task complete."
-```
+## Response Format
 
-### Example 3: Critical Learning (Alert User)
-```
-Task: Get client bandwidth
-Issue: status/lan/clients has NO bandwidth fields (major doc error)
-Action: Update api-reference.md, add CRITICAL warning
-Output: "⚠️ Task complete. Found critical issue: status/lan/clients doesn't have rx_bytes/tx_bytes. Updated api-reference.md. You may want to review."
-```
+**After update (if needed):**
+- Minor fix: "✓ Done. Updated [file] with [what]."
+- Critical fix: "⚠️ Done. Found critical issue: [what]. Updated [file]."
+- No update: "✓ Done."
 
-## Integration with Existing Rules
+---
 
-This rule works WITH existing rules:
-- **meta.md** - Still applies, but now automatic
-- **api-reference.md** - Gets updated automatically
-- **workflow.md** - Gets updated if workflow improvements found
-- **coding-standards.md** - Gets updated if new patterns emerge
+## Why This Matters
 
-## Reflection Triggers
+Every mistake you make and don't document, you'll make again. Every time you fix something, capture it so you don't repeat the error.
 
-Automatic reflection runs after:
-- ✅ Code successfully deployed
-- ✅ Question fully answered
-- ✅ Problem solved
-- ✅ Error fixed
-- ❌ NOT after partial steps in multi-step tasks
-- ❌ NOT after simple clarification questions
-
-## Opt-Out
-
-User can disable with: "Don't auto-reflect on this task"
+**This is not optional. This is the workflow.**

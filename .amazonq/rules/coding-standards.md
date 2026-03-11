@@ -69,7 +69,8 @@ except Exception as e:
 - **ALWAYS use ES5 JavaScript syntax** - NO arrow functions `=>`, NO template literals - Python 3.8 environment doesn't support ES6
 - **Use `function(){}` instead of `()=>{}`** for all functions
 - **Use string concatenation `'text'+var+'more'` instead of template literals**
-- **Use data attributes instead of onclick parameters** - Example: `<button data-id="123" onclick="handler(this)">` then `btn.getAttribute('data-id')`
+- **NEVER pass parameters in onclick attributes** - Use HTML entities (&quot;) or data attributes instead
+- **For onclick with params**: Use `onclick="func(&quot;param1&quot;,&quot;param2&quot;)"` with &quot; entities, NOT escaped quotes
 - **Auto-refresh dashboards must preserve user input** - Save `document.activeElement.id` and `.value`, restore after innerHTML update
 - Vanilla JavaScript, semantic HTML5, CSS Grid/Flexbox
 - CSS variables for theming, mobile-first responsive
