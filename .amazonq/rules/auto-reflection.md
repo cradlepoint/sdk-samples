@@ -11,45 +11,27 @@
 **YOU MUST:**
 
 1. **Ask yourself**: Did I make ANY mistake, assumption, or learn something new?
-2. **If YES**: Update the relevant rule/doc file BEFORE responding
+2. **If YES**: Use @learn.md prompt to update rules/docs
 3. **If NO**: Proceed with response
 
 ---
 
-## Quick Reflection (30 seconds)
+## Why @learn.md
 
-**Did I:**
-- ❌ Code first, then fix? → Update rules with correct pattern
-- ❌ Assume API structure without checking? → Update api-reference.md
-- ❌ Get an error? → Add guardrail to prevent it
-- ❌ Find docs were wrong? → Fix them
-- ✅ Follow rules perfectly with no issues? → No update needed
+The @learn.md prompt provides:
+- **Consistent reflection format** - Same process every time
+- **Structured decision-making** - What to document, where it goes
+- **Quality control** - Ensures updates are valuable
+- **Visibility** - User sees when reflection happens
+- **Accountability** - Harder to skip silently
 
-**If ANY ❌, update files NOW before responding.**
-
----
-
-## What to Document
-
-**DO document:**
-- API structures and field locations (e.g., `device['info']['type']` not `device['type']`)
-- Common mistakes and how to avoid them (e.g., "always check DTD first")
-- Workflow improvements (e.g., "curl before coding")
-- Patterns that apply to multiple apps (e.g., "all modem diagnostics are nested")
-
-**DON'T document:**
-- App-specific logic
-- One-off solutions that won't apply elsewhere
-- Implementation details of a single app
-- Anything that only matters for one specific use case
-
-**Test: Would this help me build a DIFFERENT app correctly? If no, don't document it.**
+**Don't manually update files during reflection - always use @learn.md for consistency.**
 
 ---
 
 ## Response Format
 
-**After update (if needed):**
+**After @learn.md (if needed):**
 - Minor fix: "✓ Done. Updated [file] with [what]."
 - Critical fix: "⚠️ Done. Found critical issue: [what]. Updated [file]."
 - No update: "✓ Done."

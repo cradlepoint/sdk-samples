@@ -5,18 +5,55 @@
 1. **VS Code**: Download from [code.visualstudio.com](https://code.visualstudio.com/)
 2. **Amazon Q**: Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AmazonWebServices.amazon-q-vscode) or Extensions panel
 
-## Quick Start (5 minutes)
+## Quick Start (15 minutes)
 
-1. **Install**: VS Code + Amazon Q extension, sign in
-2. **Clone**: `Cmd+Shift+P` → "Git: Clone" → paste repo URL (https://github.com/phate999/sdk-samples)
-3. **Configure**: Edit `sdk_settings.ini` with router IP/credentials
-4. **Test**: Ask Amazon Q: "Create hello_router app that logs every 5 seconds" then "Deploy and show logs"
+### 1. Install VS Code + Amazon Q
 
-## Common Prompts
+- Download VS Code from [code.visualstudio.com](https://code.visualstudio.com/)
+- Open VS Code → Click **Extensions icon** (4 squares) in left sidebar OR press `Cmd+Shift+X` (Mac) / `Ctrl+Shift+X` (Windows)
+- Search "Amazon Q" → Click **Install** on "Amazon Q" by AWS
+- Click **Sign in** button that appears → Follow authentication flow
+
+### 2. Clone the Repository
+
+- Press `Cmd+Shift+P` (Mac) / `Ctrl+Shift+P` (Windows) to open **Command Palette** (search bar at top)
+- Type "Git: Clone" → Select it
+- Paste: `https://github.com/cradlepoint/sdk-samples`
+- Choose folder location → Click **Open** when prompted
+
+### 3. Configure **Developer Mode** Router Connection
+
+- Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
+- Navigate to `sdk_settings.ini` in the **file tree**
+- Click to open → Edit these lines:
+  ```ini
+  dev_client_ip=192.168.0.1        # Your router IP
+  dev_client_username=admin         # Router username
+  dev_client_password=your_password # Router password
+  ```
+- Save with `Cmd+S` / `Ctrl+S`
+
+### 4. Create with Amazon Q
+
+- Click **Amazon Q icon** (Q logo) in left sidebar OR press `Cmd+Shift+Q` / `Ctrl+Shift+Q`
+- In the **chat panel** at bottom, make your request.  For example:
+  ```
+  Make a router dashboard
+  ```
+- Q will create and deploy the app, and automatically check logs for errors to fix.
+- Q will tell you how to use the app, such as:  
+Access web interface at http://router_ip:8000
+
+- Tell Q if there are any bugs, changes, or additions you would like.  For example:
+  ```
+  The memory utilization is blank. Add a graph showing CPU usage over time
+  ```
+- Q will fix bugs, make changes, and deploy the app again.
+
+
+## Prompt Examples
 
 ```
-Make a system status dashboard
-
 Make a vpn dashboard
 
 Make a speedtest web app
@@ -36,44 +73,8 @@ Show me how @5GSpeed handles speedtest data
 | **learn** | Update rules/docs based on what was learned |
 | **rtfm** | Verify API paths/fields with curl before coding |
 
-## What Amazon Q Knows Automatically
-
-✅ Python 3.8 (no `|` operator)  
-✅ Use `cp.log()` not `print()`  
-✅ Use `try/except` everywhere  
-✅ Never generate mock data  
-✅ Use relative paths (`tmp/` not `/tmp`)  
-✅ Deploy with `deploy.sh`
-
-## Recommended Extensions
-
-Open VS Code Extensions panel (`Cmd+Shift+X` or `Ctrl+Shift+X`) and install:
-
-- **Amazon Q** - amazonwebservices.amazon-q-vscode
-- **Python** - ms-python.python
-- **Pylance** - ms-python.vscode-pylance
-
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Q suggests `\|` operator | Remind: "No \| operator for Python 3.8" |
 | Deploy fails | Check `sdk_settings.ini` credentials |
-| Need cp.py help | Ask: `@cp.py what functions handle GPS?` |
-
-## Example Flow
-
-```
-You: Create "cell_logger" that logs signal strength every 30s to CSV
-Q: [Creates app, Deploys, shows logs]
-
-You: Add web interface showing last 100 readings
-Q: [Adds static/ folder with HTML/CSS/JS]
-
-You: Deploy
-Q: [Deploys, confirms web server on port 8000]
-```
-
----
-
-**Remember**: `.amazonq/rules/` loads automatically - just describe what you want to build!
