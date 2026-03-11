@@ -70,6 +70,7 @@ Requires Zone-Based Firewall filter policy per LAN:
 - Policy name must match LAN name exactly
 - Default action "allow" (app adds specific deny rules)
 - Deny rules named `Deny-{mac_address}`
+- **Apply filter policy when forwarding the network/zone to another zone** (e.g., LAN → WAN, LAN → Tunnel)
 
 If policy missing, web UI shows warning and disables Block/Allow buttons.
 
