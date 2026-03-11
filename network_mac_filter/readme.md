@@ -7,9 +7,13 @@ Enforces MAC address limits per network using deny rules in firewall filter poli
 ## Features
 
 - **Per-network configuration** - Each LAN can have its own MAC limit and allowed prefixes
-- **Monitors ARP table** (`status/routing/cli/arpdump`) for reachable IPv4 MAC addresses every second
+- **Monitors ARP table** (`status/routing/cli/arpdump`) for REACHABLE and STALE IPv4 MAC addresses every 2 seconds
+- **Grace period** - MACs must be missing for 6 seconds (3 cycles) before removal to handle ARP cache fluctuations
 - **Known/Unknown MAC tracking** - MACs matching configured OUI prefixes are marked as "known" and don't count toward limits
+- **Dynamic prefix re-evaluation** - Changing prefixes immediately updates known/unknown status for all tracked MACs
 - **Automatic enforcement** - When unknown MAC limit is reached, new MACs are automatically blocked via firewall deny rules
+- **Manual blocking** - Manually blocked MACs persist across disconnects and reboots until explicitly unblocked
+- **Color-coded status** - Green (ALLOWED), Orange (OVER LIMIT), Red (BLOCKED)
 - **Web interface** (default port 8000) for viewing and managing allowed/blocked MAC addresses per network
 - **Settings modal** - Configure limits and prefixes per network via gear icon
 - **Real-time toggle** - Manually allow/block individual MAC addresses
@@ -18,12 +22,15 @@ Enforces MAC address limits per network using deny rules in firewall filter poli
 
 ## How It Works
 
-1. **Monitoring**: Every second, the app reads the ARP table to discover reachable IPv4 devices
-2. **Classification**: Each MAC is checked against its network's allowed prefixes
+1. **Monitoring**: Every 2 seconds, the app reads the ARP table to discover REACHABLE and STALE IPv4 devices
+2. **Grace Period**: MACs must be missing for 6 seconds (3 consecutive cycles) before being removed from tracking
+3. **Classification**: Each MAC is checked against its network's allowed prefixes every cycle
    - **Known MACs**: Match configured prefixes, don't count toward limits, always allowed
    - **Unknown MACs**: Don't match prefixes, count toward limits, subject to enforcement
-3. **Enforcement**: When a new unknown MAC appears and the network has reached its limit, a firewall deny rule is automatically created
-4. **Management**: The web interface allows manual override of allow/block status for any tracked MAC
+   - Prefix changes immediately re-classify all tracked MACs
+4. **Enforcement**: When a new unknown MAC appears and the network has reached its limit, a firewall deny rule is automatically created
+5. **Manual Blocking**: MACs blocked via the web interface are saved to `tmp/manual_blocks.json` and remain blocked even after disconnecting
+6. **Management**: The web interface allows manual override of allow/block status for any tracked MAC
 
 ## Firewall Integration
 
@@ -69,7 +76,10 @@ Access at `http://{router_ip}:{port}/` (default: `http://192.168.1.4:8000/`)
     - MAC address
     - IP address
     - Prefix status (Known/Unknown)
-    - Current status (Allowed/Blocked)
+    - Current status with color-coded pills:
+      - 🟢 **ALLOWED** - Green (allowed MACs)
+      - 🟠 **OVER LIMIT** - Orange (auto-blocked due to limit, freed when disconnected)
+      - 🔴 **BLOCKED** - Red (manually blocked, persists until unblocked)
     - Block/Allow button (disabled if no filter policy)
 
 ### Settings Modal (Gear Icon)
@@ -125,6 +135,11 @@ View logs in NetCloud Manager or via the router's local logs.
 - `network_config` - JSON object with per-network configuration: `{network_name: {max_hosts: int, allowed_prefixes: [str]}}`
 - `custom_mac_filter_port` - Web interface port (default: 8000)
 
+## State Files
+
+- `tmp/state.json` - Current tracked MACs (cleared on removal after grace period)
+- `tmp/manual_blocks.json` - Manually blocked MACs (persists across disconnects and reboots)
+
 ## Troubleshooting
 
 **Block/Allow buttons are disabled**
@@ -135,3 +150,11 @@ View logs in NetCloud Manager or via the router's local logs.
 - Check that max_hosts is set > 0 for the network
 - Verify the MAC doesn't match any configured prefixes
 - Check logs for errors
+
+**MACs flickering in/out of the list**
+- This should not happen with the 6-second grace period and STALE tracking
+- If it does, check for ARP table issues or network instability
+
+**Manually blocked MAC reconnected**
+- Manually blocked MACs (red BLOCKED status) stay blocked until you click Allow
+- Auto-blocked MACs (orange OVER LIMIT status) free up slots when they disconnect

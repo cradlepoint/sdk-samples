@@ -8,10 +8,12 @@ import threading
 import socket
 
 # Global state
-tracked_macs = {}  # {network: {mac: {'ip': str, 'blocked': bool}}}
+tracked_macs = {}  # {network: {mac: {'ip': str, 'blocked': bool, 'known': bool, 'missing_count': int}}}
+manual_blocks = {}  # {network: {mac: True}} - Manually blocked MACs that persist
 network_config = {}  # {network: {'max_hosts': int, 'allowed_prefixes': [str]}}
 network_policy_status = {}  # {network: bool} - True if policy exists
 web_port = 8000
+GRACE_PERIOD_CYCLES = 3  # Remove MAC after missing for this many cycles
 
 
 def parse_mac_prefixes(prefix_str):
@@ -42,7 +44,7 @@ def parse_arpdump(arpdump_str):
     entries = []
     for line in arpdump_str.split('\n'):
         parts = line.split()
-        if len(parts) >= 5 and parts[0] == 'ethernet' and parts[2] == 'REACHABLE':
+        if len(parts) >= 5 and parts[0] == 'ethernet' and parts[2] in ['REACHABLE', 'STALE']:
             mac = parts[3]
             ip = parts[4]
             interface = parts[1]
@@ -178,6 +180,50 @@ def save_state():
         cp.log(f"Error saving state: {e}")
 
 
+def load_manual_blocks():
+    """Load manually blocked MACs from persistent file."""
+    global manual_blocks
+    try:
+        if os.path.exists('tmp/manual_blocks.json'):
+            with open('tmp/manual_blocks.json', 'r') as f:
+                manual_blocks = json.load(f)
+            cp.log(f"Loaded manual blocks: {sum(len(macs) for macs in manual_blocks.values())} MACs")
+    except Exception as e:
+        cp.log(f"Error loading manual blocks: {e}")
+
+
+def save_manual_blocks():
+    """Save manually blocked MACs to persistent file."""
+    try:
+        os.makedirs('tmp', exist_ok=True)
+        with open('tmp/manual_blocks.json', 'w') as f:
+            json.dump(manual_blocks, f)
+    except Exception as e:
+        cp.log(f"Error saving manual blocks: {e}")
+
+
+def is_manually_blocked(network, mac):
+    """Check if MAC is manually blocked."""
+    return manual_blocks.get(network, {}).get(mac, False)
+
+
+def set_manual_block(network, mac, blocked):
+    """Set or clear manual block for MAC."""
+    global manual_blocks
+    if network not in manual_blocks:
+        manual_blocks[network] = {}
+    
+    if blocked:
+        manual_blocks[network][mac] = True
+        cp.log(f"Manually blocked MAC {mac} on {network}")
+    else:
+        if mac in manual_blocks[network]:
+            del manual_blocks[network][mac]
+            cp.log(f"Manually unblocked MAC {mac} on {network}")
+    
+    save_manual_blocks()
+
+
 def monitor_macs():
     """Monitor ARP table and enforce MAC limits."""
     global tracked_macs
@@ -192,22 +238,12 @@ def monitor_macs():
                     if name and name not in tracked_macs:
                         tracked_macs[name] = {}
             
-            # Store LAN order for consistent display
-            lan_order = [lan.get('name') for lan in lans if lan.get('name')] if lans else []
-            
             arpdump = cp.get('status/routing/cli/arpdump')
             if not arpdump:
-                time.sleep(1)
+                time.sleep(2)
                 continue
             
             entries = parse_arpdump(arpdump)
-            
-            # Re-evaluate all tracked MACs based on current config
-            for network_name in tracked_macs:
-                for mac in tracked_macs[network_name]:
-                    # Check if this MAC matches current prefixes
-                    is_known = is_allowed_prefix(mac, network_name)
-                    tracked_macs[network_name][mac]['known'] = is_known
             
             current_macs = {}  # {network: {mac: ip}}
             current_known = {}  # {network: {mac: ip}} for known prefixes
@@ -233,45 +269,93 @@ def monitor_macs():
                     current_macs[network_name] = {}
                 current_macs[network_name][mac] = ip
             
-            # Track known MACs (don't enforce limits on them)
+            # Update tracked_macs in place with grace period
+            for network_name in list(tracked_macs.keys()):
+                # Mark all MACs as potentially missing
+                for mac in tracked_macs[network_name]:
+                    tracked_macs[network_name][mac]['missing_count'] = tracked_macs[network_name][mac].get('missing_count', 0) + 1
+            
+            # Process known MACs (don't enforce limits)
             for network_name, macs in current_known.items():
                 if network_name not in tracked_macs:
                     tracked_macs[network_name] = {}
                 for mac, ip in macs.items():
-                    if mac not in tracked_macs[network_name]:
-                        tracked_macs[network_name][mac] = {'ip': ip, 'blocked': False, 'known': True}
-                    else:
+                    if mac in tracked_macs[network_name]:
+                        # Update existing
                         tracked_macs[network_name][mac]['ip'] = ip
+                        tracked_macs[network_name][mac]['missing_count'] = 0
                         tracked_macs[network_name][mac]['known'] = True
+                    else:
+                        # Add new known MAC
+                        tracked_macs[network_name][mac] = {'ip': ip, 'blocked': False, 'known': True, 'missing_count': 0}
             
-            # Process each network
+            # Re-evaluate all tracked MACs against current config to handle prefix changes
+            for network_name in tracked_macs:
+                for mac in list(tracked_macs[network_name].keys()):
+                    # Check if this MAC should be known based on current config
+                    should_be_known = is_allowed_prefix(mac, network_name)
+                    tracked_macs[network_name][mac]['known'] = should_be_known
+            
+            # Process unknown MACs and enforce limits
             for network_name, macs in current_macs.items():
                 if network_name not in tracked_macs:
                     tracked_macs[network_name] = {}
                 
-                # Add new MACs to tracking
                 for mac, ip in macs.items():
-                    if mac not in tracked_macs[network_name]:
-                        # Count non-blocked MACs
-                        allowed_count = sum(1 for m in tracked_macs[network_name].values() if not m['blocked'])
-                        
-                        # Check if limit reached for this network
-                        max_hosts = network_config.get(network_name, {}).get('max_hosts', 0)
-                        should_block = max_hosts > 0 and allowed_count >= max_hosts
-                        
-                        tracked_macs[network_name][mac] = {'ip': ip, 'blocked': should_block}
-                        
-                        if should_block:
+                    if mac in tracked_macs[network_name]:
+                        # Update existing MAC
+                        tracked_macs[network_name][mac]['ip'] = ip
+                        tracked_macs[network_name][mac]['missing_count'] = 0
+                        # Check if manually blocked
+                        if is_manually_blocked(network_name, mac):
+                            tracked_macs[network_name][mac]['blocked'] = True
+                    else:
+                        # New MAC - check if manually blocked or if limit reached
+                        if is_manually_blocked(network_name, mac):
+                            # Manually blocked - always block
+                            tracked_macs[network_name][mac] = {'ip': ip, 'blocked': True, 'known': False, 'missing_count': 0}
                             policy_id = get_filter_policy_id(network_name)
                             if policy_id:
                                 add_deny_rule(policy_id, mac)
-                                cp.log(f"Blocked MAC {mac} on {network_name} (limit: {max_hosts})")
-                    else:
-                        # Update IP
-                        tracked_macs[network_name][mac]['ip'] = ip
-                        # Ensure known flag is set to False for unknown MACs
-                        if 'known' not in tracked_macs[network_name][mac]:
-                            tracked_macs[network_name][mac]['known'] = False
+                                cp.log(f"Blocked manually blocked MAC {mac} on {network_name}")
+                        else:
+                            # Check if limit reached
+                            allowed_count = sum(1 for m in tracked_macs[network_name].values() 
+                                              if not m.get('blocked', False) and not m.get('known', False) and m.get('missing_count', 0) < GRACE_PERIOD_CYCLES)
+                            
+                            max_hosts = network_config.get(network_name, {}).get('max_hosts', 0)
+                            should_block = max_hosts > 0 and allowed_count >= max_hosts
+                            
+                            if should_block:
+                                # Block new MAC
+                                tracked_macs[network_name][mac] = {'ip': ip, 'blocked': True, 'known': False, 'missing_count': 0}
+                                policy_id = get_filter_policy_id(network_name)
+                                if policy_id:
+                                    add_deny_rule(policy_id, mac)
+                                    cp.log(f"Blocked MAC {mac} on {network_name} (limit: {max_hosts})")
+                            else:
+                                # Allow new MAC
+                                tracked_macs[network_name][mac] = {'ip': ip, 'blocked': False, 'known': False, 'missing_count': 0}
+            
+            # Remove MACs that have been missing for grace period
+            for network_name in list(tracked_macs.keys()):
+                for mac in list(tracked_macs[network_name].keys()):
+                    if tracked_macs[network_name][mac].get('missing_count', 0) >= GRACE_PERIOD_CYCLES:
+                        # Don't remove manually blocked MACs - keep deny rule active
+                        if is_manually_blocked(network_name, mac):
+                            cp.log(f"Keeping manually blocked MAC {mac} on {network_name} (disconnected but blocked)")
+                            continue
+                        
+                        # Remove deny rule if blocked
+                        if tracked_macs[network_name][mac].get('blocked', False):
+                            policy_id = get_filter_policy_id(network_name)
+                            if policy_id:
+                                remove_deny_rule(policy_id, mac)
+                                cp.log(f"Removed deny rule for disconnected MAC {mac} on {network_name}")
+                        
+                        # Remove from tracking
+                        del tracked_macs[network_name][mac]
+                        cp.log(f"Stopped tracking MAC {mac} on {network_name} (missing for {GRACE_PERIOD_CYCLES} cycles)")
             
             # Save state every cycle
             save_state()
@@ -279,7 +363,7 @@ def monitor_macs():
         except Exception as e:
             cp.log(f"Error in monitor_macs: {e}")
         
-        time.sleep(1)
+        time.sleep(2)
 
 
 class WebHandler(BaseHTTPRequestHandler):
@@ -296,7 +380,7 @@ class WebHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            data = {'networks': tracked_macs, 'network_config': network_config, 'policy_status': network_policy_status}
+            data = {'networks': tracked_macs, 'network_config': network_config, 'policy_status': network_policy_status, 'manual_blocks': manual_blocks}
             self.wfile.write(json.dumps(data).encode())
         elif self.path == '/api/config':
             self.send_response(200)
@@ -333,8 +417,10 @@ class WebHandler(BaseHTTPRequestHandler):
                 if policy_id:
                     if new_blocked:
                         add_deny_rule(policy_id, mac)
+                        set_manual_block(network, mac, True)
                     else:
                         remove_deny_rule(policy_id, mac)
+                        set_manual_block(network, mac, False)
                     
                     tracked_macs[network][mac]['blocked'] = new_blocked
                     
@@ -412,6 +498,7 @@ th { font-weight: 600; }
 .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
 .status.allowed { background: var(--success); color: white; }
 .status.blocked { background: var(--danger); color: white; }
+.status.overlimit { background: #ff8c00; color: white; }
 button { background: var(--primary); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; }
 button:hover { opacity: 0.9; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -590,11 +677,30 @@ function loadData() {
         for (var i = 0; i < macList.length; i++) {
           var mac = macList[i];
           var info = macs[mac];
-          var status = info.blocked ? 'blocked' : 'allowed';
-          var action = info.blocked ? 'Allow' : 'Block';
+          var isManualBlock = data.manual_blocks[network] && data.manual_blocks[network][mac];
+          var status = '';
+          var statusClass = '';
+          var action = '';
+          
+          if (info.blocked) {
+            if (isManualBlock) {
+              status = 'BLOCKED';
+              statusClass = 'blocked';
+              action = 'Allow';
+            } else {
+              status = 'OVER LIMIT';
+              statusClass = 'overlimit';
+              action = 'Allow';
+            }
+          } else {
+            status = 'ALLOWED';
+            statusClass = 'allowed';
+            action = 'Block';
+          }
+          
           var prefix = info.known ? 'Known' : 'Unknown';
           var disabled = hasPolicy ? '' : ' disabled';
-          html += '<tr><td>' + mac + '</td><td>' + info.ip + '</td><td>' + prefix + '</td><td><span class="status ' + status + '">' + status.toUpperCase() + '</span></td><td><button' + disabled + ' onclick="toggleMAC(&quot;' + network + '&quot;,&quot;' + mac + '&quot;)">' + action + '</button></td></tr>';
+          html += '<tr><td>' + mac + '</td><td>' + info.ip + '</td><td>' + prefix + '</td><td><span class="status ' + statusClass + '">' + status + '</span></td><td><button' + disabled + ' onclick="toggleMAC(&quot;' + network + '&quot;,&quot;' + mac + '&quot;)">' + action + '</button></td></tr>';
         }
         
         html += '</tbody></table></div>';
@@ -633,6 +739,7 @@ def main():
     
     # Load saved state
     load_state()
+    load_manual_blocks()
     
     # Check filter policies on startup
     check_filter_policies()
