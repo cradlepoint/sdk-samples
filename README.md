@@ -96,6 +96,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [encrypt_appdata v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/encrypt_appdata.v1.0.0.tar.gz)
 - **failover_modem_reset**
     - Monitors all modem SIM slots and detects failover from sim1 to sim2. Logs all SIM status changes and resets the sim2 device after failover.
+    - **Download:** [failover_modem_reset v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/failover_modem_reset.v1.0.0.tar.gz)
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
     - **Download:** [ftp_client v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ftp_client.v2.0.0.tar.gz)
@@ -352,6 +353,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
