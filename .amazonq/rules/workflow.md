@@ -43,6 +43,18 @@ python3 make.py create {app_name}
 
 This generates all required files from app_template (package.ini, start.sh, cp.py, {app_name}.py, readme.md).
 
+**CRITICAL: Before writing ANY app code:**
+1. **RTFM FIRST** - Use `@rtfm.md` prompt to verify API paths, fields, and structures
+2. **ASK USER for unknowns** - Never assume requirements, data formats, or behavior
+3. **VERIFY with curl/DTD** - Test API endpoints before coding
+4. **THEN code** - Only write code after verification
+
+**NEVER:**
+- Assume API fields exist without testing
+- Make up data structures or formats
+- Guess at user requirements
+- Write code before verifying APIs
+
 **After creation, only modify the main {app_name}.py file and readme.md** - all other files are generated correctly.
 
 **NEVER overwrite package.ini, start.sh, or cp.py after creation** - these are auto-generated and correct.

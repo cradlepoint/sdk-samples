@@ -24,6 +24,9 @@
 - **DTD API** (structure): `/api/dtd/config/path` shows exact field types and requirements
 - **When searching for an API path**: use `grep -r "keyword" docs/ncos-api/status/ --include="*.md"` to find the right doc file
 - Use `cp.get('status/path')` for reads, `cp.put('control/path', value)` for actions
+- **Control API via REST**: Use form data format: `curl -u admin:pass -X PUT http://router/api/control/path -d "data=value"` (NOT JSON)
+- **Control API via SDK**: Use `cp.put('control/path', value)` - SDK handles encoding automatically
+- **Reboot examples**: REST: `curl -u admin:pass -X PUT http://router/api/control/system/reboot -d "data=1"` | SDK: `cp.put('control/system/reboot', 1)`
 
 ## CRITICAL: API Verification Workflow (MANDATORY)
 
@@ -74,6 +77,10 @@ disk = data.get('disk_usage', {})  # {'total_bytes': int, 'free_bytes': int}
 data = cp.get('status/wan/devices')  # {'ethernet-wan': {...}, 'mdm-xxx': {...}}
 # Each device has nested structure: device['info']['type'], device['diagnostics'], device['status']
 # Check device type: device.get('info', {}).get('type') == 'mdm'
+# CRITICAL: Each SIM slot is a separate mdm device (mdm-12345, mdm-67890)
+# CRITICAL: SIM slot is in device['info']['sim'] ('sim1' or 'sim2')
+# CRITICAL: Same physical modem = same device['info']['port'] (e.g., 'int1')
+# PATTERN: Detect SIM failover by tracking primary_device's info.sim changing from 'sim1' to 'sim2'
 # Modem diagnostics: device.get('diagnostics', {}) contains RSRP, RSRQ, SINR, RFBAND, CARRID, etc.
 state = cp.get('status/wan/connection_state')  # 'connected' or 'disconnected' string
 primary = cp.get('status/wan/primary_device')  # device name string like 'mdm-41949674'
