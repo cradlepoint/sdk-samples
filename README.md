@@ -94,6 +94,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **encrypt_appdata**
     - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
     - **Download:** [encrypt_appdata v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/encrypt_appdata.v1.0.0.tar.gz)
+- **failver_modem_reset**
+    - Monitors all modem SIM slots and detects failover from sim1 to sim2. Logs all SIM status changes and resets the sim2 device after failover.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
     - **Download:** [ftp_client v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ftp_client.v2.0.0.tar.gz)
