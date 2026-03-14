@@ -28,8 +28,7 @@ def get_mdm_devices(devices):
 
 
 last_summaries = {}
-failover_time = None
-failover_port = None
+failovers = {}  # {port: failover_time}
 first_run = True
 
 while True:
@@ -45,9 +44,8 @@ while True:
                 last_summaries[dev_id] = summary
                 if sim == 'sim2' and summary == 'connected':
                     port = dev.get('info', {}).get('port', '')
-                    cp.log(f'Primary already on sim2 ({dev_id}) - starting reboot timer')
-                    failover_time = time.time()
-                    failover_port = port
+                    cp.log(f'Already on sim2 ({dev_id}) port {port} - starting reboot timer')
+                    failovers[port] = time.time()
             first_run = False
             time.sleep(3)
             continue
@@ -59,39 +57,31 @@ while True:
             summary = dev.get('status', {}).get('summary', '')
             if dev_id in last_summaries and last_summaries[dev_id] != summary:
                 cp.log(f'{dev_id} ({sim}): {last_summaries[dev_id]} -> {summary}')
-                # Detect sim2 connecting after sim1 was connected
-                if sim == 'sim2' and summary == 'connected' and not failover_time:
+                if sim == 'sim2' and summary == 'connected':
                     port = info.get('port', '')
-                    # Check if sim1 on same port was previously connected
-                    for other_id, other_dev in mdms.items():
-                        other_info = other_dev.get('info', {})
-                        if other_info.get('sim') == 'sim1' and other_info.get('port') == port:
-                            cp.log(f'FAILOVER DETECTED: sim2 connected on port {port} ({dev_id}). Starting reboot timer.')
-                            failover_time = time.time()
-                            failover_port = port
-                            break
+                    if port not in failovers:
+                        cp.log(f'FAILOVER DETECTED: sim2 connected on port {port} ({dev_id}). Starting reboot timer.')
+                        failovers[port] = time.time()
             last_summaries[dev_id] = summary
 
         # Reboot logic
-        if failover_time:
+        for port in list(failovers):
             now = datetime.now()
             if reboot_timer:
-                if (time.time() - failover_time) >= int(reboot_timer) * 60:
-                    cp.log(f'Reboot timer expired ({reboot_timer} min). Resetting modem on port {failover_port}.')
+                if (time.time() - failovers[port]) >= int(reboot_timer) * 60:
+                    cp.log(f'Reboot timer expired ({reboot_timer} min). Resetting sim2 on port {port}.')
                     for dev_id, dev in mdms.items():
-                        if dev.get('info', {}).get('port') == failover_port and dev.get('info', {}).get('sim') == 'sim2':
+                        if dev.get('info', {}).get('port') == port and dev.get('info', {}).get('sim') == 'sim2':
                             cp.put(f'control/wan/devices/{dev_id}/reset', None)
                             cp.log(f'Reset {dev_id}')
-                    failover_time = None
-                    failover_port = None
+                    del failovers[port]
             elif now.hour == reboot_hour and now.minute < 5:
-                cp.log(f'Scheduled modem reboot at {now.strftime("%H:%M")}')
+                cp.log(f'Scheduled modem reset at {now.strftime("%H:%M")} for port {port}')
                 for dev_id, dev in mdms.items():
-                    if dev.get('info', {}).get('port') == failover_port and dev.get('info', {}).get('sim') == 'sim2':
+                    if dev.get('info', {}).get('port') == port and dev.get('info', {}).get('sim') == 'sim2':
                         cp.put(f'control/wan/devices/{dev_id}/reset', None)
                         cp.log(f'Reset {dev_id}')
-                failover_time = None
-                failover_port = None
+                del failovers[port]
 
         time.sleep(3)
 
