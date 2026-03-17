@@ -87,11 +87,20 @@ def check_filter_policies():
 
 
 def cleanup_orphaned_deny_rules():
-    """Remove all Deny-* rules from filter policies on startup."""
+    """Remove deny rules for non-known MACs from filter policies on startup.
+    Keep deny rules for known-prefix MACs and manually blocked MACs."""
+    global tracked_macs
     try:
         policies = cp.get('config/security/zfw/filter_policies')
         if not policies:
             return
+        
+        # Build set of MACs to keep (known-prefix + manually blocked)
+        keep_macs = set()
+        for network_name, macs in tracked_macs.items():
+            for mac, info in macs.items():
+                if info.get('known', False) or is_manually_blocked(network_name, mac):
+                    keep_macs.add(mac)
         
         total_removed = 0
         for policy in policies:
@@ -102,23 +111,34 @@ def cleanup_orphaned_deny_rules():
             
             rules = cp.get(f'config/security/zfw/filter_policies/{policy_id}/rules') or []
             
-            # Filter out all Deny-* rules
             new_rules = []
             removed_count = 0
             for rule in rules:
                 rule_name = rule.get('name', '')
                 if rule_name.startswith('Deny-'):
-                    removed_count += 1
+                    # Extract MAC from rule name
+                    rule_mac = rule_name[5:]  # Strip 'Deny-' prefix
+                    if rule_mac in keep_macs:
+                        new_rules.append(rule)
+                    else:
+                        removed_count += 1
                 else:
                     new_rules.append(rule)
             
             if removed_count > 0:
                 cp.put(f'config/security/zfw/filter_policies/{policy_id}/rules', new_rules)
-                cp.log(f"Removed {removed_count} orphaned deny rules from {policy_name}")
+                cp.log(f"Removed {removed_count} deny rules from {policy_name} (kept {len(keep_macs)} known/manual)")
                 total_removed += removed_count
         
+        # Flush tracked_macs of non-known, non-manual entries
+        for network_name in list(tracked_macs.keys()):
+            for mac in list(tracked_macs[network_name].keys()):
+                if not tracked_macs[network_name][mac].get('known', False) and not is_manually_blocked(network_name, mac):
+                    del tracked_macs[network_name][mac]
+        save_state()
+        
         if total_removed > 0:
-            cp.log(f"Startup cleanup: Removed {total_removed} total orphaned deny rules")
+            cp.log(f"Startup cleanup: Removed {total_removed} total deny rules")
     except Exception as e:
         cp.log(f"Error cleaning up orphaned deny rules: {e}")
 
@@ -374,23 +394,15 @@ def monitor_macs():
                                 # Allow new MAC
                                 tracked_macs[network_name][mac] = {'ip': ip, 'blocked': False, 'known': False, 'missing_count': 0}
             
-            # Remove MACs that have been missing for grace period
+            # Handle MACs that have been missing for grace period
             for network_name in list(tracked_macs.keys()):
                 for mac in list(tracked_macs[network_name].keys()):
                     if tracked_macs[network_name][mac].get('missing_count', 0) >= GRACE_PERIOD_CYCLES:
-                        # Don't remove manually blocked MACs - keep deny rule active
-                        if is_manually_blocked(network_name, mac):
-                            cp.log(f"Keeping manually blocked MAC {mac} on {network_name} (disconnected but blocked)")
+                        # Keep blocked MACs (manual or auto) - deny rules stay active
+                        if tracked_macs[network_name][mac].get('blocked', False):
                             continue
                         
-                        # Remove deny rule if blocked
-                        if tracked_macs[network_name][mac].get('blocked', False):
-                            policy_id = get_filter_policy_id(network_name)
-                            if policy_id:
-                                remove_deny_rule(policy_id, mac)
-                                cp.log(f"Removed deny rule for disconnected MAC {mac} on {network_name}")
-                        
-                        # Remove from tracking
+                        # Remove unblocked MACs that disappeared
                         del tracked_macs[network_name][mac]
                         cp.log(f"Stopped tracking MAC {mac} on {network_name} (missing for {GRACE_PERIOD_CYCLES} cycles)")
             
@@ -774,17 +786,11 @@ def main():
     
     cp.log("Starting network_mac_filter")
     
-    # Clean up orphaned deny rules from previous runs
-    cleanup_orphaned_deny_rules()
-    
-    # Load saved state
+    # Load saved state first (needed for cleanup decisions)
     load_state()
     load_manual_blocks()
     
-    # Check filter policies on startup
-    check_filter_policies()
-    
-    # Load configuration from appdata
+    # Load configuration from appdata (needed for known-prefix detection during cleanup)
     try:
         config_str = cp.get_appdata('network_config')
         if config_str:
@@ -792,6 +798,12 @@ def main():
             cp.log(f"Loaded network config: {len(network_config)} networks")
     except Exception as e:
         cp.log(f"Error loading network_config: {e}")
+    
+    # Clean up deny rules for non-known MACs and flush tracking
+    cleanup_orphaned_deny_rules()
+    
+    # Check filter policies on startup
+    check_filter_policies()
     
     try:
         port_str = cp.get_appdata('custom_mac_filter_port')
