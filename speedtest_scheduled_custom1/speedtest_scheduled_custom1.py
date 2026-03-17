@@ -20,14 +20,11 @@ DEFAULT_SCHEDULE = "0 12 * * *"
 
 def get_appdata(name, default):
     try:
-        appdata = cp.get('config/system/sdk/appdata')
-        for item in appdata:
-            if item['name'] == name:
-                return item['value']
-    except Exception as e:
-        cp.log(f'Error reading appdata {name}: {e}')
-    cp.post('config/system/sdk/appdata', {'name': name, 'value': default})
-    cp.log(f'Saved default appdata {name}: {default}')
+        val = cp.get_appdata(name)
+        if val:
+            return val
+    except Exception:
+        pass
     return default
 
 
