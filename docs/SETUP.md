@@ -1,27 +1,42 @@
-# VS Code + Amazon Q Setup for Cradlepoint SDK
-
-## Prerequisites
-
-1. **VS Code**: Download from [code.visualstudio.com](https://code.visualstudio.com/)
-2. **Amazon Q**: Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=AmazonWebServices.amazon-q-vscode) or Extensions panel
+# VS Code + Amazon Q Setup for Ericsson (Cradlepoint) SDK
 
 ## Quick Start (15 minutes)
 
-### 1. Install VS Code + Amazon Q
+### 1. Install Python
+
+**Windows 11:**
+- Download Python 3 from [python.org/downloads](https://www.python.org/downloads/)
+- Run the installer
+- **⚠️ IMPORTANT: Check the box "Add python.exe to PATH"** on the first screen before clicking Install Now. Without this, `python3` and `pip` commands will not work from the terminal.
+- Click **Install Now**
+- Verify by opening a new terminal in VS Code and running: `python --version`
+
+**macOS:**
+- Open Terminal and install Homebrew (if not already installed):
+  ```
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  ```
+- Install Python 3:
+  ```
+  brew install python3
+  ```
+- Verify: `python3 --version`
+
+### 2. Install VS Code + Amazon Q
 
 - Download VS Code from [code.visualstudio.com](https://code.visualstudio.com/)
 - Open VS Code → Click **Extensions icon** (4 squares) in left sidebar OR press `Cmd+Shift+X` (Mac) / `Ctrl+Shift+X` (Windows)
 - Search "Amazon Q" → Click **Install** on "Amazon Q" by AWS
 - Click **Sign in** button that appears → Follow authentication flow
 
-### 2. Clone the Repository
+### 3. Clone the Repository
 
 - Press `Cmd+Shift+P` (Mac) / `Ctrl+Shift+P` (Windows) to open **Command Palette** (search bar at top)
 - Type "Git: Clone" → Select it
 - Paste: `https://github.com/cradlepoint/sdk-samples`
 - Choose folder location → Click **Open** when prompted
 
-### 3. Configure **Developer Mode** Router Connection
+### 4. Configure **Developer Mode** Router Connection
 
 - Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
 - Navigate to `sdk_settings.ini` in the **file tree**
@@ -33,7 +48,7 @@
   ```
 - Save with `Cmd+S` / `Ctrl+S`
 
-### 4. Create with Amazon Q
+### 5. Create with Amazon Q
 
 - Click **Amazon Q icon** (Q logo) in left sidebar OR press `Cmd+Shift+Q` / `Ctrl+Shift+Q`
 
