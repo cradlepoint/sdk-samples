@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Load Steering Files",
+  "description": "Reminds the agent to read all steering files before starting any task",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before starting this task, check which steering files are relevant. The auto-included files (api-reference.md, coding-standards.md, meta.md, workflow.md) are always active. For specific workflows, load on demand: use #rtfm.md before writing any API code, #learn.md after discovering something new, #deploy.md when deploying. Do NOT load all steering files on every prompt."
+  }
+}
