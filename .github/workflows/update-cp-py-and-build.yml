@@ -194,6 +194,8 @@ jobs:
             git config --local user.name "GitHub Action"
             git add README.md
             git commit -m "Add release download links to app descriptions in README"
+            git stash --include-untracked
             git pull --rebase origin ${{ github.ref_name }}
+            git stash pop || true
             git push origin HEAD:${{ github.ref_name }}
           fi
