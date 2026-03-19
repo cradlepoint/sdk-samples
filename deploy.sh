@@ -21,7 +21,15 @@ python3 make.py purge && \
 sleep 2 && \
 python3 make.py build $APP_NAME && \
 python3 make.py install $APP_NAME && \
-sleep 3 && \
+sleep 5 && \
 echo "Checking logs..." && \
 curl -s -u $USER:$PASS http://$IP/api/status/log/ 2>/dev/null | \
-python3 -c "import json,sys; logs=json.load(sys.stdin)['data']; [print(l[3]) for l in logs[-20:] if '$APP_NAME' in str(l)]"
+python3 -c "
+import json,sys
+from datetime import datetime
+logs=json.load(sys.stdin)['data']
+for l in logs[-20:]:
+    if '$APP_NAME' in str(l):
+        ts=datetime.fromtimestamp(l[0]).strftime('%H:%M:%S')
+        print(ts+' '+l[3])
+"

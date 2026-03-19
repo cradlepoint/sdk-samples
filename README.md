@@ -310,8 +310,26 @@ python3 make.py clean all
 | **cp.py** | The Python library used in applications to communicate with the router (NCOS). |
 | **cp_methods_reference.md** | Reference for all available methods/functions when importing `cp.py`. |
 | **make.py** | The main tool for managing application packages: create, build, install, uninstall, start, stop, purge, and update. |
-| **sdk_settings.ini** | Configuration settings used by `make.py` (device connection, app name, etc.). |
+| **sdk_settings.ini** | Configuration settings used by `make.py` (device connection, app name, etc.). See [Local Settings](#local-settings) below. |
 | **tools/bin** | Contains `pscp.exe` for Windows-based transfers. |
+
+---
+
+## Local Settings
+
+`sdk_settings.ini` is checked in with safe defaults so it works out of the box. To customize it for your router without affecting the repo, run this once after cloning:
+
+```bash
+git update-index --skip-worktree sdk_settings.ini
+```
+
+Then edit `sdk_settings.ini` with your router's IP, username, and password. Git will ignore your local changes.
+
+To undo (e.g. before updating defaults):
+
+```bash
+git update-index --no-skip-worktree sdk_settings.ini
+```
 
 ---
 

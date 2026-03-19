@@ -29,6 +29,7 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Wait for connectivity** - use `cp.wait_for_wan_connection()` if internet is needed
 - **NEVER modify packaged files** - Apps have digital signatures (MANIFEST.json). Router deletes app if any packaged file is modified. Write to NEW files only (e.g., `tmp/data.csv`, `logs/output.txt`)
 - **Persist application state** - Save state to survive reboots. Use `tmp/state.json` for runtime state, or appdata for user-configurable values
+- **NEVER write default values to appdata** - Writing defaults to appdata overrides group configs pushed from NCM. Instead, read appdata and use a default in code if the field is missing/empty. For required fields with no sensible default, log a warning and skip that feature
 - **Router architecture is ARM64 (aarch64) with musl libc** - when downloading binaries, use aarch64/arm64 versions, NOT x86_64
 
 ## Python Libraries and Dependencies
@@ -39,6 +40,18 @@ Applications run on Cradlepoint routers using Python 3.8.
 - Libraries are packaged with the app and deployed to the router
 - Keep dependencies minimal - routers have limited storage
 - Test that libraries work on Python 3.8
+- **cppython is missing stdlib modules** - `pkg_resources`, `decimal`, `csv` are not available. Copy shims from existing apps (e.g., `decimal.py`, `csv.py`, `_csv.py` from 5GSpeed or Mobile_Site_Survey)
+- **cppython HAS these stdlib modules** - `threading`, `select`, `ssl`, `http.server`, `socket`, `configparser`, `zipfile`, `io`, `hashlib`, `hmac`, `base64`, `struct`, `uuid`, `json`, `logging`, `os`, `sys`, `time`, `xml.etree.ElementTree` — all work as expected
+- **`redis` is NOT available** - if a library depends on redis, make it conditional with try/except ImportError
+- **C-accelerated stdlib types cannot be monkey-patched** - `xml.etree.ElementTree.Element` is a C type on cppython. Cannot add methods or subclass it. If a library uses lxml-specific methods like `iterchildren()` or `clear(keep_tail=True)`, patch the library source directly
+- **lxml can be replaced with a pure Python shim** - `xml.etree.ElementTree` covers most lxml.etree usage. Key differences to patch in library source:
+  - Replace `elm.iterchildren()` with `iter(elm)` or `list(elm)`
+  - Replace `elm.clear(keep_tail=True)` with `tail=elm.tail; elm.clear(); elm.tail=tail`
+  - `etree.tostring()`: use `ET.tostring(elm, encoding='unicode').encode('utf-8')` to avoid unwanted `<?xml?>` declarations (lxml omits them by default, stdlib adds them with byte encodings). NEVER use `encoding='utf-8'` directly — it returns bytes WITH xml declaration
+  - `etree.XMLSyntaxError` → `xml.etree.ElementTree.ParseError`
+  - `etree.XMLPullParser` works on cppython — use for streaming XML parsing
+  - `etree.Element` is a C type — cannot add attributes/methods at runtime, cannot subclass
+- **Libraries using `pkg_resources` for versioning** - hardcode the version string directly in `__init__.py` instead
 
 ## Error Handling
 
@@ -68,6 +81,8 @@ except Exception as e:
 - **Default port: 8000** - use port 8000 for web applications unless there's a conflict
 - **ALWAYS set SO_REUSEADDR** before binding: `server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)`
 - **Port conflicts on redeployment** - SO_REUSEADDR doesn't prevent "Address in use" errors when redeploying without router reboot. If port 8000 is in use, either reboot router or use a different port (8001, 8002, etc.)
+- **Background web server pattern** - run `http.server.HTTPServer` in a daemon thread: `Thread(target=server.serve_forever, daemon=True).start()`. Main thread runs the app's primary loop
+- **Dashboard auto-refresh with server-side timestamps** - compute `_ago` values (seconds since event) on the server, not the client. Client clocks may differ from router. Return `connected_ago`, `last_rx_ago` etc. as integers
 - **Dynamic download filenames** - use router hostname and timestamp: `cp.get('config/system/system_id')` + `datetime.now().strftime('%Y%m%d_%H%M%S')`
 - **Light/dark mode** - use `data-theme` attribute on `<html>` element, persist with `localStorage.setItem('theme', 'light'|'dark')`, load on page init
 - **ALWAYS use ES5 JavaScript syntax** - NO arrow functions `=>`, NO template literals - Python 3.8 environment doesn't support ES6

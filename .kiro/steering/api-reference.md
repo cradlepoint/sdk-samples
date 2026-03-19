@@ -16,7 +16,8 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - **cp.get_appdata() without args returns a LIST of dicts, not a dict** - each item has 'name', 'value', '_id_'
 - **cp.put_appdata(name, value) takes TWO arguments** - name and value as separate strings, NOT a dict
 - **Appdata is stored in config, not status** - `config/system/sdk/appdata` (not status/system/sdk/appdata)
-- Document all appdata fields in readme.md
+- **NEVER write default values to appdata** - This overrides NCM group configs. Read appdata, use a code default if missing. For required fields with no sensible default, log a warning
+- Document all appdata fields in readme.md, mark required fields
 
 ## NCOS API Documentation
 
@@ -52,6 +53,16 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 # System - dict with cpu (fractions!), memory (bytes), uptime (seconds), temperature (C)
 data = cp.get('status/system')
 cpu_percent = (data.get('cpu', {}).get('user', 0) + data.get('cpu', {}).get('system', 0)) * 100
+
+# Router hostname - string
+hostname = cp.get('config/system/system_id')  # e.g., 'IBR1700-abc'
+
+# LAN IP address - from config/lan array
+lans = cp.get('config/lan') or []
+for lan in lans:
+    if lan.get('ip_address'):
+        server_ip = lan['ip_address']  # e.g., '192.168.0.1'
+        break
 
 # Disk - dict with disk_usage nested object
 data = cp.get('status/mount')
@@ -147,3 +158,20 @@ qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 - **Log entry format**: `[timestamp, facility, level, message]` — index 0 = epoch, index 3 = message text
 
 **See @docs/ncos-api/README.md for full examples and all API paths**
+
+## Certificate Management
+
+- Router can generate CA, server, and client X.509 certs via `control/certmgmt/ca`
+- Use `cp.decrypt()` to retrieve encrypted private keys
+- Router can export `.p12` (PKCS#12) files via REST: `GET /api/certexport?uuid={uuid}&passphrase={pw}&filetype=P12` (requires Basic Auth, not available via SDK `cp` module)
+- For SDK apps needing `.p12` without admin creds, use pure-Python PKCS#12 encoding with PEM data from `cp.get()`/`cp.decrypt()`
+- **Router cert store has limited space** - creating many certs can hit "exceeds config store storage limit". Reuse existing certs when possible (check by name before creating)
+- **Cert creation is async** - after `cp.put('control/certmgmt/ca', {...})`, wait ~5 seconds with `time.sleep(5)` before trying to find the cert
+- **Full docs**: `docs/ncos-api/control/certmgmt.md`
+
+## SSL/TLS Patterns
+
+- **Server SSL context**: `ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)` with `load_cert_chain()` and `load_verify_locations()`
+- **Client SSL context (self-signed)**: `ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)` with `check_hostname=False` and `verify_mode=ssl.CERT_NONE`
+- **Wrap sockets**: Server: `ctx.wrap_socket(sock, server_side=True)`, Client: `ctx.wrap_socket(sock, server_hostname=host)`
+- **Non-blocking SSL**: After wrapping, `sock.setblocking(False)` — handle `ssl.SSLWantReadError` and `ssl.SSLWantWriteError` in recv/send

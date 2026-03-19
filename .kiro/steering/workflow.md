@@ -6,7 +6,7 @@ description: "Cradlepoint SDK development workflow and prompt shortcuts"
 
 ## Python Environment
 
-Use the venv Python for all commands: `/Users/eareelt/environments/sdk/bin/python3.12`
+Use `python3` for all commands.
 
 ## Saved Prompt Shortcuts
 
@@ -33,15 +33,18 @@ Default/placeholder values that indicate unconfigured settings:
 
 ## Project Structure
 
-```
+```text
 app_name/
 ├── package.ini          # Metadata with uuid, version, vendor
 ├── cp.py               # CP module copy
 ├── {app_name}.py       # Main logic
 ├── start.sh            # Uses cppython
 ├── readme.md           # Usage and appdata fields
-└── static/             # Web assets (if applicable)
+├── static/             # Web assets (if applicable)
+└── mylib/              # Subdirectories with Python modules work fine
 ```
+
+- **Multi-file apps work** - apps can have subdirectories with Python modules (e.g., `taky/taky/cot/`). Imports work normally. Include `__init__.py` in each package directory
 
 ## Create App
 
@@ -74,17 +77,20 @@ This generates all required files from app_template (package.ini, start.sh, cp.p
 **ALWAYS use deploy.sh script** - `bash deploy.sh {app_name}`
 
 This script handles:
+- Cleaning old build artifacts
 - Building the app package
 - Stopping the old version
 - Installing the new version
 - Starting the app
 - Showing status and logs
 
+**Just run `bash deploy.sh {app_name}`** - no need to run `make.py clean` or remove old tar.gz files first. deploy.sh handles everything. The app auto-starts after install (auto_start=true in package.ini), so there's no need to run `make.py start` either.
+
 **NEVER use make.py install directly** - always use deploy.sh for deployment.
 
 **deploy.sh output is sufficient** - if logs show app started successfully (e.g., "Starting app_name", "Web server started"), DO NOT run status or logs commands again. The deployment verification is already complete.
 
-**ALWAYS check log timestamps after deploy** - log entries include Unix epoch timestamps. Only consider logs with timestamps AFTER the deploy started. Old log entries from previous deploys will still be in the buffer.
+**ALWAYS check log timestamps after deploy** - deploy.sh shows timestamps (HH:MM:SS) on each log line. Only trust logs with timestamps AFTER you ran the deploy. The router log buffer contains old entries from previous deploys — if you see logs without recent timestamps, they are stale and do not reflect the current deploy.
 
 ## Other Commands
 
