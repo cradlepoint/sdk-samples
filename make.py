@@ -249,7 +249,7 @@ MANIFEST_FILE = 'MANIFEST.json'
 BYTE_CODE_FILES = re.compile(r'^.*/.(pyc|pyo|pyd)$')
 BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
 
-DEFAULT_IGNORE = ['__pycache__/', 'METADATA/', 'buildignore', '.DS_Store']
+DEFAULT_IGNORE = ['__pycache__/', 'buildignore', '.DS_Store']
 
 
 def parse_ignore_file(app_root):
