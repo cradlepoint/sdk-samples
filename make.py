@@ -698,7 +698,7 @@ def install():
 
         # For Windows, use pscp.exe in the tools directory
         if sys.platform == 'win32':
-            cmd = './tools/bin/pscp.exe -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
+            cmd = './tools/bin/pscp.exe -O -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
                    g_dev_client_password, app_archive,
                    g_dev_client_username, g_dev_client_ip)
 
