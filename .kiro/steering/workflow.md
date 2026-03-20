@@ -4,6 +4,16 @@ description: "Cradlepoint SDK development workflow and prompt shortcuts"
 ---
 # Cradlepoint SDK Development Workflow
 
+## Use Specs for New Apps
+
+When building a new SDK app (not a quick script), use a Kiro Spec to plan before coding:
+1. Define requirements — what APIs, what UI, what data
+2. Design — break into tasks, identify API paths needed
+3. RTFM — verify all API paths exist before implementation tasks
+4. Implement — work through tasks step by step
+
+This prevents the "code first, debug later" cycle. Start a spec with: "Create a spec for [app description]".
+
 ## Python Environment
 
 Use `python3` for all commands.

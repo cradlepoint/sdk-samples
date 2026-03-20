@@ -1,4 +1,4 @@
-# VS Code + Amazon Q Setup for Ericsson (Cradlepoint) SDK
+# Kiro Setup for Ericsson (Cradlepoint) SDK
 
 ## Quick Start (15 minutes)
 
@@ -9,7 +9,7 @@
 - Run the installer
 - **⚠️ IMPORTANT: Check the box "Add python.exe to PATH"** on the first screen before clicking Install Now. Without this, `python3` and `pip` commands will not work from the terminal.
 - Click **Install Now**
-- Verify by opening a new terminal in VS Code and running: `python --version`
+- Verify by opening a new terminal in Kiro and running: `python --version`
 
 **macOS:**
 - Open Terminal and install Homebrew (if not already installed):
@@ -22,12 +22,12 @@
   ```
 - Verify: `python3 --version`
 
-### 2. Install VS Code + Amazon Q
+### 2. Install Kiro
 
-- Download VS Code from [code.visualstudio.com](https://code.visualstudio.com/)
-- Open VS Code → Click **Extensions icon** (4 squares) in left sidebar OR press `Cmd+Shift+X` (Mac) / `Ctrl+Shift+X` (Windows)
-- Search "Amazon Q" → Click **Install** on "Amazon Q" by AWS
-- Click **Sign in** button that appears → Follow authentication flow
+- Download Kiro from [kiro.dev](https://kiro.dev/)
+- Run the installer and follow the setup prompts
+- Sign in using **IAM Identity Center** — enter your Start URL and Region when prompted
+  - *Note: You can also sign in with an AWS Builder ID for personal use*
 
 ### 3. Clone the Repository
 
@@ -48,25 +48,22 @@
   ```
 - Save with `Cmd+S` / `Ctrl+S`
 
-### 5. Create with Amazon Q
+### 5. Create with Kiro
 
-- Click **Amazon Q icon** (Q logo) in left sidebar OR press `Cmd+Shift+Q` / `Ctrl+Shift+Q`
-
-**Note:** Amazon Q is a separate extension by AWS, not the same as VS Code's built-in Chat feature. If it says "Chat" at the top, it's the wrong one.
-
-- In the **chat panel** at bottom, make your request.  For example:
+- Open the Kiro chat panel from the sidebar
+- In the **chat panel**, make your request. For example:
   ```
   Make a router dashboard
   ```
-- Q will create and deploy the app, and automatically check logs for errors to fix.
-- Q will tell you how to use the app, such as:  
+- Kiro will create and deploy the app, and automatically check logs for errors to fix.
+- Kiro will tell you how to use the app, such as:
 Access web interface at http://router_ip:8000
 
-- Tell Q if there are any bugs, changes, or additions you would like.  For example:
+- Tell Kiro if there are any bugs, changes, or additions you would like. For example:
   ```
   The memory utilization is blank. Add a graph showing CPU usage over time
   ```
-- Q will fix bugs, make changes, and deploy the app again.
+- Kiro will fix bugs, make changes, and deploy the app again.
 
 
 ## Prompt Examples
