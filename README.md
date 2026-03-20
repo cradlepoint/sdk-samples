@@ -94,6 +94,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **encrypt_appdata**
     - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
     - **Download:** [encrypt_appdata v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/encrypt_appdata.v1.0.0.tar.gz)
+- **failover_modem_reset**
+    - Monitors all modem SIM slots and detects failover from sim1 to sim2. Logs all SIM status changes and resets the sim2 device after failover. Supports multiple modems with independent failover tracking per port.
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
     - **Download:** [ftp_client v2.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ftp_client.v2.0.0.tar.gz)
@@ -229,6 +231,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **throttle_cellular_datacap_rate_tiered**
     - Upon *any* Modem interface reaching 70, 80, 90 or 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit as set by the rate tier (minbwup and minbwdown variables).
     - **Download:** [throttle_cellular_datacap_rate_tiered v1.1.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/throttle_cellular_datacap_rate_tiered.v1.1.0.tar.gz)
+- **ttyd**
+    - ttyd runs a Linux bash shell in a web browser on port 8022. Think of it as web-SSH for your router — access a full bash terminal from any browser on the LAN without needing an SSH client.
 - **tunnel_modem_reset**
     - Monitor tunnels and if down, reset modem it egresses from.
     - **Download:** [tunnel_modem_reset v1.0.4.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/tunnel_modem_reset.v1.0.4.tar.gz)
