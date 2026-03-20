@@ -1,0 +1,10 @@
+# Files to exclude
+favicon.ico
+index.html
+ncx_staging_wizard.py
+readme.md
+requirements.txt
+
+# Directories to exclude
+docs/
+static/

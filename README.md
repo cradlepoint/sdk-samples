@@ -94,9 +94,6 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **encrypt_appdata**
     - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
     - **Download:** [encrypt_appdata v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/encrypt_appdata.v1.0.0.tar.gz)
-- **failover_modem_reset**
-    - Monitors all modem SIM slots and detects failover from sim1 to sim2. Logs all SIM status changes and resets the sim2 device after failover.
-    - **Download:** [failover_modem_reset v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/failover_modem_reset.v1.0.0.tar.gz)
 - **ftp_client**
     - Creates a file and uploads it to an FTP server.
     - **Download:** [ftp_client v2.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ftp_client.v2.0.0.tar.gz)
@@ -156,7 +153,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [ncx_self_provision v2.7.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ncx_self_provision.v2.7.0.tar.gz)
 - **network_mac_filter**
     - Enforces MAC address limits per network using deny rules in firewall filter policies. When the MAC limit is reached on a specific network, the app automatically adds deny rules for any new reachable MACs seen on that network.
-    - **Download:** [network_mac_filter v1.0.1.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/network_mac_filter.v1.0.1.tar.gz)
+    - **Download:** [network_mac_filter v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/network_mac_filter.v1.0.0.tar.gz)
 - **OBDII_monitor**
     - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
     - **Download:** [OBDII_monitor v1.0.2.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/OBDII_monitor.v1.0.2.tar.gz)
@@ -204,7 +201,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [simple_web_server v2.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/simple_web_server.v2.0.0.tar.gz)
 - **speedtest_scheduled_custom1**
     - Run Ookla speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
-    - **Download:** [speedtest_scheduled_custom1 v1.0.1.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.0.1.tar.gz)
+    - **Download:** [speedtest_scheduled_custom1 v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.0.0.tar.gz)
 - **splunk_conntrack**
     - This app monitors the conntrack table and sends new connections to Splunk.
     - **Download:** [splunk_conntrack v1.1.1.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/splunk_conntrack.v1.1.1.tar.gz)
@@ -303,6 +300,40 @@ python3 make.py clean all
 
 ---
 
+## Build Ignore File (buildignore)
+
+You can exclude files and directories from the built app package by placing a `buildignore` file in the app directory. This works similarly to `.gitignore` — one entry per line.
+
+### Default Exclusions
+
+The following are always excluded, even without a `buildignore` file:
+
+- `__pycache__/`
+- `METADATA/`
+- `buildignore`
+- `.DS_Store`
+
+### Format
+
+- One filename or directory per line
+- Directories must end with `/`
+- Lines starting with `#` are comments
+- Blank lines are ignored
+
+### Example `buildignore`
+
+```
+# Development files
+test_data.json
+requirements.txt
+
+# Directories
+tests/
+docs/
+```
+
+---
+
 ## Key Files
 
 | File | Description |
@@ -310,26 +341,8 @@ python3 make.py clean all
 | **cp.py** | The Python library used in applications to communicate with the router (NCOS). |
 | **cp_methods_reference.md** | Reference for all available methods/functions when importing `cp.py`. |
 | **make.py** | The main tool for managing application packages: create, build, install, uninstall, start, stop, purge, and update. |
-| **sdk_settings.ini** | Configuration settings used by `make.py` (device connection, app name, etc.). See [Local Settings](#local-settings) below. |
+| **sdk_settings.ini** | Configuration settings used by `make.py` (device connection, app name, etc.). |
 | **tools/bin** | Contains `pscp.exe` for Windows-based transfers. |
-
----
-
-## Local Settings
-
-`sdk_settings.ini` is checked in with safe defaults so it works out of the box. To customize it for your router without affecting the repo, run this once after cloning:
-
-```bash
-git update-index --skip-worktree sdk_settings.ini
-```
-
-Then edit `sdk_settings.ini` with your router's IP, username, and password. Git will ignore your local changes.
-
-To undo (e.g. before updating defaults):
-
-```bash
-git update-index --no-skip-worktree sdk_settings.ini
-```
 
 ---
 
@@ -371,19 +384,6 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
