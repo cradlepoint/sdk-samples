@@ -249,6 +249,46 @@ MANIFEST_FILE = 'MANIFEST.json'
 BYTE_CODE_FILES = re.compile(r'^.*/.(pyc|pyo|pyd)$')
 BYTE_CODE_FOLDERS = re.compile('^(__pycache__)$')
 
+DEFAULT_IGNORE = ['__pycache__/', 'METADATA/', 'buildignore', '.DS_Store']
+
+
+def parse_ignore_file(app_root):
+    """Parse .ignore file in app directory and return list of patterns to exclude.
+    Combines default ignore patterns with any patterns from the .ignore file.
+
+    Args:
+        app_root (str): Path to the app directory
+
+    Returns:
+        tuple: (ignored_files, ignored_dirs) - sets of filenames and directory names to ignore
+    """
+    ignored_files = set()
+    ignored_dirs = set()
+
+    # Add default ignored directories
+    for pattern in DEFAULT_IGNORE:
+        if pattern.endswith('/'):
+            ignored_dirs.add(pattern.rstrip('/'))
+        else:
+            ignored_files.add(pattern)
+
+    # Parse .ignore file if it exists
+    ignore_path = os.path.join(app_root, 'buildignore')
+    if os.path.isfile(ignore_path):
+        with open(ignore_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.endswith('/'):
+                    ignored_dirs.add(line.rstrip('/'))
+                else:
+                    ignored_files.add(line)
+        print('Loaded .ignore file with {} file(s) and {} dir(s) to exclude'.format(
+            len(ignored_files), len(ignored_dirs)))
+
+    return ignored_files, ignored_dirs
+
 
 # Returns the proper HTTP Auth for the global username and password.
 # Digest Auth is used for NCOS 6.4 and below while Basic Auth is
@@ -407,10 +447,17 @@ def file_checksum(hash_func=hashlib.sha256, file=None):
     return h.hexdigest()
 
 
-def hash_dir(target, hash_func=hashlib.sha256):
+def hash_dir(target, hash_func=hashlib.sha256, ignored_files=None, ignored_dirs=None):
+    if ignored_files is None or ignored_dirs is None:
+        ignored_files, ignored_dirs = parse_ignore_file(target)
     hashed_files = {}
     for path, d, f in os.walk(target):
+        # Prune ignored directories in-place so os.walk won't descend into them
+        d[:] = [x for x in d if x not in ignored_dirs]
         for fl in f:
+            if fl in ignored_files:
+                print("Ignored file: {}".format(fl))
+                continue
             if not fl.startswith('.') and not os.path.basename(path).startswith('.'):
                 # we need this be LINUX fashion!
                 if sys.platform == "win32":
@@ -426,10 +473,21 @@ def hash_dir(target, hash_func=hashlib.sha256):
     return hashed_files
 
 
-def pack_package(app_root, app_name):
+def pack_package(app_root, app_name, ignored_files=None, ignored_dirs=None):
+    if ignored_files is None or ignored_dirs is None:
+        ignored_files, ignored_dirs = parse_ignore_file(app_root)
+
+    def tar_filter(tarinfo):
+        basename = os.path.basename(tarinfo.name)
+        if tarinfo.isdir() and basename in ignored_dirs:
+            return None
+        if tarinfo.isfile() and basename in ignored_files:
+            return None
+        return tarinfo
+
     tar_name = f"{app_name}.tar"
     with tarfile.open(tar_name, 'w') as tar:
-        tar.add(app_root, arcname=os.path.basename(app_root))
+        tar.add(app_root, arcname=os.path.basename(app_root), filter=tar_filter)
 
     gzip_name = "{}.tar.gz".format(app_name)
     with open(tar_name, 'rb') as f_in:
@@ -521,7 +579,8 @@ def package_application(app_root, pkey):
         data['pmf'] = pmf
         data['app'] = app
 
-        app['files'] = hash_dir(app_root)
+        ignored_files, ignored_dirs = parse_ignore_file(app_root)
+        app['files'] = hash_dir(app_root, ignored_files=ignored_files, ignored_dirs=ignored_dirs)
 
         with open(app_manifest_file, 'w') as f:
             f.write(json.dumps(data, indent=4, sort_keys=True))
@@ -529,7 +588,7 @@ def package_application(app_root, pkey):
         create_signature(app_metadata_folder, pkey)
 
         app_name_version = f"{section} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
-        pack_package(app_root, app_name_version)
+        pack_package(app_root, app_name_version, ignored_files=ignored_files, ignored_dirs=ignored_dirs)
 
         print(f'Package {app_name_version}.tar.gz created')
 
@@ -639,7 +698,7 @@ def install():
 
         # For Windows, use pscp.exe in the tools directory
         if sys.platform == 'win32':
-            cmd = './tools/bin/pscp.exe -O -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
+            cmd = './tools/bin/pscp.exe -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
                    g_dev_client_password, app_archive,
                    g_dev_client_username, g_dev_client_ip)
 
