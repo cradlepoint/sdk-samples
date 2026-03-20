@@ -498,46 +498,44 @@ class CSClient(object):
             device_username = ''
             device_password = ''
 
-            if 'linux' not in sys.platform:
+            # Try parent directory first, then fallback to current directory
+            parent_settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
+            current_settings_file = os.path.join(os.getcwd(), 'sdk_settings.ini')
 
-                # Try parent directory first, then fallback to current directory
-                parent_settings_file = os.path.join(os.path.dirname(os.getcwd()), 'sdk_settings.ini')
-                current_settings_file = os.path.join(os.getcwd(), 'sdk_settings.ini')
-                
-                # Check which file exists
-                if os.path.exists(parent_settings_file):
-                    settings_file = parent_settings_file
-                elif os.path.exists(current_settings_file):
-                    settings_file = current_settings_file
+            # Check which file exists
+            if os.path.exists(parent_settings_file):
+                settings_file = parent_settings_file
+            elif os.path.exists(current_settings_file):
+                settings_file = current_settings_file
+            else:
+                settings_file = parent_settings_file  # Use parent as default for error messages
+
+            config = configparser.ConfigParser()
+            config.read(settings_file)
+
+            # Keys in sdk_settings.ini
+            sdk_key = 'sdk'
+            ip_key = 'dev_client_ip'
+            username_key = 'dev_client_username'
+            password_key = 'dev_client_password'
+
+            if sdk_key in config:
+                if ip_key in config[sdk_key]:
+                    device_ip = config[sdk_key][ip_key]
                 else:
-                    settings_file = parent_settings_file  # Use parent as default for error messages
-                
-                config = configparser.ConfigParser()
-                config.read(settings_file)
+                    log('ERROR 1: The {} key does not exist in {}'.format(ip_key, settings_file))
 
-                # Keys in sdk_settings.ini
-                sdk_key = 'sdk'
-                ip_key = 'dev_client_ip'
-                username_key = 'dev_client_username'
-                password_key = 'dev_client_password'
-
-                if sdk_key in config:
-                    if ip_key in config[sdk_key]:
-                        device_ip = config[sdk_key][ip_key]
-                    else:
-                        log('ERROR 1: The {} key does not exist in {}'.format(ip_key, settings_file))
-
-                    if username_key in config[sdk_key]:
-                        device_username = config[sdk_key][username_key]
-                    else:
-                        log('ERROR 2: The {} key does not exist in {}'.format(username_key, settings_file))
-
-                    if password_key in config[sdk_key]:
-                        device_password = config[sdk_key][password_key]
-                    else:
-                        log('ERROR 3: The {} key does not exist in {}'.format(password_key, settings_file))
+                if username_key in config[sdk_key]:
+                    device_username = config[sdk_key][username_key]
                 else:
-                    log('ERROR 4: The {} section does not exist in {}'.format(sdk_key, settings_file))
+                    log('ERROR 2: The {} key does not exist in {}'.format(username_key, settings_file))
+
+                if password_key in config[sdk_key]:
+                    device_password = config[sdk_key][password_key]
+                else:
+                    log('ERROR 3: The {} key does not exist in {}'.format(password_key, settings_file))
+            else:
+                log('ERROR 4: The {} section does not exist in {}'.format(sdk_key, settings_file))
 
             return device_ip, device_username, device_password
         except Exception as e:
@@ -4841,10 +4839,7 @@ def get_ncm_api_keys() -> Dict[str, Optional[str]]:
                 if key in cert_name:
                     api_keys[key] = _cs_client.decrypt(f'config/certmgmt/certs/{cert["_id_"]}/key')
 
-        # Log warning for any missing keys
-        missing = [k for k, v in api_keys.items() if v is None]
-        if missing:
-            _cs_client.log(f"Missing API keys: {', '.join(missing)}")
+
 
         return api_keys
         
