@@ -16,6 +16,26 @@ Configuration tree. **Read/write** via GET, PUT, POST. Persisted to NVRAM.
 | Read | `GET /api/config/{path}` | `cp.get('config/{path}')` |
 | Write | `PUT /api/config/{path}` | `cp.put('config/{path}', value)` |
 | Create (arrays) | `POST /api/config/{path}` | `cp.post('config/{path}', value)` |
+| Delete | `DELETE /api/config/{path}/{_id_}` | — |
+
+### REST API Data Format
+
+**CRITICAL: REST writes use form-encoded `data=` parameter, NOT JSON body.**
+
+```bash
+# POST (create) - form data with JSON value
+curl -k -u admin:pass -X POST "https://ROUTER/api/config/{path}/" \
+  -d 'data={"name":"field","value":"val"}'
+
+# PUT (update) - form data with JSON value
+curl -k -u admin:pass -X PUT "https://ROUTER/api/config/{path}/{_id_}/" \
+  -d 'data={"name":"field","value":"val"}'
+
+# DELETE
+curl -k -u admin:pass -X DELETE "https://ROUTER/api/config/{path}/{_id_}"
+```
+
+**Do NOT use `-H "Content-Type: application/json"` with `-d '{...}'` — the router expects `data=` form encoding.**
 
 ### Array Indexing
 

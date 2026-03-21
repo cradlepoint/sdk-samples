@@ -53,6 +53,34 @@ Applications run on Cradlepoint routers using Python 3.8.
   - `etree.Element` is a C type — cannot add attributes/methods at runtime, cannot subclass
 - **Libraries using `pkg_resources` for versioning** - hardcode the version string directly in `__init__.py` instead
 
+## Docker / Container Development
+
+- **Deploy containers via REST API** - POST to `/api/config/container/projects/` with JSON body. Do NOT use SSH/SCP (router SSH is a restricted CLI, not bash)
+- **Container project schema** (`config/container/projects`):
+  - `name` (string) — project name
+  - `config` (string) — docker-compose YAML as a single escaped string
+  - `enabled` (boolean) — whether the project is active
+  - `update_interval` (integer) — update check interval (0 = disabled)
+- **Named volumes MUST have `driver: local`** - Cradlepoint's container runtime requires explicit `driver: local` on all named volumes in docker-compose files. Without it, volume creation fails
+- **Use alpine-based images** - prefer `-alpine` image variants to reduce size and RAM usage on the router's limited resources
+- **Expect ~200-300MB RAM for InfluxDB** - monitor system metrics when running databases in containers alongside SDK apps
+- **SSH `container` CLI** - can list, start, stop, pull, exec, and view logs. `container exec` does NOT return stdout to the SSH session
+- **Container status API** - `status/container/{name}` shows state, info, and stats per container
+
+Example deploy via curl:
+```bash
+curl -s -k -u admin:pass -X POST "https://ROUTER_IP/api/config/container/projects/" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"myproject","config":"version: \"3\"\nservices:\n  ...","enabled":true,"update_interval":0}'
+```
+
+Example volume declaration:
+```yaml
+volumes:
+  my-data:
+    driver: local
+```
+
 ## Error Handling
 
 Always wrap API calls in try/except and log errors:
