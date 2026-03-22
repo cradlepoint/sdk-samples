@@ -7,9 +7,10 @@
 **Windows 11:**
 - Download Python 3 from [python.org/downloads](https://www.python.org/downloads/)
 - Run the installer
-- **⚠️ IMPORTANT: Check the box "Add python.exe to PATH"** on the first screen before clicking Install Now. Without this, `python3` and `pip` commands will not work from the terminal.
+- **⚠️ IMPORTANT: Check the box "Add python.exe to PATH"** on the first screen before clicking Install Now. Without this, `python` and `pip` commands will not work from the terminal.
 - Click **Install Now**
 - Verify by opening a new terminal in Kiro and running: `python --version`
+- Having trouble? See the [detailed Windows Python setup guide](../WINDOWS_PYTHON_SETUP.md)
 
 **macOS:**
 - Open Terminal and install Homebrew (if not already installed):
@@ -22,21 +23,47 @@
   ```
 - Verify: `python3 --version`
 
-### 2. Install Kiro
+### 2. Install System-Level Dependencies (one-time)
+
+These are needed for app signing and deploying to routers. Python libraries are handled automatically by Kiro in step 4.
+
+**Windows:**
+- Install OpenSSL (Light version) from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html). Choose Win64 or Win32 based on your machine.
+
+**macOS:**
+```bash
+brew install openssl
+brew install hudochenkov/sshpass/sshpass
+```
+
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt-get install libffi-dev libssl-dev sshpass
+```
+
+### 3. Install Kiro
 
 - Download Kiro from [kiro.dev](https://kiro.dev/)
 - Run the installer and follow the setup prompts
 - Sign in using **IAM Identity Center** — enter your Start URL and Region when prompted
   - *Note: You can also sign in with an AWS Builder ID for personal use*
 
-### 3. Clone the Repository
+### 4. Clone the Repository
 
 - Press `Cmd+Shift+P` (Mac) / `Ctrl+Shift+P` (Windows) to open **Command Palette** (search bar at top)
 - Type "Git: Clone" → Select it
 - Paste: `https://github.com/cradlepoint/sdk-samples`
 - Choose folder location → Click **Open** when prompted
 
-### 4. Configure **Developer Mode** Router Connection
+### 5. Python Environment (automatic)
+
+The first time you chat with Kiro after cloning, it automatically:
+- Creates a `.venv` virtual environment
+- Installs all Python dependencies from `requirements.txt` (requests, pyopenssl, cryptography, pyserial)
+
+No manual `pip install` needed. 
+
+### 6. Configure **Developer Mode** Router Connection
 
 - Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
 - Navigate to `sdk_settings.ini` in the **file tree**
@@ -48,7 +75,7 @@
   ```
 - Save with `Cmd+S` / `Ctrl+S`
 
-### 5. Create with Kiro
+### 7. Create with Kiro
 
 - Open the Kiro chat panel from the sidebar
 - In the **chat panel**, make your request. For example:
@@ -93,3 +120,6 @@ Show me how @5GSpeed handles speedtest data
 | Issue | Solution |
 |-------|----------|
 | Deploy fails | Check `sdk_settings.ini` credentials |
+| `python` not found (Windows) | Reinstall Python with "Add to PATH" checked |
+| `pip` not found | Run `python -m ensurepip` or reinstall Python |
+| Venv not created | Delete `.kiro/.setup_complete` and `.venv/`, then chat with Kiro |

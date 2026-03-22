@@ -24,13 +24,25 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Relative paths only** - use `tmp/`, never absolute like `/tmp`
 - **Create directories before writing** - use `os.makedirs('tmp', exist_ok=True)` before writing to tmp/
 - **Python is "cppython"** - start.sh must use `cppython`
-- **Static apps** - no .pyc or .so files
+- **Static apps** - no .pyc or .so files, but statically linked ARM64 binaries ARE supported
 - **Boot logging** - `cp.log('Starting...')` ASAP at startup
 - **Wait for connectivity** - use `cp.wait_for_wan_connection()` if internet is needed
-- **NEVER modify packaged files** - Apps have digital signatures (MANIFEST.json). Router deletes app if any packaged file is modified. Write to NEW files only (e.g., `tmp/data.csv`, `logs/output.txt`)
-- **Persist application state** - Save state to survive reboots. Use `tmp/state.json` for runtime state, or appdata for user-configurable values
+- **NEVER modify packaged files** - Apps have digital signatures (MANIFEST.json). Router deletes app if any packaged file is modified. Write to NEW files only (e.g., `data.csv`, `logs/output.txt`)
+- **Persist application state** - Save state to survive reboots. Use a state file for runtime state, or appdata for user-configurable values
 - **NEVER write default values to appdata** - Writing defaults to appdata overrides group configs pushed from NCM. Instead, read appdata and use a default in code if the field is missing/empty. For required fields with no sensible default, log a warning and skip that feature
 - **Router architecture is ARM64 (aarch64) with musl libc** - when downloading binaries, use aarch64/arm64 versions, NOT x86_64
+
+## Local Development (Running on Your Computer)
+
+- **Apps can run locally** - `python3 my_app/my_app.py` runs the app on your computer. cp.py auto-detects it's not on a router and uses HTTP REST to communicate with the dev router specified in `sdk_settings.ini`
+- **cp.get/put/post/delete work locally** - all API calls route through REST to the dev router
+- **cp.log() prints to stdout locally** - output goes to your terminal instead of syslog
+- **cp.alert() does NOT work locally** - logs the alert text to console but does not send to NCM
+- **cp.register()/cp.unregister() do NOT work locally** - event callbacks require the router's internal socket, no REST equivalent exists
+- **cp.decrypt() does NOT work locally** - returns None and logs a message
+- **Web servers bind to YOUR machine locally** - if your app runs an HTTP server, it binds to your computer's port, not the router's. LAN clients on the router cannot reach it
+- **Serial/GPIO not available locally** - these access your computer's hardware, not the router's
+- **Use local execution for fast iteration** - test API reads, data processing, and business logic locally, then deploy to router for final testing of alerts, events, web UIs, serial, and GPIO
 
 ## Python Libraries and Dependencies
 
@@ -66,12 +78,15 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Expect ~200-300MB RAM for InfluxDB** - monitor system metrics when running databases in containers alongside SDK apps
 - **SSH `container` CLI** - can list, start, stop, pull, exec, and view logs. `container exec` does NOT return stdout to the SSH session
 - **Container status API** - `status/container/{name}` shows state, info, and stats per container
+- **NO memory limits in docker-compose** - Cradlepoint's container runtime does not support `mem_limit`, `deploy.resources.limits.memory`, or any memory constraint options. Omit them entirely or the compose validation will fail
+- **Use Compose version "2.4"** - Cradlepoint's container runtime uses Compose v2.4, not v3. Always set `version: "2.4"` in docker-compose files
+- **Use `restart: unless-stopped`** - Cradlepoint does not allow `restart: always`. Use `unless-stopped` instead
 
 Example deploy via curl:
 ```bash
 curl -s -k -u admin:pass -X POST "https://ROUTER_IP/api/config/container/projects/" \
   -H "Content-Type: application/json" \
-  -d '{"name":"myproject","config":"version: \"3\"\nservices:\n  ...","enabled":true,"update_interval":0}'
+  -d '{"name":"myproject","config":"version: \"2.4\"\nservices:\n  ...","enabled":true,"update_interval":0}'
 ```
 
 Example volume declaration:

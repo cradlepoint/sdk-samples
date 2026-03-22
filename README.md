@@ -258,6 +258,60 @@ Ready-to-use applications you can install from the [releases page](https://githu
 
 ---
 
+## Development Environment Setup
+
+### 1. Install Python
+
+Install Python 3.8 or later from [python.org](https://www.python.org/downloads/) if you don't already have it.
+
+### 2. Clone and set up
+
+```bash
+git clone https://github.com/cradlepoint/sdk-samples.git
+cd sdk-samples
+```
+
+#### Windows
+
+```cmd
+setup_env.bat
+```
+
+#### macOS / Linux
+
+```bash
+bash setup_env.sh
+```
+
+This creates a `.venv` virtual environment and installs all Python dependencies from `requirements.txt`.
+
+Using [Kiro](https://kiro.dev)? See [docs/SETUP.md](docs/SETUP.md) for a guided walkthrough — the Python environment is set up automatically.
+
+### 3. System-level dependencies (one-time, manual)
+
+The setup scripts handle Python libraries. These system tools are needed for app signing and device deployment:
+
+#### Windows
+
+Install OpenSSL (Light version) from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html). Choose Win64 or Win32 based on your machine.
+
+#### macOS
+
+```bash
+brew install openssl
+brew install hudochenkov/sshpass/sshpass
+```
+
+If you don't have Homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"`
+
+#### Linux (Debian/Ubuntu)
+
+```bash
+sudo apt-get install libffi-dev libssl-dev sshpass
+```
+
+---
+
 ## Quick Start — make.py
 
 The `make.py` tool manages the full lifecycle of SDK applications: create, build, install, and maintain.

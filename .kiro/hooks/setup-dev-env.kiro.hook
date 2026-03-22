@@ -1,0 +1,12 @@
+{
+  "name": "Setup Dev Environment",
+  "version": "1.0.0",
+  "description": "Creates a Python virtual environment and installs all SDK dependencies from requirements.txt",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "bash setup_env.sh"
+  }
+}
