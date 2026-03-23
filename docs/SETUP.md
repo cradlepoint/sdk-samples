@@ -46,7 +46,7 @@ sudo apt-get install libffi-dev libssl-dev sshpass
 
 - Download Kiro from [kiro.dev](https://kiro.dev/)
 - Run the installer and follow the setup prompts
-- Sign in using **IAM Identity Center** — enter your Start URL and Region when prompted
+- Sign in using **"Sign in with your organization identity"** — enter your Start URL and Region when prompted
   - *You can use your Google account to try it for free (500 credits to use in 30 days)*
 - If you signed in using a free Google account and later want to switch to a different account that has a license, click the account panel icon at the bottom of the left sidebar to sign out and sign in with a different account.
 
