@@ -61,13 +61,14 @@ sudo apt-get install libffi-dev libssl-dev sshpass
 - Click **Open** when prompted.
 - Click **"Yes, I trust the authors"** when prompted.
 
-### 5. Python Environment (automatic)
+### 5. Python Environment
 
-When the chat panel comes up, go ahead and ask Kiro to build your app. The first time, Kiro will run a script to set up the environment and you will be prompted to Trust/Run the command. I recommend trusting Kiro with commands — it allows autopilot. Use at your own risk.
+- Click the **Kiro ghost icon** in the left sidebar
+- Find and run the **Setup Dev Environment** hook
 
-It automatically:
-- Creates a `.venv` virtual environment
-- Installs all Python dependencies from `requirements.txt` (requests, pyopenssl, cryptography, pyserial)
+It will:
+- Create a `.venv` virtual environment
+- Install all Python dependencies from `requirements.txt` (requests, pyopenssl, cryptography, pyserial)
 
 No manual `pip install` needed.
 
@@ -130,4 +131,4 @@ Show me how @5GSpeed handles speedtest data
 | Deploy fails | Check `sdk_settings.ini` credentials |
 | `python` not found (Windows) | Reinstall Python with "Add to PATH" checked |
 | `pip` not found | Run `python -m ensurepip` or reinstall Python |
-| Venv not created | Delete `.kiro/.setup_complete` and `.venv/`, then chat with Kiro |
+| Venv not created | Delete `.venv/`, then run the **Setup Dev Environment** hook again |
