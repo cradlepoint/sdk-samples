@@ -29,6 +29,7 @@ These are needed for app signing and deploying to routers. Python libraries are 
 
 **Windows:**
 - Install OpenSSL (Light version) from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html). Choose Win64 or Win32 based on your machine.
+  - **⚠️ On the final screen, the installer asks for a donation — uncheck the box and click Finish without donating.**
 
 **macOS:**
 ```bash
@@ -46,22 +47,29 @@ sudo apt-get install libffi-dev libssl-dev sshpass
 - Download Kiro from [kiro.dev](https://kiro.dev/)
 - Run the installer and follow the setup prompts
 - Sign in using **IAM Identity Center** — enter your Start URL and Region when prompted
-  - *Note: You can also sign in with an AWS Builder ID for personal use*
+  - *You can use your Google account to try it for free (500 credits to use in 30 days)*
+- If you signed in using a free Google account and later want to switch to a different account that has a license, click the account panel icon at the bottom of the left sidebar to sign out and sign in with a different account.
 
 ### 4. Clone the Repository
 
-- Press `Cmd+Shift+P` (Mac) / `Ctrl+Shift+P` (Windows) to open **Command Palette** (search bar at top)
-- Type "Git: Clone" → Select it
-- Paste: `https://github.com/cradlepoint/sdk-samples`
-- Choose folder location → Click **Open** when prompted
+- **⚠️ When Kiro starts and you see the Getting Started page, DO NOT click "Open a Project".**
+- Click the **Source Control icon** (git) — the 3rd icon from the top in the left sidebar.
+- If you see a button to download Git for Windows, click it. It will take you to the Git website — click the first link to download the latest version and install it (default settings are fine). Then click the **Reload** link in the Source Control panel where the button was.
+- Click **"Clone Repository"** in the Source Control panel and paste:
+  `https://github.com/cradlepoint/sdk-samples`
+- Choose a folder where you want to save your code when prompted.
+- Click **Open** when prompted.
+- Click **"Yes, I trust the authors"** when prompted.
 
 ### 5. Python Environment (automatic)
 
-The first time you chat with Kiro after cloning, it automatically:
+When the chat panel comes up, go ahead and ask Kiro to build your app. The first time, Kiro will run a script to set up the environment and you will be prompted to Trust/Run the command. I recommend trusting Kiro with commands — it allows autopilot. Use at your own risk.
+
+It automatically:
 - Creates a `.venv` virtual environment
 - Installs all Python dependencies from `requirements.txt` (requests, pyopenssl, cryptography, pyserial)
 
-No manual `pip install` needed. 
+No manual `pip install` needed.
 
 ### 6. Configure **Developer Mode** Router Connection
 

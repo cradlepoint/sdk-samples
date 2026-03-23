@@ -10,7 +10,7 @@ import socket
 # Global state
 tracked_macs = {}  # {network: {mac: {'ip': str, 'blocked': bool, 'known': bool, 'missing_count': int}}}
 manual_blocks = {}  # {network: {mac: True}} - Manually blocked MACs that persist
-network_config = {}  # {network: {'max_hosts': int, 'allowed_prefixes': [str]}}
+network_config = {}  # {network: {'max_unknown': int, 'allowed_prefixes': [str]}}
 network_policy_status = {}  # {network: bool} - True if policy exists
 web_port = 8000
 GRACE_PERIOD_CYCLES = 3  # Remove MAC after missing for this many cycles
@@ -28,6 +28,16 @@ def parse_mac_prefixes(prefix_str):
         if len(clean) >= 6:
             prefixes.append(clean[:6].upper())
     return prefixes
+
+
+def normalize_mac(mac_str):
+    """Normalize a MAC address string to XX:XX:XX:XX:XX:XX format.
+    Handles formats like AABBCCDDEEFF, AA-BB-CC-DD-EE-FF, aa:bb:cc:dd:ee:ff, etc."""
+    clean = re.sub(r'[^0-9A-Fa-f]', '', mac_str.strip())
+    if len(clean) != 12:
+        return None
+    clean = clean.upper()
+    return ':'.join(clean[i:i+2] for i in range(0, 12, 2))
 
 
 def is_allowed_prefix(mac, network):
@@ -238,23 +248,21 @@ def save_state():
 
 
 def load_manual_blocks():
-    """Load manually blocked MACs from persistent file."""
+    """Load manually blocked MACs from appdata."""
     global manual_blocks
     try:
-        if os.path.exists('tmp/manual_blocks.json'):
-            with open('tmp/manual_blocks.json', 'r') as f:
-                manual_blocks = json.load(f)
+        data = cp.get_appdata('manual_blocks')
+        if data:
+            manual_blocks = json.loads(data)
             cp.log(f"Loaded manual blocks: {sum(len(macs) for macs in manual_blocks.values())} MACs")
     except Exception as e:
         cp.log(f"Error loading manual blocks: {e}")
 
 
 def save_manual_blocks():
-    """Save manually blocked MACs to persistent file."""
+    """Save manually blocked MACs to appdata."""
     try:
-        os.makedirs('tmp', exist_ok=True)
-        with open('tmp/manual_blocks.json', 'w') as f:
-            json.dump(manual_blocks, f)
+        cp.put_appdata('manual_blocks', json.dumps(manual_blocks))
     except Exception as e:
         cp.log(f"Error saving manual blocks: {e}")
 
@@ -279,6 +287,147 @@ def set_manual_block(network, mac, blocked):
             cp.log(f"Manually unblocked MAC {mac} on {network}")
     
     save_manual_blocks()
+
+def publish_status():
+    """Publish per-network status to status tree for CLI access."""
+    for network_name, macs in tracked_macs.items():
+        known = 0
+        unknown_allowed = 0
+        unknown_blocked = 0
+        manual = 0
+        total = len(macs)
+        mac_list = []
+
+        for mac, info in macs.items():
+            if info.get('known', False):
+                known += 1
+            elif info.get('blocked', False):
+                unknown_blocked += 1
+                if is_manually_blocked(network_name, mac):
+                    manual += 1
+            else:
+                unknown_allowed += 1
+
+            mac_list.append({
+                'mac': mac,
+                'ip': info.get('ip', ''),
+                'known': info.get('known', False),
+                'blocked': info.get('blocked', False),
+                'manual': is_manually_blocked(network_name, mac)
+            })
+
+        config = network_config.get(network_name, {})
+        max_unknown = config.get('max_unknown', 0)
+        has_policy = network_policy_status.get(network_name, False)
+
+        status = {
+            'total_macs': total,
+            'known_macs': known,
+            'unknown_allowed': unknown_allowed,
+            'unknown_blocked': unknown_blocked,
+            'manual_blocks': manual,
+            'max_unknown': max_unknown,
+            'has_policy': has_policy,
+            'macs': mac_list
+        }
+
+        try:
+            safe_name = network_name.replace(' ', '_').replace('/', '_')
+            cp.put(f'status/network_mac_filter/{safe_name}', status)
+        except Exception as e:
+            cp.log(f"Error publishing status for {network_name}: {e}")
+
+
+def _resolve_network_name(safe_name):
+    """Resolve a safe (underscored) network name back to the real LAN name."""
+    try:
+        lans = cp.get('config/lan')
+        if lans:
+            for lan in lans:
+                name = lan.get('name', '')
+                if name.replace(' ', '_').replace('/', '_') == safe_name:
+                    return name
+    except Exception as e:
+        cp.log(f"Error resolving network name: {e}")
+    return None
+
+
+def on_block(path, value, args):
+    """Callback for control/network_mac_filter/{network}/block."""
+    try:
+        parts = path.split('/')
+        safe_name = parts[2] if len(parts) >= 4 else ''
+        network_name = _resolve_network_name(safe_name)
+        if not network_name:
+            cp.log(f"Block: unknown network '{safe_name}'")
+            return
+
+        mac = normalize_mac(str(value))
+        if not mac:
+            cp.log(f"Block: invalid MAC '{value}'")
+            return
+
+        policy_id = get_filter_policy_id(network_name)
+        if not policy_id:
+            cp.log(f"Block: no filter policy for {network_name}")
+            return
+
+        set_manual_block(network_name, mac, True)
+        if network_name in tracked_macs and mac in tracked_macs[network_name]:
+            tracked_macs[network_name][mac]['blocked'] = True
+        add_deny_rule(policy_id, mac)
+        cp.log(f"CLI block: {mac} on {network_name}")
+    except Exception as e:
+        cp.log(f"Error in on_block: {e}")
+
+
+def on_unblock(path, value, args):
+    """Callback for control/network_mac_filter/{network}/unblock."""
+    try:
+        parts = path.split('/')
+        safe_name = parts[2] if len(parts) >= 4 else ''
+        network_name = _resolve_network_name(safe_name)
+        if not network_name:
+            cp.log(f"Unblock: unknown network '{safe_name}'")
+            return
+
+        mac = normalize_mac(str(value))
+        if not mac:
+            cp.log(f"Unblock: invalid MAC '{value}'")
+            return
+
+        policy_id = get_filter_policy_id(network_name)
+        if not policy_id:
+            cp.log(f"Unblock: no filter policy for {network_name}")
+            return
+
+        set_manual_block(network_name, mac, False)
+        if network_name in tracked_macs and mac in tracked_macs[network_name]:
+            tracked_macs[network_name][mac]['blocked'] = False
+        remove_deny_rule(policy_id, mac)
+        cp.log(f"CLI unblock: {mac} on {network_name}")
+    except Exception as e:
+        cp.log(f"Error in on_unblock: {e}")
+
+
+def register_control_callbacks():
+    """Register block/unblock callbacks for each LAN network."""
+    try:
+        lans = cp.get('config/lan')
+        if not lans:
+            return
+        for lan in lans:
+            name = lan.get('name', '')
+            if not name:
+                continue
+            safe_name = name.replace(' ', '_').replace('/', '_')
+            cp.register('set', f'control/network_mac_filter/{safe_name}/block', on_block)
+            cp.register('set', f'control/network_mac_filter/{safe_name}/unblock', on_unblock)
+            cp.log(f"Registered control callbacks for {name}")
+    except Exception as e:
+        cp.log(f"Error registering control callbacks: {e}")
+
+
 
 
 def monitor_macs():
@@ -380,8 +529,8 @@ def monitor_macs():
                             allowed_count = sum(1 for m in tracked_macs[network_name].values() 
                                               if not m.get('blocked', False) and not m.get('known', False) and m.get('missing_count', 0) < GRACE_PERIOD_CYCLES)
                             
-                            max_hosts = network_config.get(network_name, {}).get('max_hosts', 0)
-                            should_block = max_hosts > 0 and allowed_count >= max_hosts
+                            max_unknown = network_config.get(network_name, {}).get('max_unknown', 0)
+                            should_block = max_unknown > 0 and allowed_count >= max_unknown
                             
                             if should_block:
                                 # Block new MAC
@@ -389,7 +538,7 @@ def monitor_macs():
                                 policy_id = get_filter_policy_id(network_name)
                                 if policy_id:
                                     add_deny_rule(policy_id, mac)
-                                    cp.log(f"Blocked MAC {mac} on {network_name} (limit: {max_hosts})")
+                                    cp.log(f"Blocked MAC {mac} on {network_name} (limit: {max_unknown})")
                             else:
                                 # Allow new MAC
                                 tracked_macs[network_name][mac] = {'ip': ip, 'blocked': False, 'known': False, 'missing_count': 0}
@@ -408,6 +557,9 @@ def monitor_macs():
             
             # Save state every cycle
             save_state()
+            
+            # Publish status for CLI access
+            publish_status()
             
         except Exception as e:
             cp.log(f"Error in monitor_macs: {e}")
@@ -612,10 +764,10 @@ function openSettings() {
     var html = '';
     for (var i = 0; i < data.networks.length; i++) {
       var network = data.networks[i];
-      var config = networkConfig[network] || {max_hosts: 0, allowed_prefixes: []};
+      var config = networkConfig[network] || {max_unknown: 0, allowed_prefixes: []};
       var prefixes = config.allowed_prefixes ? config.allowed_prefixes.join(', ') : '';
       html += '<div class="network-config"><h3>' + network + '</h3>';
-      html += '<div class="form-group"><label>Max Hosts (0 = no limit)</label><input type="number" id="max_' + i + '" value="' + config.max_hosts + '" min="0"></div>';
+      html += '<div class="form-group"><label>Max Unknown (0 = no limit)</label><input type="number" id="max_' + i + '" value="' + config.max_unknown + '" min="0"></div>';
       html += '<div class="form-group"><label>Allowed MAC Prefixes (comma-separated)</label><input type="text" id="prefix_' + i + '" value="' + prefixes + '" placeholder="00:11:22, AA:BB:CC"></div>';
       html += '</div>';
     }
@@ -645,7 +797,7 @@ function saveSettings() {
           }
         }
       }
-      newConfig[network] = {max_hosts: maxHosts, allowed_prefixes: prefixes};
+      newConfig[network] = {max_unknown: maxHosts, allowed_prefixes: prefixes};
     }
     fetch('/api/save_config', {
       method: 'POST',
@@ -692,7 +844,7 @@ function loadData() {
         var network = networks[n];
         var macs = data.networks[network] || {};
         var macList = Object.keys(macs);
-        var config = data.network_config[network] || {max_hosts: 0, allowed_prefixes: []};
+        var config = data.network_config[network] || {max_unknown: 0, allowed_prefixes: []};
         var hasPolicy = data.policy_status[network];
         
         var knownCount = 0;
@@ -705,7 +857,7 @@ function loadData() {
           }
         }
         
-        var limit = config.max_hosts > 0 ? config.max_hosts : 'unlimited';
+        var limit = config.max_unknown > 0 ? config.max_unknown : 'unlimited';
         var prefixes = config.allowed_prefixes.length ? config.allowed_prefixes.join(', ') : 'None';
         
         html += '<div class="network"><h2>' + network + ' (' + knownCount + ' known MACs - ' + unknownCount + ' of ' + limit + ' unknown MACs)</h2>';
@@ -812,9 +964,16 @@ def main():
     except Exception as e:
         cp.log(f"Error loading custom_mac_filter_port: {e}")
     
-    # Start web server in background
-    web_thread = threading.Thread(target=start_web_server, daemon=True)
-    web_thread.start()
+    # Start web server in background (unless disabled via appdata)
+    disable_ui = cp.get_appdata('disable_ui')
+    if disable_ui:
+        cp.log("Web UI disabled via appdata")
+    else:
+        web_thread = threading.Thread(target=start_web_server, daemon=True)
+        web_thread.start()
+    
+    # Register control callbacks for CLI block/unblock
+    register_control_callbacks()
     
     # Start monitoring
     monitor_macs()

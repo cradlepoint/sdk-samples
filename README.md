@@ -369,7 +369,6 @@ You can exclude files and directories from the built app package by placing a `b
 The following are always excluded, even without a `buildignore` file:
 
 - `__pycache__/`
-- `METADATA/`
 - `buildignore`
 - `.DS_Store`
 
