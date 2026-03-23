@@ -1,7 +1,7 @@
 # Cradlepoint SDK Documentation
 
 ## Quick Start
-- **[SETUP.md](SETUP.md)** - VS Code + Amazon Q setup (5 minutes)
+- **[SETUP.md](SETUP.md)** - Setup Kiro
 
 ## NCOS API Reference
 - **[ncos-api/](ncos-api/README.md)** - Complete NCOS API documentation
