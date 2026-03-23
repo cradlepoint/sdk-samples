@@ -10,17 +10,17 @@ if command -v python3 &> /dev/null; then
 elif command -v python &> /dev/null; then
     PY=python
 else
-    echo "ERROR: Python 3 not found. Install Python 3.7+ from https://www.python.org/downloads/"
+    echo "ERROR: Python 3 not found. Install Python 3.8+ from https://www.python.org/downloads/"
     exit 1
 fi
 
-# Verify Python version >= 3.7
+# Verify Python version >= 3.8
 VERSION=$($PY -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 MAJOR=$($PY -c "import sys; print(sys.version_info.major)")
 MINOR=$($PY -c "import sys; print(sys.version_info.minor)")
 
-if [ "$MAJOR" -lt 3 ] || { [ "$MAJOR" -eq 3 ] && [ "$MINOR" -lt 7 ]; }; then
-    echo "ERROR: Python 3.7+ required, found $VERSION"
+if [ "$MAJOR" -lt 3 ] || { [ "$MAJOR" -eq 3 ] && [ "$MINOR" -lt 8 ]; }; then
+    echo "ERROR: Python 3.8+ required, found $VERSION"
     exit 1
 fi
 

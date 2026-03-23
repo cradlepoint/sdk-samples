@@ -6,7 +6,7 @@ set VENV_DIR=.venv
 
 where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo ERROR: Python not found. Install Python 3.7+ from https://www.python.org/downloads/windows/
+    echo ERROR: Python not found. Install Python 3.8+ from https://www.python.org/downloads/windows/
     exit /b 1
 )
 
