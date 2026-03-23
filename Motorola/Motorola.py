@@ -12,7 +12,8 @@ Default Configuration:
 
 import cp
 from threading import Thread
-import tornado.web
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
 import json
 import os
 import ipaddress
@@ -67,42 +68,58 @@ def save_config(config):
         cp.get_logger().exception("Error saving config: %s", e)
 
 
-class ConfigHandler(tornado.web.RequestHandler):
-    """Handles config/ endpoint requests."""
-    def get(self):
-        """Return app config in JSON for web UI."""
-        config = get_config()
-        self.write(json.dumps(config))
+class AppHandler(SimpleHTTPRequestHandler):
+    """Handles all HTTP requests for the web UI."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=os.path.dirname(__file__), **kwargs)
 
-class SubmitHandler(tornado.web.RequestHandler):
-    """Handles submit/ endpoint requests."""
-    def get(self):
-        """Parse args and update and save config."""
-        try:
-            broadcaster.interval = int(self.get_argument('interval', DEFAULT_INTERVAL))
-            broadcaster.udp_port = int(self.get_argument('udp_port', DEFAULT_UDP_PORT))
-            networks = self.get_arguments('networks')
-            lans = []
-            cp_lans = cp.get('config/lan') or []
-            for lan in cp_lans:
-                enabled = lan["_id_"] in networks
-                lans.append({
-                    "_id_": lan["_id_"],
-                    "name": lan["name"],
-                    "enabled": enabled
-                })
-            broadcaster.networks = lans
-            config = {
-                "interval": broadcaster.interval,
-                "udp_port": broadcaster.udp_port,
-                "networks": lans
-            }
-            save_config(config)
-            cp.log("Saved new config: %s" % config)
-            self.redirect('/')
-        except Exception as e:
-            cp.get_logger().exception("Error saving config: %s", e)
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == '/config':
+            config = get_config()
+            self._json_response(json.dumps(config))
+        elif parsed.path == '/submit':
+            try:
+                params = parse_qs(parsed.query)
+                broadcaster.interval = int(params.get('interval', [DEFAULT_INTERVAL])[0])
+                broadcaster.udp_port = int(params.get('udp_port', [DEFAULT_UDP_PORT])[0])
+                networks = params.get('networks', [])
+                lans = []
+                cp_lans = cp.get('config/lan') or []
+                for lan in cp_lans:
+                    enabled = lan["_id_"] in networks
+                    lans.append({
+                        "_id_": lan["_id_"],
+                        "name": lan["name"],
+                        "enabled": enabled
+                    })
+                broadcaster.networks = lans
+                config = {
+                    "interval": broadcaster.interval,
+                    "udp_port": broadcaster.udp_port,
+                    "networks": lans
+                }
+                save_config(config)
+                cp.log("Saved new config: %s" % config)
+                self.send_response(302)
+                self.send_header('Location', '/')
+                self.end_headers()
+            except Exception as e:
+                cp.get_logger().exception("Error saving config: %s", e)
+                self.send_response(500)
+                self.end_headers()
+        else:
+            super().do_GET()
+
+    def _json_response(self, data):
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(data.encode('utf-8'))
+
+    def log_message(self, format, *args):
+        cp.log(format % args)
 
 
 def get_message():
@@ -382,11 +399,6 @@ if __name__ == "__main__":
 
     web_port = int(cp.get_appdata('Motorola_port') or 8000)
     cp.log('Web UI on port %s' % web_port)
-    application = tornado.web.Application([
-        (r"/config", ConfigHandler),
-        (r"/submit", SubmitHandler),
-        (r"/(.*)", tornado.web.StaticFileHandler,
-         {"path": os.path.dirname(__file__), "default_filename": "index.html"}),
-    ])
-    application.listen(web_port)
-    tornado.ioloop.IOLoop.instance().start()
+    server = HTTPServer(('0.0.0.0', web_port), AppHandler)
+    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.serve_forever()

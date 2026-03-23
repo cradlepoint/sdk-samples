@@ -70,9 +70,6 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **client_session_monitor**
     - Monitors client connections to specific domains by tracking firewall connection table entries. Logs session start/end times, duration, and bandwidth usage.
     - **Download:** [client_session_monitor v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_session_monitor.v1.0.0.tar.gz)
-- **cp_shell**
-    - Web interface for running linux shell commands.
-    - **Download:** [cp_shell v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cp_shell.v0.1.0.tar.gz)
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
     - **Download:** [cpu_usage v0.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cpu_usage.v0.2.0.tar.gz)
