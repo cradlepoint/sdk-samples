@@ -141,9 +141,7 @@ class CSClient(object):
             return
 
         if self.ncos and self.enable_logging: 
-            handlers = [logging.StreamHandler()]
-        
-            handlers.append(logging.handlers.SysLogHandler(address='/dev/log'))
+            handlers = [logging.handlers.SysLogHandler(address='/dev/log')]
             logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)s: %(message)s', datefmt='%b %d %H:%M:%S',
                             handlers=handlers)
             self.logger = logging.getLogger(app_name)
@@ -417,14 +415,14 @@ class CSClient(object):
             None: This method does not return a value.
         """
         if _cs_client.enable_logging:
-            # Running in NCOS so write to the logger
+            # Running as native SDK app on router - write to syslog
             self.logger.info(value)
         elif self.ncos:
-            # Running in container so write to stdout
+            # Running in container with cs.sock - write to stdout for container runtime
             with open('/dev/stdout', 'w') as logfile:
                 logfile.write(f'{value}\n')
         else:
-            # Running in a computer so just use print for the log.
+            # Running on a computer - print to console
             print(value)
 
 
