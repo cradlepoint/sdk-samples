@@ -1,13 +1,13 @@
 {
   "enabled": true,
   "name": "Deploy App",
-  "description": "One-click deploy of the current SDK app to the router via deploy.sh",
+  "description": "One-click deploy of the current SDK app to the router via deploy.sh. Verifies the app started successfully by reviewing log timestamps.",
   "version": "1",
   "when": {
     "type": "userTriggered"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Read sdk_settings.ini to get the app_name, then run: bash deploy.sh <app_name>. Check the output for errors and verify the app started successfully by reviewing log timestamps."
+    "prompt": "Read sdk_settings.ini to get the app_name, then run: bash deploy.sh <app_name>. After the command completes, review the output for errors. Check that log timestamps are AFTER the deploy started. If logs show the app started successfully, report success briefly. If there are errors, diagnose and suggest fixes."
   }
 }
