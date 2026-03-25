@@ -1,6 +1,8 @@
 # AutoInstall_Web
 
-AutoInstall – web interface for automated SIM testing, WAN reprioritization, and optional NCM group assignment.
+AutoInstall – Detects SIMs, speedtests each, collects diagnostics, picks fastest. Default: reprioritizes WAN by speed. With group_by_sim/carrier: moves router to matching NCM group. Optionally enforces min_speed, sends alerts, and updates NCM custom fields.
+
+<img width="1162" height="1034" alt="image" src="https://github.com/user-attachments/assets/a9353b53-d62c-434d-943c-98338d7c91b5" />
 
 ## What It Does
 
