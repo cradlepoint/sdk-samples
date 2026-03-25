@@ -40,6 +40,8 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **Autoinstall**
     - Automatically choose fastest SIM on install. On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed. Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.
     - **Download:** [AutoInstall v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.0.1.tar.gz)
+- **AutoInstall_Web**
+    - Detects SIMs, speedtests each, collects diagnostics, picks fastest. Default: reprioritizes WAN by speed. With group_by_sim/carrier: moves router to matching NCM group. Optionally enforces min_speed, sends alerts, and updates NCM custom fields.
 - **Installer_UI**
     - Provide a web interface for installers to configure WiFi and run speedtests.
     - **Download:** [Installer_UI v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.2.0.tar.gz)
