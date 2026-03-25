@@ -4,12 +4,19 @@ from datetime import datetime
 
 cp.log('Starting Failover Modem Reset...')
 
-reboot_hour = cp.get_appdata('reboot_hour') or ''
-reboot_timer = cp.get_appdata('reboot_timer') or ''
+def load_config():
+    """Load reboot_hour and reboot_timer from appdata."""
+    timer = cp.get_appdata('reboot_timer') or ''
+    hour = cp.get_appdata('reboot_hour') or ''
+    if timer:
+        return int(hour or '2'), timer
+    return int(hour or '2'), timer
+
+
+reboot_hour, reboot_timer = load_config()
 if reboot_timer:
     cp.log(f'Config: reboot_timer={reboot_timer} min')
 else:
-    reboot_hour = int(reboot_hour or '2')
     cp.log(f'Config: reboot_hour={reboot_hour}')
 
 
@@ -60,9 +67,20 @@ while True:
                 if sim == 'sim2' and summary == 'connected':
                     port = info.get('port', '')
                     if port not in failovers:
-                        cp.log(f'FAILOVER DETECTED: sim2 connected on port {port} ({dev_id}). Starting reboot timer.')
+                        carrier = info.get('carrier', 'unknown')
+                        diag = dev.get('diagnostics', {})
+                        signal_str = diag.get('RSRP', diag.get('RSSI', 'N/A'))
+                        alert_msg = (
+                            f'FAILOVER DETECTED: sim2 connected on port {port} '
+                            f'(dev={dev_id}, carrier={carrier}, signal={signal_str})'
+                        )
+                        cp.log(alert_msg)
+                        cp.alert(alert_msg)
                         failovers[port] = time.time()
             last_summaries[dev_id] = summary
+
+        # Reload config from appdata each cycle
+        reboot_hour, reboot_timer = load_config()
 
         # Reboot logic
         for port in list(failovers):
