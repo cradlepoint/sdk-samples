@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IFTTT Rule Engine</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <h1 id="app-title">IFTTT Rule Engine <span class="beta-tag">BETA</span></h1>
+                <button type="button" id="dark-mode-toggle" class="dark-mode-btn" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
+            </div>
+        </header>
+        <div class="app-body">
+            <!-- Left sidebar -->
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <ul class="nav-list">
+                        <li><a href="#home" class="nav-item active" data-section="home-section">&#127968; Home</a></li>
+                        <li><a href="#rules" class="nav-item" data-section="rules-section">&#9881; Rules</a></li>
+                    </ul>
+                </nav>
+                <div class="sidebar-section rules-only">
+                    <h3>Rules</h3>
+                    <button type="button" id="add-rule-btn" class="btn btn-primary sidebar-btn">+ New Rule</button>
+                    <button type="button" id="save-all-btn" class="btn btn-success sidebar-btn">&#8593; Save Rule(s)</button>
+                </div>
+                <div class="sidebar-section rules-only">
+                    <h3>Conditions</h3>
+                    <div class="palette-items">
+                        <div class="palette-item" draggable="true" data-type="condition">
+                            <span class="badge badge-if">IF</span> Path / Value...
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="condition-while">
+                            <span class="badge badge-while">WHILE</span> Path / Value...
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="condition-while-time">
+                            <span class="badge badge-while">WHILE</span> Date / Time...
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="condition-when">
+                            <span class="badge badge-when">WHEN</span> Date / Time...
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="condition-where">
+                            <span class="badge badge-where">WHERE</span> GPS...
+                        </div>
+                    </div>
+                </div>
+                <div class="sidebar-section rules-only">
+                    <h3>Actions</h3>
+                    <div class="palette-items">
+                        <div class="palette-item" draggable="true" data-type="action-set">
+                            <span class="badge badge-then">THEN</span> Set Config
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="action-alert">
+                            <span class="badge badge-then">THEN</span> Send Alert
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="action-log">
+                            <span class="badge badge-then">THEN</span> Log Message
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main content -->
+            <main class="content-area">
+                <div id="unsaved-banner" class="unsaved-banner" style="display:none;">
+                    <span class="warning-icon">&#9888;</span>
+                    <span>You have unsaved changes.</span>
+                </div>
+
+                <!-- Home Section -->
+                <section id="home-section" class="home-section">
+                    <div class="welcome-hero">
+                        <p class="welcome-lead">Create automated if this then that rules that interact with your router's config store. Build conditions based on path values, time schedules, GPS location, and sustained states — then trigger actions like setting config, sending alerts, or logging messages.</p>
+                        <div class="welcome-checklist">
+                            <div class="checklist-item"><span class="badge badge-if">IF</span> Conditions check path values in real-time</div>
+                            <div class="checklist-item"><span class="badge badge-while">WHILE</span> Conditions sustain over duration or intervals</div>
+                            <div class="checklist-item"><span class="badge badge-when">WHEN</span> Conditions trigger on day/time schedules</div>
+                            <div class="checklist-item"><span class="badge badge-where">WHERE</span> Conditions use GPS geofencing</div>
+                            <div class="checklist-item"><span class="badge badge-then">THEN</span> Actions set config, send alerts, or log</div>
+                            <div class="checklist-item"><span class="checklist-icon" style="color:var(--primary-color);">&#9679;</span> Per-rule appdata storage for portability</div>
+                        </div>
+                    </div>
+                    <div class="welcome-highlights">
+                        <article class="welcome-highlight">
+                            <div class="highlight-icon" style="background:rgba(37,99,235,0.12);color:var(--if-color);">&#9881;</div>
+                            <h3>IF / WHILE Conditions</h3>
+                            <p>Check path values in real-time or sustain over duration and intervals. Combine with AND/OR logic.</p>
+                        </article>
+                        <article class="welcome-highlight">
+                            <div class="highlight-icon" style="background:rgba(217,119,6,0.12);color:var(--when-color);">&#128339;</div>
+                            <h3>WHEN Schedules</h3>
+                            <p>Trigger rules on specific days and times with optional repeat intervals for recurring automation.</p>
+                        </article>
+                        <article class="welcome-highlight">
+                            <div class="highlight-icon" style="background:rgba(13,148,136,0.12);color:var(--where-color);">&#128205;</div>
+                            <h3>WHERE Geofencing</h3>
+                            <p>Use the router's GPS location to trigger rules when within or outside a target radius.</p>
+                        </article>
+                        <article class="welcome-highlight">
+                            <div class="highlight-icon" style="background:rgba(5,150,105,0.12);color:var(--then-color);">&#9889;</div>
+                            <h3>THEN Actions</h3>
+                            <p>Set config values, send alerts, or log messages when conditions are met. Drag and drop to build.</p>
+                        </article>
+                    </div>
+                    <div style="text-align:center;margin-top:1.5rem;">
+                        <button type="button" id="get-started-btn" class="btn btn-primary" style="padding:0.75rem 2rem;font-size:1rem;">Get Started &#8594;</button>
+                    </div>
+                </section>
+
+                <!-- Rules Section -->
+                <section id="rules-section" style="display:none;">
+                    <div id="rules-container"></div>
+                    <div id="empty-state" class="empty-state">
+                        <p>No rules yet. Click <strong>+ New Rule</strong> or drag components to get started.</p>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Path Browser Modal -->
+    <div id="browse-modal" class="modal" role="dialog" aria-labelledby="browse-title" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="browse-title">Browse Config Store</h3>
+                <button type="button" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="browse-nav">
+                    <div class="field-group">
+                        <select id="browse-root" class="form-input" aria-label="Root path">
+                            <option value="config">config</option>
+                            <option value="status" selected>status</option>
+                            <option value="state">state</option>
+                            <option value="control">control</option>
+                        </select>
+                        <span class="field-label">Root</span>
+                    </div>
+                    <div class="field-group" style="flex:1">
+                        <input type="text" id="browse-path" class="form-input full-width" value="status" placeholder="e.g. status/wan">
+                        <span class="field-label">Path</span>
+                    </div>
+                    <button type="button" id="browse-back" class="btn btn-ghost" title="Go back">&#8592;</button>
+                    <button type="button" id="browse-go" class="btn btn-primary">Go</button>
+                </div>
+                <div id="browse-breadcrumb" class="browse-breadcrumb"></div>
+                <div id="browse-results" class="browse-results"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="browse-select" class="btn btn-primary">Select Path</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-box">
+            <div class="spinner-circle"></div>
+            <p id="loading-text">Working...</p>
+        </div>
+    </div>
+    <div id="toast-container" class="toast-container"></div>
+    <script src="static/js/script.js"></script>
+</body>
+</html>

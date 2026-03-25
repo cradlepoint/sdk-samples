@@ -1,0 +1,5 @@
+# Files to exclude
+readme.md
+
+# Directories to exclude
+docs/

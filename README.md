@@ -70,6 +70,9 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **client_session_monitor**
     - Monitors client connections to specific domains by tracking firewall connection table entries. Logs session start/end times, duration, and bandwidth usage.
     - **Download:** [client_session_monitor v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/client_session_monitor.v1.0.0.tar.gz)
+- **cp_shell**
+    - Web interface for running linux shell commands.
+    - **Download:** [cp_shell v0.1.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/cp_shell.v0.1.0.tar.gz)
 - **cpu_usage**
     - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
     - **Download:** [cpu_usage v0.2.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/cpu_usage.v0.2.0.tar.gz)
@@ -124,6 +127,9 @@ Ready-to-use applications you can install from the [releases page](https://githu
 - **ibr1700_obdII**
     - Demonstrates how to access OBD-II PIDs on the IBR1700
     - **Download:** [ibr1700_obdII v2.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ibr1700_obdII.v2.0.0.tar.gz)
+- **ifttt**
+    - IFTTT (If This Then That) Rule Engine with a drag-and-drop web dashboard on port 8000. Create automated rules using IF, WHILE, WHEN, and WHERE conditions against the router config/status tree, GPS location, and time schedules — then trigger actions like setting config values, sending alerts, or logging messages. Supports per-rule polling intervals or on-change callbacks, sustained condition tracking, and per-rule appdata storage.
+    - **Download:** [ifttt v1.2.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ifttt.v1.0.0.tar.gz)
 - **iperf3**
     - Downloads and runs iPerf3 to a user defined server and puts results in asset_id. Clear the asset_id to run a new test.
     - **Download:** [iperf3 v1.0.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/iperf3.v1.0.0.tar.gz)
@@ -153,7 +159,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [ncx_self_provision v2.7.0.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/ncx_self_provision.v2.7.0.tar.gz)
 - **network_mac_filter**
     - Enforces MAC address limits per network using deny rules in firewall filter policies. When the MAC limit is reached on a specific network, the app automatically adds deny rules for any new reachable MACs seen on that network.
-    - **Download:** [network_mac_filter v1.0.2.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/network_mac_filter.v1.0.2.tar.gz)
+    - **Download:** [network_mac_filter v1.0.1.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/network_mac_filter.v1.0.1.tar.gz)
 - **OBDII_monitor**
     - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
     - **Download:** [OBDII_monitor v1.0.2.tar.gz](https://github.com/jongaudu/sdk-samples/releases/download/built_apps/OBDII_monitor.v1.0.2.tar.gz)
@@ -440,12 +446,6 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
-
-
-
-
-
-
 
 
 
