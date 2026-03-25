@@ -7,6 +7,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "bash setup_env.sh"
+    "command": "python3 make.py setup"
   }
 }

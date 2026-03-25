@@ -276,13 +276,13 @@ cd sdk-samples
 #### Windows
 
 ```cmd
-setup_env.bat
+python make.py setup
 ```
 
 #### macOS / Linux
 
 ```bash
-bash setup_env.sh
+python3 make.py setup
 ```
 
 This creates a `.venv` virtual environment and installs all Python dependencies from `requirements.txt`.

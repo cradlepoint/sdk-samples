@@ -13,4 +13,4 @@
 - Project guidelines: `../.amazonq/rules/project-guidelines.md`
 - App template: `../app_template/`
 - Build tool: `../make.py`
-- Deploy script: `../deploy.sh`
+- Deploy command: `python3 ../make.py deploy <app_name>`

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+  <link rel="icon" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+  <title>AutoInstall</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <link href="libs/font-awesome.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <main class="app-main autoinstall-main">
+      <div class="content-area">
+        <div class="control-panel autoinstall-panel">
+          <div class="panel-header panel-header-with-dark-mode">
+            <div class="panel-header-left">
+              {% if logo %}
+              {% if logo_dark %}
+              <img src="{{ logo }}" alt="" class="panel-logo panel-logo-light">
+              <img src="{{ logo_dark }}" alt="" class="panel-logo panel-logo-dark">
+              {% else %}
+              <img src="{{ logo }}" alt="" class="panel-logo panel-logo-invert">
+              {% end %}
+              {% else %}
+              <i class="fas fa-sim-card"></i>
+              {% end %}
+            </div>
+            <h2 class="panel-header-center">{{ title }}</h2>
+            <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+              <i class="fas fa-moon"></i>
+            </button>
+          </div>
+          <div class="panel-content">
+            <div id="signal_meter" class="signal-meter-container" style="margin-bottom: 1.5rem;">
+              <div id="signal_label" class="signal-label">--</div>
+              <div id="signal_bar_wrapper" class="signal-bar-wrapper" style="display: none;">
+                <div class="signal-bar-track">
+                  <div id="signal_bar_fill" class="signal-bar-fill" style="width: 0%;"></div>
+                </div>
+              </div>
+              <div id="signal_metrics" class="signal-metrics" style="display: none;"></div>
+            </div>
+
+            <div id="install_form_wrapper">
+              <form id="install_form">
+                <div class="form-field">
+                  <label for="password_entered">Installer Password</label>
+                  <input type="password" name="password_entered" id="password_entered" class="form-input" maxlength="64" autocomplete="current-password" required placeholder="Enter Password">
+                </div>
+                <div class="action-buttons">
+                  <button type="button" id="connect_btn" class="btn btn-secondary btn-action">
+                    <i class="fas fa-link"></i> Connect
+                  </button>
+                  <button type="button" id="switch_sims_btn" class="btn btn-secondary btn-action" disabled>
+                    <i class="fas fa-exchange-alt"></i> Switch SIMs
+                  </button>
+                  <button type="button" id="start_autoinstall_btn" class="btn btn-primary btn-action">
+                    <i class="fas fa-play"></i> Start AutoInstall
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div id="status" class="status-panel" style="display: none; margin-top: 1.5rem;">
+              <div class="progress-bar-container">
+                <div class="progress-label">
+                  <span id="status_message" style="white-space: pre-line;">Idle</span>
+                  <span id="progress_pct">0%</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="progress_fill" style="width: 0%;"></div>
+                </div>
+              </div>
+              <textarea id="log_display" class="log-display" readonly></textarea>
+              <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" id="cancel_btn" class="btn btn-danger" style="display: none;">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" id="copy_logs" class="btn btn-secondary" style="display: none;">
+                  <i class="fas fa-download"></i> Download Logs
+                </button>
+              </div>
+            </div>
+
+            <div class="text-light" style="margin-top: 1.5rem; font-size: 0.75rem;">Version {{ version }} | System ID: {{ system_id }}</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="app_modal_overlay" class="app-modal-overlay" style="display: none;">
+    <div class="app-modal">
+      <div class="app-modal-icon"><i class="fas fa-info-circle"></i></div>
+      <p id="app_modal_message" class="app-modal-message"></p>
+      <button type="button" id="app_modal_ok" class="btn btn-primary app-modal-btn">OK</button>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("install_form");
+
+    function safeJson(res) {
+      return res.text().then(function(text) {
+        if (!text || !text.trim()) return null;
+        try { return JSON.parse(text); } catch (e) { return null; }
+      });
+    }
+
+    const statusPanel = document.getElementById("status");
+    const statusMessage = document.getElementById("status_message");
+    const progressFill = document.getElementById("progress_fill");
+    const progressPct = document.getElementById("progress_pct");
+    const installButton = document.getElementById("start_autoinstall_btn");
+    const copyLogsButton = document.getElementById("copy_logs");
+    const logDisplay = document.getElementById("log_display");
+    const connectButton = document.getElementById("connect_btn");
+    const switchButton = document.getElementById("switch_sims_btn");
+    const installFormWrapper = document.getElementById("install_form_wrapper");
+    const cancelButton = document.getElementById("cancel_btn");
+
+    var actionInProgress = false;
+
+    function setInstallRunningUI(running) {
+      if (running) {
+        installFormWrapper.style.display = "none";
+        statusPanel.style.display = "block";
+        statusPanel.style.marginTop = "0";
+        cancelButton.style.display = "inline-flex";
+      } else {
+        installFormWrapper.style.display = "block";
+        statusPanel.style.marginTop = "1.5rem";
+        cancelButton.style.display = "none";
+      }
+    }
+
+    function setAllActionButtonsDisabled(disabled) {
+      actionInProgress = !!disabled;
+      connectButton.disabled = disabled;
+      switchButton.disabled = disabled;
+      installButton.disabled = disabled;
+    }
+
+    function rsrpRsrqToScore(rsrp, rsrq) {
+      var r = parseFloat(rsrp);
+      var q = parseFloat(rsrq);
+      if (isNaN(r)) r = -140;
+      if (isNaN(q)) q = -19.5;
+      var rsrpScore = Math.max(0, Math.min(100, (r + 140) / 96 * 100));
+      var rsrqScore = Math.max(0, Math.min(100, (q + 19.5) / 16.5 * 100));
+      return (rsrpScore + rsrqScore) / 2;
+    }
+
+    function scoreToColor(pct) {
+      if (pct >= 67) return '#059669';
+      if (pct >= 34) return '#d97706';
+      return '#dc2626';
+    }
+
+    function showAppModal(message, isError) {
+      var overlay = document.getElementById("app_modal_overlay");
+      var msgEl = document.getElementById("app_modal_message");
+      var iconEl = overlay.querySelector(".app-modal-icon i");
+      msgEl.textContent = message || "";
+      overlay.classList.toggle("app-modal-error", !!isError);
+      iconEl.className = isError ? "fas fa-exclamation-circle" : "fas fa-info-circle";
+      overlay.style.display = "flex";
+    }
+    document.getElementById("app_modal_ok").addEventListener("click", function() {
+      document.getElementById("app_modal_overlay").style.display = "none";
+    });
+    document.getElementById("app_modal_overlay").addEventListener("click", function(e) {
+      if (e.target === this) this.style.display = "none";
+    });
+
+    function updateSignalMeter() {
+      fetch("/signal").then(function(res) { return safeJson(res); }).then(function(data) {
+        var labelEl = document.getElementById("signal_label");
+        var barWrap = document.getElementById("signal_bar_wrapper");
+        var fillEl = document.getElementById("signal_bar_fill");
+        var metricsEl = document.getElementById("signal_metrics");
+        var allAvailable = data && data.all_sims_available;
+        var switching = data && data.switching;
+        var installRunning = data && data.install_running;
+        var header = (data && data.header) ? data.header : "DISCONNECTED";
+        labelEl.textContent = header;
+        labelEl.className = data && data.connected ? "signal-label signal-connected" : "signal-label signal-disconnected";
+        var cb = document.getElementById("connect_btn");
+        var sb = document.getElementById("switch_sims_btn");
+        var ib = document.getElementById("start_autoinstall_btn");
+        if (actionInProgress) {
+          cb.disabled = true;
+          sb.disabled = true;
+          ib.disabled = true;
+          barWrap.style.display = (data && data.connected) ? "block" : "none";
+          metricsEl.style.display = (data && data.connected) ? "block" : "none";
+          if (data && data.connected) {
+            var pct = rsrpRsrqToScore(data.rsrp, data.rsrq);
+            fillEl.style.width = pct + "%";
+            fillEl.style.backgroundColor = scoreToColor(pct);
+            metricsEl.innerHTML = (data.rsrp_key || "RSRP") + ": " + (data.rsrp != null ? data.rsrp : "--") + " | " + (data.rsrq_key || "RSRQ") + ": " + (data.rsrq != null ? data.rsrq : "--") + " | " + (data.label || "4G/5G") + " Score: <strong>" + Math.round(pct) + "</strong>";
+          }
+        } else {
+          if (switching) {
+            sb.disabled = true;
+            sb.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Switching...';
+            ib.disabled = true;
+            if (!data || data.disconnected || !data.connected) {
+              cb.disabled = true;
+            }
+          } else {
+            if (data && data.install_running) ib.disabled = true;
+            else ib.disabled = false;
+          }
+          if (!data || (!data.connected && !switching)) {
+            barWrap.style.display = "none";
+            metricsEl.style.display = "none";
+            cb.disabled = switching ? true : !allAvailable;
+            cb.innerHTML = '<i class="fas fa-link"></i> Connect';
+            if (!switching) {
+              sb.disabled = true;
+              sb.innerHTML = '<i class="fas fa-exchange-alt"></i> Switch SIMs';
+            }
+          } else {
+            cb.disabled = true;
+            cb.innerHTML = '<i class="fas fa-link"></i> Connect';
+            sb.disabled = switching || installRunning;
+            if (switching) {
+              sb.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Switching...';
+            } else {
+              sb.innerHTML = '<i class="fas fa-exchange-alt"></i> Switch SIMs';
+            }
+            barWrap.style.display = "block";
+            metricsEl.style.display = "block";
+            var pct = rsrpRsrqToScore(data.rsrp, data.rsrq);
+            fillEl.style.width = pct + "%";
+            fillEl.style.backgroundColor = scoreToColor(pct);
+            metricsEl.innerHTML = (data.rsrp_key || "RSRP") + ": " + (data.rsrp != null ? data.rsrp : "--") + " | " + (data.rsrq_key || "RSRQ") + ": " + (data.rsrq != null ? data.rsrq : "--") + " | " + (data.label || "4G/5G") + " Score: <strong>" + Math.round(pct) + "</strong>";
+          }
+        }
+      }).catch(function() {
+        document.getElementById("signal_label").textContent = "DISCONNECTED";
+        document.getElementById("signal_label").className = "signal-label signal-disconnected";
+        document.getElementById("signal_bar_wrapper").style.display = "none";
+        document.getElementById("signal_metrics").style.display = "none";
+        var cb = document.getElementById("connect_btn");
+        cb.disabled = true;
+        cb.innerHTML = '<i class="fas fa-link"></i> Connect';
+        var sb = document.getElementById("switch_sims_btn");
+        sb.disabled = true;
+        sb.innerHTML = '<i class="fas fa-exchange-alt"></i> Switch SIMs';
+      });
+    }
+
+    var signalInterval = setInterval(updateSignalMeter, 3000);
+    updateSignalMeter();
+
+    let statusCheckInterval = null;
+    let logCheckInterval = null;
+    let logDownloaded = false;
+
+    // Dark mode
+    function initDarkMode() {
+      const savedTheme = localStorage.getItem("theme") || "light";
+      document.body.setAttribute("data-theme", savedTheme);
+      const icon = document.querySelector("#dark-mode-toggle i");
+      if (icon) icon.className = savedTheme === "dark" ? "fas fa-sun" : "fas fa-moon";
+    }
+    document.getElementById("dark-mode-toggle").addEventListener("click", function() {
+      const current = document.body.getAttribute("data-theme") || "light";
+      const next = current === "dark" ? "light" : "dark";
+      document.body.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      const icon = this.querySelector("i");
+      if (icon) icon.className = next === "dark" ? "fas fa-sun" : "fas fa-moon";
+    });
+    initDarkMode();
+
+    function setStatusClass(klass) {
+      statusPanel.classList.remove("status-connected", "status-disconnected", "status-connecting");
+      if (klass) statusPanel.classList.add(klass);
+    }
+
+    function updateProgressFillClass(status) {
+      progressFill.classList.remove("progress-success", "progress-danger", "progress-warning");
+      if (status === "complete") progressFill.classList.add("progress-success");
+      else if (status === "error") progressFill.classList.add("progress-danger");
+      else if (status === "running") progressFill.classList.add("progress-warning");
+      /* "starting"/"idle": no variant = default blue */
+    }
+
+    async function checkActiveInstallation() {
+      try {
+        const res = await fetch("/status");
+        const status = await safeJson(res);
+        if (!status || !status.status) return;
+        if (status.status === "running" || status.status === "complete" || status.status === "error") {
+          setInstallRunningUI(status.status === "running");
+          statusPanel.style.display = "block";
+          statusMessage.textContent = status.message || status.status;
+          progressFill.style.width = status.progress + "%";
+          progressPct.textContent = status.progress + "%";
+          setAllActionButtonsDisabled(status.status === "running");
+          setStatusClass(status.status === "running" ? "status-connecting" : status.status === "complete" ? "status-connected" : "status-disconnected");
+          updateProgressFillClass(status.status);
+
+          if (status.status === "complete" || status.status === "error") {
+            setInstallRunningUI(false);
+            copyLogsButton.style.display = "inline-flex";
+            setAllActionButtonsDisabled(false);
+            installButton.innerHTML = status.status === "error" ? '<i class="fas fa-redo"></i> Auto-Install Failed! Restart' : '<i class="fas fa-play"></i> Start AutoInstall';
+            if (status.status === "error") installButton.classList.add("btn-danger"), installButton.classList.remove("btn-primary");
+            else installButton.classList.remove("btn-danger"), installButton.classList.add("btn-primary");
+          } else {
+            setInstallRunningUI(true);
+            startStatusPolling();
+            startLogPolling();
+          }
+        }
+      } catch (e) {
+        console.error("Error checking status:", e);
+      }
+    }
+    checkActiveInstallation();
+
+    function doStartAutoInstall() {
+      var password = document.getElementById("password_entered").value;
+      if (!password) {
+        alert("Please enter a password");
+        return;
+      }
+      var fd = new FormData(form);
+      setAllActionButtonsDisabled(true);
+      installButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+      installButton.classList.remove("btn-danger");
+      installButton.classList.add("btn-primary");
+      statusPanel.style.display = "block";
+      setStatusClass("status-connecting");
+      updateProgressFillClass("starting");
+      statusMessage.textContent = "Starting auto-install process...";
+      progressFill.style.width = "5%";
+      progressPct.textContent = "5%";
+      fetch("/install", { method: "POST", body: fd }).then(function(res) { return safeJson(res); }).then(function(result) {
+        actionInProgress = false;
+        if (!result) {
+          alert("Server error or invalid response");
+          installButton.innerHTML = '<i class="fas fa-play"></i> Start AutoInstall';
+          setAllActionButtonsDisabled(false);
+          updateSignalMeter();
+          return;
+        }
+        if (result.success) {
+          setInstallRunningUI(true);
+          startStatusPolling();
+          startLogPolling();
+        } else {
+          alert(result.result);
+          installButton.innerHTML = '<i class="fas fa-play"></i> Start AutoInstall';
+          setAllActionButtonsDisabled(false);
+          updateSignalMeter();
+        }
+      }).catch(function(err) {
+        actionInProgress = false;
+        alert("Error: " + err.message);
+        installButton.innerHTML = '<i class="fas fa-play"></i> Start AutoInstall';
+        setAllActionButtonsDisabled(false);
+        updateSignalMeter();
+      });
+    }
+
+    document.getElementById("start_autoinstall_btn").addEventListener("click", doStartAutoInstall);
+
+    connectButton.addEventListener("click", function() {
+      if (this.disabled) return;
+      var password = document.getElementById("password_entered").value;
+      if (!password) {
+        alert("Please enter a password");
+        return;
+      }
+      setAllActionButtonsDisabled(true);
+      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+      var btn = this;
+      var fd = new FormData();
+      fd.append("password_entered", password);
+      fetch("/connect", { method: "POST", body: fd }).then(function(res) { return safeJson(res); }).then(function(result) {
+        actionInProgress = false;
+        if (result && result.success) {
+          updateSignalMeter();
+          alert(result.result);
+        } else {
+          btn.innerHTML = '<i class="fas fa-link"></i> Connect';
+          setAllActionButtonsDisabled(false);
+          updateSignalMeter();
+          alert(result && result.result ? result.result : "Connect failed");
+        }
+      }).catch(function(err) {
+        actionInProgress = false;
+        btn.innerHTML = '<i class="fas fa-link"></i> Connect';
+        setAllActionButtonsDisabled(false);
+        updateSignalMeter();
+        alert("Error: " + err.message);
+      });
+    });
+
+    switchButton.addEventListener("click", function() {
+      if (this.disabled) return;
+      var password = document.getElementById("password_entered").value;
+      if (!password) {
+        alert("Please enter a password");
+        return;
+      }
+      setAllActionButtonsDisabled(true);
+      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Switching...';
+      var btn = this;
+      var fd = new FormData();
+      fd.append("password_entered", password);
+      fetch("/switch_sims", { method: "POST", body: fd }).then(function(res) { return safeJson(res); }).then(function(result) {
+        actionInProgress = false;
+        if (result && result.success) {
+          updateSignalMeter();
+        } else {
+          btn.innerHTML = '<i class="fas fa-exchange-alt"></i> Switch SIMs';
+          setAllActionButtonsDisabled(false);
+          updateSignalMeter();
+          showAppModal(result && result.result ? result.result : "Switch failed", true);
+        }
+      }).catch(function(err) {
+        actionInProgress = false;
+        btn.innerHTML = '<i class="fas fa-exchange-alt"></i> Switch SIMs';
+        setAllActionButtonsDisabled(false);
+        updateSignalMeter();
+        showAppModal("Error: " + err.message, true);
+      });
+    });
+
+    form.addEventListener("submit", function(e) {
+      e.preventDefault();
+      doStartAutoInstall();
+    });
+
+    function startStatusPolling() {
+      if (statusCheckInterval) clearInterval(statusCheckInterval);
+      statusCheckInterval = setInterval(async () => {
+        try {
+          const res = await fetch("/status");
+          const status = await safeJson(res);
+          if (!status || !status.status) return;
+          statusMessage.textContent = status.message || status.status;
+          progressFill.style.width = status.progress + "%";
+          progressPct.textContent = status.progress + "%";
+          updateProgressFillClass(status.status);
+
+          if (status.status === "complete") {
+            setInstallRunningUI(false);
+            setStatusClass("status-connected");
+            copyLogsButton.style.display = "inline-flex";
+            clearInterval(statusCheckInterval);
+            clearInterval(logCheckInterval);
+            setAllActionButtonsDisabled(false);
+            installButton.innerHTML = '<i class="fas fa-play"></i> Start AutoInstall';
+            installButton.classList.remove("btn-danger");
+            installButton.classList.add("btn-primary");
+            if (!logDownloaded && status.progress === 100) {
+              logDownloaded = true;
+              fetch("/logview").then(r => safeJson(r)).then(d => {
+                if (d && d.success && d.content) logDisplay.value = d.content;
+              });
+            }
+          } else if (status.status === "error") {
+            setInstallRunningUI(false);
+            setStatusClass("status-disconnected");
+            copyLogsButton.style.display = "inline-flex";
+            clearInterval(statusCheckInterval);
+            clearInterval(logCheckInterval);
+            setAllActionButtonsDisabled(false);
+            installButton.innerHTML = '<i class="fas fa-redo"></i> Auto-Install Failed! Restart';
+            installButton.classList.add("btn-danger");
+            installButton.classList.remove("btn-primary");
+            if (!logDownloaded && status.progress === 0) {
+              logDownloaded = true;
+              fetch("/logview").then(r => safeJson(r)).then(d => {
+                if (d && d.success && d.content) logDisplay.value = d.content;
+              });
+            }
+          } else {
+            setStatusClass("status-connecting");
+          }
+        } catch (e) {
+          console.error("Status poll error:", e);
+        }
+      }, 1000);
+    }
+
+    function startLogPolling() {
+      if (logCheckInterval) clearInterval(logCheckInterval);
+      logCheckInterval = setInterval(async () => {
+        try {
+          const res = await fetch("/logview");
+          const d = await safeJson(res);
+          if (d && d.success && d.content) {
+            const wasAtBottom = logDisplay.scrollHeight - logDisplay.scrollTop - logDisplay.clientHeight < 50;
+            logDisplay.value = d.content;
+            if (wasAtBottom) {
+              logDisplay.scrollTop = logDisplay.scrollHeight;
+            }
+          }
+        } catch (e) {
+          console.error("Log poll error:", e);
+        }
+      }, 1000);
+    }
+
+    cancelButton.addEventListener("click", function() {
+      if (this.disabled) return;
+      this.disabled = true;
+      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling...';
+      fetch("/cancel", { method: "POST" }).then(function(res) { return safeJson(res); }).then(function(result) {
+        if (result && result.success) {
+          statusMessage.textContent = "Cancelling...";
+        }
+      }).catch(function() {
+        cancelButton.disabled = false;
+        cancelButton.innerHTML = '<i class="fas fa-times"></i> Cancel';
+      });
+    });
+
+    copyLogsButton.addEventListener("click", async function() {
+      const logText = logDisplay.value;
+      if (!logText || !logText.trim()) {
+        alert("No logs to download");
+        return;
+      }
+      let filename = "install_log.txt";
+      try {
+        const res = await fetch("/logview");
+        const d = await safeJson(res);
+        if (d && d.success && d.filename) filename = d.filename;
+        else {
+          const sysMatch = logText.match(/System ID: (.+)/);
+          const startMatch = logText.match(/Started: (.+)/);
+          if (sysMatch && startMatch) {
+            const sysId = sysMatch[1].trim();
+            const ts = startMatch[1].trim();
+            const m = ts.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+            if (m) filename = "AutoInstall_" + sysId + "_" + m[1] + m[2] + m[3] + "_" + m[4] + m[5] + m[6] + ".txt";
+          }
+        }
+      } catch (e) {}
+      const blob = new Blob([logText], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      try { await navigator.clipboard.writeText(logText); } catch (c) {}
+      const orig = this.innerHTML;
+      this.innerHTML = '<i class="fas fa-check"></i> Downloaded!';
+      this.disabled = true;
+      setTimeout(() => { this.innerHTML = orig; this.disabled = false; }, 2000);
+    });
+  </script>
+</body>
+</html>

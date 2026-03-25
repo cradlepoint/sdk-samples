@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Auto Deploy on Code Change",
+  "description": "Automatically deploys the SDK app to the router after Kiro finishes making code changes. Uses make.py deploy.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "If you just created or modified any SDK app Python files during this session, deploy the app now by running: python3 make.py deploy {app_name} (substitute the actual app name). If no app code was changed, do nothing."
+  }
+}

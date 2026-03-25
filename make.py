@@ -20,6 +20,7 @@ import hashlib
 import re
 import tarfile
 import gzip
+import time
 urllib3.disable_warnings()
 
 from requests.auth import HTTPDigestAuth
@@ -758,6 +759,61 @@ def purge():
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to purge the app from {}.'.format(g_dev_client_ip))
 
+def deploy():
+    """Full deploy: purge, build, install, and show logs."""
+    print('Deploying {} to {}...'.format(g_app_name, g_dev_client_ip))
+    purge()
+    time.sleep(2)
+    package()
+    install()
+    time.sleep(5)
+    print('Checking logs...')
+    try:
+        log_url = 'https://{}/api/status/log/'.format(g_dev_client_ip)
+        response = requests.get(log_url, auth=get_auth(), verify=False)
+        logs = json.loads(response.text).get('data', [])
+        for entry in logs[-20:]:
+            if g_app_name in str(entry):
+                ts = datetime.datetime.fromtimestamp(entry[0]).strftime('%H:%M:%S')
+                print('{} {}'.format(ts, entry[3]))
+    except Exception as e:
+        print('Warning: Could not fetch logs: {}'.format(e))
+
+def setup():
+    """Create .venv and install requirements.txt."""
+    venv_dir = os.path.join(os.getcwd(), '.venv')
+    py = sys.executable
+
+    if not os.path.isdir(venv_dir):
+        print('Creating virtual environment in .venv...')
+        subprocess.run([py, '-m', 'venv', venv_dir], check=True)
+    else:
+        print('Virtual environment already exists in .venv')
+
+    # Determine pip path inside venv
+    if sys.platform == 'win32':
+        pip = os.path.join(venv_dir, 'Scripts', 'pip')
+    else:
+        pip = os.path.join(venv_dir, 'bin', 'pip')
+
+    print('Upgrading pip...')
+    subprocess.run([pip, 'install', '-U', 'pip'], check=True)
+
+    req = os.path.join(os.getcwd(), 'requirements.txt')
+    if os.path.isfile(req):
+        print('Installing dependencies...')
+        subprocess.run([pip, 'install', '-r', req], check=True)
+    else:
+        print('No requirements.txt found, skipping dependency install.')
+
+    print('\nSetup complete! Activate the venv with:')
+    if sys.platform == 'win32':
+        print('  .venv\\Scripts\\activate.bat')
+    else:
+        print('  source .venv/bin/activate')
+
+
+
 
 # Prints the help information
 def output_help():
@@ -780,6 +836,8 @@ def output_help():
     print('stop: Stop the app on the locally connected NCOS device.\n')
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
     print('purge: Purge all apps from the locally connected NCOS device.\n')
+    print('deploy: Purge, build, install, and show logs in one step.\n')
+    print('setup: Create .venv and install requirements.txt.\n')
     print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
     print('update: Check and update core SDK files from GitHub repository.\n')
     print('\tUpdates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py\n')
@@ -893,7 +951,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         option = str(sys.argv[2])
 
-    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge', 'update']:
+    if utility_name in ['clean', 'package', 'build', 'uuid', 'status', 'start', 'stop', 'install', 'uninstall', 'purge', 'update', 'deploy']:
         # Load the settings from the sdk_settings.ini file.
         if not init(option):
             sys.exit(0)
@@ -932,6 +990,12 @@ if __name__ == "__main__":
 
     elif utility_name == 'purge':
         purge()
+
+    elif utility_name == 'deploy':
+        deploy()
+
+    elif utility_name == 'setup':
+        setup()
 
     elif utility_name == 'uuid':
         # This is handled in init()

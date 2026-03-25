@@ -24,6 +24,16 @@ Use `python3` for all commands.
 - **When user says "learn"** - Load `.kiro/steering/learn.md` (Update rules and docs based on what was learned)
 - **When user says "deploy"** - Load `.kiro/steering/deploy.md` (Deploy app to router workflow)
 
+## Auto-Deploy
+
+**ALWAYS deploy after creating or modifying an app.** After any code change to an app's Python files, automatically run:
+
+```bash
+python3 make.py deploy {app_name}
+```
+
+Do NOT ask the user if they want to deploy — just do it.
+
 ## Configuration Files
 
 - **NEVER make up configuration formats** - always reference actual files like @sdk_settings.ini
@@ -80,27 +90,26 @@ This generates all required files from app_template (package.ini, start.sh, cp.p
 
 **NEVER overwrite package.ini, start.sh, or cp.py after creation** - these are auto-generated and correct.
 
-**ALWAYS deploy after creating or modifying an app** - use `bash deploy.sh {app_name}` immediately after code changes.
+**ALWAYS deploy after creating or modifying an app** - use `python3 make.py deploy {app_name}` immediately after code changes.
 
 ## Deploy to Router
 
-**ALWAYS use deploy.sh script** - `bash deploy.sh {app_name}`
+**ALWAYS use make.py deploy** - `python3 make.py deploy {app_name}`
 
-This script handles:
-- Cleaning old build artifacts
+This handles:
+- Purging old apps
 - Building the app package
-- Stopping the old version
 - Installing the new version
-- Starting the app
+- Starting the app (auto_start=true in package.ini)
 - Showing status and logs
 
-**Just run `bash deploy.sh {app_name}`** - no need to run `make.py clean` or remove old tar.gz files first. deploy.sh handles everything. The app auto-starts after install (auto_start=true in package.ini), so there's no need to run `make.py start` either.
+**Just run `python3 make.py deploy {app_name}`** - no need to run `make.py clean` or remove old tar.gz files first. It handles everything. The app auto-starts after install, so there's no need to run `make.py start` either.
 
-**NEVER use make.py install directly** - always use deploy.sh for deployment.
+**NEVER use make.py install directly** - always use `make.py deploy` for deployment.
 
-**deploy.sh output is sufficient** - if logs show app started successfully (e.g., "Starting app_name", "Web server started"), DO NOT run status or logs commands again. The deployment verification is already complete.
+**deploy output is sufficient** - if logs show app started successfully (e.g., "Starting app_name", "Web server started"), DO NOT run status or logs commands again. The deployment verification is already complete.
 
-**ALWAYS check log timestamps after deploy** - deploy.sh shows timestamps (HH:MM:SS) on each log line. Only trust logs with timestamps AFTER you ran the deploy. The router log buffer contains old entries from previous deploys — if you see logs without recent timestamps, they are stale and do not reflect the current deploy.
+**ALWAYS check log timestamps after deploy** - deploy shows timestamps (HH:MM:SS) on each log line. Only trust logs with timestamps AFTER you ran the deploy. The router log buffer contains old entries from previous deploys — if you see logs without recent timestamps, they are stale and do not reflect the current deploy.
 
 ## Other Commands
 

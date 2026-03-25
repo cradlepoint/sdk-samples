@@ -120,7 +120,7 @@ Show me how @5GSpeed handles speedtest data
 
 | Command | Description |
 |---------|-------------|
-| **deploy** | Deploy app to router using deploy.sh |
+| **deploy** | Deploy app to router using `make.py deploy` |
 | **learn** | Update rules/docs based on what was learned |
 | **rtfm** | Verify API paths/fields with curl before coding |
 
