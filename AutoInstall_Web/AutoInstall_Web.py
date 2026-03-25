@@ -1414,17 +1414,14 @@ def cleanup_wan_profile_changes(rule_states):
         try:
             try:
                 cp.delete(f'config/wan/rules2/{rule_id}/def_conn_state')
-                cp.log(f'Restored def_conn_state (deleted, default ondemand) for {get_rule_display_name(rule_id)}')
-            except Exception:
-                try:
-                    cp.put(f'config/wan/rules2/{rule_id}/def_conn_state', '')
-                except Exception:
-                    pass
+                cp.log(f'Deleted def_conn_state for {get_rule_display_name(rule_id)}')
+            except Exception as e:
+                cp.log(f'Could not delete def_conn_state for {get_rule_display_name(rule_id)}: {e}')
             try:
-                cp.delete(f'config/wan/rules2/{rule_id}/disabled')
-                cp.log(f'Restored disabled (deleted, default enabled) for {get_rule_display_name(rule_id)}')
-            except Exception:
-                pass
+                cp.put(f'config/wan/rules2/{rule_id}/disabled', False)
+                cp.log(f'Enabled {get_rule_display_name(rule_id)}')
+            except Exception as e:
+                cp.log(f'Could not enable {get_rule_display_name(rule_id)}: {e}')
         except Exception as e:
             cp.log(f'Error restoring {get_rule_display_name(rule_id)}: {e}')
     # Delete per-SIM rules that were created during this run

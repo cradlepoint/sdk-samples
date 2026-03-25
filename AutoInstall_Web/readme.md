@@ -30,7 +30,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | **logo** | Base64-encoded image (or full `data:image/...;base64,...` URL) to display instead of the SIM card icon next to the panel title. |
 | **logo_dark** | Optional dark-mode logo. If set, used in night mode instead of `logo`. If not set, the regular logo is CSS-inverted in dark mode. |
 | **title** | Panel title. Default: `AutoInstall`. |
-| **text** | (Legacy) Intro text – replaced by signal meter when using the default UI. |
+| **text** | Intro text shown above the signal meter. Default: `Enter password to start auto-install process.` |
 | **autostart** | If set (any value), the auto-install process starts automatically on app launch without user input or password. |
 | **sims** | Which SIMs to test: `all` (default), `local` (remote/product_name not populated), or `captive` (remote/product_name populated). Case-insensitive. |
 | **min_speed** | Minimum download speed (Mbps). If no SIM meets this, the process stops with an error. Default: no minimum. |

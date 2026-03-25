@@ -14,24 +14,29 @@
       <div class="content-area">
         <div class="control-panel autoinstall-panel">
           <div class="panel-header panel-header-with-dark-mode">
-            <div class="panel-header-left">
-              {% if logo %}
-              {% if logo_dark %}
-              <img src="{{ logo }}" alt="" class="panel-logo panel-logo-light">
-              <img src="{{ logo_dark }}" alt="" class="panel-logo panel-logo-dark">
-              {% else %}
-              <img src="{{ logo }}" alt="" class="panel-logo panel-logo-invert">
-              {% end %}
-              {% else %}
-              <i class="fas fa-sim-card"></i>
-              {% end %}
+            <div class="panel-header-top-row">
+              <div class="panel-header-logo-row">
+                {% if logo %}
+                {% if logo_dark %}
+                <img src="{{ logo }}" alt="" class="panel-logo panel-logo-light">
+                <img src="{{ logo_dark }}" alt="" class="panel-logo panel-logo-dark">
+                {% else %}
+                <img src="{{ logo }}" alt="" class="panel-logo panel-logo-invert">
+                {% end %}
+                {% else %}
+                <i class="fas fa-sim-card"></i>
+                {% end %}
+                <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                  <i class="fas fa-moon"></i>
+                </button>
+              </div>
+              <h2 class="panel-header-center">{{ title }}</h2>
             </div>
-            <h2 class="panel-header-center">{{ title }}</h2>
-            <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
-              <i class="fas fa-moon"></i>
-            </button>
           </div>
           <div class="panel-content">
+            {% if text %}
+            <div class="intro-text" style="margin-bottom: 1rem; text-align: center; font-size: 0.95rem; opacity: 0.85;">{{ text }}</div>
+            {% end %}
             <div id="signal_meter" class="signal-meter-container" style="margin-bottom: 1.5rem;">
               <div id="signal_label" class="signal-label">--</div>
               <div id="signal_bar_wrapper" class="signal-bar-wrapper" style="display: none;">

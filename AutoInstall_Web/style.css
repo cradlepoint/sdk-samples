@@ -1950,24 +1950,58 @@ body[data-theme="dark"] {
 }
 
 .autoinstall-panel .panel-header-with-dark-mode {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+}
+
+.autoinstall-panel .panel-header-logo-row {
+    display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 1rem;
+    padding-top: 0.5rem;
+    width: 100%;
+    position: relative;
+    min-height: 2.5rem;
+}
+
+.autoinstall-panel .panel-header-logo-row .dark-mode-toggle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.autoinstall-panel .panel-header-left .panel-logo,
+.autoinstall-panel .panel-header-logo-row .panel-logo {
+    max-height: 2.5rem;
+    width: auto;
+    object-fit: contain;
+}
+
+.autoinstall-panel .panel-header-title-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
 }
 
 .autoinstall-panel .panel-header-left {
     display: flex;
     align-items: center;
     justify-self: start;
+    flex-shrink: 0;
 }
 
 .autoinstall-panel .panel-header-center {
     text-align: center;
     margin: 0;
-    font-size: 2.5rem;
+    font-size: clamp(1rem, 3.5vw, 1.6rem);
     font-weight: 600;
     justify-self: center;
+    min-width: 0;
 }
 
 .autoinstall-panel .panel-header-with-dark-mode .dark-mode-toggle {
