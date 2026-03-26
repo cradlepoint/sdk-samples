@@ -10,22 +10,27 @@ import sys
 import uuid
 import json
 import shutil
-import requests
 import subprocess
 import configparser
 import unittest
-import urllib3
 import datetime
 import hashlib
 import re
 import tarfile
 import gzip
 import time
-urllib3.disable_warnings()
 
-from requests.auth import HTTPDigestAuth
-from OpenSSL import crypto
-
+try:
+    import requests
+    import urllib3
+    urllib3.disable_warnings()
+    from requests.auth import HTTPDigestAuth
+    from OpenSSL import crypto
+except ImportError:
+    requests = None
+    HTTPDigestAuth = None
+    crypto = None
+    
 # Upgrade functionality for checking and updating files from GitHub
 def get_github_commit_timestamp(file_path):
     """
@@ -790,14 +795,16 @@ def setup():
     else:
         print('Virtual environment already exists in .venv')
 
-    # Determine pip path inside venv
+    # Determine pip and python paths inside venv
     if sys.platform == 'win32':
         pip = os.path.join(venv_dir, 'Scripts', 'pip')
+        venv_py = os.path.join(venv_dir, 'Scripts', 'python')
     else:
         pip = os.path.join(venv_dir, 'bin', 'pip')
+        venv_py = os.path.join(venv_dir, 'bin', 'python')
 
     print('Upgrading pip...')
-    subprocess.run([pip, 'install', '-U', 'pip'], check=True)
+    subprocess.run([venv_py, '-m', 'pip', 'install', '-U', 'pip'], check=True)
 
     req = os.path.join(os.getcwd(), 'requirements.txt')
     if os.path.isfile(req):
