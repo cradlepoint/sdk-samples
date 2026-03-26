@@ -8,6 +8,6 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "If you just created or modified any SDK app Python files during this session, deploy the app now by running: python3 make.py deploy {app_name} (substitute the actual app name). If no app code was changed, do nothing."
+    "prompt": "If you already ran a deploy (python3 make.py deploy) during this session, do nothing — the app is already deployed. Otherwise, if you created or modified any SDK app Python files during this session, deploy the app now by running: python3 make.py deploy {app_name} (substitute the actual app name). If no app code was changed, do nothing."
   }
 }

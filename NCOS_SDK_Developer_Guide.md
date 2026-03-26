@@ -42,7 +42,7 @@ Ericsson publishes and supports the SDK toolkit. However, custom applications bu
 
 - Python 3.8 or later on your development machine (Windows users: see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md) for detailed install steps)
 - OpenSSL tools (for application signing)
-- SSH access to a Cradlepoint router in Developer Mode
+- SSH access to a Cradlepoint router in Developer Mode (enabled via NetCloud Manager, not the router UI)
 
 ### SDK Installation
 
@@ -756,10 +756,9 @@ Cradlepoint routers support Docker containers via the NCOS container runtime, de
 
 ### Key Constraints
 
-- Use Compose version `"2.4"`.
 - Use `restart: unless-stopped` (not `restart: always`).
 - Named volumes require explicit `driver: local`.
-- Memory limit directives (`mem_limit`, `deploy.resources.limits.memory`) are not supported.
+- Memory limit directives (`mem_limit`, `deploy.resources.limits.memory`) are not supported. Set `shm_size' at the service level to set shared memory size.
 - Prefer alpine-based images to minimize storage and RAM usage.
 - Router architecture is ARM64 (aarch64) with musl libc — use `arm64` image variants.
 

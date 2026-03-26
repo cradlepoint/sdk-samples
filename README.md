@@ -359,7 +359,7 @@ python3 make.py clean all
 
 - **Python 3** is required.
 - **SSH access** (scp/ssh) to the target NCOS device is required for `install`, `start`, `stop`, `uninstall`, `purge`, and `status`.
-- The NCOS device must be in **SDK DEV mode** via registration and licensing with NetCloud Manager.
+- The NCOS device must be in **SDK DEV mode** — enabled via NetCloud Manager (not the router UI).
 - Any directory containing a `package.ini` file is treated as an application.
 - Run `python3 make.py help` for full help from the tool.
 

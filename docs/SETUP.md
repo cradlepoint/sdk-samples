@@ -74,6 +74,7 @@ No manual `pip install` needed.
 
 ### 6. Configure **Developer Mode** Router Connection
 
+- **Developer Mode must be enabled in NetCloud Manager** (not in the router UI). Go to the device in NCM and enable SDK Developer Mode under the device settings.
 - Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
 - Navigate to `sdk_settings.ini` in the **file tree**
 - Click to open → Edit these lines:
