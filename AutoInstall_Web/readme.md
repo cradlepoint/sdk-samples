@@ -45,6 +45,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | **disable_alerts** | If set (any value), the app does not send the results alert. |
 | **custom1** | If set (any value), the app writes a results summary to the NCM device custom1 field. |
 | **custom2** | If set (any value), the app writes a results summary to the NCM device custom2 field. |
+| **results_field** | Optional NCOS config path to write results to (e.g. `config/system/desc` or `config/system/asset_id`). Truncated to 1023 chars. |
 
 ## UI
 

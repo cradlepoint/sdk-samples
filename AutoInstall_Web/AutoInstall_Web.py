@@ -569,6 +569,18 @@ def write_results_appdata(sims):
         cp.put_appdata('results', results_string)
         cp.log(f'Wrote results to appdata: {results_string}')
         write_log(f'Wrote results to appdata')
+        # Write to optional NCOS config path (e.g. config/system/desc or config/system/asset_id)
+        results_field = get_config('results_field')
+        if results_field and str(results_field).strip():
+            field_path = str(results_field).strip()
+            try:
+                # Truncate to 1023 chars for fields like desc that have limits
+                cp.put(field_path, results_string[:1023])
+                cp.log(f'Wrote results to {field_path}')
+                write_log(f'Wrote results to {field_path}')
+            except Exception as e:
+                cp.log(f'Error writing results to {field_path}: {e}')
+                write_log(f'Error writing results to {field_path}: {e}')
     except Exception as e:
         cp.log(f'Error writing results to appdata: {e}')
         write_log(f'Error writing results to appdata: {e}')
