@@ -7,6 +7,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "python3 make.py setup"
+    "command": "python3 make.py setup 2>/dev/null || python make.py setup"
   }
 }
