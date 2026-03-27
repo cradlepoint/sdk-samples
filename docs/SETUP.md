@@ -46,8 +46,10 @@ sudo apt-get install libffi-dev libssl-dev sshpass
 
 - Download Kiro from [kiro.dev](https://kiro.dev/)
 - Run the installer and follow the setup prompts
-- Sign in using **"Sign in with your organization identity"** — enter your Start URL and Region when prompted
-  - *You can use your Google account to try it for free (500 credits to use in 30 days)*
+- Click **"Sign in with your organization identity"**
+- On the next page, **DO NOT enter your email address**. Click the link below that says **"Sign in via IAM Identity Center instead"**
+- On the next page, enter the **Start URL** and **Region** provided by your IT department
+- *You can use your Google account to try it for free (500 credits to use in 30 days)*
 - If you signed in using a free Google account and later want to switch to a different account that has a license, click the account panel icon at the bottom of the left sidebar to sign out and sign in with a different account.
 
 ### 4. Clone the Repository
@@ -74,6 +76,7 @@ No manual `pip install` needed.
 
 ### 6. Configure **Developer Mode** Router Connection
 
+- **Developer Mode must be enabled in NetCloud Manager** (not in the router UI). Go to the device in NCM and enable SDK Developer Mode under the device settings.
 - Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
 - Navigate to `sdk_settings.ini` in the **file tree**
 - Click to open → Edit these lines:

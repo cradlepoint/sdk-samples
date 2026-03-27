@@ -33,7 +33,8 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | **logo_dark** | Optional dark-mode logo. If set, used in night mode instead of `logo`. If not set, the regular logo is CSS-inverted in dark mode. |
 | **title** | Panel title. Default: `AutoInstall`. |
 | **text** | Intro text shown above the signal meter. Default: `Enter password to start auto-install process.` |
-| **autostart** | If set (any value), the auto-install process starts automatically on app launch without user input or password. |
+| **autostart** | If set (any value), the auto-install process starts automatically on app launch — but only if **results** appdata does not exist. This prevents re-running on every reboot. Delete **results** to re-run. |
+| **results** | Written automatically on successful completion. One-line parseable string: `timestamp \| port sim carrier ICCID=X dl:Xmbps ul:Xmbps score:X \| ...` sorted by download speed. Delete this field (via NCM API or router UI) to allow autostart to run again. |
 | **sims** | Which SIMs to test: `all` (default), `local` (remote/product_name not populated), or `captive` (remote/product_name populated). Case-insensitive. |
 | **min_speed** | Minimum download speed (Mbps). If no SIM meets this, the process stops with an error. Default: no minimum. |
 | **group_keyword** | Word that must appear in the NCM group name. Default: `prod`. |
@@ -44,6 +45,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | **disable_alerts** | If set (any value), the app does not send the results alert. |
 | **custom1** | If set (any value), the app writes a results summary to the NCM device custom1 field. |
 | **custom2** | If set (any value), the app writes a results summary to the NCM device custom2 field. |
+| **results_field** | Optional NCOS config path to write results to (e.g. `config/system/desc` or `config/system/asset_id`). Truncated to 1023 chars. |
 
 ## UI
 
@@ -97,6 +99,16 @@ The app fully supports routers with two modems (e.g. internal + MC400), each wit
 - **SIM switching** disables other profiles and only re-enables them after the target SIM is confirmed connected, preventing modems from competing.
 - **WAN reprioritization** resolves shared rule IDs to per-SIM rules so each SIM gets its own priority.
 - **Group matching** (group_by_sim) disambiguates by port name on dual-modem routers (e.g. `prod_Internal_SIM1` vs `prod_MC400_SIM1`).
+
+## Re-running AutoInstall
+
+The manual **Start AutoInstall** button always works regardless of results state.
+
+When using **autostart**, the app checks for the **results** appdata field on boot:
+- If **results** exists: autostart is skipped (already ran successfully).
+- If **results** does not exist: autostart runs immediately.
+
+To re-run via automation, delete the **results** appdata field from the device config via NCM API.
 
 ## Requirements
 

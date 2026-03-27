@@ -81,6 +81,7 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **NO memory limits in docker-compose** - Cradlepoint's container runtime does not support `mem_limit`, `deploy.resources.limits.memory`, or any memory constraint options. Omit them entirely or the compose validation will fail
 - **Use Compose version "2.4"** - Cradlepoint's container runtime uses Compose v2.4, not v3. Always set `version: "2.4"` in docker-compose files
 - **Use `restart: unless-stopped`** - Cradlepoint does not allow `restart: always`. Use `unless-stopped` instead
+- **Set shared memory with `shm_size`** - some services (e.g. databases, browsers) need more than the default 64MB `/dev/shm`. Set `shm_size: '1gb'` (or appropriate size) at the service level in docker-compose
 
 Example deploy via curl:
 ```bash

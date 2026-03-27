@@ -359,7 +359,7 @@ python3 make.py clean all
 
 - **Python 3** is required.
 - **SSH access** (scp/ssh) to the target NCOS device is required for `install`, `start`, `stop`, `uninstall`, `purge`, and `status`.
-- The NCOS device must be in **SDK DEV mode** via registration and licensing with NetCloud Manager.
+- The NCOS device must be in **SDK DEV mode** — enabled via NetCloud Manager (not the router UI).
 - Any directory containing a `package.ini` file is treated as an application.
 - Run `python3 make.py help` for full help from the tool.
 
@@ -448,6 +448,10 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
+
+
+
 
 
 

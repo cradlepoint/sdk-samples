@@ -539,6 +539,52 @@ original_rule_states = {}
 # Rule IDs created by ensure_sims_have_distinct_rules (for cleanup/deletion)
 created_rule_ids = set()
 
+
+def write_results_appdata(sims):
+    """Write a one-line parseable results string to appdata 'results'.
+    Format: timestamp | port sim carrier dl:Xmbps ul:Xmbps score:X | port sim carrier dl:Xmbps ul:Xmbps score:X
+    Sorted by download speed descending."""
+    try:
+        timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        sorted_sims = sorted(sims.keys(), key=lambda s: sims[s].get('download', 0.0), reverse=True)
+        parts = [timestamp]
+        for sim_device in sorted_sims:
+            diag = sims[sim_device].get('diagnostics', {}) or {}
+            carrier = (diag.get('CARRID') or '').strip() or 'Unknown'
+            iccid = diag.get('ICCID', '')
+            down = sims[sim_device].get('download', 0.0)
+            up = sims[sim_device].get('upload', 0.0)
+            port_display = get_display_port(sim_device) or get_sim_port(sim_device) or ''
+            sim_slot = get_sim_slot(sim_device) or ''
+            prefix = (port_display + ' ' + sim_slot).strip()
+            score, lbl = rsrp_rsrq_to_score(diag)
+            sim_part = prefix + ' ' + carrier
+            if iccid:
+                sim_part += ' ICCID=' + iccid
+            sim_part += ' dl:%.2fmbps ul:%.2fmbps' % (down, up)
+            if score is not None:
+                sim_part += ' score:%d' % score
+            parts.append(sim_part)
+        results_string = ' | '.join(parts)
+        cp.put_appdata('results', results_string)
+        cp.log(f'Wrote results to appdata: {results_string}')
+        write_log(f'Wrote results to appdata')
+        # Write to optional NCOS config path (e.g. config/system/desc or config/system/asset_id)
+        results_field = get_config('results_field')
+        if results_field and str(results_field).strip():
+            field_path = str(results_field).strip()
+            try:
+                # Truncate to 1023 chars for fields like desc that have limits
+                cp.put(field_path, results_string[:1023])
+                cp.log(f'Wrote results to {field_path}')
+                write_log(f'Wrote results to {field_path}')
+            except Exception as e:
+                cp.log(f'Error writing results to {field_path}: {e}')
+                write_log(f'Error writing results to {field_path}: {e}')
+    except Exception as e:
+        cp.log(f'Error writing results to appdata: {e}')
+        write_log(f'Error writing results to appdata: {e}')
+
 def write_log(message):
     """Write message to log file with timestamp."""
     global log_filename
@@ -2294,6 +2340,7 @@ def run_auto_install():
                     if use_group_mode() and group_match:
                         update_status('running', f'Moving router to group: {group_name}...', 95)
                         time.sleep(0.5)
+                        write_results_appdata(sims)
                         complete_msg = 'Auto-install process complete!'
                         cp.log(complete_msg)
                         write_log(complete_msg)
@@ -2353,6 +2400,7 @@ def run_auto_install():
                         return False
                     else:
                         # Reprioritize mode - complete successfully
+                        write_results_appdata(sims)
                         complete_msg = 'Auto-install process complete! WAN reprioritized by download speed.'
                         cp.log(complete_msg)
                         # Build SIM lines for UI (format: Internal SIM1 | T-Mobile | 150.1Mbps)
@@ -2443,11 +2491,14 @@ if __name__ == '__main__':
     )
     application.listen(web_port)
     if has_appdata('autostart'):
-        cp.log('Autostart enabled - starting auto-install process without user input')
-        def delayed_autostart():
-            time.sleep(3)
-            run_auto_install()
-        thread = threading.Thread(target=delayed_autostart)
-        thread.daemon = True
-        thread.start()
+        if has_appdata('results'):
+            cp.log('Autostart enabled but results already exist - skipping. Delete "results" appdata to re-run.')
+        else:
+            cp.log('Autostart enabled, no results found - starting auto-install process')
+            def delayed_autostart():
+                time.sleep(3)
+                run_auto_install()
+            thread = threading.Thread(target=delayed_autostart)
+            thread.daemon = True
+            thread.start()
     tornado.ioloop.IOLoop.instance().start()
