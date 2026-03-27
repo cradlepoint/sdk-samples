@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Package SDK App",
+  "description": "Packages the SDK app using make.py without deploying it to the router",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": ".venv/bin/python make.py package 2>/dev/null || .venv/Scripts/python make.py package 2>/dev/null || python3 make.py package 2>/dev/null || python make.py package"
+  }
+}

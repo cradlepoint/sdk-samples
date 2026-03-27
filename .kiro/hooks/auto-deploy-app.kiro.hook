@@ -8,6 +8,8 @@
   },
   "then": {
     "type": "askAgent",
-    "prompt": "If you already ran a deploy (python3 make.py deploy) during this session, do nothing — the app is already deployed. Otherwise, if you created or modified any SDK app Python files during this session, read sdk_settings.ini to get the app_name, then run: python3 make.py deploy <app_name>. After the command completes, review the output for errors. Check that log timestamps are AFTER the deploy started. If logs show the app started successfully, report success briefly. If there are errors, diagnose and suggest fixes. If no app code was changed, do nothing."
-  }
+    "prompt": "If you already ran a deploy this session, do nothing — the app is already deployed. Otherwise, if you created or modified any SDK app Python files during this session, read sdk_settings.ini to get the app_name, then deploy using the correct Python: if .venv exists, use '.venv/Scripts/python make.py deploy <app_name>' on Windows or '.venv/bin/python make.py deploy <app_name>' on Mac/Linux. If no .venv exists, fall back to 'python3 make.py deploy <app_name>' or 'python make.py deploy <app_name>' whichever is available. After the command completes, review the output for errors. Check that log timestamps are AFTER the deploy started. If logs show the app started successfully, report success briefly. If there are errors, diagnose and suggest fixes. If no app code was changed, do nothing."
+  },
+  "workspaceFolderName": "sdk-samples",
+  "shortName": "auto-deploy-app"
 }
