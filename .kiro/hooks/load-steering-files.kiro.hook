@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Load Steering Files",
+  "description": "At the start of every prompt, load all steering files from .kiro/steering/ and follow their instructions before doing anything else.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "BEFORE doing anything else, you MUST activate and read ALL of the following steering files using the discloseContext tool. Do this FIRST, before responding to the user's message:\n\n1. \"api-reference\"\n2. \"coding-standards\"\n3. \"meta\"\n4. \"workflow\"\n\nLoad each one by calling discloseContext with the exact name. Then follow all instructions contained in them for the remainder of this conversation. This is non-negotiable."
+  }
+}
