@@ -6,9 +6,11 @@ description: "Deploy SDK app to Cradlepoint router via make.py deploy (cross-pla
 
 Deploy the SDK app to the router:
 
-```bash
-python3 make.py deploy {app_name}
-```
+1. Read `sdk_settings.ini` to get the `app_name`
+2. Run the deploy command:
+
+- Windows: `.venv\Scripts\python make.py deploy {app_name}`
+- Mac/Linux: `.venv/bin/python make.py deploy {app_name}`
 
 This will:
 1. Purge all apps from router
@@ -18,4 +20,4 @@ This will:
 
 After deployment, verify the app started successfully by checking the logs.
 
-**Note:** Ensure sdk_settings.ini has correct router IP and credentials before deploying.
+**Note:** Before deploying, read `sdk_settings.ini` and check that `dev_client_password` is not the default `mypassword`. If it is, open `sdk_settings.ini` and tell the user to update it with their router credentials before proceeding.

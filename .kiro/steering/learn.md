@@ -35,7 +35,10 @@ description: "Review learnings and update rules and documentation"
 ## Explore APIs before documenting:
 
 ```bash
-python3 docs/ncos-api/explore_status.py status/wan/devices
+# Mac/Linux:
+.venv/bin/python docs/ncos-api/explore_status.py status/wan/devices
+# Windows:
+.venv\Scripts\python docs/ncos-api/explore_status.py status/wan/devices
 ```
 
 This shows the ACTUAL API response with all fields - use it to verify structures before updating docs.

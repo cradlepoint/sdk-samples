@@ -1,14 +1,14 @@
 {
   "enabled": true,
   "name": "Auto Deploy on Code Change",
-  "description": "Automatically deploys the SDK app to the router after Kiro finishes making code changes. Uses make.py deploy.",
+  "description": "Automatically deploys the SDK app to the router after Kiro finishes making code changes. Uses .kiro/steering/deploy.md.",
   "version": "1",
   "when": {
     "type": "agentStop"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "If you already ran a deploy this session, do nothing — the app is already deployed. Otherwise, if you created or modified any SDK app Python files during this session, read sdk_settings.ini to get the app_name, then deploy using the correct Python: if .venv exists, use '.venv/Scripts/python make.py deploy <app_name>' on Windows or '.venv/bin/python make.py deploy <app_name>' on Mac/Linux. If no .venv exists, fall back to 'python3 make.py deploy <app_name>' or 'python make.py deploy <app_name>' whichever is available. After the command completes, review the output for errors. Check that log timestamps are AFTER the deploy started. If logs show the app started successfully, report success briefly. If there are errors, diagnose and suggest fixes. If no app code was changed, do nothing."
+    "prompt": "If you already ran a deploy this session, do nothing — the app is already deployed. Otherwise, if you created or modified any SDK app Python files during this session, read .kiro/steering/deploy.md and follow its instructions. Read sdk_settings.ini to get the app_name. If no app code was changed, do nothing."
   },
   "workspaceFolderName": "sdk-samples",
   "shortName": "auto-deploy-app"

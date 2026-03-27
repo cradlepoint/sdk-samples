@@ -1,12 +1,12 @@
 {
   "name": "Setup Dev Environment",
   "version": "1.0.0",
-  "description": "Creates a Python virtual environment and installs all SDK dependencies from requirements.txt",
+  "description": "Automatically creates a Python virtual environment and installs SDK dependencies if .venv is missing",
   "when": {
-    "type": "userTriggered"
+    "type": "promptSubmit"
   },
   "then": {
     "type": "runCommand",
-    "command": "python3 make.py setup 2>/dev/null || python make.py setup"
+    "command": "test -d .venv || (python3 make.py setup || python make.py setup)"
   }
 }

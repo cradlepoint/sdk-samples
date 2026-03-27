@@ -11,8 +11,8 @@ description: "API verification workflow — read docs before writing API code"
 1. **STOP** - Do NOT assume fields exist
 2. **SEARCH docs FIRST**: `grep -r "keyword" docs/ncos-api/ --include="*.md"`
 3. **READ relevant docs** - Understand proper usage patterns and examples
-4. **CHECK DTD**: `curl -s -u admin:pass http://router/api/dtd/config/path | python3 -m json.tool`
-5. **TEST with curl**: `curl -s -u admin:pass http://router/api/status/path | python3 -m json.tool`
+4. **CHECK DTD**: `curl -s -u admin:pass http://router/api/dtd/config/path | .venv/bin/python -m json.tool` (Mac/Linux) or `curl -s -u admin:pass http://router/api/dtd/config/path | .venv\Scripts\python -m json.tool` (Windows)
+5. **TEST with curl**: `curl -s -u admin:pass http://router/api/status/path | .venv/bin/python -m json.tool` (Mac/Linux) or `curl -s -u admin:pass http://router/api/status/path | .venv\Scripts\python -m json.tool` (Windows)
 6. **VERIFY fields** - Only use fields that actually exist in the response
 7. **THEN code** - Write code based on verified, documented structure
 

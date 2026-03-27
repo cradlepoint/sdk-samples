@@ -34,7 +34,7 @@ Applications run on Cradlepoint routers using Python 3.8.
 
 ## Local Development (Running on Your Computer)
 
-- **Apps can run locally** - `python3 my_app/my_app.py` runs the app on your computer. cp.py auto-detects it's not on a router and uses HTTP REST to communicate with the dev router specified in `sdk_settings.ini`
+- **Apps can run locally** - `.venv/bin/python my_app/my_app.py` (Mac/Linux) or `.venv\Scripts\python my_app/my_app.py` (Windows) runs the app on your computer. cp.py auto-detects it's not on a router and uses HTTP REST to communicate with the dev router specified in `sdk_settings.ini`
 - **cp.get/put/post/delete work locally** - all API calls route through REST to the dev router
 - **cp.log() prints to stdout locally** - output goes to your terminal instead of syslog
 - **cp.alert() does NOT work locally** - logs the alert text to console but does not send to NCM
@@ -46,8 +46,8 @@ Applications run on Cradlepoint routers using Python 3.8.
 
 ## Python Libraries and Dependencies
 
-- **Install libraries directly to app folder**: `pip3 install -t path/to/app_folder library_name`
-- **Example**: `pip3 install -t gpio_modem_control requests`
+- **Install libraries directly to app folder**: `.venv/bin/pip install -t path/to/app_folder library_name` (Mac/Linux) or `.venv\Scripts\pip install -t path/to/app_folder library_name` (Windows)
+- **Example**: `.venv/bin/pip install -t gpio_modem_control requests` (Mac/Linux) or `.venv\Scripts\pip install -t gpio_modem_control requests` (Windows)
 - **CRITICAL: No .pyc or .so files** - routers only support pure Python (.py) files
 - Libraries are packaged with the app and deployed to the router
 - Keep dependencies minimal - routers have limited storage
