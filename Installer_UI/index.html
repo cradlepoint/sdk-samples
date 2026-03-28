@@ -6,83 +6,183 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="w3.css">
   <link rel="stylesheet" href="w3-theme-blue-grey.css">
-  <script src="sweetalert2.all.js"></script>
+  <style>
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 32px;
+      min-width: 280px;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    .modal-box .icon { font-size: 48px; margin-bottom: 12px; }
+    .modal-box .icon.success { color: #4caf50; }
+    .modal-box .icon.error { color: #f44336; }
+    .modal-box .icon.info { color: #2196f3; }
+    .modal-box h3 { margin: 8px 0 16px; white-space: pre-line; }
+    .modal-box .progress {
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    .modal-box .progress-bar {
+      height: 100%;
+      background: #2196f3;
+      width: 0%;
+    }
+  </style>
 </head>
 <body class="w3-content" style="max-width:1300px; background-color: #3b4146">
   <div class="w3-half w3-theme-d3 w3-container" style="height:700px">
     <div class="w3-padding-32 w3-theme-l3 w3-padding-large">
-      <img src="cp-logo.svg" alt="Logo" style="padding-bottom: 16px" >
-      <form class="w3-container w3-card w3-theme-l4 w3-padding-32" id="main_form" action="/save" method="post">
+      <img src="cp-logo.svg" alt="Logo" style="padding-bottom: 16px">
+      <form class="w3-container w3-card w3-theme-l4 w3-padding-32" id="main_form">
         <fieldset>
         <legend><h3>WiFi Settings</h3></legend>
           Current SSID:<br><div id="ssid"><h4>{{current_ssid}}</h4></div>
-        <label for="wifi_ssid">Set WiFi SSID:</label><br/>
+        <label for="wifi_ssid">Set WiFi SSID:</label><br>
         <input name="wifi_ssid" type="text" maxlength="32" autocomplete="name" style="width:50%" id="wifi_ssid"><br>
-        <label for="wifi_password">Set WiFi Password:</label><br/>
-        <input name="wifi_password" type="password" minlength="8" maxlength="64" autocomplete="current-password" style="width:50%" id="wifi_password"><br/>
-        <br/>
-        <label for="password_entered">Installer Password:</label><br/>
-        <input name="password_entered" type="password" maxlength="64" autocomplete="current-password" style="width:50%" id="password_entered" required><br/>
+        <label for="wifi_password">Set WiFi Password:</label><br>
+        <input name="wifi_password" type="password" minlength="8" maxlength="64" autocomplete="current-password" style="width:50%" id="wifi_password"><br>
+        <br>
+        <label for="password_entered">Installer Password:</label><br>
+        <input name="password_entered" type="password" maxlength="64" autocomplete="current-password" style="width:50%" id="password_entered" required><br>
         </fieldset>
-        <button type="submit" id="save_button" onclick="save_settings()" style="float: left"> Save Settings </button>
-        <button type="submit" id="speedtest_button" onclick="speedtest()" style="float: right"> Run Speedtest </button>
+        <button type="button" id="save_button" onclick="saveSettings()" style="float: left"> Save Settings </button>
+        <button type="button" id="speedtest_button" onclick="runSpeedtest()" style="float: right"> Run Speedtest </button>
         <button type="button" id="signal_monitor_button" onclick="window.location.href='/signal'" style="float: right; margin-right: 10px;"> Signal Monitor </button>
       </form>
     </div>
   </div>
 
+  <div class="modal-overlay" id="modal">
+    <div class="modal-box">
+      <div class="icon" id="modal-icon"></div>
+      <h3 id="modal-title"></h3>
+      <div class="progress" id="modal-progress" style="display:none">
+        <div class="progress-bar" id="modal-progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    async function save_settings() {
-      event.preventDefault()
-      const form = document.getElementById("main_form");
-      const submitter = document.querySelector("button#save_button");
-      const formData = new FormData(form, submitter);
-      const response = await fetch('/save', {method:'post', body: formData});
-      const save_result = await response.json();
-      let icon = 'success';
-      if (save_result["success"]) {
-        document.getElementById("ssid").innerHTML = '<h4>' + save_result["current_ssid"] + '</h4>';
+    var modalTimer = null;
+
+    function showModal(title, type, duration) {
+      var modal = document.getElementById('modal');
+      var icon = document.getElementById('modal-icon');
+      var titleEl = document.getElementById('modal-title');
+      var progress = document.getElementById('modal-progress');
+      var bar = document.getElementById('modal-progress-bar');
+
+      icon.className = 'icon ' + type;
+      if (type === 'success') {
+        icon.textContent = '\u2713';
+      } else if (type === 'error') {
+        icon.textContent = '\u2717';
       } else {
-        icon = 'error'
+        icon.textContent = '\u2139';
       }
-        Swal.fire({
-          title: save_result["result"],
-          icon: icon,
-          timer: 2000,
-          timerProgressBar: true,
-          showConfirmButton: false,
-        });
+      titleEl.textContent = title;
+      modal.className = 'modal-overlay active';
+
+      if (modalTimer) { clearTimeout(modalTimer); modalTimer = null; }
+      progress.style.display = 'none';
+      bar.style.width = '0%';
+
+      if (duration) {
+        progress.style.display = 'block';
+        bar.style.transition = 'width ' + duration + 'ms linear';
+        setTimeout(function() { bar.style.width = '100%'; }, 10);
+        modalTimer = setTimeout(function() { hideModal(); }, duration);
+      }
     }
 
-    async function speedtest() {
-      event.preventDefault();
-      Swal.fire({
-        title: "Running Speedtest!\nPlease wait...",
-        timer: 60000,
-        showConfirmButton: false,
-        timerProgressBar: true,
-      });
-      const form = document.getElementById("main_form");
-      const submitter = document.querySelector("button#speedtest_button");
-      const formData = new FormData(form, submitter);
-      const response = await fetch('/speedtest', {method:'post', body: formData});
-      const speedtest_result = await response.json();
-      console.log(speedtest_result);
-      if (speedtest_result["success"]) {
-        Swal.fire({
-          title: speedtest_result["result"],
-          icon: 'success',
-          showConfirmButton: true,
-        });
-      } else {
-        Swal.fire({
-          title: speedtest_result["result"],
-          icon: 'error',
-          timer: 2000,
-          timerProgressBar: true,
-          showConfirmButton: false,
-        });
+    function hideModal() {
+      document.getElementById('modal').className = 'modal-overlay';
+      if (modalTimer) { clearTimeout(modalTimer); modalTimer = null; }
+    }
+
+    function getFormData() {
+      var form = document.getElementById('main_form');
+      var inputs = form.querySelectorAll('input[name]');
+      var params = [];
+      for (var i = 0; i < inputs.length; i++) {
+        params.push(encodeURIComponent(inputs[i].name) + '='
+                     + encodeURIComponent(inputs[i].value));
       }
+      return params.join('&');
+    }
+
+    function saveSettings() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/save', true);
+      xhr.setRequestHeader('Content-Type',
+                           'application/x-www-form-urlencoded');
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var result = JSON.parse(xhr.responseText);
+          if (result.success) {
+            document.getElementById('ssid').innerHTML =
+              '<h4>' + result.current_ssid + '</h4>';
+            showModal(result.result, 'success', 2000);
+          } else {
+            showModal(result.result, 'error', 2000);
+          }
+        } else {
+          showModal('Server error', 'error', 2000);
+        }
+      };
+      xhr.onerror = function() {
+        showModal('Connection error', 'error', 2000);
+      };
+      xhr.send(getFormData());
+    }
+
+    function runSpeedtest() {
+      showModal('Running Speedtest!\nPlease wait...', 'info', 60000);
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/speedtest', true);
+      xhr.setRequestHeader('Content-Type',
+                           'application/x-www-form-urlencoded');
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          var result = JSON.parse(xhr.responseText);
+          if (result.success) {
+            hideModal();
+            showModal(result.result, 'success', 0);
+            document.getElementById('modal').onclick = function() {
+              hideModal();
+              document.getElementById('modal').onclick = null;
+            };
+          } else {
+            hideModal();
+            showModal(result.result, 'error', 2000);
+          }
+        } else {
+          hideModal();
+          showModal('Server error', 'error', 2000);
+        }
+      };
+      xhr.onerror = function() {
+        hideModal();
+        showModal('Connection error', 'error', 2000);
+      };
+      xhr.send(getFormData());
     }
   </script>
 </body>
