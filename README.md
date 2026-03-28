@@ -45,7 +45,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [AutoInstall_Web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall_Web.v1.0.0.tar.gz)
 - **Installer_UI**
     - Provide a web interface for installers to configure WiFi and run speedtests.
-    - **Download:** [Installer_UI v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.2.0.tar.gz)
+    - **Download:** [Installer_UI v1.3.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.3.0.tar.gz)
 - **Mobile_Site_Survey**
     - Field survey tool that runs speedtests and collects modem diagnostics with GPS locations, uploading results for network coverage and throughput analysis to 5g-ready.io
     - **Download:** [Mobile_Site_Survey v3.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.0.3.tar.gz)
@@ -448,6 +448,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
