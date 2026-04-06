@@ -91,6 +91,27 @@ cp.put('control/gpio/LED_SS_0', 0)  # off
 cp.put('control/ping/start', {'host': '8.8.8.8', 'num': 4})
 ```
 
+### Register callback for custom control tree path
+```python
+# MUST use 'put' (lowercase) as the action — 'set' and 'PUT' do NOT work
+def on_my_action(path, value, args):
+    cp.log(f"Action triggered: {path} = {value}")
+
+cp.register('put', 'control/my_app/my_action', on_my_action)
+```
+
+**CRITICAL:** Register callbacks BEFORE seeding the control tree with `cp.put()`. Seeding first causes socket response desync that silently breaks subsequent `cp.register()` calls.
+
+```python
+# CORRECT order:
+cp.register('put', 'control/my_app/action', on_action)
+cp.put('control/my_app', {'action': None})  # seed AFTER register
+
+# WRONG order — register may silently fail:
+cp.put('control/my_app', {'action': None})  # seed BEFORE register
+cp.register('put', 'control/my_app/action', on_action)  # may not work!
+```
+
 ## Access
 
 ```bash

@@ -50,6 +50,8 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - `cp.register` callback receives 3 args: `(path, value, args)` where `args` is a single tuple — do NOT use `*args` unpacking in the callback signature
 - SCP "lost connection" during `make.py install` is normal — the router drops the SSH connection after receiving the file. Exit code 1 is expected
 - IP Verify identity `name` field only allows `[a-zA-Z0-9_-]` — no dots. Replace dots with underscores (e.g., `'SDK-' + ip.replace('.', '_')`)
-- `cp.register()` callback receives 3 args: `(path, value, args)` where `args` is a single tuple — do NOT use `*args` unpacking in the callback signature
+- **`cp.register()` for control tree paths MUST use `'put'` (lowercase) as the action** — `cp.register('put', 'control/...', callback)`. Using `'set'` or `'PUT'` (uppercase) silently fails to trigger callbacks
+- **Do NOT `cp.put()` to seed the control tree before `cp.register()`** — the dict PUT response causes socket desync, making subsequent register calls fail silently. Register first, then seed (or don't seed at all)
+- **Control tree keys persist across app redeploys** — the router merges control tree writes, never replaces. Renaming control paths leaves stale keys until router reboot. Keep control path names stable to avoid confusion
 
 **For detailed API structures, response formats, and code patterns, see `#[[file:docs/ncos-api/api-structures.md]]`**

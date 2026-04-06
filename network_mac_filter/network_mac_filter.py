@@ -105,7 +105,7 @@ def cleanup_orphaned_deny_rules():
         if not policies:
             return
         
-        # Build set of MACs to keep (known-prefix + manually blocked)
+        # Build set of MACs to keep (known-prefix + explicitly known + manually blocked)
         keep_macs = set()
         for network_name, macs in tracked_macs.items():
             for mac, info in macs.items():
@@ -319,6 +319,7 @@ def publish_status():
         config = network_config.get(network_name, {})
         max_unknown = config.get('max_unknown', 0)
         has_policy = network_policy_status.get(network_name, False)
+        prefixes = config.get('allowed_prefixes', [])
 
         status = {
             'total_macs': total,
@@ -326,8 +327,10 @@ def publish_status():
             'unknown_allowed': unknown_allowed,
             'unknown_blocked': unknown_blocked,
             'manual_blocks': manual,
+            'manual_blocked_macs': list(manual_blocks.get(network_name, {}).keys()),
             'max_unknown': max_unknown,
             'has_policy': has_policy,
+            'known_prefixes': prefixes,
             'macs': mac_list
         }
 
@@ -410,8 +413,82 @@ def on_unblock(path, value, args):
         cp.log(f"Error in on_unblock: {e}")
 
 
+def on_add_known_prefix(path, value, args):
+    """Callback for control/network_mac_filter/{network}/add_known_prefix.
+    Value is a MAC prefix (OUI), e.g. '00:11:22' or '001122'."""
+    cp.log(f"on_add_known_prefix called: path={path} value={value}")
+    try:
+        parts = path.split('/')
+        safe_name = parts[2] if len(parts) >= 4 else ''
+        network_name = _resolve_network_name(safe_name)
+        if not network_name:
+            cp.log(f"Add prefix: unknown network '{safe_name}'")
+            return
+
+        prefixes = parse_mac_prefixes(str(value))
+        if not prefixes:
+            cp.log(f"Add prefix: invalid prefix '{value}'")
+            return
+
+        if network_name not in network_config:
+            network_config[network_name] = {'max_unknown': 0, 'allowed_prefixes': []}
+
+        added = []
+        for prefix in prefixes:
+            if prefix not in network_config[network_name]['allowed_prefixes']:
+                network_config[network_name]['allowed_prefixes'].append(prefix)
+                added.append(prefix)
+
+        if added:
+            try:
+                cp.put_appdata('network_config', json.dumps(network_config))
+            except Exception as e:
+                cp.log(f"Error saving network_config: {e}")
+            cp.log(f"CLI add_known_prefix: {','.join(added)} on {network_name}")
+    except Exception as e:
+        cp.log(f"Error in on_add_known_prefix: {e}")
+
+
+def on_remove_known_prefix(path, value, args):
+    """Callback for control/network_mac_filter/{network}/remove_known_prefix.
+    Value is a MAC prefix (OUI), e.g. '00:11:22' or '001122'."""
+    cp.log(f"on_remove_known_prefix called: path={path} value={value}")
+    try:
+        parts = path.split('/')
+        safe_name = parts[2] if len(parts) >= 4 else ''
+        network_name = _resolve_network_name(safe_name)
+        if not network_name:
+            cp.log(f"Remove prefix: unknown network '{safe_name}'")
+            return
+
+        prefixes = parse_mac_prefixes(str(value))
+        if not prefixes:
+            cp.log(f"Remove prefix: invalid prefix '{value}'")
+            return
+
+        config = network_config.get(network_name)
+        if not config:
+            cp.log(f"Remove prefix: no config for {network_name}")
+            return
+
+        removed = []
+        for prefix in prefixes:
+            if prefix in config.get('allowed_prefixes', []):
+                config['allowed_prefixes'].remove(prefix)
+                removed.append(prefix)
+
+        if removed:
+            try:
+                cp.put_appdata('network_config', json.dumps(network_config))
+            except Exception as e:
+                cp.log(f"Error saving network_config: {e}")
+            cp.log(f"CLI remove_known_prefix: {','.join(removed)} from {network_name}")
+    except Exception as e:
+        cp.log(f"Error in on_remove_known_prefix: {e}")
+
+
 def register_control_callbacks():
-    """Register block/unblock callbacks for each LAN network."""
+    """Register block/unblock/add_known_prefix/remove_known_prefix callbacks for each LAN network."""
     try:
         lans = cp.get('config/lan')
         if not lans:
@@ -421,8 +498,10 @@ def register_control_callbacks():
             if not name:
                 continue
             safe_name = name.replace(' ', '_').replace('/', '_')
-            cp.register('set', f'control/network_mac_filter/{safe_name}/block', on_block)
-            cp.register('set', f'control/network_mac_filter/{safe_name}/unblock', on_unblock)
+            cp.register('put', f'control/network_mac_filter/{safe_name}/block', on_block)
+            cp.register('put', f'control/network_mac_filter/{safe_name}/unblock', on_unblock)
+            cp.register('put', f'control/network_mac_filter/{safe_name}/add_known_prefix', on_add_known_prefix)
+            cp.register('put', f'control/network_mac_filter/{safe_name}/remove_known_prefix', on_remove_known_prefix)
             cp.log(f"Registered control callbacks for {name}")
     except Exception as e:
         cp.log(f"Error registering control callbacks: {e}")
@@ -667,10 +746,62 @@ class WebHandler(BaseHTTPRequestHandler):
                 cp.log(f"Error saving config: {e}")
                 self.send_response(500)
                 self.end_headers()
+        elif self.path == '/api/add_known_prefix':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length).decode()
+            data = json.loads(body) if body else {}
+
+            network = data.get('network')
+            prefix_str = data.get('prefix', '')
+            prefixes = parse_mac_prefixes(prefix_str)
+
+            if network and prefixes:
+                if network not in network_config:
+                    network_config[network] = {'max_unknown': 0, 'allowed_prefixes': []}
+                for prefix in prefixes:
+                    if prefix not in network_config[network]['allowed_prefixes']:
+                        network_config[network]['allowed_prefixes'].append(prefix)
+                try:
+                    cp.put_appdata('network_config', json.dumps(network_config))
+                except Exception as e:
+                    cp.log(f"Error saving network_config: {e}")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': True}).encode())
+            else:
+                self.send_response(400)
+                self.end_headers()
+        elif self.path == '/api/remove_known_prefix':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length).decode()
+            data = json.loads(body) if body else {}
+
+            network = data.get('network')
+            prefix_str = data.get('prefix', '')
+            prefixes = parse_mac_prefixes(prefix_str)
+
+            if network and prefixes and network in network_config:
+                for prefix in prefixes:
+                    if prefix in network_config[network].get('allowed_prefixes', []):
+                        network_config[network]['allowed_prefixes'].remove(prefix)
+                try:
+                    cp.put_appdata('network_config', json.dumps(network_config))
+                except Exception as e:
+                    cp.log(f"Error saving network_config: {e}")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': True}).encode())
+            else:
+                self.send_response(400)
+                self.end_headers()
         else:
             self.send_response(404)
             self.end_headers()
-    
+
     def get_html(self):
         return '''<!DOCTYPE html>
 <html data-theme="light">
@@ -824,6 +955,26 @@ function toggleMAC(network, mac) {
   });
 }
 
+function addPrefix(network, prefix) {
+  fetch('/api/add_known_prefix', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({network: network, prefix: prefix})
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.success) { loadData(); }
+  });
+}
+
+function removePrefix(network, prefix) {
+  fetch('/api/remove_known_prefix', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({network: network, prefix: prefix})
+  }).then(function(r) { return r.json(); }).then(function(result) {
+    if (result.success) { loadData(); }
+  });
+}
+
 function showAlert(message) {
   var alert = document.createElement('div');
   alert.className = 'alert';
@@ -873,12 +1024,15 @@ function loadData() {
           continue;
         }
         
-        html += '<table><thead><tr><th>MAC Address</th><th>IP Address</th><th>Prefix</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+        html += '<table><thead><tr><th>MAC Address</th><th>IP Address</th><th>Type</th><th>Status</th><th>Action</th><th>Known</th></tr></thead><tbody>';
         
         for (var i = 0; i < macList.length; i++) {
           var mac = macList[i];
           var info = macs[mac];
           var isManualBlock = data.manual_blocks[network] && data.manual_blocks[network][mac];
+          var macPrefix = mac.replace(/[^0-9A-Fa-f]/g, '').substring(0, 6).toUpperCase();
+          var configPrefixes = config.allowed_prefixes || [];
+          var isPrefixKnown = configPrefixes.indexOf(macPrefix) !== -1;
           var status = '';
           var statusClass = '';
           var action = '';
@@ -901,7 +1055,10 @@ function loadData() {
           
           var prefix = info.known ? 'Known' : 'Unknown';
           var disabled = hasPolicy ? '' : ' disabled';
-          html += '<tr><td>' + mac + '</td><td>' + info.ip + '</td><td>' + prefix + '</td><td><span class="status ' + statusClass + '">' + status + '</span></td><td><button' + disabled + ' onclick="toggleMAC(&quot;' + network + '&quot;,&quot;' + mac + '&quot;)">' + action + '</button></td></tr>';
+          var knownBtn = isPrefixKnown
+            ? '<button onclick="removePrefix(&quot;' + network + '&quot;,&quot;' + macPrefix + '&quot;)">Remove Prefix</button>'
+            : '<button onclick="addPrefix(&quot;' + network + '&quot;,&quot;' + macPrefix + '&quot;)">Add Prefix</button>';
+          html += '<tr><td>' + mac + '</td><td>' + info.ip + '</td><td>' + prefix + '</td><td><span class="status ' + statusClass + '">' + status + '</span></td><td><button' + disabled + ' onclick="toggleMAC(&quot;' + network + '&quot;,&quot;' + mac + '&quot;)">' + action + '</button></td><td>' + knownBtn + '</td></tr>';
         }
         
         html += '</tbody></table></div>';

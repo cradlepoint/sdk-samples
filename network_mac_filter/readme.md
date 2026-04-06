@@ -7,7 +7,7 @@ Enforces MAC address limits per network using Zone-Based Firewall deny rules. Au
 ## Features
 
 - **Per-network limits** - Configure max unknown hosts per LAN (0 = unlimited)
-- **MAC prefix whitelist** - Known OUI prefixes don't count toward limits
+- **MAC prefix whitelist** - Known OUI prefixes don't count toward limits, manageable via control tree
 - **Auto-blocking** - New MACs blocked when limit reached (🟠 OVER LIMIT)
 - **Manual blocking** - Persist blocks across disconnects/reboots (🔴 BLOCKED)
 - **Dynamic tracking** - Monitors REACHABLE and STALE ARP entries every 2 seconds
@@ -97,8 +97,10 @@ Example response:
   "unknown_allowed": 2,
   "unknown_blocked": 1,
   "manual_blocks": 1,
+  "manual_blocked_macs": ["AA:BB:CC:DD:EE:FF"],
   "max_unknown": 5,
   "has_policy": true,
+  "known_prefixes": ["001122", "AABBCC"],
   "macs": [
     {
       "mac": "00:11:22:33:44:55",
@@ -119,6 +121,7 @@ Example response:
 ```
 
 - `known` — matches an allowed prefix
+- `known_prefixes` — OUI prefixes configured for this network
 - `blocked` — currently has a firewall deny rule
 - `manual` — manually blocked, persists until explicitly unblocked
 
@@ -128,6 +131,17 @@ Example response:
 PUT control/network_mac_filter/{network_name}/block    → "AA:BB:CC:DD:EE:FF"
 PUT control/network_mac_filter/{network_name}/unblock  → "AA:BB:CC:DD:EE:FF"
 ```
+
+### Add / Remove Known Prefixes via Control Tree
+
+Add or remove OUI prefixes (first 6 hex chars of MAC) to a network's allowed list:
+
+```
+PUT control/network_mac_filter/{network_name}/add_known_prefix    → "00:11:22"
+PUT control/network_mac_filter/{network_name}/remove_known_prefix → "00:11:22"
+```
+
+Accepts any format: `00:11:22`, `001122`, `00-11-22`. Comma-separated for multiple: `00:11:22,AA:BB:CC`. All MACs matching the prefix are treated as known (always allowed, don't count toward limits). Changes are saved to appdata and take effect on the next monitoring cycle.
 
 MAC addresses accept any format (colons, dashes, no separators, mixed case).
 
@@ -142,6 +156,16 @@ curl -s -k -u admin:pass -X PUT \
 curl -s -k -u admin:pass -X PUT \
   https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/unblock \
   -d "data=AA:BB:CC:DD:EE:FF"
+
+# Add known prefix
+curl -s -k -u admin:pass -X PUT \
+  https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/add_known_prefix \
+  -d "data=00:11:22"
+
+# Remove known prefix
+curl -s -k -u admin:pass -X PUT \
+  https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/remove_known_prefix \
+  -d "data=00:11:22"
 
 # Read status
 curl -s -k -u admin:pass \
