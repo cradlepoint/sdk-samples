@@ -48,13 +48,6 @@ Enforces MAC address limits per network using Zone-Based Firewall deny rules. Au
 - **Max Unknown** - Maximum unknown MACs allowed (0 = unlimited)
 - **Allowed MAC Prefixes** - Comma-separated OUI prefixes: `00:11:22,AA:BB:CC,DD:EE:FF`
 
-### Via Appdata (Optional)
-
-- `network_config` - JSON: `{"Network Name": {"max_unknown": 5, "allowed_prefixes": ["001122", "AABBCC"]}}`
-- `manual_blocks` - JSON: `{"Network Name": {"AA:BB:CC:DD:EE:FF": true}}`
-- `disable_ui` - Set to any value to disable the web interface
-- `custom_mac_filter_port` - Web port (default: 8000)
-
 ## Example
 
 **Scenario**: Guest network with 5-device limit, excluding company devices
@@ -144,59 +137,6 @@ PUT control/network_mac_filter/{network_name}/remove_known_prefix → "00:11:22"
 Accepts any format: `00:11:22`, `001122`, `00-11-22`. Comma-separated for multiple: `00:11:22,AA:BB:CC`. All MACs matching the prefix are treated as known (always allowed, don't count toward limits). Changes are saved to appdata and take effect on the next monitoring cycle.
 
 MAC addresses accept any format (colons, dashes, no separators, mixed case).
-
-curl examples:
-```
-# Block a MAC on Guest_LAN
-curl -s -k -u admin:pass -X PUT \
-  https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/block \
-  -d "data=AA:BB:CC:DD:EE:FF"
-
-# Unblock
-curl -s -k -u admin:pass -X PUT \
-  https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/unblock \
-  -d "data=AA:BB:CC:DD:EE:FF"
-
-# Add known prefix
-curl -s -k -u admin:pass -X PUT \
-  https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/add_known_prefix \
-  -d "data=00:11:22"
-
-# Remove known prefix
-curl -s -k -u admin:pass -X PUT \
-  https://ROUTER_IP/api/control/network_mac_filter/Guest_LAN/remove_known_prefix \
-  -d "data=00:11:22"
-
-# Read status
-curl -s -k -u admin:pass \
-  https://ROUTER_IP/api/status/network_mac_filter/Guest_LAN
-```
-
-### Configure networks via Appdata
-
-Set `network_config` appdata:
-```json
-{"Guest LAN": {"max_unknown": 5, "allowed_prefixes": ["001122", "AABBCC"]}}
-```
-
-### Appdata curl examples
-
-Appdata is an array of `{"name": "...", "value": "...", "_id_": "..."}` objects. You need to find the entry's `_id_` to update or delete it.
-
-```
-# List all appdata (find _id_ values)
-curl -s -k -u admin:pass https://ROUTER_IP/api/config/system/sdk/appdata/
-
-# Create network_config (first time)
-curl -s -k -u admin:pass -X POST https://ROUTER_IP/api/config/system/sdk/appdata/ \
-  -d 'data={"name":"network_config","value":"{\"Guest LAN\":{\"max_unknown\":5,\"allowed_prefixes\":[\"001122\"]}}"}'
-
-# Update network_config (use _id_ from GET response)
-curl -s -k -u admin:pass -X PUT https://ROUTER_IP/api/config/system/sdk/appdata/ID/value \
-  -d 'data={"Guest LAN":{"max_unknown":5,"allowed_prefixes":["001122"]}}'
-```
-
-Replace `ID` with the `_id_` value returned from the GET request for the `network_config` entry.
 
 ## State Files
 
