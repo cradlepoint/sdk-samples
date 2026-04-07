@@ -7,12 +7,13 @@ Enforces MAC address limits per network using Zone-Based Firewall deny rules. Au
 ## Features
 
 - **Per-network limits** - Configure max unknown hosts per LAN (0 = unlimited)
+- **Sticky MACs** - Learned unknown MACs hold their slot permanently while running (like Cisco port-security sticky). Reboot clears them
 - **MAC prefix whitelist** - Known OUI prefixes don't count toward limits, manageable via control tree
 - **Auto-blocking** - New MACs blocked when limit reached (🟠 OVER LIMIT)
 - **Manual blocking** - Persist blocks across disconnects/reboots (🔴 BLOCKED)
 - **Dynamic tracking** - Monitors REACHABLE and STALE ARP entries every 2 seconds
-- **Grace period** - 6-second delay before removing disconnected MACs
-- **Web interface** - Real-time view and control at port 8000
+- **Grace period** - 6-second delay before removing disconnected known-prefix MACs
+- **Web interface** - Real-time view and control at port 8000, can be disabled/enabled at runtime
 - **Color-coded status** - 🟢 ALLOWED, 🟠 OVER LIMIT, 🔴 BLOCKED
 
 ## Quick Start
@@ -35,10 +36,11 @@ Enforces MAC address limits per network using Zone-Based Firewall deny rules. Au
 - Prefix changes immediately re-classify all MACs
 
 **Enforcement**:
-- **Auto-block** (🟠 OVER LIMIT) - When limit reached, new MACs get firewall deny rules. Freed when disconnected.
+- **Sticky learning** - When an unknown MAC is first seen and a slot is available, it's allowed and becomes "sticky". Sticky MACs hold their slot permanently while the app is running, even if the device disconnects. This prevents slot recycling — once learned, only a reboot or `clear_sticky` frees the slot.
+- **Auto-block** (🟠 OVER LIMIT) - When all sticky slots are filled, new MACs get firewall deny rules.
 - **Manual block** (🔴 BLOCKED) - Click Block button. Saved to appdata, persists until unblocked.
 
-**Grace Period**: MACs must be missing for 6 seconds (3 cycles) before removal
+**Grace Period**: Known-prefix MACs must be missing for 6 seconds (3 cycles) before removal. Sticky and blocked MACs are never removed automatically.
 
 ## Configuration
 
@@ -57,7 +59,7 @@ Enforces MAC address limits per network using Zone-Based Firewall deny rules. Au
 3. Allowed MAC Prefixes: `00:11:22,AA:BB:CC`
 4. Save
 
-**Result**: Company devices (00:11:22*, AA:BB:CC*) always allowed. Up to 5 other devices allowed. 6th device auto-blocked.
+**Result**: Company devices (00:11:22*, AA:BB:CC*) always allowed. Up to 5 other devices allowed and learned as sticky. 6th unknown device auto-blocked. Sticky MACs hold their slots even when disconnected — reboot or `clear_sticky` to reset.
 
 ## Firewall Integration
 
@@ -71,7 +73,7 @@ If policy missing, web UI shows warning and disables Block/Allow buttons.
 
 ## Headless Mode (No Web UI)
 
-Set `disable_ui` appdata to any value to run without the web interface. All configuration and blocking is done via appdata and the CLI/API.
+Set `disable_ui` appdata to any value to run without the web interface. All configuration and blocking is done via appdata and the CLI/API. The app checks this setting every 2 seconds — setting or clearing `disable_ui` while running will stop or start the web server dynamically without an app restart.
 
 ### Status
 
@@ -100,14 +102,16 @@ Example response:
       "ip": "192.168.0.10",
       "known": true,
       "blocked": false,
-      "manual": false
+      "manual": false,
+      "sticky": false
     },
     {
       "mac": "AA:BB:CC:DD:EE:FF",
       "ip": "192.168.0.100",
       "known": false,
       "blocked": true,
-      "manual": true
+      "manual": true,
+      "sticky": false
     }
   ]
 }
@@ -117,6 +121,7 @@ Example response:
 - `known_prefixes` — OUI prefixes configured for this network
 - `blocked` — currently has a firewall deny rule
 - `manual` — manually blocked, persists until explicitly unblocked
+- `sticky` — learned unknown MAC that holds its slot permanently while running
 
 ### Block / Unblock via Control Tree
 
@@ -136,6 +141,16 @@ PUT control/network_mac_filter/{network_name}/remove_known_prefix → "00:11:22"
 
 Accepts any format: `00:11:22`, `001122`, `00-11-22`. Comma-separated for multiple: `00:11:22,AA:BB:CC`. All MACs matching the prefix are treated as known (always allowed, don't count toward limits). Changes are saved to appdata and take effect on the next monitoring cycle.
 
+### Clear Sticky MACs via Control Tree
+
+Reset all learned sticky MACs for a network, freeing their slots:
+
+```
+PUT control/network_mac_filter/{network_name}/clear_sticky → "1"
+```
+
+This removes all sticky MACs from tracking (unless manually blocked) and allows new devices to fill the slots. Equivalent to a reboot for that network only.
+
 MAC addresses accept any format (colons, dashes, no separators, mixed case).
 
 ## State Files
@@ -152,5 +167,7 @@ MAC addresses accept any format (colons, dashes, no separators, mixed case).
 - Filter policy is applied to correct zone forwarding (e.g., LAN → WAN)
 
 **Manual vs Auto-blocking**:
-- 🟠 OVER LIMIT - Auto-blocked, frees slot when disconnected
+- 🟠 OVER LIMIT - Auto-blocked, denied until `clear_sticky` frees a slot or reboot
 - 🔴 BLOCKED - Manually blocked, stays blocked until you click Allow
+
+**Sticky MACs not clearing** - Use `clear_sticky` control tree action or reboot the router

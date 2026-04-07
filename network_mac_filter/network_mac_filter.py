@@ -10,9 +10,13 @@ import socket
 # Global state
 tracked_macs = {}  # {network: {mac: {'ip': str, 'blocked': bool, 'known': bool, 'missing_count': int}}}
 manual_blocks = {}  # {network: {mac: True}} - Manually blocked MACs that persist
+sticky_macs = {}  # {network: {mac: True}} - Learned/allowed unknown MACs that occupy a slot permanently
 network_config = {}  # {network: {'max_unknown': int, 'allowed_prefixes': [str]}}
 network_policy_status = {}  # {network: bool} - True if policy exists
 web_port = 8000
+web_server = None  # HTTPServer instance (or None if UI disabled)
+web_thread = None  # Web server thread
+ui_disabled = False  # True when disable_ui appdata is set
 GRACE_PERIOD_CYCLES = 3  # Remove MAC after missing for this many cycles
 
 
@@ -267,6 +271,21 @@ def save_manual_blocks():
         cp.log(f"Error saving manual blocks: {e}")
 
 
+def load_sticky_macs():
+    """No-op. Sticky MACs are memory-only and reset on reboot."""
+    pass
+
+
+def save_sticky_macs():
+    """No-op. Sticky MACs are memory-only and reset on reboot."""
+    pass
+
+
+def is_sticky(network, mac):
+    """Check if MAC is a sticky (learned/allowed) MAC."""
+    return sticky_macs.get(network, {}).get(mac, False)
+
+
 def is_manually_blocked(network, mac):
     """Check if MAC is manually blocked."""
     return manual_blocks.get(network, {}).get(mac, False)
@@ -313,7 +332,8 @@ def publish_status():
                 'ip': info.get('ip', ''),
                 'known': info.get('known', False),
                 'blocked': info.get('blocked', False),
-                'manual': is_manually_blocked(network_name, mac)
+                'manual': is_manually_blocked(network_name, mac),
+                'sticky': is_sticky(network_name, mac)
             })
 
         config = network_config.get(network_name, {})
@@ -487,6 +507,38 @@ def on_remove_known_prefix(path, value, args):
         cp.log(f"Error in on_remove_known_prefix: {e}")
 
 
+def on_clear_sticky(path, value, args):
+    """Callback for control/network_mac_filter/{network}/clear_sticky.
+    Clears all sticky (learned) MACs for the network, freeing their slots."""
+    global sticky_macs, tracked_macs
+    try:
+        parts = path.split('/')
+        safe_name = parts[2] if len(parts) >= 4 else ''
+        network_name = _resolve_network_name(safe_name)
+        if not network_name:
+            cp.log(f"Clear sticky: unknown network '{safe_name}'")
+            return
+
+        count = len(sticky_macs.get(network_name, {}))
+        if count == 0:
+            cp.log(f"Clear sticky: no sticky MACs on {network_name}")
+            return
+
+        # Remove sticky MACs from tracked_macs (unless manually blocked)
+        if network_name in tracked_macs:
+            for mac in list(sticky_macs.get(network_name, {}).keys()):
+                if mac in tracked_macs[network_name]:
+                    if not is_manually_blocked(network_name, mac):
+                        del tracked_macs[network_name][mac]
+
+        # Clear sticky list
+        sticky_macs[network_name] = {}
+        save_state()
+        cp.log(f"Cleared {count} sticky MACs on {network_name}")
+    except Exception as e:
+        cp.log(f"Error in on_clear_sticky: {e}")
+
+
 def register_control_callbacks():
     """Register block/unblock/add_known_prefix/remove_known_prefix callbacks for each LAN network."""
     try:
@@ -498,10 +550,19 @@ def register_control_callbacks():
             if not name:
                 continue
             safe_name = name.replace(' ', '_').replace('/', '_')
+            # Seed control tree so GET shows available actions
+            cp.put(f'control/network_mac_filter/{safe_name}', {
+                'block': '',
+                'unblock': '',
+                'add_known_prefix': '',
+                'remove_known_prefix': '',
+                'clear_sticky': ''
+            })
             cp.register('put', f'control/network_mac_filter/{safe_name}/block', on_block)
             cp.register('put', f'control/network_mac_filter/{safe_name}/unblock', on_unblock)
             cp.register('put', f'control/network_mac_filter/{safe_name}/add_known_prefix', on_add_known_prefix)
             cp.register('put', f'control/network_mac_filter/{safe_name}/remove_known_prefix', on_remove_known_prefix)
+            cp.register('put', f'control/network_mac_filter/{safe_name}/clear_sticky', on_clear_sticky)
             cp.log(f"Registered control callbacks for {name}")
     except Exception as e:
         cp.log(f"Error registering control callbacks: {e}")
@@ -511,7 +572,7 @@ def register_control_callbacks():
 
 def monitor_macs():
     """Monitor ARP table and enforce MAC limits."""
-    global tracked_macs
+    global tracked_macs, web_thread, ui_disabled
     
     while True:
         try:
@@ -604,12 +665,11 @@ def monitor_macs():
                                 add_deny_rule(policy_id, mac)
                                 cp.log(f"Blocked manually blocked MAC {mac} on {network_name}")
                         else:
-                            # Check if limit reached
-                            allowed_count = sum(1 for m in tracked_macs[network_name].values() 
-                                              if not m.get('blocked', False) and not m.get('known', False) and m.get('missing_count', 0) < GRACE_PERIOD_CYCLES)
+                            # Count sticky MACs against the limit (they occupy slots permanently)
+                            sticky_count = len(sticky_macs.get(network_name, {}))
                             
                             max_unknown = network_config.get(network_name, {}).get('max_unknown', 0)
-                            should_block = max_unknown > 0 and allowed_count >= max_unknown
+                            should_block = max_unknown > 0 and sticky_count >= max_unknown
                             
                             if should_block:
                                 # Block new MAC
@@ -617,10 +677,14 @@ def monitor_macs():
                                 policy_id = get_filter_policy_id(network_name)
                                 if policy_id:
                                     add_deny_rule(policy_id, mac)
-                                    cp.log(f"Blocked MAC {mac} on {network_name} (limit: {max_unknown})")
+                                    cp.log(f"Blocked MAC {mac} on {network_name} (limit: {max_unknown}, sticky: {sticky_count})")
                             else:
-                                # Allow new MAC
+                                # Allow new MAC and make it sticky
                                 tracked_macs[network_name][mac] = {'ip': ip, 'blocked': False, 'known': False, 'missing_count': 0}
+                                if network_name not in sticky_macs:
+                                    sticky_macs[network_name] = {}
+                                sticky_macs[network_name][mac] = True
+                                cp.log(f"Learned sticky MAC {mac} on {network_name} ({sticky_count + 1}/{max_unknown if max_unknown else 'unlimited'})")
             
             # Handle MACs that have been missing for grace period
             for network_name in list(tracked_macs.keys()):
@@ -630,7 +694,11 @@ def monitor_macs():
                         if tracked_macs[network_name][mac].get('blocked', False):
                             continue
                         
-                        # Remove unblocked MACs that disappeared
+                        # Keep sticky MACs - they hold their slot permanently
+                        if is_sticky(network_name, mac):
+                            continue
+                        
+                        # Remove unblocked non-sticky MACs that disappeared (known-prefix MACs)
                         del tracked_macs[network_name][mac]
                         cp.log(f"Stopped tracking MAC {mac} on {network_name} (missing for {GRACE_PERIOD_CYCLES} cycles)")
             
@@ -639,6 +707,21 @@ def monitor_macs():
             
             # Publish status for CLI access
             publish_status()
+            
+            # Check if UI should be dynamically enabled/disabled
+            try:
+                disable_ui = cp.get_appdata('disable_ui')
+                if disable_ui and not ui_disabled:
+                    cp.log("disable_ui appdata set, stopping web UI")
+                    ui_disabled = True
+                    stop_web_server()
+                elif not disable_ui and ui_disabled:
+                    cp.log("disable_ui appdata cleared, starting web UI")
+                    ui_disabled = False
+                    web_thread = threading.Thread(target=start_web_server, daemon=True)
+                    web_thread.start()
+            except Exception as e:
+                cp.log(f"Error checking disable_ui: {e}")
             
         except Exception as e:
             cp.log(f"Error in monitor_macs: {e}")
@@ -1078,20 +1161,34 @@ setInterval(loadData, 2000);
 
 def start_web_server():
     """Start web server in background thread."""
-    global web_port
+    global web_port, web_server
     
     try:
         os.makedirs('tmp', exist_ok=True)
-        server = HTTPServer(('', web_port), WebHandler)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        web_server = HTTPServer(('', web_port), WebHandler)
+        web_server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         cp.log(f"Web server started on port {web_port}")
-        server.serve_forever()
+        web_server.serve_forever()
     except Exception as e:
         cp.log(f"Error starting web server: {e}")
+    finally:
+        web_server = None
+
+
+def stop_web_server():
+    """Stop the web server if running."""
+    global web_server
+    if web_server:
+        try:
+            web_server.shutdown()
+            cp.log("Web server stopped")
+        except Exception as e:
+            cp.log(f"Error stopping web server: {e}")
+        web_server = None
 
 
 def main():
-    global network_config, web_port
+    global network_config, web_port, web_thread, ui_disabled
     
     cp.log("Starting network_mac_filter")
     
@@ -1125,6 +1222,7 @@ def main():
     disable_ui = cp.get_appdata('disable_ui')
     if disable_ui:
         cp.log("Web UI disabled via appdata")
+        ui_disabled = True
     else:
         web_thread = threading.Thread(target=start_web_server, daemon=True)
         web_thread.start()
