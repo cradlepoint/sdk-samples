@@ -138,7 +138,11 @@ trap exit_safely SIGINT SIGTERM EXIT
 
 HOME=$(pwd) ./${tsdbinary} --socket=./tailscaled.sock --tun=userspace-networking --socks5-server=localhost:1055 2>&1 | logerr &
 sleep 2
-HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --hostname="$tshostname" --auth-key="$tskey" --advertise-routes="$tsroutes" --advertise-tags="$tsadvertise_tags" --login-server="$tsserver" 2>&1 | logerr
+tsup_cmd="HOME=$(pwd) ./${tsbinary} --socket ./tailscaled.sock up --hostname=\"$tshostname\" --auth-key=\"$tskey\""
+[ -n "$tsroutes" ] && tsup_cmd="$tsup_cmd --advertise-routes=\"$tsroutes\""
+[ -n "$tsadvertise_tags" ] && tsup_cmd="$tsup_cmd --advertise-tags=\"$tsadvertise_tags\""
+[ -n "$tsserver" ] && tsup_cmd="$tsup_cmd --login-server=\"$tsserver\""
+eval $tsup_cmd 2>&1 | logerr
 
 tsretcode=$?
 if [ $tsretcode -ne 0 ]; then
