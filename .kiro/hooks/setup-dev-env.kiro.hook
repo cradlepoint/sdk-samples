@@ -1,12 +1,13 @@
 {
+  "enabled": true,
   "name": "Setup Dev Environment",
-  "version": "1.0.0",
-  "description": "Automatically creates a Python virtual environment and installs SDK dependencies if .venv is missing",
+  "description": "Creates a Python virtual environment and installs SDK dependencies. Run manually via the play button in the Agent Hooks panel.",
+  "version": "1",
   "when": {
-    "type": "promptSubmit"
+    "type": "userTriggered"
   },
   "then": {
     "type": "runCommand",
-    "command": "test -d .venv || (python3 make.py setup || python make.py setup)"
+    "command": "python3 make.py setup || python make.py setup"
   }
 }

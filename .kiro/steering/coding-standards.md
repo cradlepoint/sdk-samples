@@ -82,6 +82,7 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **NO memory limits in docker-compose** - Cradlepoint's container runtime does not support `mem_limit`, `deploy.resources.limits.memory`, or any memory constraint options. Omit them entirely or the compose validation will fail
 - **Use Compose version "2.4"** - Cradlepoint's container runtime uses Compose v2.4, not v3. Always set `version: "2.4"` in docker-compose files
 - **Use `restart: unless-stopped`** - Cradlepoint does not allow `restart: always`. Use `unless-stopped` instead
+- **NO `network_mode: host`** - Cradlepoint's container runtime only supports bridged networking. Use `ports:` to publish ports instead of `network_mode: host`
 - **Set shared memory with `shm_size`** - some services (e.g. databases, browsers) need more than the default 64MB `/dev/shm`. Set `shm_size: '1gb'` (or appropriate size) at the service level in docker-compose
 
 Example deploy via curl:
@@ -164,6 +165,7 @@ if nmea_sentences:
 ## Web Development
 
 - **ALWAYS use Python's built-in `http.server` module** - never use third-party web frameworks (Flask, Bottle, CherryPy, etc.). The native `http.server.HTTPServer` is available on cppython and has zero dependencies
+- **LAN client access to router ports requires firewall zone forwarding** - For a client device on the LAN to reach a port on the router (SDK app web UI, SNMP agent, container-published port, etc.), the firewall must have a forwarding rule from the Primary LAN Zone to the Router Zone. If an app is running but LAN clients get connection timeouts, the zone forwarding is the first thing to check. This is configured at `config/firewall/zone_fwd` or via the NCOS UI under Security > Zone Firewall.
 - **Default port: 8000** - use port 8000 for web applications unless there's a conflict
 - **ALWAYS set SO_REUSEADDR** before binding: `server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)`
 - **Port conflicts on redeployment** - SO_REUSEADDR doesn't prevent "Address in use" errors when redeploying without router reboot. If port 8000 is in use, either reboot router or use a different port (8001, 8002, etc.)

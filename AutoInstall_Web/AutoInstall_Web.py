@@ -539,6 +539,13 @@ original_rule_states = {}
 # Rule IDs created by ensure_sims_have_distinct_rules (for cleanup/deletion)
 created_rule_ids = set()
 
+# SIM device uid (mdm-xxx) most recently set to alwayson by switch_to_sim.
+# Used by cleanup_wan_profile_changes to wait for this SIM to come up before
+# re-enabling any previously-disabled rules — prevents the router from falling
+# back to a working SIM that was just disabled while the target SIM is still
+# mid-connection (which would misleadingly look like "SIM1 was not disabled").
+current_active_sim = None
+
 
 def write_results_appdata(sims):
     """Write a one-line parseable results string to appdata 'results'.
@@ -1385,22 +1392,35 @@ def switch_to_sim(active_sim, all_sims, rule_states):
 
         # Step 1: Disable ALL other SIM rules first
         other_rule_ids = set()
+        other_sims = []
         for sim_device in all_sims:
             if sim_device == active_sim:
                 continue
             rule_id = get_sim_rule_id(sim_device)
             if rule_id and rule_id != active_rule_id:
                 other_rule_ids.add(rule_id)
+                other_sims.append(sim_device)
+        # Revert def_conn_state on the rules we're about to disable so we never
+        # leave a rule in the contradictory state "disabled=True AND alwayson"
+        # (which can happen across iterations if this rule was previously the
+        # active rule and had def_conn_state set to 'alwayson').
+        if other_rule_ids:
+            _restore_def_conn_state_from_originals(other_rule_ids)
         for rule_id in other_rule_ids:
             _capture_rule_state(rule_states, rule_id)
             cp.put(f'config/wan/rules2/{rule_id}/disabled', True)
             cp.log(f'Disabled rule {get_rule_display_name(rule_id)}')
             write_log(f'Disabled rule {get_rule_display_name(rule_id)}')
-        time.sleep(2)
+        # Wait briefly for other SIMs to actually drop their connections so the
+        # router doesn't keep using a "disabled" SIM while we try to bring up
+        # the new one.
+        _wait_for_sims_disconnected(other_sims, timeout_sec=30)
 
         # Step 2: Enable active SIM rule with alwayson
         cp.put(f'config/wan/rules2/{active_rule_id}/disabled', False)
         cp.put(f'config/wan/rules2/{active_rule_id}/def_conn_state', 'alwayson')
+        global current_active_sim
+        current_active_sim = active_sim
         cp.log(f'Set {port_sim} rule {get_rule_display_name(active_rule_id)} to alwayson')
         write_log(f'Set {port_sim} rule {get_rule_display_name(active_rule_id)} to alwayson')
 
@@ -1426,18 +1446,19 @@ def switch_to_sim(active_sim, all_sims, rule_states):
             time.sleep(poll_interval)
             elapsed += poll_interval
 
-        # Step 4: Re-enable other rules only after connected
-        if connected:
-            for rule_id in other_rule_ids:
-                try:
-                    cp.put(f'config/wan/rules2/{rule_id}/disabled', False)
-                    cp.log(f'Re-enabled rule {get_rule_display_name(rule_id)}')
-                except Exception as e:
-                    cp.log(f'Could not re-enable rule {get_rule_display_name(rule_id)}: {e}')
-        else:
+        # NOTE: We intentionally do NOT re-enable the other SIM rules here.
+        # Re-enabling them while this SIM is alwayson creates a window where a
+        # higher-priority rule on a different modem can take over and disrupt
+        # testing. The other rules stay disabled until the next explicit action:
+        # - Next switch_to_sim call (handles state for the new active SIM)
+        # - cleanup_wan_profile_changes on cancel/fail/completion
+        if not connected:
             cp.log(f'{port_sim} did not connect within {timeout_sec}s')
             write_log(f'{port_sim} did not connect within {timeout_sec}s')
         return True
+    except InstallCancelledException:
+        # Let the top-level cancel handler run its proper cleanup path.
+        raise
     except Exception as e:
         port_sim = (get_display_port(active_sim) or '') + ' ' + (get_sim_slot(active_sim) or '')
         port_sim = port_sim.strip() or 'SIM'
@@ -1445,14 +1466,94 @@ def switch_to_sim(active_sim, all_sims, rule_states):
         write_log(f'Error switching to {port_sim}: {e}')
         return False
 
-def cleanup_wan_profile_changes(rule_states):
+def _wait_for_sims_disconnected(sim_devices, timeout_sec=30, poll_interval=2):
+    """Poll the given SIMs' connection_state until all report not-connected or timeout.
+    Does NOT check install_cancelled so switching state can't be left half-applied.
+    Returns True if all disconnected, False on timeout."""
+    if not sim_devices:
+        return True
+    try:
+        pending = list(sim_devices)
+        elapsed = 0
+        while elapsed < timeout_sec:
+            still_connected = []
+            for sim in pending:
+                try:
+                    state = cp.get(f'status/wan/devices/{sim}/status/connection_state')
+                    if state == 'connected':
+                        still_connected.append(sim)
+                except Exception:
+                    pass
+            if not still_connected:
+                return True
+            pending = still_connected
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+        labels = []
+        for sim in pending:
+            port_display = get_display_port(sim) or get_sim_port(sim) or ''
+            sim_slot_str = get_sim_slot(sim) or ''
+            labels.append((port_display + ' ' + sim_slot_str).strip() or sim)
+        cp.log(f'Timed out waiting for SIMs to disconnect after {timeout_sec}s: {", ".join(labels)}')
+        return False
+    except Exception as e:
+        cp.log(f'Error waiting for SIMs to disconnect: {e}')
+        return False
+
+
+def _wait_for_active_sim_connected(active_sim, timeout_sec=60, poll_interval=3):
+    """Poll the given SIM's connection_state until it is 'connected' or timeout.
+    Does NOT check install_cancelled so cleanup can finish after a cancel.
+    Returns True if connected, False on timeout or error."""
+    if not active_sim:
+        return True
+    try:
+        port_display = get_display_port(active_sim) or get_sim_port(active_sim) or ''
+        sim_slot_str = get_sim_slot(active_sim) or ''
+        port_sim = (port_display + ' ' + sim_slot_str).strip() or 'SIM'
+        conn_path = f'status/wan/devices/{active_sim}/status/connection_state'
+        try:
+            if cp.get(conn_path) == 'connected':
+                return True
+        except Exception:
+            pass
+        cp.log(f'Waiting up to {timeout_sec}s for {port_sim} to connect before restoring other SIM rules')
+        write_log(f'Waiting up to {timeout_sec}s for {port_sim} to connect before restoring other SIM rules')
+        elapsed = 0
+        while elapsed < timeout_sec:
+            try:
+                if cp.get(conn_path) == 'connected':
+                    cp.log(f'{port_sim} connected after {elapsed}s; proceeding with restore')
+                    return True
+            except Exception:
+                pass
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+        cp.log(f'{port_sim} still not connected after {timeout_sec}s; restoring other SIM rules anyway so router has WAN')
+        write_log(f'{port_sim} still not connected after {timeout_sec}s; restoring other SIM rules anyway so router has WAN')
+        return False
+    except Exception as e:
+        cp.log(f'Error waiting for active SIM to connect: {e}')
+        return False
+
+
+def cleanup_wan_profile_changes(rule_states, active_sim=None, wait_timeout=60):
     """Restore def_conn_state and disabled to defaults for all modified rules.
     Delete def_conn_state (default ondemand) and delete disabled (default enabled)
     so profiles return to a clean state regardless of prior captures.
-    Also deletes any per-SIM rules created by ensure_sims_have_distinct_rules."""
-    global created_rule_ids
+    Also deletes any per-SIM rules created by ensure_sims_have_distinct_rules.
+
+    If active_sim is provided (or tracked globally), wait up to wait_timeout seconds
+    for that SIM to be connected before re-enabling other rules. This avoids the
+    router falling back to a previously-disabled SIM while the new one is still
+    mid-connection. Pass wait_timeout=0 to skip the wait."""
+    global created_rule_ids, current_active_sim
     if not rule_states and not created_rule_ids:
         return
+    # Wait for the active SIM (if any) to connect before re-enabling other rules
+    target_sim = active_sim if active_sim is not None else current_active_sim
+    if target_sim and wait_timeout > 0:
+        _wait_for_active_sim_connected(target_sim, timeout_sec=wait_timeout)
     # First restore state on all tracked rules (excluding ones we'll delete)
     for rule_id in rule_states:
         if rule_id in created_rule_ids:
@@ -1479,6 +1580,7 @@ def cleanup_wan_profile_changes(rule_states):
         except Exception as e:
             cp.log(f'Error deleting created rule {rule_id}: {e}')
     created_rule_ids.clear()
+    current_active_sim = None
 
 def cleanup_all_speedtest_routes_for_device(sim_device):
     """Clean up any leftover speedtest routes for a specific device."""
@@ -1726,6 +1828,9 @@ def test_sim(device, sims):
             write_log(error_msg)
             sims[device]['download'] = sims[device]['upload'] = 0.0
             return False
+    except InstallCancelledException:
+        # Let the top-level cancel handler run its proper cleanup path.
+        raise
     except Exception as e:
         port_display = get_display_port(device) or get_sim_port(device) or ''
         sim_slot = get_sim_slot(device) or ''
@@ -1890,8 +1995,10 @@ def run_auto_install():
     """Main auto-install process."""
     global log_filename, install_cancelled
     install_cancelled = False
-    global created_rule_ids
+    global created_rule_ids, current_active_sim, original_rule_states
     created_rule_ids = set()
+    current_active_sim = None
+    original_rule_states = {}
     rule_states = {}
     sims = {}
     try:
@@ -2040,6 +2147,8 @@ def run_auto_install():
                     update_status('running', 'Normalizing Config...', prog_switch)
                     time.sleep(0.5)
                     cleanup_wan_profile_changes(rule_states)
+                    for sim_device in sims:
+                        cleanup_all_speedtest_routes_for_device(sim_device)
                     update_status('error', f'Failed to switch to {port_sim}{carrier_suffix}', 0)
                     time.sleep(0.5)
                     return
@@ -2051,6 +2160,8 @@ def run_auto_install():
                     update_status('running', 'Normalizing Config...', prog_switch)
                     time.sleep(0.5)
                     cleanup_wan_profile_changes(rule_states)
+                    for sim_device in sims:
+                        cleanup_all_speedtest_routes_for_device(sim_device)
                     update_status('error', error_msg, 0)
                     time.sleep(0.5)
                     return
@@ -2066,6 +2177,8 @@ def run_auto_install():
                 update_status('running', 'Normalizing Config...', prog_testing)
                 time.sleep(0.5)
                 cleanup_wan_profile_changes(rule_states)
+                for sim_device in sims:
+                    cleanup_all_speedtest_routes_for_device(sim_device)
                 update_status('error', error_msg, 0)
                 time.sleep(0.5)
                 return
@@ -2073,6 +2186,8 @@ def run_auto_install():
         update_status('running', 'Normalizing Config...', 80)
         time.sleep(0.5)
         cleanup_wan_profile_changes(rule_states)
+        for sim_device in sims:
+            cleanup_all_speedtest_routes_for_device(sim_device)
         time.sleep(2)
         update_status('running', 'Waiting for WAN Connection...', 82)
         time.sleep(0.5)
@@ -2456,7 +2571,6 @@ def run_auto_install():
         update_status('running', 'Normalizing Config...', 86)
         time.sleep(0.5)
         all_rules_to_restore = dict(rule_states) if rule_states else {}
-        global original_rule_states
         for rid in original_rule_states:
             if rid not in all_rules_to_restore:
                 all_rules_to_restore[rid] = {}

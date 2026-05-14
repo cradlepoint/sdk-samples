@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "name": "Auto Deploy on Code Change",
   "description": "Automatically deploys the SDK app to the router after Kiro finishes making code changes. Uses .kiro/steering/deploy.md.",
   "version": "1",
@@ -9,7 +9,5 @@
   "then": {
     "type": "askAgent",
     "prompt": "If you already ran a deploy this session, do nothing — the app is already deployed. Otherwise, if you created or modified any SDK app Python files during this session, read .kiro/steering/deploy.md and follow its instructions. Read sdk_settings.ini to get the app_name. If no app code was changed, do nothing."
-  },
-  "workspaceFolderName": "sdk-samples",
-  "shortName": "auto-deploy-app"
+  }
 }
