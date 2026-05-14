@@ -121,7 +121,7 @@ def get_modem_diagnostics():
         if not diag:
             return None, None, None
 
-        carrier = diag.get('HOMECARRID')
+        carrier = diag.get('CARRID')
         dbm = diag.get('DBM')
         sinr = diag.get('SINR')
         return carrier, dbm, sinr
