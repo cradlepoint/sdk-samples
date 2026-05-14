@@ -227,7 +227,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [system_monitor_web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/system_monitor_web.v1.0.0.tar.gz)
 - **tailscale**
     - A 3rd party mesh VPN called [Tailscale](https://tailscale.com) that makes it easy to connect your devices, wherever they are. This application provides a way to proxy traffic from the LAN to the Tailscale network. See the README.md for more information.
-    - **Download:** [tailscale v0.0.36.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/tailscale.v0.0.36.tar.gz)
+    - **Download:** [tailscale v0.0.37.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/tailscale.v0.0.37.tar.gz)
 - **timezone_via_gnss**
     - An app to read the device's GNSS data and send a request to timezonedb.com in order to return and set time device's timezone.
     - **Download:** [timezone_via_gnss v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/timezone_via_gnss.v0.1.0.tar.gz)
@@ -451,6 +451,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
