@@ -3,9 +3,9 @@ speedtest_scheduled_asset_id - Runs Ookla speedtest on a configurable cron sched
 and writes results to the router's asset_id field.
 
 Results format: ISO timestamp followed by speedtest results and modem diagnostics.
-Example: "2024-03-15T14:30:00Z DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, Carrier: Verizon, DBM: -74, SINR: 5.6"
+Example: "DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, Carrier: Verizon, DBM: -74, SINR: 5.6, RSRP: -95, RSRQ: -11, 2024-03-15T14:30:00Z"
 
-Modem diagnostics (Carrier, DBM, SINR) are included only if the primary WAN device is a modem.
+Modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) are included only if the primary WAN device is a modem.
 
 Appdata fields:
 - cron_schedule: Cron expression (minute hour day month weekday). Default: "0 2 * * 1" (Monday at 2:00 AM UTC)
@@ -100,34 +100,36 @@ def cron_matches(cron_expr, dt):
 
 
 def get_modem_diagnostics():
-    """Get carrier, DBM, and SINR from primary WAN device if it is a modem.
+    """Get carrier, DBM, SINR, RSRP, and RSRQ from primary WAN device if it is a modem.
 
-    Returns tuple (carrier, dbm, sinr) or (None, None, None) if not a modem.
+    Returns tuple (carrier, dbm, sinr, rsrp, rsrq) or (None, None, None, None, None) if not a modem.
     """
     try:
         primary = cp.get('status/wan/primary_device')
         if not primary:
-            return None, None, None
+            return None, None, None, None, None
 
         # Check if primary device is a modem (starts with 'mdm-')
         if not primary.startswith('mdm-'):
-            return None, None, None
+            return None, None, None, None, None
 
         device = cp.get(f'status/wan/devices/{primary}')
         if not device:
-            return None, None, None
+            return None, None, None, None, None
 
         diag = device.get('diagnostics', {})
         if not diag:
-            return None, None, None
+            return None, None, None, None, None
 
         carrier = diag.get('CARRID')
         dbm = diag.get('DBM')
         sinr = diag.get('SINR')
-        return carrier, dbm, sinr
+        rsrp = diag.get('RSRP')
+        rsrq = diag.get('RSRQ')
+        return carrier, dbm, sinr, rsrp, rsrq
     except Exception as e:
         cp.log(f'Error getting modem diagnostics: {e}')
-        return None, None, None
+        return None, None, None, None, None
 
 
 def run_speedtest():
@@ -145,16 +147,21 @@ def run_speedtest():
         timestamp = f'{datetime.utcnow().isoformat()}Z'
 
         # Build result string
-        result = f'{timestamp} DL: {dl_mbps:.1f}Mbps, UL: {ul_mbps:.1f}Mbps, Latency: {latency:.0f}ms'
+        result = f'DL: {dl_mbps:.1f}Mbps, UL: {ul_mbps:.1f}Mbps, Latency: {latency:.0f}ms'
 
         # Add modem diagnostics if primary device is a modem
-        carrier, dbm, sinr = get_modem_diagnostics()
+        carrier, dbm, sinr, rsrp, rsrq = get_modem_diagnostics()
         if carrier:
             result += f', Carrier: {carrier}'
         if dbm is not None:
             result += f', DBM: {dbm}'
         if sinr is not None:
             result += f', SINR: {sinr}'
+        if rsrp is not None:
+            result += f', RSRP: {rsrp}'
+        if rsrq is not None:
+            result += f', RSRQ: {rsrq}'
+        result += f', {timestamp}'
 
         cp.log(f'Speedtest result: {result}')
         cp.put('config/system/asset_id', result)
