@@ -180,6 +180,9 @@ try:
     last_run_minute = None
 
     while True:
+        # Re-read schedule every cycle to pick up appdata changes
+        cron_schedule = get_cron_schedule()
+
         now = datetime.utcnow()
         current_minute = (now.year, now.month, now.day, now.hour, now.minute)
 
@@ -187,8 +190,6 @@ try:
         if current_minute != last_run_minute and cron_matches(cron_schedule, now):
             last_run_minute = current_minute
             run_speedtest()
-            # Re-read schedule in case it changed
-            cron_schedule = get_cron_schedule()
 
         time.sleep(15)
 except Exception as e:
