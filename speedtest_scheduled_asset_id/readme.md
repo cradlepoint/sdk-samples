@@ -1,20 +1,29 @@
 # speedtest_scheduled_asset_id
 
-Runs an Ookla speedtest on a configurable cron schedule and writes results to the router's asset_id field.
+Runs an Ookla speedtest on a configurable cron schedule and writes results to the router's asset_id field. Can also be triggered manually by setting asset_id to "start".
 
 ## Result Format
 
 ```
-2024-03-15T14:30:00Z DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, DBM: -74, SINR: 5.6
+DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, Carrier: Verizon, DBM: -74, SINR: 5.6, RSRP: -95, RSRQ: -11, 2024-03-15T14:30:00Z
 ```
 
-ISO timestamp followed by download speed, upload speed, latency, and modem diagnostics. Modem diagnostics (DBM, SINR) are only included if the primary WAN device is a modem.
+Download speed, upload speed, latency, modem diagnostics, and ISO timestamp. Modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) are only included if the primary WAN device is a modem. Timestamp is at the end so results can be sorted by download speed.
+
+## Manual Trigger
+
+Set the router's asset_id to "start" (case-insensitive) via NCM API or router UI to trigger an immediate speedtest. Results overwrite the "start" value when complete.
+
+```
+PUT https://www.cradlepointecm.com/api/v2/routers/{router_id}/
+{"asset_id": "start"}
+```
 
 ## Appdata Fields
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `cron_schedule` | No | `0 2 * * 1` | Cron expression (minute hour day month weekday) |
+| `cron_schedule` | No | `0 2 * * 1` | Cron expression (minute hour day month weekday). Changes are picked up within 15 seconds |
 
 ## Cron Expression Examples
 
@@ -30,11 +39,12 @@ ISO timestamp followed by download speed, upload speed, latency, and modem diagn
 ## How It Works
 
 1. App starts and waits for WAN connectivity
-2. Reads `cron_schedule` from appdata (uses default if not set)
-3. Checks every 15 seconds if the current time matches the cron schedule
-4. When triggered, runs an Ookla speedtest
-5. Reads modem diagnostics (DBM, SINR) from the primary WAN device if it's a modem
-6. Writes formatted results to `config/system/asset_id`
+2. Reads `cron_schedule` from appdata every 15 seconds (uses default if not set)
+3. Checks if the current time matches the cron schedule
+4. Also checks if asset_id is set to "start" for manual triggering
+5. When triggered, runs an Ookla speedtest
+6. Reads modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) from the primary WAN device if it's a modem
+7. Writes formatted results to `config/system/asset_id`
 
 ## Retrieving Results via NCM
 
