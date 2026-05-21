@@ -1,29 +1,19 @@
 ---
 inclusion: auto
-description: "Mandatory reflection and documentation maintenance after tasks"
+description: "Documentation maintenance reference - what goes where"
 ---
-# Documentation Maintenance & Reflection
+# Documentation Maintenance
 
-## Mandatory Reflection After Every Task
+Reflection is enforced by the `reflect-on-learnings` agentStop hook. This file defines *how* to update docs when you learn something.
 
-**After completing ANY task where you deployed code, fixed an error, answered a technical question, or made any API call — ask yourself:**
+## Response Format
 
-1. Did I make a mistake, wrong assumption, or learn something new?
-2. If YES: update rules/docs using `#learn.md`
-3. If NO: proceed
-
-**Response format:**
 - Minor fix: "✓ Done. Updated [file] with [what]."
 - Critical fix: "⚠️ Done. Found critical issue: [what]. Updated [file]."
-- No update: "✓ Done."
+- No update: "✓ No new learnings."
 
-Every mistake you don't document, you'll make again. This is not optional.
+## When to Update
 
----
-
-## When to Update Rules and Docs
-
-**ALWAYS update when:**
 - An API returns different data than documented
 - You find a common mistake or gotcha
 - You learn a better pattern or workflow

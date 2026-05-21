@@ -183,6 +183,14 @@ try:
         # Re-read schedule every cycle to pick up appdata changes
         cron_schedule = get_cron_schedule()
 
+        # Manual trigger: run speedtest if asset_id is set to "start"
+        asset_id = cp.get('config/system/asset_id')
+        if asset_id and asset_id.lower() == 'start':
+            cp.log('asset_id is "start" - running manual speedtest...')
+            run_speedtest()
+            time.sleep(15)
+            continue
+
         now = datetime.utcnow()
         current_minute = (now.year, now.month, now.day, now.hour, now.minute)
 

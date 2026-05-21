@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Reflect on Learnings",
+  "description": "After each agent execution, reflect on whether any mistakes were made, wrong assumptions held, or new things learned. If yes, update the appropriate steering file or docs.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Reflect: Did you make a mistake, wrong assumption, or learn something new this turn? Consider: API behavior differences, router constraints, SDK patterns, workflow improvements, or incorrect documentation. If YES: update the appropriate file (.kiro/steering/ for rules/guardrails, docs/ for detailed reference). Keep updates minimal — only add what prevents future errors. If NO: respond with \"✓ No new learnings.\" Do NOT update rules for app-specific logic or one-off decisions."
+  }
+}
