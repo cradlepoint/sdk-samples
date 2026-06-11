@@ -1,6 +1,9 @@
 # Packet Capture Web
 
-Web interface for managing packet captures on Cradlepoint routers.
+Web interface for automating and managing packet captures on Ericsson routers.
+
+<img width="1591" height="844" alt="image" src="https://github.com/user-attachments/assets/42232886-79c4-4472-ad09-be4f3f8eaa98" />
+<img width="1591" height="844" alt="image" src="https://github.com/user-attachments/assets/e3ed8620-d4e8-4623-8376-7b433a429944" />
 
 ## Features
 
