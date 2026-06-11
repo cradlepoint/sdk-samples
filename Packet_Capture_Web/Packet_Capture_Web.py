@@ -444,9 +444,21 @@ def run_capture(options):
             final_name = generate_capture_filename()
             local_path = os.path.join(CAPTURES_DIR, final_name)
 
+            capture_start_time = time.time()
             try:
                 urllib.request.install_opener(opener)
-                urllib.request.urlretrieve(tcpdump_url, local_path)
+                # Use urlopen with timeout instead of urlretrieve
+                # to prevent hanging on down interfaces
+                req_timeout = timeout_val + 30  # grace period
+                response = opener.open(
+                    tcpdump_url, timeout=req_timeout)
+                with open(local_path, 'wb') as out_f:
+                    while True:
+                        chunk = response.read(65536)
+                        if not chunk:
+                            break
+                        out_f.write(chunk)
+                response.close()
             except urllib.error.HTTPError as e:
                 if capture_stop_requested:
                     capture_status = 'Stopped by user'
@@ -462,10 +474,26 @@ def run_capture(options):
                 cp.log('Capture error: ' + str(e))
                 break
 
+            capture_elapsed = time.time() - capture_start_time
+
             # Verify file was saved
             if os.path.exists(local_path):
                 file_size = os.path.getsize(local_path)
                 if file_size > 0:
+                    # Check for suspiciously fast completion
+                    if (timeout_val > 10
+                            and capture_elapsed < 5
+                            and count_val == 0):
+                        os.remove(local_path)
+                        capture_status = ('Warning: capture completed '
+                                          'in ' + str(int(capture_elapsed))
+                                          + 's (interface may be down)'
+                                          + suffix)
+                        cp.log('Capture too fast ('
+                               + str(int(capture_elapsed))
+                               + 's for ' + str(timeout_val)
+                               + 's timeout) - interface likely down')
+                        break
                     save_meta(final_name, options)
                     capture_status = 'Saved: ' + final_name + suffix
                     cp.log('Capture saved: ' + final_name
@@ -502,16 +530,15 @@ def run_capture(options):
 
 def stop_capture():
     """Stop a running capture."""
-    global capture_running, capture_status, capture_stop_requested
+    global capture_status, capture_stop_requested
     capture_stop_requested = True
     try:
         cp.stop_packet_capture()
-        capture_status = 'Capture stopped by user'
-        cp.log('Capture stopped by user')
+        capture_status = 'Stopping...'
+        cp.log('Capture stop requested')
     except Exception as e:
         capture_status = 'Error stopping: ' + str(e)
         cp.log('Error stopping capture: ' + str(e))
-    capture_running = False
 
 
 class CaptureHandler(BaseHTTPRequestHandler):
@@ -614,6 +641,9 @@ class CaptureHandler(BaseHTTPRequestHandler):
         if capture_running:
             self.send_json({'error': 'Capture already running'}, 400)
             return
+        # Wait for previous thread to fully exit
+        if capture_thread and capture_thread.is_alive():
+            capture_thread.join(timeout=5)
         capture_thread = threading.Thread(target=run_capture, args=(data,))
         capture_thread.daemon = True
         capture_thread.start()

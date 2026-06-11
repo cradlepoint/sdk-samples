@@ -69,4 +69,7 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - **Auth propagation delay** — after creating a user, the router's shadow password system needs time to propagate. Wait 3+ seconds after delete (clears stale shadow), then verify auth works with a test GET before using the credentials. The router log shows "Removing stale shadow password for: USERNAME" during cleanup — if you authenticate too soon after creation, you get 401
 - **Parameters**: `iface` (interface), `args` (BPF filter), `timeout` (seconds), `count` (packets), `url` (upload URL for CloudShark), `wifichannel`, `wifichannelwidth`, `wifiextrachannel`
 - **iface value for LAN networks** — use the UUID from `config/lan[]/_id_` (e.g., `00000000-0d93-319d-8220-4a1fb0372b51`), NOT the device iface name. This matches how the NCOS UI sends it
+- **Unplugged/down interfaces** — behavior depends on iface value type:
+  - **WAN profile name** (e.g., `ethernet-wan`): tcpdump returns immediately with a valid pcap header (~1.4 KB) but no real packets
+  - **Device iface name** (e.g., the actual linux iface): tcpdump blocks indefinitely, never returns. Always set an HTTP timeout on the request (timeout + 30s grace period)
 - **Do NOT use `cp.start_packet_capture()`** for on-router apps — it calls `get()` which can't handle binary pcap responses correctly

@@ -74,10 +74,10 @@
         .btn-stop:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: transparent; z-index: 1000; align-items: center; justify-content: center; }
+            background: rgba(255,255,255,0.85); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.active { display: flex; }
         .modal { background: var(--bg-primary); border-radius: var(--radius-md); padding: 1.5rem;
-            max-width: 500px; width: 90%; box-shadow: var(--shadow-lg); }
+            max-width: 500px; width: 90%; box-shadow: 0 4px 24px rgba(0,0,0,0.15); border: 1px solid var(--border-color); }
         .modal h3 { margin-bottom: 1rem; }
         .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
         .modal pre { background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-sm);
@@ -151,7 +151,7 @@
 
                             <div class="form-row">
                                 <label for="capture-interface">Interface:</label>
-                                <select id="capture-interface">
+                                <select id="capture-interface" title="Avoid capturing on interfaces that include this app's traffic (port 80) to prevent feedback loops">
                                     <option value="any">Any</option>
                                 </select>
                             </div>
