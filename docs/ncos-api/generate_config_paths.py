@@ -27,15 +27,34 @@ def collect_paths(nodes, prefix="config"):
     return paths
 
 
+def find_dtd_file(dtd_dir):
+    """Find the most recent DTD file in the directory."""
+    if not os.path.isdir(dtd_dir):
+        return None
+    dtd_files = [f for f in os.listdir(dtd_dir) if f.endswith('.json')]
+    if not dtd_files:
+        return None
+    # Sort by name (model-version) — user can override with --dtd anyway
+    dtd_files.sort()
+    return os.path.join(dtd_dir, dtd_files[-1])
+
+
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    default_dtd = os.path.join(script_dir, "config", "dtd", "NCOS-DTD-7.25.101.json")
+    dtd_dir = os.path.join(script_dir, "config", "dtd")
+    default_dtd = find_dtd_file(dtd_dir)
     default_out = os.path.join(script_dir, "config", "PATHS.md")
 
     parser = argparse.ArgumentParser(description="Generate config path index from DTD")
-    parser.add_argument("--dtd", default=default_dtd, help="Path to DTD JSON")
+    parser.add_argument("--dtd", default=default_dtd,
+                        help="Path to DTD JSON (default: newest in config/dtd/)")
     parser.add_argument("--output", default=default_out, help="Output PATHS.md path")
     args = parser.parse_args()
+
+    if not args.dtd or not os.path.isfile(args.dtd):
+        print("Error: No DTD file found. Place a {MODEL}-NCOS-{VERSION}.json "
+              "in config/dtd/ or pass --dtd path.")
+        return
 
     with open(args.dtd, "r") as f:
         data = json.load(f)

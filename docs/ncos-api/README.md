@@ -13,7 +13,7 @@ Comprehensive NCOS (NetCloud OS) API documentation for Cradlepoint SDK applicati
 ### Reference Files
 - [config/PATHS.md](config/PATHS.md) - Complete config path index
 - [FEATURES_TO_ENABLE.md](FEATURES_TO_ENABLE.md) - Feature flags and UUIDs
-- [config/dtd/NCOS-DTD-7.25.101.json](config/dtd/NCOS-DTD-7.25.101.json) - Full config schema
+- [config/dtd/](config/dtd/) - Config schema (DTD) files by model and NCOS version
 
 ### Scripts
 - **explore_status.py** - Query live router: `python3 explore_status.py status/wan/connection_state`

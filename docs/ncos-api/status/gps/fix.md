@@ -28,6 +28,8 @@ GPS fix data (10 fields, latitude/longitude add depth 3). Returned as `status/gp
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `degree` | number | Degrees |
-| `minute` | number | Minutes |
-| `second` | number | Seconds |
+| `degree` | integer | Degrees (e.g. `43`, `-116`). Negative = South/West |
+| `minute` | integer | Minutes (e.g. `40`) |
+| `second` | float | Seconds (e.g. `23.2175`) |
+
+**Important:** DMS values must be **numbers** (int/float), not strings. The router's internal WPC client does arithmetic on these fields — string values cause `'<' not supported between 'str' and 'int'` errors. The hardware GPS daemon writes strings (e.g. `"43.0"`) but when injecting via `cp.put()`, use numeric types.

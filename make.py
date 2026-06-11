@@ -320,12 +320,30 @@ def get_auth():
 
 
 # Returns boolean to indicate if the NCOS device is
-# in DEV mode
+# in DEV mode. Returns False and prints a message if
+# the device is unreachable or not in dev mode.
 def is_NCOS_device_in_DEV_mode():
-    sdk_status = json.loads(get('/status/system/sdk')).get('data')
-    if sdk_status.get('mode') in ['devmode', 'standard']:
-        return True if sdk_status.get('mode') == 'devmode' else False
-    raise('Unknown SDK mode (%s)' % sdk_status.get('mode'))
+    raw = get('/status/system/sdk/mode')
+    if raw is None:
+        print('\nERROR: Could not connect to NCOS device at {}.'.format(g_dev_client_ip))
+        print('       Verify the device is powered on, reachable, and that')
+        print('       sdk_settings.ini has the correct IP/credentials.')
+        return False
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        print('\nERROR: Unexpected response from NCOS device at {}.'.format(g_dev_client_ip))
+        return False
+    mode = data.get('data', '')
+    if mode == 'devmode':
+        return True
+    elif mode == 'standard':
+        print('\nERROR: NCOS device at {} is not in Developer Mode.'.format(g_dev_client_ip))
+        print('       Enable Dev Mode: System > Administration > Developer Mode.')
+        return False
+    else:
+        print('\nERROR: Unexpected SDK mode ({}) on device at {}.'.format(mode, g_dev_client_ip))
+        return False
 
 
 # Returns the app package name based on the global app name.
@@ -338,6 +356,10 @@ def get_app_pack(app_name=None):
 
 # Gets data from the NCOS config store
 def get(config_tree):
+    if requests is None:
+        print("Error: 'requests' library is not installed. Run: pip install requests")
+        return None
+
     ncos_api = 'https://{}/api{}'.format(g_dev_client_ip, config_tree)
 
     try:

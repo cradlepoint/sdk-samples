@@ -43,6 +43,7 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - QoS rules do NOT support MAC addresses — only IP addresses via lipaddr/lmask
 - Firewall conntrack entries have unique 'id' field — track by ID to avoid counting stale connections
 - ARP dump interface names have trailing digits — strip them before looking up network info
+- **GPS injection**: Write scalar sub-paths (`fix/lock`, `fix/latitude` as dict, `lastpos/latitude`, etc.) + `status/gps/devices/None/current_nmea` with 0.5s keepalive loop. GPS must be enabled with keepalive. Use `control/gps/stop` each cycle. **May only work reliably from NCM-installed apps** (production SDK mode) — dev-mode SCP installs appear to have lower privilege for status tree writes that reach WPC. See `connected_ems_vehicle/ncm_client.py` for the confirmed working pattern and `docs/ncos-api/status/gps.md`
 - Firewall filter policies require full rules array put — cannot update individual rules
 - Log entry format: `[timestamp, facility, level, message]` — filter by recency after deploys
 - Cert creation is async — wait ~5 seconds after `cp.put('control/certmgmt/ca', {...})`

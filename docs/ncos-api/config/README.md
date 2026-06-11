@@ -61,11 +61,13 @@ rule = cp.get(f'config/wan/rules2/{rule_id}')
 
 ## Schema (DTD)
 
-The config tree schema is defined in the **NCOS DTD** JSON file. Types, defaults, min/max, and structure come from the DTD.
+The config tree schema is defined in **NCOS DTD** JSON files, one per router model and firmware version. Types, defaults, min/max, and structure come from the DTD. Different models have different schemas based on their hardware (ports, radios, modems, etc.).
 
-| File | NCOS Version | Description |
-|------|--------------|-------------|
-| [dtd/NCOS-DTD-7.25.101.json](dtd/NCOS-DTD-7.25.101.json) | 7.25.101 | Full config schema |
+| File | Model | NCOS Version | Description |
+|------|-------|--------------|-------------|
+| [dtd/E3000-NCOS-7.25.101.json](dtd/E3000-NCOS-7.25.101.json) | E3000 | 7.25.101 | 10 ethernet ports (4 PoE), enterprise branch router |
+
+See **[dtd/README.md](dtd/README.md)** for naming conventions, how to add DTDs from other models, and what varies between models.
 
 **Note:** The status tree is *not* defined in the DTD; it is runtime-only. See [status/](../status/README.md).
 

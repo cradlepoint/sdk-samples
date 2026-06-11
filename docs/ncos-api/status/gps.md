@@ -130,3 +130,68 @@ Parent `status/rtk/` also has:
 
 Cradlepoint routers may include proprietary NMEA sentences in `status/gps/nmea`:
 - `$PCPTMINR` — Cradlepoint internal sentence. Not parseable by pynmeagps. Catch and skip the parse error.
+
+### GPS Coordinate Injection (Simulated GPS)
+
+To inject simulated GPS coordinates that NCM Location Services will report:
+
+1. **Disable GPS to stop gnssd** from overwriting your injected data:
+```python
+cp.put("config/system/gps/enabled", False)
+```
+
+2. **Each cycle, write the ENTIRE `status/gps` tree in one put.** Partial writes (sub-paths or sub-dicts) don't reliably reach WPC. You must write the complete tree matching gnssd's output:
+```python
+cp.put("status/gps", {
+    "fix": {
+        "accuracy": 3.0,
+        "age": 0.0,
+        "altitude_meters": 50.0,
+        "from_sentence": "GPGGA",
+        "ground_speed_knots": speed_knots,
+        "heading": heading,
+        "latitude": {"degree": 40.0, "minute": 45.0, "second": 14.2},  # floats
+        "lock": True,
+        "longitude": {"degree": -73.0, "minute": 59.0, "second": 37.1},
+        "satellites": 8,
+        "time": 143248,  # HHMMSS int
+    },
+    "lastpos": {
+        "age": 0.0,
+        "latitude": 40.7539,  # decimal degrees
+        "longitude": -73.9936,
+        "timestamp": time.time(),
+    },
+    "nmea": [gga, rmc, pcptminr],  # include $PCPTMINR
+    "state": 1,
+    "connections": [],
+    "schedule": {},
+    "ploop": [],
+    "devices": {
+        "mdm-XXXXX": {
+            "current_nmea": [gga + "\r\n", rmc + "\r\n"],
+            "fix": {
+                "latitude": {"degree": "40.0", "minute": "45.0", "second": "14.2"},  # strings!
+                "longitude": {"degree": "-73.0", "minute": "59.0", "second": "37.1"},
+                "lock": True, "age": 0, "satellites": 8, "time": 143248,
+            },
+            "nmea": [gga + "\r\n", rmc + "\r\n"],
+        },
+    },
+})
+```
+
+3. **PCPTMINR sentence format** — Cradlepoint proprietary, contains decimal lat/lon:
+```
+$PCPTMINR,uptime,lat,lon,alt,speed_ms,heading,climb,hacc,vacc,sacc,hdop,vdop,pdop,fix_type,num_sv,*checksum
+```
+
+**CRITICAL rules:**
+- **Write the FULL `status/gps` tree** — partial writes (`status/gps/fix`, `status/gps/fix/lock`) do NOT reliably reach WPC
+- **The modem GPS hardware (`cpevt` via QMI/rmnet) cannot be stopped from the SDK** — `config/wan/devices/{modem}/gps/enabled = False`, `config/system/gps/enabled = False`, `control/gps/stop`, and `gps_interval = 0` all fail to stop the kernel-level QMI GPS session. The modem pushes GPS events every second regardless
+- **GPS antenna must be physically disconnected** for reliable injection — when the hardware GPS has a fix, `cpevt` overwrites the status tree every second and WPC reads its data instead of yours
+- **Top-level DMS = floats** (43.0), **device-level DMS = strings** ("43.0")
+- **Include `$PCPTMINR`** — Cradlepoint proprietary sentence with decimal lat/lon
+- **Include `connections`, `schedule`, `ploop`** — even empty, these keys must be present
+- NCM reports in "breadcrumbs" mode every ~10 minutes
+- See `gps_playback/` for a complete working implementation

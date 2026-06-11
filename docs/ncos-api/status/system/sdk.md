@@ -15,7 +15,7 @@ SDK service and apps. Returned as `status/system` → `sdk`.
 |-------|------|-------------|
 | `service` | string | SDK service state |
 | `summary` | string | Summary |
-| `mode` | string | Mode |
+| `mode` | string | `"devmode"` or `"standard"` — query directly via `status/system/sdk/mode` |
 | `apps` | array | See sub-table |
 
 **sdk.apps[]**
