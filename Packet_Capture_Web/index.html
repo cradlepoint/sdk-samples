@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packet Capture Web</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        .capture-form { max-width: 700px; }
+        .form-row { display: flex; align-items: center; margin-bottom: 1rem; gap: 1rem; }
+        .form-row label { min-width: 100px; font-weight: 600; text-align: right; color: var(--text-secondary); }
+        .form-row select, .form-row input[type="text"], .form-row input[type="number"] {
+            flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm); background: var(--bg-primary);
+            color: var(--text-primary); font-size: 0.9rem;
+        }
+        .form-row select:focus, .form-row input:focus { outline: none; border-color: var(--accent-color); }
+        .capture-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: flex-end; }
+        .status-bar { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: var(--radius-sm);
+            background: var(--bg-tertiary); border: 1px solid var(--border-color); min-height: 1.5rem; }
+        .status-bar.running { border-color: var(--warning-color); background: rgba(255,193,7,0.08); }
+        .status-bar.error { border-color: var(--danger-color); background: rgba(220,53,69,0.08); }
+        .status-bar.success { border-color: var(--success-color); background: rgba(40,167,69,0.08); }
+
+        .file-list { width: 100%; }
+        .file-table { width: 100%; border-collapse: collapse; }
+        .file-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--border-color);
+            color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .file-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+        .file-table tr:hover { background: var(--bg-secondary); }
+        .file-actions { display: flex; gap: 0.4rem; align-items: center; }
+        .file-actions button { background: none; border: none; cursor: pointer; padding: 0.3rem 0.5rem;
+            border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 1rem; }
+        .file-actions button:hover { background: var(--bg-tertiary); color: var(--accent-color); }
+        .file-size { color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
+        .file-date { color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap; }
+        .file-name { font-weight: 500; word-break: break-all; }
+        .file-name-edit { display: none; padding: 0.3rem 0.5rem; border: 1px solid var(--accent-color);
+            border-radius: var(--radius-sm); font-size: 0.9rem; background: var(--bg-primary); color: var(--text-primary); }
+
+        .mode-fields { display: none; }
+        .mode-fields.active { display: block; }
+        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+        .empty-state i { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; }
+
+        .disk-meter-row { display: flex; align-items: center; gap: 1rem; }
+        .disk-meter { position: relative; height: 22px; background: var(--bg-tertiary); border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color); overflow: hidden; width: 33%; min-width: 80px; flex-shrink: 0; }
+        .disk-meter-fill { height: 100%; background: var(--success-color); transition: width 0.3s; }
+        .disk-meter-fill.warning { background: var(--warning-color); }
+        .disk-meter-fill.danger { background: var(--danger-color); }
+        .disk-meter-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
+        .disk-threshold-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem;
+            color: var(--text-secondary); flex-wrap: nowrap; white-space: nowrap; }
+        .disk-threshold-row input, .disk-threshold-row select { padding: 0.2rem 0.4rem;
+            border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+            background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; }
+        .disk-threshold-row input[type="number"] { width: 54px; flex: none; text-align: center; -moz-appearance: textfield; }
+        .disk-threshold-row input[type="number"]::-webkit-outer-spin-button,
+        .disk-threshold-row input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .disk-threshold-row select { width: auto; max-width: 120px; flex: none; font-size: 0.8rem; padding: 0.2rem 0.3rem; }
+
+        .btn-start { background: var(--success-color); color: #fff; border: none; padding: 0.5rem 1.5rem;
+            border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+        .btn-start:hover { opacity: 0.9; }
+        .btn-start:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-stop { background: var(--text-secondary); color: #fff; border: none; padding: 0.5rem 1.5rem;
+            border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+        .btn-stop:hover { opacity: 0.9; }
+        .btn-stop:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: transparent; z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--bg-primary); border-radius: var(--radius-md); padding: 1.5rem;
+            max-width: 500px; width: 90%; box-shadow: var(--shadow-lg); }
+        .modal h3 { margin-bottom: 1rem; }
+        .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+        .modal pre { background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-sm);
+            overflow-x: auto; font-size: 0.85rem; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">Packet Capture Web</h1>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-network-wired"></i> Captures</a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li>
+                            <a href="#" class="nav-item active" data-section="capture-section">
+                                <i class="fas fa-play-circle"></i> New Capture
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-section="files-section">
+                                <i class="fas fa-folder-open"></i> Saved Files
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+                    <!-- Capture Section -->
+                    <section class="element-section active" id="capture-section">
+                        <h2 class="section-title">Packet Capture</h2>
+                        <div class="capture-form">
+                            <div class="form-row">
+                                <label for="capture-mode">Mode:</label>
+                                <select id="capture-mode">
+                                    <option value="download">Download</option>
+                                    <option value="cloudshark">CloudShark</option>
+                                    <option value="custom">Custom URL</option>
+                                </select>
+                            </div>
+
+                            <div class="mode-fields" id="cloudshark-fields">
+                                <div class="form-row">
+                                    <label for="cloudshark-token">Token:</label>
+                                    <input type="text" id="cloudshark-token" placeholder="CloudShark API token">
+                                </div>
+                            </div>
+
+                            <div class="mode-fields" id="custom-fields">
+                                <div class="form-row">
+                                    <label for="custom-url">URL:</label>
+                                    <input type="text" id="custom-url" placeholder="http://server/upload">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="capture-interface">Interface:</label>
+                                <select id="capture-interface">
+                                    <option value="any">Any</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <label for="capture-args">Arguments:</label>
+                                <input type="text" id="capture-args" placeholder="e.g. dst port 80">
+                            </div>
+
+                            <div class="form-row">
+                                <label for="capture-timeout">Timeout:</label>
+                                <input type="number" id="capture-timeout" value="30" min="0" placeholder="seconds">
+                            </div>
+
+                            <div class="form-row">
+                                <label for="capture-count">Count:</label>
+                                <input type="number" id="capture-count" value="0" min="0" placeholder="0 = unlimited">
+                            </div>
+
+                            <div class="form-row">
+                                <label for="capture-loop">Loop:</label>
+                                <div style="display: flex; align-items: center; flex: 1; gap: 0.5rem;">
+                                    <input type="checkbox" id="capture-loop" style="width: auto;">
+                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Repeat capture continuously until stopped</span>
+                                </div>
+                            </div>
+
+                            <div class="form-row" style="align-items: flex-start;">
+                                <label>Disk:</label>
+                                <div style="flex: 1;">
+                                    <div class="disk-meter-row">
+                                        <div class="disk-meter" id="disk-meter" title="Loading...">
+                                            <div class="disk-meter-fill" id="disk-meter-fill" style="width: 0%;"></div>
+                                            <span class="disk-meter-text" id="disk-meter-text">--%</span>
+                                        </div>
+                                        <div class="disk-threshold-row">
+                                            <span>When disk is</span>
+                                            <input type="number" id="disk-threshold" value="80" min="1" max="99">
+                                            <span>% full:</span>
+                                            <select id="disk-action">
+                                                <option value="delete_oldest">Delete Oldest</option>
+                                                <option value="stop">Stop</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <label>Status:</label>
+                                <div class="status-bar" id="capture-status">Ready</div>
+                            </div>
+
+                            <div class="capture-actions">
+                                <button type="button" class="btn-start" id="btn-start" onclick="startCapture()">Start</button>
+                                <button type="button" class="btn-stop" id="btn-stop" onclick="stopCapture()" disabled>Stop</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Files Section -->
+                    <section class="element-section" id="files-section">
+                        <h2 class="section-title">Saved Captures</h2>
+                        <div class="file-list" id="file-list">
+                            <div class="empty-state">
+                                <i class="fas fa-file-alt"></i>
+                                <p>No capture files yet</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Options Modal -->
+    <div class="modal-overlay" id="options-modal">
+        <div class="modal">
+            <h3><i class="fas fa-cog"></i> Capture Options</h3>
+            <pre id="options-content"></pre>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="applyOptions()">
+                    <i class="fas fa-check"></i> Apply to Current
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    var statusInterval = null;
+    var currentModalOptions = null;
+
+    // Dark mode
+    (function() {
+        var saved = localStorage.getItem('theme');
+        if (saved === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+
+    document.getElementById('dark-mode-toggle').addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+    });
+
+    // Navigation
+    var navItems = document.querySelectorAll('.nav-item[data-section]');
+    for (var i = 0; i < navItems.length; i++) {
+        navItems[i].addEventListener('click', function(e) {
+            e.preventDefault();
+            var section = this.getAttribute('data-section');
+            showSection(section);
+            for (var j = 0; j < navItems.length; j++) {
+                navItems[j].classList.remove('active');
+            }
+            this.classList.add('active');
+        });
+    }
+
+    document.getElementById('homepage-link').addEventListener('click', function(e) {
+        e.preventDefault();
+        showSection('capture-section');
+        for (var j = 0; j < navItems.length; j++) {
+            navItems[j].classList.remove('active');
+        }
+        navItems[0].classList.add('active');
+    });
+
+    function showSection(id) {
+        var sections = document.querySelectorAll('.element-section');
+        for (var i = 0; i < sections.length; i++) {
+            sections[i].classList.remove('active');
+        }
+        document.getElementById(id).classList.add('active');
+        if (id === 'files-section') { loadFiles(); }
+    }
+
+    // Mode switching
+    document.getElementById('capture-mode').addEventListener('change', function() {
+        var mode = this.value;
+        var cloudFields = document.getElementById('cloudshark-fields');
+        var customFields = document.getElementById('custom-fields');
+        cloudFields.className = 'mode-fields' + (mode === 'cloudshark' ? ' active' : '');
+        customFields.className = 'mode-fields' + (mode === 'custom' ? ' active' : '');
+    });
+
+    // Load interfaces
+    function loadInterfaces() {
+        $.ajax({
+            url: '/api/interfaces',
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                var sel = document.getElementById('capture-interface');
+                sel.innerHTML = '';
+                for (var i = 0; i < data.length; i++) {
+                    var opt = document.createElement('option');
+                    opt.value = data[i].value;
+                    opt.textContent = data[i].label;
+                    sel.appendChild(opt);
+                }
+            },
+            error: function() {
+                console.log('Failed to load interfaces');
+            }
+        });
+    }
+
+    // Start capture
+    function startCapture() {
+        var ifaceSelect = document.getElementById('capture-interface');
+        var options = {
+            mode: document.getElementById('capture-mode').value,
+            interface: ifaceSelect.value,
+            interface_label: ifaceSelect.options[ifaceSelect.selectedIndex].text,
+            arguments: document.getElementById('capture-args').value,
+            timeout: document.getElementById('capture-timeout').value,
+            count: document.getElementById('capture-count').value,
+            loop: document.getElementById('capture-loop').checked,
+            disk_threshold: document.getElementById('disk-threshold').value,
+            disk_action: document.getElementById('disk-action').value,
+            cloudshark_token: document.getElementById('cloudshark-token').value,
+            url: document.getElementById('custom-url').value
+        };
+
+        $.ajax({
+            url: '/api/start',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(options),
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    document.getElementById('btn-start').disabled = true;
+                    document.getElementById('btn-stop').disabled = false;
+                    startStatusPolling();
+                } else {
+                    updateStatus(data.error || 'Failed to start', 'error');
+                }
+            },
+            error: function() {
+                updateStatus('Request failed', 'error');
+            }
+        });
+    }
+
+    // Stop capture
+    function stopCapture() {
+        $.ajax({
+            url: '/api/stop',
+            method: 'POST',
+            contentType: 'application/json',
+            data: '{}',
+            dataType: 'json',
+            success: function(data) {
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-stop').disabled = true;
+            },
+            error: function() {
+                updateStatus('Stop request failed', 'error');
+            }
+        });
+    }
+
+    // Status polling
+    function startStatusPolling() {
+        if (statusInterval) { clearInterval(statusInterval); }
+        statusInterval = setInterval(pollStatus, 1500);
+        pollStatus();
+    }
+
+    function pollStatus() {
+        $.ajax({
+            url: '/api/status',
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                var cls = '';
+                if (data.running) { cls = 'running'; }
+                else if (data.status && data.status.indexOf('Error') === 0) { cls = 'error'; }
+                else if (data.status && data.status.indexOf('Saved') === 0) { cls = 'success'; }
+                else if (data.status && data.status.indexOf('Stopped') === 0) { cls = ''; }
+                updateStatus(data.status || 'Ready', cls);
+
+                if (data.running) {
+                    pollDisk();
+                }
+
+                if (!data.running) {
+                    document.getElementById('btn-start').disabled = false;
+                    document.getElementById('btn-stop').disabled = true;
+                    if (statusInterval) {
+                        clearInterval(statusInterval);
+                        statusInterval = null;
+                    }
+                    // Refresh files after capture ends
+                    loadFiles();
+                    pollDisk();
+                }
+            }
+        });
+    }
+
+    function updateStatus(text, cls) {
+        var bar = document.getElementById('capture-status');
+        bar.textContent = text;
+        bar.className = 'status-bar' + (cls ? ' ' + cls : '');
+    }
+
+    // File list
+    function loadFiles() {
+        $.ajax({
+            url: '/api/files',
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                renderFiles(data);
+            },
+            error: function() {
+                document.getElementById('file-list').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading files</p></div>';
+            }
+        });
+    }
+
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function renderFiles(files) {
+        var container = document.getElementById('file-list');
+        if (!files || files.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>No capture files yet</p></div>';
+            return;
+        }
+        var html = '<table class="file-table"><thead><tr>';
+        html += '<th>Filename</th><th>Date/Time</th><th>Size</th><th>Actions</th>';
+        html += '</tr></thead><tbody>';
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            html += '<tr>';
+            html += '<td class="file-name"><span id="fname-' + i + '">' + escapeHtml(f.filename) + '</span>';
+            html += '<input type="text" class="file-name-edit" id="fedit-' + i + '" data-index="' + i + '" data-original="' + escapeHtml(f.filename) + '"></td>';
+            html += '<td class="file-date">' + escapeHtml(f.datetime) + '</td>';
+            html += '<td class="file-size">' + formatSize(f.size) + '</td>';
+            html += '<td class="file-actions">';
+            html += '<button title="Rename" data-action="rename" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '"><i class="fas fa-pencil-alt"></i></button>';
+            html += '<button title="View Options" data-action="options" data-filename="' + escapeHtml(f.filename) + '"><i class="fas fa-cog"></i></button>';
+            html += '<button title="Download" data-action="download" data-filename="' + escapeHtml(f.filename) + '"><i class="fas fa-download"></i></button>';
+            html += '<button title="Delete" data-action="delete" data-filename="' + escapeHtml(f.filename) + '"><i class="fas fa-trash"></i></button>';
+            html += '</td></tr>';
+        }
+        html += '</tbody></table>';
+        container.innerHTML = html;
+
+        // Bind action buttons
+        var buttons = container.querySelectorAll('button[data-action]');
+        for (var b = 0; b < buttons.length; b++) {
+            buttons[b].addEventListener('click', handleFileAction);
+        }
+
+        // Bind rename input enter key
+        var editInputs = container.querySelectorAll('.file-name-edit');
+        for (var e = 0; e < editInputs.length; e++) {
+            editInputs[e].addEventListener('keydown', function(ev) {
+                if (ev.key === 'Enter') { commitRename(this); }
+                if (ev.key === 'Escape') { cancelRename(this); }
+            });
+            editInputs[e].addEventListener('blur', function() { commitRename(this); });
+        }
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    function handleFileAction(e) {
+        var btn = e.currentTarget;
+        var action = btn.getAttribute('data-action');
+        var filename = btn.getAttribute('data-filename');
+        var index = btn.getAttribute('data-index');
+
+        if (action === 'rename') {
+            startRename(index, filename);
+        } else if (action === 'options') {
+            showOptions(filename);
+        } else if (action === 'download') {
+            window.location.href = '/api/download/' + encodeURIComponent(filename);
+        } else if (action === 'delete') {
+            if (confirm('Delete ' + filename + '?')) {
+                deleteFile(filename);
+            }
+        }
+    }
+
+    function startRename(index, filename) {
+        var span = document.getElementById('fname-' + index);
+        var input = document.getElementById('fedit-' + index);
+        span.style.display = 'none';
+        input.style.display = 'inline-block';
+        input.value = filename.replace('.pcap', '');
+        input.focus();
+        input.select();
+    }
+
+    function commitRename(input) {
+        var index = input.getAttribute('data-index');
+        var original = input.getAttribute('data-original');
+        var newName = input.value.trim();
+        var span = document.getElementById('fname-' + index);
+
+        if (!newName || newName + '.pcap' === original) {
+            cancelRename(input);
+            return;
+        }
+
+        $.ajax({
+            url: '/api/rename',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({old_name: original, new_name: newName}),
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    loadFiles();
+                } else {
+                    alert(data.error || 'Rename failed');
+                    cancelRename(input);
+                }
+            },
+            error: function() {
+                alert('Rename request failed');
+                cancelRename(input);
+            }
+        });
+    }
+
+    function cancelRename(input) {
+        var index = input.getAttribute('data-index');
+        var span = document.getElementById('fname-' + index);
+        span.style.display = '';
+        input.style.display = 'none';
+    }
+
+    function showOptions(filename) {
+        $.ajax({
+            url: '/api/meta/' + encodeURIComponent(filename),
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (data.error) {
+                    alert('No saved options for this file');
+                    return;
+                }
+                currentModalOptions = data;
+                var text = 'Mode: ' + (data.mode || 'download') + '\n';
+                text += 'Interface: ' + (data.interface_label || data.interface || 'any') + '\n';
+                text += 'Arguments: ' + (data.arguments || '(none)') + '\n';
+                text += 'Timeout: ' + (data.timeout || '30') + ' sec\n';
+                text += 'Count: ' + (data.count || '0') + '\n';
+                if (data.loop) {
+                    text += 'Loop: enabled\n';
+                }
+                if (data.mode === 'cloudshark') {
+                    text += 'CloudShark Token: ' + (data.cloudshark_token || '') + '\n';
+                }
+                if (data.mode === 'custom') {
+                    text += 'Custom URL: ' + (data.url || '') + '\n';
+                }
+                document.getElementById('options-content').textContent = text;
+                document.getElementById('options-modal').classList.add('active');
+            },
+            error: function() {
+                alert('No saved options for this file');
+            }
+        });
+    }
+
+    function applyOptions() {
+        if (!currentModalOptions) return;
+        var opts = currentModalOptions;
+
+        // Set mode
+        var modeSelect = document.getElementById('capture-mode');
+        modeSelect.value = opts.mode || 'download';
+        modeSelect.dispatchEvent(new Event('change'));
+
+        // Check if selected interface is available
+        var ifaceSelect = document.getElementById('capture-interface');
+        var ifaceValue = opts.interface || 'any';
+        var found = false;
+        for (var i = 0; i < ifaceSelect.options.length; i++) {
+            if (ifaceSelect.options[i].value === ifaceValue) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            alert('Interface "' + ifaceValue + '" is not available in the current session. Loading remaining options.');
+        } else {
+            ifaceSelect.value = ifaceValue;
+        }
+
+        document.getElementById('capture-args').value = opts.arguments || '';
+        document.getElementById('capture-timeout').value = opts.timeout || '30';
+        document.getElementById('capture-count').value = opts.count || '0';
+
+        if (opts.mode === 'cloudshark') {
+            document.getElementById('cloudshark-token').value = opts.cloudshark_token || '';
+        }
+        if (opts.mode === 'custom') {
+            document.getElementById('custom-url').value = opts.url || '';
+        }
+
+        closeModal();
+        showSection('capture-section');
+        for (var j = 0; j < navItems.length; j++) { navItems[j].classList.remove('active'); }
+        navItems[0].classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('options-modal').classList.remove('active');
+        currentModalOptions = null;
+    }
+
+    function deleteFile(filename) {
+        $.ajax({
+            url: '/api/delete',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({filename: filename}),
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) { loadFiles(); }
+                else { alert(data.error || 'Delete failed'); }
+            },
+            error: function() { alert('Delete request failed'); }
+        });
+    }
+
+    // Disk usage
+    function pollDisk() {
+        $.ajax({
+            url: '/api/disk',
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                var pct = data.percent_used || 0;
+                var fill = document.getElementById('disk-meter-fill');
+                var text = document.getElementById('disk-meter-text');
+                var meter = document.getElementById('disk-meter');
+                fill.style.width = pct + '%';
+                text.textContent = pct + '%';
+                fill.className = 'disk-meter-fill';
+                if (pct >= 90) { fill.className += ' danger'; }
+                else if (pct >= 70) { fill.className += ' warning'; }
+                var free = (data.free_bytes / 1048576).toFixed(0);
+                var total = (data.total_bytes / 1048576).toFixed(0);
+                meter.title = 'Free: ' + free + ' MB / Total: ' + total + ' MB';
+            }
+        });
+    }
+
+    // Close modal on overlay click
+    document.getElementById('options-modal').addEventListener('click', function(e) {
+        if (e.target === this) { closeModal(); }
+    });
+
+    // Init
+    loadInterfaces();
+    pollStatus();
+    pollDisk();
+    </script>
+</body>
+</html>

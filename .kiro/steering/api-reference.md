@@ -56,3 +56,17 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - **Control tree keys persist across app redeploys** — the router merges control tree writes, never replaces. Renaming control paths leaves stale keys until router reboot. Keep control path names stable to avoid confusion
 
 **For detailed API structures, response formats, and code patterns, see `#[[file:docs/ncos-api/api-structures.md]]`**
+
+## Packet Capture (tcpdump) API
+
+- **tcpdump is a REST-only API** — it does NOT work via `cp.get()` socket dispatch. You must use HTTP with Basic Auth
+- **Pattern**: `GET http://{router_ip}/api/tcpdump/{filename}.pcap?iface=...&args=...&timeout=...&count=...&url=...`
+- **The request blocks** until the capture completes (timeout or count reached), then returns pcap binary data
+- **Requires user credentials** — use `cp.ensure_fresh_user('SDKTCPDUMP', 'admin')` to create a temp user with a random password, then use those creds for HTTP Basic Auth
+- **CAUTION with ensure_fresh_user passwords** — the generated password contains special chars (`!@#$%^&*`) that can break HTTP Basic Auth. Instead use `cp.delete_user()` + `cp.create_user()` with an alphanumeric-only password (e.g., `hashlib.md5(str(time.time()).encode()).hexdigest()[:16]`)
+- **Router IP on-device**: Use `cp.get('config/lan/0/ip_address')` or `127.0.0.1`
+- **Clean up**: Delete the temp user after capture with `cp.delete_user('SDKTCPDUMP')`
+- **Auth propagation delay** — after creating a user, the router's shadow password system needs time to propagate. Wait 3+ seconds after delete (clears stale shadow), then verify auth works with a test GET before using the credentials. The router log shows "Removing stale shadow password for: USERNAME" during cleanup — if you authenticate too soon after creation, you get 401
+- **Parameters**: `iface` (interface), `args` (BPF filter), `timeout` (seconds), `count` (packets), `url` (upload URL for CloudShark), `wifichannel`, `wifichannelwidth`, `wifiextrachannel`
+- **iface value for LAN networks** — use the UUID from `config/lan[]/_id_` (e.g., `00000000-0d93-319d-8220-4a1fb0372b51`), NOT the device iface name. This matches how the NCOS UI sends it
+- **Do NOT use `cp.start_packet_capture()`** for on-router apps — it calls `get()` which can't handle binary pcap responses correctly

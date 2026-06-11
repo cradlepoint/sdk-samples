@@ -624,8 +624,26 @@ def package_application(app_root, pkey):
 # Package the app files into a tar.gz archive.
 def package(app=None):
     app_name = app or g_app_name
-    print("Packaging {}".format(app_name))
     app_path = os.path.join(app_name)
+
+    # Verify the app directory exists
+    if not os.path.isdir(app_path):
+        print("ERROR: App directory '{}' does not exist. Skipping.".format(app_path))
+        return False
+
+    # Verify the app has a valid package.ini with the correct section
+    app_config_file = os.path.join(app_path, CONFIG_FILE)
+    if not os.path.isfile(app_config_file):
+        print("ERROR: '{}' not found in '{}'. Skipping.".format(CONFIG_FILE, app_path))
+        return False
+
+    config = configparser.ConfigParser()
+    config.read(app_config_file)
+    if app_name not in config:
+        print("ERROR: The '{}' section does not exist in {}. Skipping.".format(app_name, app_config_file))
+        return False
+
+    print("Packaging {}".format(app_name))
     scan_for_cr(app_path)
     setup_script(app_path)
 
@@ -882,6 +900,13 @@ def get_app_uuid():
     if g_app_uuid == '':
         uuid_key = 'uuid'
         app_config_file = os.path.join(g_app_name, 'package.ini')
+
+        if not os.path.isdir(g_app_name):
+            return g_app_uuid
+
+        if not os.path.isfile(app_config_file):
+            return g_app_uuid
+
         config = configparser.ConfigParser()
         config.read(app_config_file)
         if g_app_name in config:
