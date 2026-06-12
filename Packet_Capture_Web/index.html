@@ -420,6 +420,13 @@
         return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
+    function formatPackets(count) {
+        if (count === null || count === undefined) return '--';
+        if (count < 1000) return count.toString();
+        if (count < 1000000) return (count / 1000).toFixed(1) + 'K';
+        return (count / 1000000).toFixed(1) + 'M';
+    }
+
     function renderFiles(files) {
         var container = document.getElementById('file-list');
         if (!files || files.length === 0) {
@@ -427,7 +434,7 @@
             return;
         }
         var html = '<table class="file-table"><thead><tr>';
-        html += '<th>Filename</th><th>Date/Time</th><th>Size</th><th>Actions</th>';
+        html += '<th>Filename</th><th>Date/Time</th><th>Size</th><th>Packets</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
         for (var i = 0; i < files.length; i++) {
             var f = files[i];
@@ -436,6 +443,7 @@
             html += '<input type="text" class="file-name-edit" id="fedit-' + i + '" data-index="' + i + '" data-original="' + escapeHtml(f.filename) + '"></td>';
             html += '<td class="file-date">' + escapeHtml(f.datetime) + '</td>';
             html += '<td class="file-size">' + formatSize(f.size) + '</td>';
+            html += '<td class="file-size">' + formatPackets(f.packets) + '</td>';
             html += '<td class="file-actions">';
             html += '<button title="Rename" data-action="rename" data-index="' + i + '" data-filename="' + escapeHtml(f.filename) + '"><i class="fas fa-pencil-alt"></i></button>';
             html += '<button title="View Options" data-action="options" data-filename="' + escapeHtml(f.filename) + '"><i class="fas fa-cog"></i></button>';
@@ -563,6 +571,10 @@
                 }
                 if (data.mode === 'custom') {
                     text += 'Custom URL: ' + (data.url || '') + '\n';
+                }
+                if (data.stop_reason) {
+                    var reasons = {disk_full: 'Disk threshold reached', user_stop: 'Stopped by user', error: 'Error', unknown: 'App restarted/interrupted'};
+                    text += '\nStop reason: ' + (reasons[data.stop_reason] || data.stop_reason) + '\n';
                 }
                 document.getElementById('options-content').textContent = text;
                 document.getElementById('options-modal').classList.add('active');

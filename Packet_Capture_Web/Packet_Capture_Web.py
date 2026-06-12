@@ -195,12 +195,17 @@ def get_capture_files():
             if os.path.isfile(fpath) and fname.endswith('.pcap'):
                 stat = os.stat(fpath)
                 meta = load_meta(fname)
+                pkt_count = None
+                if meta and 'packet_count' in meta:
+                    pkt_count = meta.get('packet_count')
                 files.append({
                     'filename': fname,
                     'size': stat.st_size,
-                    'datetime': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
+                    'datetime': datetime.fromtimestamp(
+                        stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
                     'timestamp': stat.st_mtime,
-                    'options': meta
+                    'options': meta,
+                    'packets': pkt_count
                 })
         files.sort(key=lambda x: x['timestamp'], reverse=True)
     except Exception as e:
@@ -227,6 +232,27 @@ def load_meta(filename):
                 return json.loads(f.read())
     except Exception as e:
         cp.log('Error loading meta for ' + filename + ': ' + str(e))
+    return None
+
+
+def count_pcap_packets(filepath):
+    """Count packets in a pcap file by reading record headers."""
+    try:
+        count = 0
+        with open(filepath, 'rb') as f:
+            header = f.read(24)
+            if len(header) < 24:
+                return 0
+            while True:
+                rec_hdr = f.read(16)
+                if len(rec_hdr) < 16:
+                    break
+                incl_len = int.from_bytes(rec_hdr[8:12], 'little')
+                f.seek(incl_len, 1)
+                count += 1
+        return count
+    except Exception as e:
+        cp.log('Error counting packets: ' + str(e))
     return None
 
 
@@ -345,6 +371,18 @@ def run_capture(options):
     disk_action = options.get('disk_action', 'stop')
     send_alert = options.get('send_alert', False)
     iteration = 0
+
+    # Check disk BEFORE doing anything
+    disk = get_disk_usage()
+    if disk['percent_used'] >= threshold_pct:
+        capture_status = ('Stopped: disk already at '
+                          + str(disk['percent_used']) + '% (limit '
+                          + str(threshold_pct) + '%)')
+        cp.log('Capture not started: disk at '
+               + str(disk['percent_used']) + '% >= '
+               + str(threshold_pct) + '%')
+        capture_running = False
+        return
 
     # Credentials for tcpdump REST API
     capture_user = None
@@ -468,6 +506,13 @@ def run_capture(options):
 
             final_name = generate_capture_filename()
             local_path = os.path.join(CAPTURES_DIR, final_name)
+            stop_reason = ''
+
+            # Save meta immediately with unknown stop reason
+            # so if app is killed, the file still has options
+            meta_initial = dict(options)
+            meta_initial['stop_reason'] = 'unknown'
+            save_meta(final_name, meta_initial)
 
             try:
                 import requests as req
@@ -534,12 +579,13 @@ def run_capture(options):
                                               + size_str
                                               + ' captured')
                             disk_check_counter += 1
-                            if disk_check_counter >= 100:
+                            if disk_check_counter >= 25:
                                 disk_check_counter = 0
                                 if check_disk_threshold(
                                         threshold_pct,
                                         disk_action,
                                         send_alert):
+                                    stop_reason = 'disk_full'
                                     capture_status = (
                                         'Stopped: disk threshold'
                                         ' (' + size_str
@@ -555,17 +601,31 @@ def run_capture(options):
             except Exception as e:
                 if not capture_stop_requested:
                     cp.log('Stream error: ' + str(e))
+                    stop_reason = 'error'
+
+            # Determine stop reason if not already set
+            if capture_stop_requested and stop_reason == '':
+                stop_reason = 'user_stop'
 
             # Save if we got data
             if (os.path.exists(local_path)
                     and os.path.getsize(local_path) > 24):
-                save_meta(final_name, options)
+                meta = dict(options)
+                meta['stop_reason'] = stop_reason
+                meta['packet_count'] = count_pcap_packets(local_path)
+                save_meta(final_name, meta)
                 fsize = os.path.getsize(local_path)
+                reason_text = ''
+                if stop_reason == 'disk_full':
+                    reason_text = ' [disk full]'
+                elif stop_reason == 'user_stop':
+                    reason_text = ' [stopped]'
                 capture_status = ('Stream saved: ' + final_name
                                   + ' (' + str(int(fsize / 1024))
-                                  + ' KB)')
+                                  + ' KB)' + reason_text)
                 cp.log('Stream saved: ' + final_name + ' ('
-                       + str(fsize) + ' bytes)')
+                       + str(fsize) + ' bytes) reason='
+                       + stop_reason)
             elif os.path.exists(local_path):
                 os.remove(local_path)
                 capture_status = 'Stream ended (no data captured)'
@@ -670,7 +730,10 @@ def run_capture(options):
                                + 's for ' + str(timeout_val)
                                + 's timeout) - interface likely down')
                         break
-                    save_meta(final_name, options)
+                    meta_dl = dict(options)
+                    meta_dl['packet_count'] = count_pcap_packets(
+                        local_path)
+                    save_meta(final_name, meta_dl)
                     capture_status = 'Saved: ' + final_name + suffix
                     cp.log('Capture saved: ' + final_name
                            + ' (' + str(file_size) + ' bytes)')
@@ -965,6 +1028,31 @@ def start_server():
         cp.log('Error starting web server: ' + str(e))
 
 
+def backfill_packet_counts():
+    """Count packets for any pcap files missing packet_count in meta."""
+    try:
+        if not os.path.exists(CAPTURES_DIR):
+            return
+        for fname in os.listdir(CAPTURES_DIR):
+            fpath = os.path.join(CAPTURES_DIR, fname)
+            if not os.path.isfile(fpath) or not fname.endswith('.pcap'):
+                continue
+            meta = load_meta(fname)
+            if meta and 'packet_count' in meta:
+                continue
+            # Count packets and update meta
+            count = count_pcap_packets(fpath)
+            if count is not None:
+                if meta is None:
+                    meta = {}
+                meta['packet_count'] = count
+                save_meta(fname, meta)
+                cp.log('Backfill: ' + fname + ' = '
+                       + str(count) + ' packets')
+    except Exception as e:
+        cp.log('Error in backfill_packet_counts: ' + str(e))
+
+
 def main():
     """Main entry point."""
     # Start web server in a thread
@@ -973,6 +1061,12 @@ def main():
     server_thread.start()
 
     cp.log('Packet_Capture_Web running on port ' + str(PORT))
+
+    # Backfill packet counts for existing files
+    try:
+        backfill_packet_counts()
+    except Exception as e:
+        cp.log('Backfill error: ' + str(e))
 
     # Auto-start capture if enabled in defaults
     try:
