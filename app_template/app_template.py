@@ -1,3 +1,3 @@
-# Ericsson Cradlepoint SDK Application
+# Ericsson Router SDK Application
 import cp
 cp.log('Starting...')

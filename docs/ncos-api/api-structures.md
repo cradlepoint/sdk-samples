@@ -175,3 +175,28 @@ qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 - Client SSL context (self-signed): `ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)` with `check_hostname=False` and `verify_mode=ssl.CERT_NONE`
 - Wrap sockets: Server: `ctx.wrap_socket(sock, server_side=True)`, Client: `ctx.wrap_socket(sock, server_hostname=host)`
 - Non-blocking SSL: After wrapping, `sock.setblocking(False)` — handle `ssl.SSLWantReadError` and `ssl.SSLWantWriteError` in recv/send
+
+## User Password Hashes
+
+```python
+users = cp.get('config/system/users/')
+# [{"_id_": "...", "group": "admin", "password": "$3$75000$gJD5ZbYo$...", "username": "admin"}]
+```
+
+**Hash format:** `$3$iterations$salt$key_b64`
+- `$3` = PBKDF2-HMAC-SHA256
+- `iterations` = integer (e.g., 75000)
+- `salt` = **raw ASCII string** (NOT base64-decoded — use `salt.encode('utf-8')` directly)
+- `key_b64` = base64-encoded derived key (32 bytes)
+
+**Validation:**
+```python
+import base64, hashlib, hmac
+# Parse: parts = hash_str.split('$') → ['', '3', '75000', 'gJD5ZbYo', 'key_b64']
+salt_bytes = parts[3].encode('utf-8')  # salt as raw string bytes!
+expected = base64.b64decode(parts[4])
+dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt_bytes, int(parts[2]), dklen=len(expected))
+valid = hmac.compare_digest(dk, expected)
+```
+
+**GOTCHA: REST API returns masked `$0$` hashes** — these are NOT real PBKDF2 hashes and cannot be validated. Only the SDK socket (on-router) returns the real `$3$` hash. `cp.validate_password()` will return an error when it encounters `$0$` hashes.

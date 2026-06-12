@@ -54,6 +54,7 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - **`cp.register()` for control tree paths MUST use `'put'` (lowercase) as the action** — `cp.register('put', 'control/...', callback)`. Using `'set'` or `'PUT'` (uppercase) silently fails to trigger callbacks
 - **Do NOT `cp.put()` to seed the control tree before `cp.register()`** — the dict PUT response causes socket desync, making subsequent register calls fail silently. Register first, then seed (or don't seed at all)
 - **Control tree keys persist across app redeploys** — the router merges control tree writes, never replaces. Renaming control paths leaves stale keys until router reboot. Keep control path names stable to avoid confusion
+- **Password hashes: REST API returns masked `$0$` format** — only the SDK socket (on-router) returns the real `$3$` PBKDF2-SHA256 hash. Salt in `$3$iters$salt$key` is raw ASCII string bytes, NOT base64-decoded. Use `cp.validate_password()` on-router only
 
 **For detailed API structures, response formats, and code patterns, see `#[[file:docs/ncos-api/api-structures.md]]`**
 
