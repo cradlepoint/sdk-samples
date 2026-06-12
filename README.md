@@ -53,7 +53,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs.
     - **Download:** [Motorola v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Motorola.v1.2.0.tar.gz)
 - **Packet_Capture_Web**
-    - Web interface for running and managing packet captures. Select interface, BPF filter, timeout, and count. Supports Download, CloudShark, and Custom URL modes. Loop mode for continuous captures with disk usage monitoring and auto-cleanup. Saved captures can be renamed, downloaded, or deleted from the browser.
+    - Web interface for running and managing packet captures. Stream mode captures continuously to one file until stopped or disk threshold. Download mode captures for a set timeout/count. Supports all router interfaces, BPF filters, disk monitoring with NCM alerts, and file management (rename, download, delete) from the browser.
     - **Download:** [Packet_Capture_Web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Packet_Capture_Web.v1.0.0.tar.gz)
 - **app_template**
     - A template for the creation of a new application utilizing the csclient library.

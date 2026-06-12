@@ -48,21 +48,12 @@
 
         .disk-meter-row { display: flex; align-items: center; gap: 1rem; }
         .disk-meter { position: relative; height: 22px; background: var(--bg-tertiary); border-radius: var(--radius-sm);
-            border: 1px solid var(--border-color); overflow: hidden; width: 33%; min-width: 80px; flex-shrink: 0; }
+            border: 1px solid var(--border-color); overflow: hidden; width: 100%; min-width: 80px; }
         .disk-meter-fill { height: 100%; background: var(--success-color); transition: width 0.3s; }
         .disk-meter-fill.warning { background: var(--warning-color); }
         .disk-meter-fill.danger { background: var(--danger-color); }
         .disk-meter-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
-        .disk-threshold-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem;
-            color: var(--text-secondary); flex-wrap: nowrap; white-space: nowrap; }
-        .disk-threshold-row input, .disk-threshold-row select { padding: 0.2rem 0.4rem;
-            border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-            background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; }
-        .disk-threshold-row input[type="number"] { width: 54px; flex: none; text-align: center; -moz-appearance: textfield; }
-        .disk-threshold-row input[type="number"]::-webkit-outer-spin-button,
-        .disk-threshold-row input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .disk-threshold-row select { width: auto; max-width: 120px; flex: none; font-size: 0.8rem; padding: 0.2rem 0.3rem; }
 
         .btn-start { background: var(--success-color); color: #fff; border: none; padding: 0.5rem 1.5rem;
             border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; font-size: 0.9rem; }
@@ -129,24 +120,9 @@
                             <div class="form-row">
                                 <label for="capture-mode">Mode:</label>
                                 <select id="capture-mode">
+                                    <option value="stream">Stream</option>
                                     <option value="download">Download</option>
-                                    <option value="cloudshark">CloudShark</option>
-                                    <option value="custom">Custom URL</option>
                                 </select>
-                            </div>
-
-                            <div class="mode-fields" id="cloudshark-fields">
-                                <div class="form-row">
-                                    <label for="cloudshark-token">Token:</label>
-                                    <input type="text" id="cloudshark-token" placeholder="CloudShark API token">
-                                </div>
-                            </div>
-
-                            <div class="mode-fields" id="custom-fields">
-                                <div class="form-row">
-                                    <label for="custom-url">URL:</label>
-                                    <input type="text" id="custom-url" placeholder="http://server/upload">
-                                </div>
                             </div>
 
                             <div class="form-row">
@@ -161,21 +137,29 @@
                                 <input type="text" id="capture-args" placeholder="e.g. dst port 80">
                             </div>
 
-                            <div class="form-row">
-                                <label for="capture-timeout">Timeout:</label>
-                                <input type="number" id="capture-timeout" value="30" min="0" placeholder="seconds">
+                            <div class="mode-fields" id="download-fields">
+                                <div class="form-row">
+                                    <label for="capture-timeout">Timeout:</label>
+                                    <input type="number" id="capture-timeout" value="30" min="0" placeholder="seconds">
+                                </div>
+                                <div class="form-row">
+                                    <label for="capture-count">Count:</label>
+                                    <input type="number" id="capture-count" value="0" min="0" placeholder="0 = unlimited">
+                                </div>
                             </div>
 
-                            <div class="form-row">
-                                <label for="capture-count">Count:</label>
-                                <input type="number" id="capture-count" value="0" min="0" placeholder="0 = unlimited">
-                            </div>
-
-                            <div class="form-row">
-                                <label for="capture-loop">Loop:</label>
-                                <div style="display: flex; align-items: center; flex: 1; gap: 0.5rem;">
-                                    <input type="checkbox" id="capture-loop" style="width: auto;">
-                                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Repeat capture continuously until stopped</span>
+                            <div class="mode-fields active" id="stream-fields">
+                                <div class="form-row">
+                                    <label>Limit:</label>
+                                    <div style="display: flex; align-items: center; flex: 1; gap: 0.5rem; flex-wrap: wrap;">
+                                        <span style="color: var(--text-secondary); font-size: 0.85rem;">Stop when disk is</span>
+                                        <input type="number" id="disk-threshold" value="80" min="1" max="99" style="width: 76px; flex: none; text-align: center; padding: 0.2rem 0.3rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; -moz-appearance: textfield;">
+                                        <span style="color: var(--text-secondary); font-size: 0.85rem;">% full</span>
+                                        <label style="display: flex; align-items: center; gap: 0.3rem; margin-left: 0.5rem; cursor: pointer;">
+                                            <input type="checkbox" id="disk-alert" style="width: auto; margin: 0;">
+                                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Send Alert</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 
@@ -186,15 +170,6 @@
                                         <div class="disk-meter" id="disk-meter" title="Loading...">
                                             <div class="disk-meter-fill" id="disk-meter-fill" style="width: 0%;"></div>
                                             <span class="disk-meter-text" id="disk-meter-text">--%</span>
-                                        </div>
-                                        <div class="disk-threshold-row">
-                                            <span>When disk is</span>
-                                            <input type="number" id="disk-threshold" value="80" min="1" max="99">
-                                            <span>% full:</span>
-                                            <select id="disk-action">
-                                                <option value="delete_oldest">Delete Oldest</option>
-                                                <option value="stop">Stop</option>
-                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -295,10 +270,10 @@
     // Mode switching
     document.getElementById('capture-mode').addEventListener('change', function() {
         var mode = this.value;
-        var cloudFields = document.getElementById('cloudshark-fields');
-        var customFields = document.getElementById('custom-fields');
-        cloudFields.className = 'mode-fields' + (mode === 'cloudshark' ? ' active' : '');
-        customFields.className = 'mode-fields' + (mode === 'custom' ? ' active' : '');
+        var dlFields = document.getElementById('download-fields');
+        var stFields = document.getElementById('stream-fields');
+        dlFields.className = 'mode-fields' + (mode === 'download' ? ' active' : '');
+        stFields.className = 'mode-fields' + (mode === 'stream' ? ' active' : '');
     });
 
     // Load interfaces
@@ -326,18 +301,17 @@
     // Start capture
     function startCapture() {
         var ifaceSelect = document.getElementById('capture-interface');
+        var mode = document.getElementById('capture-mode').value;
         var options = {
-            mode: document.getElementById('capture-mode').value,
+            mode: mode,
+            stream: (mode === 'stream'),
             interface: ifaceSelect.value,
             interface_label: ifaceSelect.options[ifaceSelect.selectedIndex].text,
             arguments: document.getElementById('capture-args').value,
             timeout: document.getElementById('capture-timeout').value,
             count: document.getElementById('capture-count').value,
-            loop: document.getElementById('capture-loop').checked,
             disk_threshold: document.getElementById('disk-threshold').value,
-            disk_action: document.getElementById('disk-action').value,
-            cloudshark_token: document.getElementById('cloudshark-token').value,
-            url: document.getElementById('custom-url').value
+            send_alert: document.getElementById('disk-alert').checked
         };
 
         $.ajax({
@@ -524,6 +498,8 @@
     }
 
     function commitRename(input) {
+        if (input.getAttribute('data-renaming') === 'true') return;
+        input.setAttribute('data-renaming', 'true');
         var index = input.getAttribute('data-index');
         var original = input.getAttribute('data-original');
         var newName = input.value.trim();

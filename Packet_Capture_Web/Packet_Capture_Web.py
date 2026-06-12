@@ -24,6 +24,7 @@ capture_status = ''
 capture_thread = None
 capture_loop = False
 capture_stop_requested = False
+disk_alert_sent = False
 server = None
 
 os.makedirs(CAPTURES_DIR, exist_ok=True)
@@ -251,12 +252,28 @@ def delete_oldest_capture():
     return None
 
 
-def check_disk_threshold(threshold_pct, action):
+def check_disk_threshold(threshold_pct, action, send_alert=False):
     """Check if disk is over threshold. Returns True if capture should stop."""
+    global disk_alert_sent
     disk = get_disk_usage()
     if disk['percent_used'] >= threshold_pct:
         cp.log('Disk threshold reached: ' + str(disk['percent_used'])
                + '% used (threshold: ' + str(threshold_pct) + '%)')
+        # Send alert once
+        if send_alert and not disk_alert_sent:
+            free_mb = int(disk['free_bytes'] / 1048576)
+            total_mb = int(disk['total_bytes'] / 1048576)
+            used_mb = int(disk['used_bytes'] / 1048576)
+            msg = ('Disk ' + str(disk['percent_used']) + '% full ('
+                   + str(used_mb) + ' MB used / '
+                   + str(total_mb) + ' MB total, '
+                   + str(free_mb) + ' MB free)')
+            try:
+                cp.alert(msg)
+                cp.log('Disk alert sent: ' + msg)
+            except Exception as e:
+                cp.log('Error sending disk alert: ' + str(e))
+            disk_alert_sent = True
         if action == 'delete_oldest':
             deleted = delete_oldest_capture()
             if deleted:
@@ -268,6 +285,10 @@ def check_disk_threshold(threshold_pct, action):
             return True  # Nothing to delete, stop
         else:
             return True  # action == 'stop'
+    else:
+        # Below threshold — reset alert flag
+        if disk_alert_sent:
+            disk_alert_sent = False
     return False
 
 
@@ -300,6 +321,7 @@ def run_capture(options):
     loop_enabled = options.get('loop', False)
     threshold_pct = float(options.get('disk_threshold', 80))
     disk_action = options.get('disk_action', 'stop')
+    send_alert = options.get('send_alert', False)
     iteration = 0
 
     # Credentials for tcpdump REST API
@@ -392,13 +414,129 @@ def run_capture(options):
 
         cp.log('Capture user ready: ' + capture_user)
 
+        # Create opener for all capture modes
+        pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        pwd_mgr.add_password(None, 'http://' + device_ip,
+                             capture_user, capture_password)
+        auth_handler = urllib.request.HTTPBasicAuthHandler(pwd_mgr)
+        opener = urllib.request.build_opener(auth_handler)
+
+        # === STREAM MODE ===
+        if options.get('stream', False):
+            capture_stop_requested = False  # Ensure clean state
+            capture_status = 'Streaming on ' + iface_label + '...'
+            cp.log('Starting stream capture: interface=' + interface
+                   + ' filter=' + arguments)
+
+            params = {
+                'iface': interface,
+                'args': arguments,
+                'wifichannel': '',
+                'wifichannelwidth': '',
+                'wifiextrachannel': '',
+                'timeout': 86400,
+                'count': '',
+                'url': capture_url
+            }
+            query = urllib.parse.urlencode(params)
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+            pcap_filename = timestamp + '.pcap'
+            tcpdump_url = ('http://localhost/api/tcpdump/'
+                           + pcap_filename + '?' + query)
+
+            final_name = generate_capture_filename()
+            local_path = os.path.join(CAPTURES_DIR, final_name)
+
+            try:
+                import requests as req
+                cp.log('Stream: opening ' + tcpdump_url)
+                resp = req.get(
+                    tcpdump_url,
+                    auth=(capture_user, capture_password),
+                    stream=True,
+                    timeout=None
+                )
+                cp.log('Stream: status=' + str(resp.status_code)
+                       + ' encoding='
+                       + str(resp.headers.get(
+                           'Transfer-Encoding', 'none')))
+                if resp.status_code != 200:
+                    capture_status = ('Error: HTTP '
+                                      + str(resp.status_code))
+                    cp.log('Stream HTTP error: '
+                           + str(resp.status_code))
+                    return
+                total_bytes = 0
+                disk_check_counter = 0
+                with open(local_path, 'wb') as out_f:
+                    for chunk in resp.iter_content(
+                            chunk_size=4096):
+                        if capture_stop_requested:
+                            break
+                        if chunk:
+                            out_f.write(chunk)
+                            out_f.flush()
+                            total_bytes += len(chunk)
+                            size_kb = total_bytes / 1024
+                            if size_kb < 1024:
+                                size_str = (str(int(size_kb))
+                                            + ' KB')
+                            else:
+                                size_str = (
+                                    str(round(size_kb / 1024, 1))
+                                    + ' MB')
+                            capture_status = ('Streaming: '
+                                              + size_str
+                                              + ' captured')
+                            disk_check_counter += 1
+                            if disk_check_counter >= 100:
+                                disk_check_counter = 0
+                                if check_disk_threshold(
+                                        threshold_pct,
+                                        disk_action,
+                                        send_alert):
+                                    capture_status = (
+                                        'Stopped: disk threshold'
+                                        ' (' + size_str
+                                        + ' saved)')
+                                    cp.log('Stream stopped: disk'
+                                           ' threshold at '
+                                           + str(total_bytes)
+                                           + ' bytes')
+                                    break
+                resp.close()
+                cp.log('Stream ended: ' + str(total_bytes)
+                       + ' bytes written')
+            except Exception as e:
+                if not capture_stop_requested:
+                    cp.log('Stream error: ' + str(e))
+
+            # Save if we got data
+            if (os.path.exists(local_path)
+                    and os.path.getsize(local_path) > 24):
+                save_meta(final_name, options)
+                fsize = os.path.getsize(local_path)
+                capture_status = ('Stream saved: ' + final_name
+                                  + ' (' + str(int(fsize / 1024))
+                                  + ' KB)')
+                cp.log('Stream saved: ' + final_name + ' ('
+                       + str(fsize) + ' bytes)')
+            elif os.path.exists(local_path):
+                os.remove(local_path)
+                capture_status = 'Stream ended (no data captured)'
+            else:
+                capture_status = 'Stream ended (no file)'
+            return
+
+        # === LOOP/NORMAL MODE ===
         while True:
             if capture_stop_requested:
                 capture_status = 'Stopped by user'
                 break
 
             # Check disk before starting
-            if check_disk_threshold(threshold_pct, disk_action):
+            if check_disk_threshold(threshold_pct, disk_action,
+                                    send_alert):
                 capture_status = 'Stopped: disk threshold reached'
                 cp.log('Capture stopped: disk threshold')
                 break
@@ -431,13 +569,6 @@ def run_capture(options):
             query = urllib.parse.urlencode(params)
             tcpdump_url = ('http://' + device_ip + '/api/tcpdump/'
                            + pcap_filename + '?' + query)
-
-            # Set up HTTP auth
-            pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-            pwd_mgr.add_password(None, 'http://' + device_ip,
-                                 capture_user, capture_password)
-            handler = urllib.request.HTTPBasicAuthHandler(pwd_mgr)
-            opener = urllib.request.build_opener(handler)
 
             # The tcpdump API blocks until capture is done, then
             # returns pcap binary data

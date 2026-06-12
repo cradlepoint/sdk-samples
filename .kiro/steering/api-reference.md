@@ -62,6 +62,8 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - **tcpdump is a REST-only API** — it does NOT work via `cp.get()` socket dispatch. You must use HTTP with Basic Auth
 - **Pattern**: `GET http://{router_ip}/api/tcpdump/{filename}.pcap?iface=...&args=...&timeout=...&count=...&url=...`
 - **The request blocks** until the capture completes (timeout or count reached), then returns pcap binary data
+- **Response IS chunked streaming** — `Transfer-Encoding: chunked` with `Content-Type: application/vnd.tcpdump.pcap`. Data arrives incrementally as packets are captured (not buffered until end). First 24 bytes = pcap global header, then packet data streams in real-time. You CAN read chunks to a file during capture and close the connection to stop — the pcap is valid up to what was written
+- **Infinite streaming** — use `timeout=0&count=0` to stream forever. Close the HTTP connection to stop. The file is a valid pcap as long as the 24-byte header was received
 - **Requires user credentials** — use `cp.ensure_fresh_user('SDKTCPDUMP', 'admin')` to create a temp user with a random password, then use those creds for HTTP Basic Auth
 - **CAUTION with ensure_fresh_user passwords** — the generated password contains special chars (`!@#$%^&*`) that can break HTTP Basic Auth. Instead use `cp.delete_user()` + `cp.create_user()` with an alphanumeric-only password (e.g., `hashlib.md5(str(time.time()).encode()).hexdigest()[:16]`)
 - **Router IP on-device**: Use `cp.get('config/lan/0/ip_address')` or `127.0.0.1`
@@ -73,3 +75,5 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
   - **WAN profile name** (e.g., `ethernet-wan`): tcpdump returns immediately with a valid pcap header (~1.4 KB) but no real packets
   - **Device iface name** (e.g., the actual linux iface): tcpdump blocks indefinitely, never returns. Always set an HTTP timeout on the request (timeout + 30s grace period)
 - **Do NOT use `cp.start_packet_capture()`** for on-router apps — it calls `get()` which can't handle binary pcap responses correctly
+- **control/system/tcpdump does NOT work** — PUTs to `control/system/tcpdump` (stop, start, dicts) return success but have no effect on running captures. The REST tcpdump endpoint bypasses the control tree entirely
+- **status/tcpdump IS live** — updates when a REST capture is running. `running` field is always `{}` (never populated). Check if `timeout` (unix timestamp) is in the future to detect active capture. Shows `interface`, `args`, `count`, `kwargs.timeout_duration`, `kwargs.iface_uid`
