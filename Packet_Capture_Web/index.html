@@ -380,11 +380,11 @@
                 else if (data.status && data.status.indexOf('Stopped') === 0) { cls = ''; }
                 else if (data.status && data.status.indexOf('Warning') === 0) { cls = 'error'; }
                 updateStatus(data.status || 'Ready', cls);
+                pollDisk();
 
                 if (data.running) {
                     document.getElementById('btn-start').disabled = true;
                     document.getElementById('btn-stop').disabled = false;
-                    pollDisk();
                 } else {
                     document.getElementById('btn-start').disabled = false;
                     document.getElementById('btn-stop').disabled = true;
