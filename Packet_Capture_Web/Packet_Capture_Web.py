@@ -449,6 +449,29 @@ def run_capture(options):
 
             try:
                 import requests as req
+                # Flush any stale capture with a 1-second throwaway
+                flush_params = {
+                    'iface': interface,
+                    'args': arguments,
+                    'wifichannel': '',
+                    'wifichannelwidth': '',
+                    'wifiextrachannel': '',
+                    'timeout': 1,
+                    'count': 1,
+                    'url': ''
+                }
+                flush_query = urllib.parse.urlencode(flush_params)
+                flush_url = ('http://localhost/api/tcpdump/flush.pcap?'
+                             + flush_query)
+                try:
+                    flush_resp = req.get(
+                        flush_url,
+                        auth=(capture_user, capture_password),
+                        timeout=5
+                    )
+                    flush_resp.close()
+                except Exception:
+                    pass
                 cp.log('Stream: opening ' + tcpdump_url)
                 resp = req.get(
                     tcpdump_url,
