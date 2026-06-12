@@ -54,7 +54,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [Motorola v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Motorola.v1.2.0.tar.gz)
 - **Packet_Capture_Web**
     - Web interface for running and managing packet captures. Stream mode captures continuously to one file until stopped or disk threshold. Download mode captures for a set timeout/count. Supports all router interfaces, BPF filters, disk monitoring with NCM alerts, and file management (rename, download, delete) from the browser.
-    - **Download:** [Packet_Capture_Web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Packet_Capture_Web.v1.0.0.tar.gz)
+    - **Download:** [Packet_Capture_Web v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Packet_Capture_Web.v1.0.1.tar.gz)
 - **app_template**
     - A template for the creation of a new application utilizing the csclient library.
     - **Download:** [app_template v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/app_template.v1.0.0.tar.gz)
@@ -454,6 +454,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
