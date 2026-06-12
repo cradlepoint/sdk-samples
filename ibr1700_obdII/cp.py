@@ -25,7 +25,10 @@ Copyright (c) 2026 Ericsson Enterprise Wireless Solutions <www.cradlepoint.com>.
 All rights reserved.
 """
 
+import base64
 import configparser
+import hashlib
+import hmac
 import json
 import logging
 import logging.handlers
@@ -3594,6 +3597,93 @@ def ensure_fresh_user(username: str, group: str = "admin") -> Dict[str, Any]:
         result['password'] = password
         result['action'] = 'created_fresh'
         return result
+    except Exception as e:
+        return {'success': False, 'error': str(e), 'username': username}
+
+
+def validate_password(username: str, password: str) -> Dict[str, Any]:
+    """Validate a plaintext password against the stored hash for a user.
+
+    Supports NCOS password hash format:
+        $3$iterations$salt$key_b64 - PBKDF2-HMAC-SHA256
+
+    The salt field is used as raw ASCII bytes (not base64-decoded).
+    The key field is base64-encoded.
+
+    Note: The REST API (local dev mode) returns a masked $0$ hash that
+    cannot be validated. This function works reliably on-router where
+    cp.get() returns the real $3$ hash via the SDK socket.
+
+    Args:
+        username: The username to validate.
+        password: The plaintext password to check.
+
+    Returns:
+        Dict[str, Any]: Dict with keys:
+            - success (bool): Whether the operation completed.
+            - valid (bool): Whether the password matches (on success).
+            - username (str): The username checked.
+            - error (str): Error message (on failure).
+    """
+    try:
+        users_result = get_users()
+        if not users_result.get('success'):
+            return {'success': False, 'error': 'Failed to retrieve users',
+                    'username': username}
+
+        users = users_result.get('users', [])
+        stored_hash = None
+        if isinstance(users, list):
+            for user in users:
+                if isinstance(user, dict) and user.get('username') == username:
+                    stored_hash = user.get('password', '')
+                    break
+
+        if stored_hash is None:
+            return {'success': False, 'error': f'User {username} not found',
+                    'username': username}
+
+        # Parse hash format: $algo$[iterations$]salt_b64$key_b64
+        parts = stored_hash.split('$')
+        # parts[0] is always empty string before first $
+        algo = parts[1] if len(parts) > 1 else ''
+
+        if algo == '0' and len(parts) == 4:
+            # $0$ is a masked/encrypted format returned by the REST API.
+            # It cannot be validated — only the real $3$ hash (from the
+            # SDK socket on-router) supports local validation.
+            return {'success': False,
+                    'error': 'Cannot validate $0$ hash (REST API returns '
+                             'masked passwords). Run on-router for real '
+                             'hash validation.',
+                    'username': username}
+        elif algo == '3' and len(parts) == 5:
+            # $3$iterations$salt$key_b64 — PBKDF2-HMAC-SHA256
+            hash_algo = 'sha256'
+            iterations = int(parts[2])
+            salt_str = parts[3]
+            expected_key_b64 = parts[4]
+        else:
+            return {'success': False,
+                    'error': f'Unsupported hash format (algo=${algo}$, '
+                             f'{len(parts)} parts)',
+                    'username': username}
+
+        # Salt is used as raw ASCII string bytes, not base64-decoded
+        salt_bytes = salt_str.encode('utf-8')
+        expected_key = base64.b64decode(expected_key_b64)
+
+        derived_key = hashlib.pbkdf2_hmac(
+            hash_algo,
+            password.encode('utf-8'),
+            salt_bytes,
+            iterations,
+            dklen=len(expected_key)
+        )
+
+        valid = hmac.compare_digest(derived_key, expected_key)
+        return {'success': True, 'valid': valid, 'username': username}
+
     except Exception as e:
         return {'success': False, 'error': str(e), 'username': username}
 
