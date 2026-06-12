@@ -19,6 +19,7 @@
         }
         .form-row select:focus, .form-row input:focus { outline: none; border-color: var(--accent-color); }
         .capture-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: flex-end; }
+        .capture-actions button { min-width: 110px; }
         .status-bar { margin-top: 1rem; padding: 0.75rem 1rem; border-radius: var(--radius-sm);
             background: var(--bg-tertiary); border: 1px solid var(--border-color); min-height: 1.5rem; }
         .status-bar.running { border-color: var(--warning-color); background: rgba(255,193,7,0.08); }
@@ -183,6 +184,9 @@
                             <div class="capture-actions">
                                 <button type="button" class="btn-start" id="btn-start" onclick="startCapture()">Start</button>
                                 <button type="button" class="btn-stop" id="btn-stop" onclick="stopCapture()" disabled>Stop</button>
+                                <button type="button" class="btn btn-secondary" onclick="toggleAutoStart()" id="btn-autostart" title="Start capturing automatically on boot using saved defaults">Auto Start</button>
+                                <button type="button" class="btn btn-secondary" onclick="saveDefaults()" title="Save current settings as defaults">Save Defaults</button>
+                                <button type="button" class="btn btn-secondary" onclick="loadDefaults()" title="Load saved defaults into form">Load Defaults</button>
                             </div>
                         </div>
                     </section>
@@ -210,6 +214,9 @@
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" onclick="applyOptions()">
                     <i class="fas fa-check"></i> Apply to Current
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="saveOptionsAsDefault()">
+                    <i class="fas fa-save"></i> Save as Default
                 </button>
                 <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
             </div>
@@ -371,22 +378,16 @@
                 else if (data.status && data.status.indexOf('Error') === 0) { cls = 'error'; }
                 else if (data.status && data.status.indexOf('Saved') === 0) { cls = 'success'; }
                 else if (data.status && data.status.indexOf('Stopped') === 0) { cls = ''; }
+                else if (data.status && data.status.indexOf('Warning') === 0) { cls = 'error'; }
                 updateStatus(data.status || 'Ready', cls);
 
                 if (data.running) {
+                    document.getElementById('btn-start').disabled = true;
+                    document.getElementById('btn-stop').disabled = false;
                     pollDisk();
-                }
-
-                if (!data.running) {
+                } else {
                     document.getElementById('btn-start').disabled = false;
                     document.getElementById('btn-stop').disabled = true;
-                    if (statusInterval) {
-                        clearInterval(statusInterval);
-                        statusInterval = null;
-                    }
-                    // Refresh files after capture ends
-                    loadFiles();
-                    pollDisk();
                 }
             }
         });
@@ -619,6 +620,26 @@
         currentModalOptions = null;
     }
 
+    function saveOptionsAsDefault() {
+        if (!currentModalOptions) return;
+        $.ajax({
+            url: '/api/defaults',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(currentModalOptions),
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    closeModal();
+                    updateStatus('Saved as default', 'success');
+                } else {
+                    alert(data.error || 'Save failed');
+                }
+            },
+            error: function() { alert('Save as default failed'); }
+        });
+    }
+
     function deleteFile(filename) {
         $.ajax({
             url: '/api/delete',
@@ -662,10 +683,113 @@
         if (e.target === this) { closeModal(); }
     });
 
+    // Save defaults
+    function saveDefaults() {
+        var ifaceSelect = document.getElementById('capture-interface');
+        var btn = document.getElementById('btn-autostart');
+        var autoStartOn = btn.textContent.indexOf('ON') !== -1;
+        var options = {
+            mode: document.getElementById('capture-mode').value,
+            stream: (document.getElementById('capture-mode').value === 'stream'),
+            interface: ifaceSelect.value,
+            interface_label: ifaceSelect.options[ifaceSelect.selectedIndex].text,
+            arguments: document.getElementById('capture-args').value,
+            timeout: document.getElementById('capture-timeout').value,
+            count: document.getElementById('capture-count').value,
+            disk_threshold: document.getElementById('disk-threshold').value,
+            send_alert: document.getElementById('disk-alert').checked,
+            auto_start: autoStartOn
+        };
+        $.ajax({
+            url: '/api/defaults',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(options),
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    updateStatus('Defaults saved', 'success');
+                } else {
+                    alert(data.error || 'Save failed');
+                }
+            },
+            error: function() { alert('Save defaults failed'); }
+        });
+    }
+
+    // Toggle auto start
+    function toggleAutoStart() {
+        $.ajax({
+            url: '/api/autostart',
+            method: 'POST',
+            contentType: 'application/json',
+            data: '{}',
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    updateAutoStartBtn(data.auto_start);
+                    updateStatus(data.auto_start ? 'Auto Start enabled' : 'Auto Start disabled', '');
+                } else {
+                    alert(data.error || 'Failed');
+                }
+            },
+            error: function() { alert('Toggle auto start failed'); }
+        });
+    }
+
+    function updateAutoStartBtn(enabled) {
+        var btn = document.getElementById('btn-autostart');
+        if (enabled) {
+            btn.style.background = 'var(--success-color)';
+            btn.style.color = '#fff';
+            btn.textContent = 'Auto Start: ON';
+        } else {
+            btn.style.background = '';
+            btn.style.color = '';
+            btn.textContent = 'Auto Start';
+        }
+    }
+
+    // Load saved defaults into form
+    function loadDefaults() {
+        $.ajax({
+            url: '/api/defaults',
+            method: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (data && data.mode) {
+                    document.getElementById('capture-mode').value = data.mode;
+                    document.getElementById('capture-mode').dispatchEvent(new Event('change'));
+                    if (data.arguments) document.getElementById('capture-args').value = data.arguments;
+                    if (data.timeout) document.getElementById('capture-timeout').value = data.timeout;
+                    if (data.count) document.getElementById('capture-count').value = data.count;
+                    if (data.disk_threshold) document.getElementById('disk-threshold').value = data.disk_threshold;
+                    if (data.send_alert !== undefined) document.getElementById('disk-alert').checked = data.send_alert;
+                    // Set interface after interfaces load
+                    if (data.interface) {
+                        setTimeout(function() {
+                            var sel = document.getElementById('capture-interface');
+                            for (var i = 0; i < sel.options.length; i++) {
+                                if (sel.options[i].value === data.interface) {
+                                    sel.value = data.interface;
+                                    break;
+                                }
+                            }
+                        }, 1000);
+                    }
+                }
+                if (data && data.auto_start !== undefined) {
+                    updateAutoStartBtn(data.auto_start);
+                }
+            }
+        });
+    }
+
     // Init
     loadInterfaces();
-    pollStatus();
+    startStatusPolling();
     pollDisk();
+    loadDefaults();
     </script>
 </body>
 </html>

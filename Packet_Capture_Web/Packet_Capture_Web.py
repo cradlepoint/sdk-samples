@@ -31,6 +31,28 @@ os.makedirs(CAPTURES_DIR, exist_ok=True)
 os.makedirs(META_DIR, exist_ok=True)
 
 
+def load_defaults():
+    """Load saved defaults from appdata."""
+    try:
+        val = cp.get_appdata('pcap_defaults')
+        if val and isinstance(val, str) and val.strip():
+            return json.loads(val)
+    except Exception as e:
+        cp.log('Error loading defaults from appdata: ' + str(e))
+    return {}
+
+
+def save_defaults_file(options):
+    """Save defaults to appdata."""
+    try:
+        # Include auto_start in the saved options
+        cp.put_appdata('pcap_defaults', json.dumps(options))
+        return True
+    except Exception as e:
+        cp.log('Error saving defaults to appdata: ' + str(e))
+        return False
+
+
 def get_interfaces():
     """Get available network interfaces matching NCOS style."""
     interfaces = [{'value': 'any', 'label': 'Any'}]
@@ -743,6 +765,8 @@ class CaptureHandler(BaseHTTPRequestHandler):
             })
         elif path == '/api/disk':
             self.send_json(get_disk_usage())
+        elif path == '/api/defaults':
+            self.send_json(load_defaults())
         elif path == '/api/files':
             self.send_json(get_capture_files())
         elif path.startswith('/api/download/'):
@@ -782,6 +806,20 @@ class CaptureHandler(BaseHTTPRequestHandler):
             self.handle_start(data)
         elif path == '/api/stop':
             self.handle_stop()
+        elif path == '/api/defaults':
+            if save_defaults_file(data):
+                self.send_json({'success': True})
+            else:
+                self.send_json({'error': 'Failed to save'}, 500)
+        elif path == '/api/autostart':
+            defaults = load_defaults()
+            current = defaults.get('auto_start', False)
+            defaults['auto_start'] = not current
+            if save_defaults_file(defaults):
+                self.send_json({'success': True,
+                                'auto_start': not current})
+            else:
+                self.send_json({'error': 'Failed to save'}, 500)
         elif path == '/api/rename':
             self.handle_rename(data)
         elif path == '/api/delete':
@@ -935,6 +973,22 @@ def main():
     server_thread.start()
 
     cp.log('Packet_Capture_Web running on port ' + str(PORT))
+
+    # Auto-start capture if enabled in defaults
+    try:
+        defaults = load_defaults()
+        if defaults.get('auto_start', False):
+            cp.log('Auto-start enabled, starting capture...')
+            # Ensure stream flag matches mode
+            if defaults.get('mode') == 'stream':
+                defaults['stream'] = True
+            time.sleep(3)  # Let web server settle
+            auto_thread = threading.Thread(
+                target=run_capture, args=(defaults,))
+            auto_thread.daemon = True
+            auto_thread.start()
+    except Exception as e:
+        cp.log('Auto-start error: ' + str(e))
 
     # Keep main thread alive
     try:
