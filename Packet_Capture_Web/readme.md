@@ -2,8 +2,9 @@
 
 Web interface for running and managing packet captures on Ericsson routers.  With streaming!
 
-<img width="1596" height="846" alt="image" src="https://github.com/user-attachments/assets/8a6613a6-969c-49ce-9abd-eeb3343e2aa8" />
-<img width="1596" height="846" alt="image" src="https://github.com/user-attachments/assets/e098ef1f-6cc4-47aa-9b93-f27dd05384a9" />
+<img width="1596" height="846" alt="image" src="https://github.com/user-attachments/assets/84833d50-9d05-4d23-99e6-5209b52b5839" />
+<img width="1596" height="846" alt="image" src="https://github.com/user-attachments/assets/92f2bee0-7c9e-49f9-971f-ad187f71d6d8" />
+
 
 
 ## Features
