@@ -1,6 +1,10 @@
 """
-speedtest_scheduled_custom1 - Run Ookla speedtests on a cron schedule from appdata.
+speedtest_scheduled_custom1 - Run speedtests on a cron schedule from appdata.
 Results are written to NCM custom1 field via the ncm PyPI library.
+
+Speedtest engines (in priority order):
+1. Ookla - if licensed 'ookla' binary is present in app directory
+2. Netperf - built-in router netperf service (default fallback)
 
 Appdata fields:
   schedule   - cron expression (default: "0 8,12,17 * * *")
@@ -9,10 +13,10 @@ Appdata fields:
 """
 
 import cp
+import os
 import time
 import json
 from datetime import datetime
-from speedtest_ookla import Speedtest
 import ncm
 
 DEFAULT_SCHEDULE = "0 12 * * *"
@@ -64,8 +68,32 @@ def cron_matches(expr, now):
         return False
 
 
+def has_ookla():
+    """Check if ookla binary is present."""
+    if os.path.exists('ookla'):
+        if not os.access('ookla', os.X_OK):
+            try:
+                os.chmod('ookla', 0o755)
+            except Exception:
+                pass
+        return True
+    return False
+
+
 def run_speedtest():
+    """Run speedtest with Ookla if available, fallback to netperf."""
+    if has_ookla():
+        result = run_speedtest_ookla()
+        if result:
+            return result
+        cp.log('Ookla failed, falling back to netperf...')
+    return run_speedtest_netperf()
+
+
+def run_speedtest_ookla():
+    """Run speedtest using Ookla binary."""
     try:
+        from speedtest_ookla import Speedtest
         s = Speedtest(timeout=90)
         s.start()
         r = s.results
@@ -73,10 +101,27 @@ def run_speedtest():
         up = '{:.2f}'.format(r.upload / 1e6)
         ping = int(r.ping)
         result = f'{down}Mbps Down / {up}Mbps Up / {ping}ms'
-        cp.log(f'Speedtest result: {result}')
+        cp.log(f'Ookla result: {result}')
         return result
     except Exception as e:
-        cp.log(f'Speedtest error: {e}')
+        cp.log(f'Ookla error: {e}')
+        return None
+
+
+def run_speedtest_netperf():
+    """Run speedtest using router's built-in netperf."""
+    try:
+        data = cp.speed_test(duration=10, direction='both')
+        if data:
+            dl = data.get('download_bps', 0) / 1e6
+            ul = data.get('upload_bps', 0) / 1e6
+            result = f'{dl:.2f}Mbps Down / {ul:.2f}Mbps Up'
+            cp.log(f'Netperf result: {result}')
+            return result
+        cp.log('Netperf returned no results')
+        return None
+    except Exception as e:
+        cp.log(f'Netperf error: {e}')
         return None
 
 
@@ -130,6 +175,8 @@ def put_custom1(result_text):
 
 
 cp.log('Starting speedtest_scheduled_custom1...')
+engine = 'Ookla' if has_ookla() else 'Netperf (built-in)'
+cp.log(f'Speedtest engine: {engine}')
 cp.wait_for_wan_connection()
 
 last_fired_minute = None

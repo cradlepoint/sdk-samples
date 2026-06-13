@@ -16,5 +16,5 @@ settings = {
     "server_token": "",
     "enable_surveyors": False,
     "surveyors": [],
-    "speedtest_url": "www.speedtest.net/speedtest-config.php"
+    "speedtest_url": "speedtest.sea11.us.leaseweb.net:5201-5210"
 }

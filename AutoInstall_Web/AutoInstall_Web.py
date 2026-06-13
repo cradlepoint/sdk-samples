@@ -1,9 +1,14 @@
 """AutoInstall_Web - AutoInstall SIM Installer Application
 Web interface that accepts a password, and when entered correctly, runs the auto-install process.
-Detects SIMs per appdata sims (all, local, or captive), tests each with Ookla speed test,
+Detects SIMs per appdata sims (all, local, or captive), tests each with speed test,
 collects diagnostics. Default: reprioritizes WAN profiles by download speed. When group_by_sim or
 group_by_carrier is set, only moves router to NCM group (no WAN config changes). If appdata autostart
-is set, starts the process automatically without user input."""
+is set, starts the process automatically without user input.
+
+Speedtest engines (in priority order):
+1. Ookla - if licensed 'ookla' binary is present in app directory
+2. Netperf - built-in router netperf service with ifc_wan per-SIM (default)
+"""
 
 import cp
 import tornado.web
@@ -17,7 +22,6 @@ import configparser
 import mimetypes
 import socket
 import requests
-from speedtest_ookla import Speedtest
 import ncm
 
 def get_ui_logo():
@@ -1613,127 +1617,63 @@ def cleanup_all_speedtest_routes_for_device(sim_device):
         cp.log(f'Error cleaning up leftover routes for {port_sim}: {e}')
 
 def do_speedtest(sim, carrier_name=None):
-    """Run Ookla speedtest using binary and return TCP down and TCP up in Mbps."""
-    route_info = None
+    """Run speedtest on a SIM and return TCP down and TCP up in Mbps.
+    Uses Ookla if binary present, otherwise uses netperf with ifc_wan."""
     try:
-        # Check if ookla binary exists
-        if not os.path.exists('ookla'):
-            cp.log('Ookla binary not found')
-            return 0.0, 0.0
-        
         sim_slot = get_sim_slot(sim)
         port_display = get_display_port(sim) or get_sim_port(sim) or ''
         sim_label = (port_display + ' ' + (sim_slot or '')).strip() or ''
         if sim_label:
             sim_label = sim_label + ' '
 
-        # Ensure we always have a carrier name for logging (best-effort)
+        # Ensure we always have a carrier name for logging
         if not carrier_name:
             try:
                 diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
                 if diagnostics:
                     carrier_name = diagnostics.get('CARRID', '') or ''
-            except:
+            except Exception:
                 carrier_name = carrier_name or ''
 
         carrier_info = f' ({carrier_name})' if carrier_name else ''
 
-        # Get the IP address of the SIM device for optional source binding
-        source_ip = None
-        try:
-            ipinfo = cp.get(f'status/wan/devices/{sim}/status/ipinfo')
-            if ipinfo:
-                source_ip = ipinfo.get('ip_address')
-        except Exception as e:
-            cp.log(f'Warning: Could not get IP address for {sim_label}: {e}')
-        
-        # Resolve speedtest server IPs and add host routes via this SIM (speedtest2 approach)
-        try:
-            server_ips = resolve_speedtest_server_ips()
-            if server_ips:
-                route_info = add_speedtest_routes(sim, server_ips)
-                if route_info:
-                    cp.log(f'Added {len(route_info)} speedtest routes via {sim_label}')
-                    write_log(f'Added {len(route_info)} speedtest routes via {sim_label}')
-                    # Give routes a moment to take effect
-                    time.sleep(1)
-        except Exception as e:
-            cp.log(f'Warning: Could not add speedtest routes: {e}')
-            write_log(f'Warning: Could not add speedtest routes: {e}')
+        # Check if ookla binary exists and use it if so
+        if os.path.exists('ookla'):
+            if not os.access('ookla', os.X_OK):
+                try:
+                    os.chmod('ookla', 0o755)
+                except Exception:
+                    pass
+            return _do_speedtest_ookla(sim, sim_label, carrier_info, carrier_name)
 
-        cp.log(f'Running Ookla speedtest on {sim_label}{carrier_info}...')
-        write_log(f'Running Ookla speedtest on {sim_label}{carrier_info}...')
-        
-        # Capture bytes in/out before speedtest for RouterBytesTotal
-        bytes_in_before = None
-        bytes_out_before = None
-        try:
-            bytes_in_before = cp.get(f'status/wan/devices/{sim}/stats/in')
-        except Exception as e:
-            cp.log(f'Warning: Could not read bytes in before speedtest for {sim_label}: {e}')
-        try:
-            bytes_out_before = cp.get(f'status/wan/devices/{sim}/stats/out')
-        except Exception as e:
-            cp.log(f'Warning: Could not read bytes out before speedtest for {sim_label}: {e}')
+        # Default: use netperf with ifc_wan
+        return _do_speedtest_netperf(sim, sim_label, carrier_info, carrier_name)
 
-        # Create Speedtest instance; keep source_address if we have it, but rely on routes
-        if source_ip:
-            speedtest = Speedtest(source_address=source_ip, timeout=90)
-            cp.log(f'Binding speedtest to source IP: {source_ip}')
-        else:
-            speedtest = Speedtest(timeout=90)
-            cp.log('No source IP available, running speedtest without source binding (routes only)')
-        
-        # Run full bidirectional test (download + upload)
-        speedtest.download_and_upload()
-        
-        if speedtest.results:
-            # Convert from bits per second to Mbps and get latency in ms
-            down = speedtest.results.download / 1000000  # bps to Mbps
-            up = speedtest.results.upload / 1000000  # bps to Mbps
-            latency = getattr(speedtest.results, 'ping', 0) or 0
+    except Exception as e:
+        carrier_info = f' ({carrier_name})' if carrier_name else ''
+        error_msg = f'Error running speedtest on {sim_label}{carrier_info}: {e}'
+        cp.log(error_msg)
+        write_log(error_msg)
+        return 0.0, 0.0
 
-            # Capture bytes in/out after speedtest and compute deltas
-            bytes_in_after = None
-            bytes_out_after = None
-            try:
-                bytes_in_after = cp.get(f'status/wan/devices/{sim}/stats/in')
-            except Exception as e:
-                cp.log(f'Warning: Could not read final bytes in for {sim_label}: {e}')
-            try:
-                bytes_out_after = cp.get(f'status/wan/devices/{sim}/stats/out')
-            except Exception as e:
-                cp.log(f'Warning: Could not read final bytes out for {sim_label}: {e}')
 
-            bytes_used_in = None
-            bytes_used_out = None
-            bytes_used_total = None
-            try:
-                if bytes_in_before is not None and bytes_in_after is not None:
-                    bytes_used_in = int(bytes_in_after) - int(bytes_in_before)
-                if bytes_out_before is not None and bytes_out_after is not None:
-                    bytes_used_out = int(bytes_out_after) - int(bytes_out_before)
-                if bytes_used_in is not None or bytes_used_out is not None:
-                    if bytes_used_in is None:
-                        bytes_used_in = 0
-                    if bytes_used_out is None:
-                        bytes_used_out = 0
-                    bytes_used_total = bytes_used_in + bytes_used_out
-            except Exception as e:
-                cp.log(f'Warning: Could not compute bytes used for {sim_label}: {e}')
+def _do_speedtest_netperf(sim, sim_label, carrier_info, carrier_name):
+    """Run netperf speedtest using ifc_wan. Returns (down_mbps, up_mbps)."""
+    try:
+        iface = cp.get(f'status/wan/devices/{sim}/info/iface')
+        if not iface:
+            cp.log(f'No iface found for {sim}')
+            return 0.0, 0.0
 
-            # Get ISP from Ookla results (client dict or top-level isp in result)
-            ookla_isp = ''
-            try:
-                client = getattr(speedtest.results, 'client', {}) or {}
-                if isinstance(client, dict):
-                    ookla_isp = client.get('isp') or client.get('isp_name') or ''
-                if not ookla_isp and hasattr(speedtest.results, 'isp'):
-                    ookla_isp = speedtest.results.isp or ''
-            except Exception:
-                pass
+        cp.log(f'Running netperf speedtest on {sim_label}{carrier_info} via {iface}...')
+        write_log(f'Running netperf speedtest on {sim_label}{carrier_info} via {iface}...')
 
-            # Get ICCID and score from diagnostics if available
+        result = cp.speed_test(interface=iface, duration=10, direction='both')
+        if result:
+            down = result.get('download_bps', 0) / 1000000
+            up = result.get('upload_bps', 0) / 1000000
+
+            # Get ICCID and score from diagnostics
             iccid = ''
             score_info = ''
             try:
@@ -1743,36 +1683,144 @@ def do_speedtest(sim, carrier_name=None):
                     score, lbl = rsrp_rsrq_to_score(diagnostics)
                     if score is not None:
                         score_info = f' {lbl or "4G/5G"} Score: {score}' if lbl else f' Score: {score}'
-            except:
+            except Exception:
                 pass
+
             sim_slot = get_sim_slot(sim)
-            sim_label = f'{sim_slot} ' if sim_slot else ''
+            sim_label2 = f'{sim_slot} ' if sim_slot else ''
+            iccid_info = f' ICCID={iccid}' if iccid else ''
+
+            cp.log(f'Speedtest complete for {sim_label2}{carrier_info}{iccid_info}. '
+                   f'Download: {down:.2f}Mbps Upload: {up:.2f}Mbps{score_info}')
+            write_log(f'Speedtest complete for {sim_label2}{carrier_info}{iccid_info}. '
+                      f'Download: {down:.2f}Mbps Upload: {up:.2f}Mbps{score_info}')
+            return down, up
+        else:
+            cp.log(f'Netperf returned no results for {sim_label}{carrier_info}')
+            write_log(f'Netperf returned no results for {sim_label}{carrier_info}')
+            return 0.0, 0.0
+    except Exception as e:
+        cp.log(f'Netperf error on {sim_label}{carrier_info}: {e}')
+        write_log(f'Netperf error on {sim_label}{carrier_info}: {e}')
+        return 0.0, 0.0
+
+
+def _do_speedtest_ookla(sim, sim_label, carrier_info, carrier_name):
+    """Run Ookla speedtest with routing. Returns (down_mbps, up_mbps)."""
+    route_info = None
+    try:
+        # Get the IP address of the SIM device for source binding
+        source_ip = None
+        try:
+            ipinfo = cp.get(f'status/wan/devices/{sim}/status/ipinfo')
+            if ipinfo:
+                source_ip = ipinfo.get('ip_address')
+        except Exception as e:
+            cp.log(f'Warning: Could not get IP address for {sim_label}: {e}')
+
+        # Resolve speedtest server IPs and add host routes via this SIM
+        try:
+            server_ips = resolve_speedtest_server_ips()
+            if server_ips:
+                route_info = add_speedtest_routes(sim, server_ips)
+                if route_info:
+                    cp.log(f'Added {len(route_info)} speedtest routes via {sim_label}')
+                    write_log(f'Added {len(route_info)} speedtest routes via {sim_label}')
+                    time.sleep(1)
+        except Exception as e:
+            cp.log(f'Warning: Could not add speedtest routes: {e}')
+            write_log(f'Warning: Could not add speedtest routes: {e}')
+
+        cp.log(f'Running Ookla speedtest on {sim_label}{carrier_info}...')
+        write_log(f'Running Ookla speedtest on {sim_label}{carrier_info}...')
+
+        # Capture bytes before
+        bytes_in_before = None
+        bytes_out_before = None
+        try:
+            bytes_in_before = cp.get(f'status/wan/devices/{sim}/stats/in')
+        except Exception:
+            pass
+        try:
+            bytes_out_before = cp.get(f'status/wan/devices/{sim}/stats/out')
+        except Exception:
+            pass
+
+        # Create Speedtest instance
+        from speedtest_ookla import Speedtest
+        if source_ip:
+            speedtest = Speedtest(source_address=source_ip, timeout=90)
+            cp.log(f'Binding speedtest to source IP: {source_ip}')
+        else:
+            speedtest = Speedtest(timeout=90)
+
+        speedtest.download_and_upload()
+
+        if speedtest.results:
+            down = speedtest.results.download / 1000000
+            up = speedtest.results.upload / 1000000
+            latency = getattr(speedtest.results, 'ping', 0) or 0
+
+            # Compute bytes used
+            bytes_used_total = None
+            try:
+                bytes_in_after = cp.get(f'status/wan/devices/{sim}/stats/in')
+                bytes_out_after = cp.get(f'status/wan/devices/{sim}/stats/out')
+                if bytes_in_before is not None and bytes_in_after is not None:
+                    bytes_used_in = int(bytes_in_after) - int(bytes_in_before)
+                else:
+                    bytes_used_in = 0
+                if bytes_out_before is not None and bytes_out_after is not None:
+                    bytes_used_out = int(bytes_out_after) - int(bytes_out_before)
+                else:
+                    bytes_used_out = 0
+                bytes_used_total = bytes_used_in + bytes_used_out
+            except Exception:
+                pass
+
+            # Get ISP from Ookla results
+            ookla_isp = ''
+            try:
+                client = getattr(speedtest.results, 'client', {}) or {}
+                if isinstance(client, dict):
+                    ookla_isp = client.get('isp') or ''
+                if not ookla_isp and hasattr(speedtest.results, 'isp'):
+                    ookla_isp = speedtest.results.isp or ''
+            except Exception:
+                pass
+
+            # Get ICCID and score
+            iccid = ''
+            score_info = ''
+            try:
+                diagnostics = cp.get(f'status/wan/devices/{sim}/diagnostics')
+                if diagnostics:
+                    iccid = diagnostics.get('ICCID', '')
+                    score, lbl = rsrp_rsrq_to_score(diagnostics)
+                    if score is not None:
+                        score_info = f' {lbl or "4G/5G"} Score: {score}' if lbl else f' Score: {score}'
+            except Exception:
+                pass
+
+            sim_slot = get_sim_slot(sim)
+            sim_label2 = f'{sim_slot} ' if sim_slot else ''
             iccid_info = f' ICCID={iccid}' if iccid else ''
             isp_info = f' OoklaISP: {ookla_isp}' if ookla_isp else ''
-            bytes_info = ''
-            if bytes_used_total is not None:
-                bytes_info = f' RouterBytesTotal: {bytes_used_total}B'
+            bytes_info = f' RouterBytesTotal: {bytes_used_total}B' if bytes_used_total is not None else ''
 
-            cp.log(f'Speedtest complete for {sim_label}{carrier_info}{iccid_info}. '
+            cp.log(f'Speedtest complete for {sim_label2}{carrier_info}{iccid_info}. '
                    f'Download: {down:.2f}Mbps Upload: {up:.2f}Mbps Latency: {latency:.2f}ms{isp_info}{bytes_info}{score_info}')
-            write_log(f'Speedtest complete for {sim_label}{carrier_info}{iccid_info}. '
+            write_log(f'Speedtest complete for {sim_label2}{carrier_info}{iccid_info}. '
                       f'Download: {down:.2f}Mbps Upload: {up:.2f}Mbps Latency: {latency:.2f}ms{isp_info}{bytes_info}{score_info}')
             return down, up
         else:
-            sim_slot = get_sim_slot(sim)
-            sim_label = f'{sim_slot} ' if sim_slot else ''
-            cp.log(f'No results from speedtest on {sim_label}{carrier_info}')
+            cp.log(f'No results from Ookla on {sim_label}{carrier_info}')
             return 0.0, 0.0
     except Exception as e:
-        sim_slot = get_sim_slot(sim)
-        sim_label = f'{sim_slot} ' if sim_slot else ''
-        carrier_info = f' ({carrier_name})' if carrier_name else ''
-        error_msg = f'Error running speedtest on {sim_label}{carrier_info}: {e}'
-        cp.log(error_msg)
-        write_log(error_msg)
+        cp.log(f'Ookla error on {sim_label}{carrier_info}: {e}')
+        write_log(f'Ookla error on {sim_label}{carrier_info}: {e}')
         return 0.0, 0.0
     finally:
-        # Clean up speedtest host routes from main table
         try:
             if route_info:
                 remove_speedtest_routes(route_info)

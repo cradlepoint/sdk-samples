@@ -25,6 +25,7 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Create directories before writing** - use `os.makedirs('tmp', exist_ok=True)` before writing to tmp/
 - **Python is "cppython"** - start.sh must use `cppython`
 - **Static apps** - no .pyc or .so files, but statically linked ARM64 binaries ARE supported
+- **Bundled binaries lose execute permission** - tar extraction on the router does NOT preserve the execute bit. Always `os.chmod('binary', 0o755)` before first use. Check with `os.path.exists()` not `os.access(path, os.X_OK)`
 - **Boot logging** - `cp.log('Starting...')` ASAP at startup
 - **Wait for connectivity** - use `cp.wait_for_wan_connection()` if internet is needed
 - **NEVER modify packaged files** - Apps have digital signatures (MANIFEST.json). Router deletes app if any packaged file is modified. Write to NEW files only (e.g., `data.csv`, `logs/output.txt`)

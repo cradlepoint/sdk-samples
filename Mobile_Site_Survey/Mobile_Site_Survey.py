@@ -1,7 +1,7 @@
 import cp
 from threading import Thread, Lock
 import concurrent.futures
-from speedtest import Speedtest
+from speedtest import Speedtest, configure as configure_speedtest, get_engine
 from geopy import distance
 from settings import settings
 import requests
@@ -734,7 +734,7 @@ def run_tests(modem):
     server = None
     cur_plmn = None  # Initialize cur_plmn to avoid "referenced before assignment" error
     source_ip = None
-    ookla = None
+    st = None
     logs = []
 
     if dispatcher.config.get("speedtests"):
@@ -749,21 +749,21 @@ def run_tests(modem):
             msg = f'Exception in routing: {e}'
             log_all(msg, logs)
         try:
-            # Instantiate Ookla with source_ip from modem
+            # Instantiate speedtest with source_ip from modem
             retries = 0
             while retries < 5:
                 try:
-                    ookla = Speedtest(source_address=source_ip)
+                    st = Speedtest(source_address=source_ip)
                     break
-                except:
+                except Exception:
                     retries += 1
-                    cp.log(f'Ookla failed to start for source {source_ip} on {modem}.  Trying again...')
+                    cp.log(f'Speedtest failed to start for source {source_ip} on {modem}. Trying again...')
                     time.sleep(1)
             else:
-                log_all(f'Ookla is not accepting connections at the time.  Please try again later.  Device: {modem}', logs)
+                log_all(f'Speedtest server is not accepting connections. Please try again later. Device: {modem}', logs)
                 return
         except Exception as e:
-            msg = f'Exception in Ookla startup: {e}'
+            msg = f'Exception in speedtest startup: {e}'
             log_all(msg, logs)
 
     wan_info = cp.get(f'status/wan/devices/{modem}/info')
@@ -823,12 +823,12 @@ def run_tests(modem):
         tx, rx, packet_loss_percent = 0, 0, 0
 
     if dispatcher.config.get("speedtests"):
-        # Ookla Speedtest
+        # Speedtest
         try:
             retries = 0
             while retries < 3:
                 try:
-                    ookla.get_best_server()
+                    st.get_best_server()
                     break
                 except Exception as e:
                     retries += 1
@@ -837,34 +837,34 @@ def run_tests(modem):
             logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
             cp.log(f'Starting Download Test on {product} {carrier}.')
-            ookla.download()  # Ookla Download Test
+            st.download()
             if wan_type == 'mdm':  # Capture CA Bands for modems
                 diagnostics = cp.get(f'status/wan/devices/{modem}/diagnostics')
             logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
             cp.log(f'Starting Upload Test on {product} {carrier}.')
-            ookla.upload(pre_allocate=False)  # Ookla upload test
+            st.upload(pre_allocate=False)
             logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
             cp.log(f'Speedtest Complete on {product} {carrier}.')
 
             # Format results
             try:
-                download = round(ookla.results.download / 1000 / 1000, 2)
-                upload = round(ookla.results.upload / 1000 / 1000, 2)
-                latency = round(ookla.results.ping)
-                bytes_sent = ookla.results.bytes_sent
-                bytes_received = ookla.results.bytes_received
-                server = ookla.results.server["host"]
-                share = ookla.results.share()
+                download = round(st.results.download / 1000 / 1000, 2)
+                upload = round(st.results.upload / 1000 / 1000, 2)
+                latency = round(st.results.ping)
+                bytes_sent = st.results.bytes_sent
+                bytes_received = st.results.bytes_received
+                server = st.results.server.get("host", "")
+                share = st.results.share()
             except Exception as e:
-                cp.log(f'Exception formatting Ookla results: {e}')
+                cp.log(f'Exception formatting speedtest results: {e}')
 
             debug_log(f'bytes_sent: {bytes_sent} bytes_received: {bytes_received}')
             dispatcher.total_bytes[modem] += bytes_sent + bytes_received
             total_mb_used = round(dispatcher.total_bytes[modem] / 1000 / 1000, 2)
         except Exception as e:
-            msg = f'Exception running Ookla speedtest for {product} {carrier}: {e}'
+            msg = f'Exception running speedtest for {product} {carrier}: {e}'
             log_all(msg, logs)
 
     # SEND TO SERVER:
@@ -1087,6 +1087,20 @@ if __name__ == "__main__":
     time.sleep(3)
 
     dispatcher = Dispatcher()
+    # Configure speedtest engine
+    engine = get_engine()
+    if engine == 'ookla':
+        cp.log('Speedtest engine: Ookla (binary detected)')
+    elif engine == 'iperf3':
+        speedtest_url = dispatcher.config.get('speedtest_url', '')
+        if speedtest_url and 'speedtest.net' not in speedtest_url:
+            configure_speedtest(speedtest_url)
+            cp.log(f'Speedtest engine: iPerf3 | Server: {speedtest_url}')
+        else:
+            cp.log('Speedtest engine: iPerf3 | WARNING: No server configured. '
+                   'Set speedtest_url in appdata (e.g. "iperf.example.com:5201-5210")')
+    else:
+        cp.log('WARNING: No speedtest binary found (need ookla or iperf3-arm64v8)')
     # Initialize routing cleanup once at startup
     initialize_routing()
     Thread(target=dispatcher.loop, daemon=True).start()

@@ -1,22 +1,40 @@
 """
-speedtest_scheduled_asset_id - Runs Ookla speedtest on a configurable cron schedule
+speedtest_scheduled_asset_id - Runs speedtest on a configurable cron schedule
 and writes results to the router's asset_id field.
+
+Speedtest engines (in priority order):
+1. Ookla - if licensed 'ookla' binary is present in app directory
+2. Netperf - built-in router netperf service (default fallback)
 
 Results format: ISO timestamp followed by speedtest results and modem diagnostics.
 Example: "DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, Carrier: Verizon, DBM: -74, SINR: 5.6, RSRP: -95, RSRQ: -11, 2024-03-15T14:30:00Z"
 
-Modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) are included only if the primary WAN device is a modem.
+Modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) are included only if the primary WAN device
+is a modem.
 
 Appdata fields:
-- cron_schedule: Cron expression (minute hour day month weekday). Default: "0 2 * * 1" (Monday at 2:00 AM UTC)
+- cron_schedule: Cron expression (minute hour day month weekday).
+  Default: "0 2 * * 1" (Monday at 2:00 AM UTC)
 """
 
 import cp
+import os
 import time
 from datetime import datetime
-from speedtest_ookla import Speedtest
 
 DEFAULT_CRON = '0 2 * * 1'  # Monday at 2:00 AM UTC
+
+
+def has_ookla():
+    """Check if ookla binary is present."""
+    if os.path.exists('ookla'):
+        if not os.access('ookla', os.X_OK):
+            try:
+                os.chmod('ookla', 0o755)
+            except Exception:
+                pass
+        return True
+    return False
 
 
 def get_cron_schedule():
@@ -28,10 +46,7 @@ def get_cron_schedule():
 
 
 def parse_cron_field(field, min_val, max_val):
-    """Parse a single cron field and return set of matching values.
-
-    Supports: *, */N, N, N-M, N-M/S, and comma-separated combinations.
-    """
+    """Parse a single cron field and return set of matching values."""
     values = set()
     for part in field.split(','):
         part = part.strip()
@@ -63,11 +78,7 @@ def parse_cron_field(field, min_val, max_val):
 
 
 def cron_matches(cron_expr, dt):
-    """Check if a datetime matches a cron expression.
-
-    Cron format: minute hour day_of_month month day_of_week
-    day_of_week: 0=Sunday, 1=Monday, ..., 6=Saturday (or 7=Sunday)
-    """
+    """Check if a datetime matches a cron expression."""
     try:
         fields = cron_expr.strip().split()
         if len(fields) != 5:
@@ -100,27 +111,19 @@ def cron_matches(cron_expr, dt):
 
 
 def get_modem_diagnostics():
-    """Get carrier, DBM, SINR, RSRP, and RSRQ from primary WAN device if it is a modem.
-
-    Returns tuple (carrier, dbm, sinr, rsrp, rsrq) or (None, None, None, None, None) if not a modem.
-    """
+    """Get carrier, DBM, SINR, RSRP, and RSRQ from primary WAN device if modem."""
     try:
         primary = cp.get('status/wan/primary_device')
         if not primary:
             return None, None, None, None, None
-
-        # Check if primary device is a modem (starts with 'mdm-')
         if not primary.startswith('mdm-'):
             return None, None, None, None, None
-
         device = cp.get(f'status/wan/devices/{primary}')
         if not device:
             return None, None, None, None, None
-
         diag = device.get('diagnostics', {})
         if not diag:
             return None, None, None, None, None
-
         carrier = diag.get('CARRID')
         dbm = diag.get('DBM')
         sinr = diag.get('SINR')
@@ -132,39 +135,84 @@ def get_modem_diagnostics():
         return None, None, None, None, None
 
 
-def run_speedtest():
-    """Run an Ookla speedtest and write results to asset_id."""
+def run_speedtest_ookla():
+    """Run Ookla speedtest. Returns (dl_mbps, ul_mbps, latency_ms) or None."""
     try:
-        cp.log('Starting scheduled speedtest...')
+        from speedtest_ookla import Speedtest
+        cp.log('Running Ookla speedtest...')
         s = Speedtest(timeout=90)
         s.start()
         r = s.results
-
         dl_mbps = r.download / 1_000_000
         ul_mbps = r.upload / 1_000_000
         latency = r.ping
+        return dl_mbps, ul_mbps, latency
+    except Exception as e:
+        cp.log(f'Ookla speedtest error: {e}')
+        return None
 
+
+def run_speedtest_netperf():
+    """Run netperf speedtest. Returns (dl_mbps, ul_mbps, latency_ms) or None."""
+    try:
+        cp.log('Running netperf speedtest...')
+        result = cp.speed_test(duration=10, direction='both')
+        if result:
+            dl_mbps = result.get('download_bps', 0) / 1_000_000
+            ul_mbps = result.get('upload_bps', 0) / 1_000_000
+            return dl_mbps, ul_mbps, 0
+        return None
+    except Exception as e:
+        cp.log(f'Netperf speedtest error: {e}')
+        return None
+
+
+def run_speedtest():
+    """Run speedtest with Ookla if available, fallback to netperf.
+    Write results to asset_id."""
+    try:
+        # Try Ookla first if binary present
+        result = None
+        engine = 'netperf'
+        if has_ookla():
+            result = run_speedtest_ookla()
+            if result:
+                engine = 'ookla'
+
+        # Fallback to netperf
+        if not result:
+            if has_ookla():
+                cp.log('Ookla failed, falling back to netperf...')
+            result = run_speedtest_netperf()
+
+        if not result:
+            cp.log('All speedtest engines failed.')
+            return
+
+        dl_mbps, ul_mbps, latency = result
         timestamp = f'{datetime.utcnow().isoformat()}Z'
 
         # Build result string
-        result = f'DL: {dl_mbps:.1f}Mbps, UL: {ul_mbps:.1f}Mbps, Latency: {latency:.0f}ms'
+        text = f'DL: {dl_mbps:.1f}Mbps, UL: {ul_mbps:.1f}Mbps'
+        if latency:
+            text += f', Latency: {latency:.0f}ms'
 
         # Add modem diagnostics if primary device is a modem
         carrier, dbm, sinr, rsrp, rsrq = get_modem_diagnostics()
         if carrier:
-            result += f', Carrier: {carrier}'
+            text += f', Carrier: {carrier}'
         if dbm is not None:
-            result += f', DBM: {dbm}'
+            text += f', DBM: {dbm}'
         if sinr is not None:
-            result += f', SINR: {sinr}'
+            text += f', SINR: {sinr}'
         if rsrp is not None:
-            result += f', RSRP: {rsrp}'
+            text += f', RSRP: {rsrp}'
         if rsrq is not None:
-            result += f', RSRQ: {rsrq}'
-        result += f', {timestamp}'
+            text += f', RSRQ: {rsrq}'
+        text += f', {timestamp}'
 
-        cp.log(f'Speedtest result: {result}')
-        cp.put('config/system/asset_id', result)
+        cp.log(f'Speedtest result ({engine}): {text}')
+        cp.put('config/system/asset_id', text)
         cp.log('Results written to asset_id.')
     except Exception as e:
         cp.log(f'Speedtest error: {e}')
@@ -172,6 +220,8 @@ def run_speedtest():
 
 try:
     cp.log('Starting...')
+    engine = 'Ookla' if has_ookla() else 'Netperf (built-in)'
+    cp.log(f'Speedtest engine: {engine}')
     cp.wait_for_wan_connection()
 
     cron_schedule = get_cron_schedule()

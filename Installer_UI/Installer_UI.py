@@ -7,7 +7,6 @@ import socket
 import threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs
-from speedtest_ookla import Speedtest
 
 
 class AppHandler(SimpleHTTPRequestHandler):
@@ -173,28 +172,61 @@ def _parse_multipart(body, content_type):
 
 
 def run_speedtest():
-    """Run Ookla speedtest and return formatted results."""
+    """Run speedtest with Ookla if available, fallback to netperf."""
     try:
-        cp.log('Starting Speedtest...')
-        s = Speedtest(timeout=90)
-        s.start()
-        r = s.results
-        download = '{:.2f}'.format(r.download / 1000 / 1000)
-        upload = '{:.2f}'.format(r.upload / 1000 / 1000)
-        cp.log('Ookla Speedtest Complete! Results:')
-        cp.log('Client ISP: ' + str(r.isp))
-        cp.log('Ookla Server: ' + r.server.get('name', 'Unknown'))
-        cp.log('Ping: ' + str(r.ping) + 'ms')
-        cp.log('Download Speed: ' + download + 'Mb/s')
-        cp.log('Upload Speed: ' + upload + 'Mb/s')
-        text = ('Carrier: ' + str(r.isp) + '\nServer: '
-                + r.server.get('name', 'Unknown') + '\nDL:' + download
-                + 'Mbps\nUL:' + upload + 'Mbps\nPing:'
-                + '{:.0f}'.format(r.ping) + 'ms')
-        return text
+        if has_ookla():
+            return run_speedtest_ookla()
+        return run_speedtest_netperf()
     except Exception as e:
         cp.log('Speedtest error: ' + str(e))
         return 'Speedtest failed: ' + str(e)
+
+
+def has_ookla():
+    """Check if ookla binary is present."""
+    if os.path.exists('ookla'):
+        if not os.access('ookla', os.X_OK):
+            try:
+                os.chmod('ookla', 0o755)
+            except Exception:
+                pass
+        return True
+    return False
+
+
+def run_speedtest_ookla():
+    """Run speedtest using Ookla binary."""
+    from speedtest_ookla import Speedtest
+    cp.log('Starting Ookla Speedtest...')
+    s = Speedtest(timeout=90)
+    s.start()
+    r = s.results
+    download = '{:.2f}'.format(r.download / 1000 / 1000)
+    upload = '{:.2f}'.format(r.upload / 1000 / 1000)
+    cp.log('Ookla Speedtest Complete!')
+    cp.log('Download: ' + download + 'Mb/s  Upload: ' + upload + 'Mb/s')
+    text = ('Carrier: ' + str(r.isp) + '\nServer: '
+            + r.server.get('name', 'Unknown') + '\nDL:' + download
+            + 'Mbps\nUL:' + upload + 'Mbps\nPing:'
+            + '{:.0f}'.format(r.ping) + 'ms')
+    return text
+
+
+def run_speedtest_netperf():
+    """Run speedtest using router's built-in netperf."""
+    cp.log('Starting Netperf Speedtest...')
+    result = cp.speed_test(duration=10, direction='both')
+    if result:
+        dl_mbps = result.get('download_bps', 0) / 1000000
+        ul_mbps = result.get('upload_bps', 0) / 1000000
+        cp.log('Netperf Speedtest Complete!')
+        cp.log('Download: ' + '{:.2f}'.format(dl_mbps) + 'Mb/s  Upload: '
+               + '{:.2f}'.format(ul_mbps) + 'Mb/s')
+        text = ('Engine: Netperf\nDL:' + '{:.2f}'.format(dl_mbps)
+                + 'Mbps\nUL:' + '{:.2f}'.format(ul_mbps) + 'Mbps')
+        return text
+    cp.log('Netperf returned no results')
+    return 'Speedtest failed: no results'
 
 
 def get_ssid():
@@ -253,6 +285,8 @@ def get_signal_quality():
 
 if __name__ == '__main__':
     cp.log('Starting... edit Installer Password under System > SDK Data.')
+    engine = 'Ookla' if has_ookla() else 'Netperf (built-in)'
+    cp.log('Speedtest engine: ' + engine)
     get_config('installer_password')
     open_firewall()
     server = HTTPServer(('', 8000), AppHandler)

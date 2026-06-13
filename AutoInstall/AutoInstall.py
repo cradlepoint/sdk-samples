@@ -1,13 +1,18 @@
 """ AutoInstall is a Cradlepoint SDK Application used to choose the best SIM on install.
 The application detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization.
-Then the app collects diagnostics and runs Ookla speedtests on each SIM.
+Then the app collects diagnostics and runs speedtests on each SIM.
 Then the app prioritizes the SIMs WAN Profiles by TCP download speed.
 Results are written to the log, set as the description field, and sent as a custom alert.
 The app can be manually triggered again by clearing out the description field in NCM.
-App settings can be configured in System > SDK Data."""
+App settings can be configured in System > SDK Data.
+
+Speedtest engines (in priority order):
+1. Ookla - if licensed 'ookla' binary is present in app directory
+2. Netperf - built-in router netperf service with ifc_wan per-SIM (default)
+"""
 
 import cp
-from speedtest_ookla import Speedtest
+import os
 import time
 import datetime
 import json
@@ -57,7 +62,26 @@ class AutoInstall(object):
     sims = {}
 
     def __init__(self):
-        self.speedtest = Speedtest(timeout=90)
+        self.use_ookla = self._has_ookla()
+        if self.use_ookla:
+            from speedtest_ookla import Speedtest
+            self.speedtest = Speedtest(timeout=90)
+            cp.log('Speedtest engine: Ookla')
+        else:
+            self.speedtest = None
+            cp.log('Speedtest engine: Netperf (built-in)')
+
+    @staticmethod
+    def _has_ookla():
+        """Check if ookla binary is present."""
+        if os.path.exists('ookla'):
+            if not os.access('ookla', os.X_OK):
+                try:
+                    os.chmod('ookla', 0o755)
+                except Exception:
+                    pass
+            return True
+        return False
 
     def get_config(self, name):
         """Return config from /config/system/sdk/appdata."""
@@ -236,14 +260,46 @@ class AutoInstall(object):
         return f'{self.sims[sim]["info"]["port"]} {self.sims[sim]["info"]["sim"]}'
 
     def do_speedtest(self, sim):
-        """Run Ookla speedtests and return TCP down and TCP up in Mbps."""
+        """Run speedtest on a SIM and return TCP down and TCP up in Mbps."""
         cp.log(f'Running speedtest on {sim}...')
-        self.speedtest.start()
-        r = self.speedtest.results
-        down = r.download / 1000 / 1000
-        up = r.upload / 1000 / 1000
-        cp.log(f'Speedtest complete for {sim}.')
-        return down, up
+        if self.use_ookla:
+            return self._speedtest_ookla(sim)
+        return self._speedtest_netperf(sim)
+
+    def _speedtest_ookla(self, sim):
+        """Run Ookla speedtest. Returns (down_mbps, up_mbps)."""
+        try:
+            self.speedtest.start()
+            r = self.speedtest.results
+            down = r.download / 1000 / 1000
+            up = r.upload / 1000 / 1000
+            cp.log(f'Ookla complete for {sim}: DL={down:.2f} UL={up:.2f}')
+            return down, up
+        except Exception as e:
+            cp.log(f'Ookla error on {sim}: {e}')
+            # Fallback to netperf
+            cp.log(f'Falling back to netperf for {sim}...')
+            return self._speedtest_netperf(sim)
+
+    def _speedtest_netperf(self, sim):
+        """Run netperf speedtest using ifc_wan for the SIM's interface. Returns (down_mbps, up_mbps)."""
+        try:
+            iface = cp.get(f'{self.STATUS_DEVS_PATH}/{sim}/info/iface')
+            if not iface:
+                cp.log(f'No iface found for {sim}')
+                return 0.0, 0.0
+
+            result = cp.speed_test(interface=iface, duration=10, direction='both')
+            if result:
+                down = result.get('download_bps', 0) / 1000000
+                up = result.get('upload_bps', 0) / 1000000
+                cp.log(f'Netperf complete for {sim} ({iface}): DL={down:.2f} UL={up:.2f}')
+                return down, up
+            cp.log(f'Netperf returned no results for {sim}')
+            return 0.0, 0.0
+        except Exception as e:
+            cp.log(f'Netperf error on {sim}: {e}')
+            return 0.0, 0.0
 
     def test_sim(self, device):
         """Get diagnostics, run speedtests, and verify minimums."""
@@ -411,13 +467,7 @@ if __name__ == '__main__':
     cp.log('Starting...')
     while not cp.get('status/wan/connection_state') == 'connected':
         time.sleep(1)
-    while True:
-        try:
-            autoinstall = AutoInstall()
-            break
-        except:
-            cp.log('Error getting http://www.speedtest.net/speedtest-config.php - will try again in 5 seconds.')
-            time.sleep(5)
+    autoinstall = AutoInstall()
     try:
         # Setup callback for manual testing:
         cp.register('put', '/config/system/desc', manual_test)
