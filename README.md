@@ -6,6 +6,14 @@ The NCOS SDK enables developers to build and deploy Python applications that run
 
 ---
 
+## App Store
+
+Browse, search, and download ready-to-use sample applications:
+
+**[Open the App Store](https://cradlepoint.github.io/sdk-samples/)**
+
+---
+
 ## Why Custom Applications on Ericsson Routers?
 
 - **Extend without hardware changes** — Add new capabilities through software while your existing Ericsson/Cradlepoint fleet stays in place.
@@ -20,258 +28,32 @@ The NCOS SDK enables developers to build and deploy Python applications that run
 
 | Resource | Link |
 |----------|------|
-| **Pre-built sample apps** | [Releases — built_apps](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps) |
+| **App Store** | [Browse & download apps](https://cradlepoint.github.io/sdk-samples/) |
 | **NCOS SDK Developers Guide** | [Documentation](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide) |
 | **NetCloud Manager — SDK apps** | [Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
 
 ---
 
-## Sample Applications
+## Repository Structure
 
-Ready-to-use applications you can install from the [releases page](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps). Each app includes source code for reference and customization.
-
-### Application Catalog
-
-## Sample Application Descriptions
-
-- **[5GSpeed](5GSpeed/)**
-    - Run netperf speedtests via NCM API. Results are put in asset_id field (configurable in SDK Data). Clearing the results starts a new test. This can be done easily via NCM API v2 /routers/ endpoint.
-    - **Download:** [5GSpeed v0.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.v0.4.0.tar.gz)
-- **[Autoinstall](AutoInstall/)**
-    - Automatically choose fastest SIM on install. On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs netperf speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed. Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.
-    - **Download:** [AutoInstall v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.1.1.tar.gz)
-- **[AutoInstall_Web](AutoInstall_Web/)**
-    - Detects SIMs, speedtests each, collects diagnostics, picks fastest. Default: reprioritizes WAN by speed. With group_by_sim/carrier: moves router to matching NCM group. Optionally enforces min_speed, sends alerts, and updates NCM custom fields.
-    - **Download:** [AutoInstall_Web v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall_Web.v1.1.0.tar.gz)
-- **[Installer_UI](Installer_UI/)**
-    - Provide a web interface for installers to configure WiFi and run speedtests.
-    - **Download:** [Installer_UI v1.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.4.0.tar.gz)
-- **[Mobile_Site_Survey](Mobile_Site_Survey/)**
-    - Field survey tool that runs speedtests and collects modem diagnostics with GPS locations, uploading results for network coverage and throughput analysis to 5g-ready.io
-    - **Download:** [Mobile_Site_Survey v3.1.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.1.3.tar.gz)
-- **[Motorola](Motorola/)**
-    - Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs.
-    - **Download:** [Motorola v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Motorola.v1.2.0.tar.gz)
-- **[Packet_Capture_Web](Packet_Capture_Web/)**
-    - Web interface for running and managing packet captures. Stream mode captures continuously to one file until stopped or disk threshold. Download mode captures for a set timeout/count. Supports all router interfaces, BPF filters, disk monitoring with NCM alerts, and file management (rename, download, delete) from the browser.
-    - **Download:** [Packet_Capture_Web v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Packet_Capture_Web.v1.0.1.tar.gz)
-- **[app_template](app_template/)**
-    - A template for the creation of a new application utilizing the csclient library.
-    - **Download:** [app_template v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/app_template.v1.0.0.tar.gz)
-- **[app_holder](app_holder/)**
-    - Just a holder for dynamic_app. See dynamic_app.
-    - **Download:** [app_holder v1.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/app_holder.v1.0.3.tar.gz)
-- **[cli_sample](cli_sample/)**
-    - Includes csterm module that enables access to local CLI to send commands and return output.
-    - **Download:** [cli_sample v1.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cli_sample.v1.0.3.tar.gz)
-- **[clients](clients/)**
-    - Puts the LAN clients in the asset_id field, or specify another field in SDK Appdata.
-    - **Download:** [clients v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/clients.v1.0.0.tar.gz)
-- **[client_bandwidth_throttle](client_bandwidth_throttle/)**
-    - Web-based QoS bandwidth limiting for individual LAN clients.
-    - **Download:** [client_bandwidth_throttle v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_bandwidth_throttle.v1.0.0.tar.gz)
-- **[client_rssi_monitor](client_rssi_monitor/)**
-    - Gets the mac address and rssi of connected wlan clients and puts them in the asset_id field.
-    - **Download:** [client_rssi_monitor v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_rssi_monitor.v1.0.0.tar.gz)
-- **[client_session_monitor](client_session_monitor/)**
-    - Monitors client connections to specific domains by tracking firewall connection table entries. Logs session start/end times, duration, and bandwidth usage.
-    - **Download:** [client_session_monitor v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/client_session_monitor.v1.0.0.tar.gz)
-- **cp_shell**
-    - Web interface for running linux shell commands.
-- **[cpu_usage](cpu_usage/)**
-    - Gets cpu and memory usage information from the router every 30 seconds and writes a csv file to a usb stick formatted in fat32.
-    - **Download:** [cpu_usage v0.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cpu_usage.v0.2.0.tar.gz)
-- **[cs_explorer](cs_explorer/)**
-    - A web based application for exploring config store (CS) data. Runs on http://ROUTER_IP:9002 by default.
-    - **Download:** [cs_explorer v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/cs_explorer.v1.0.0.tar.gz)
-- **[dead_reckoning](dead_reckoning/)**
-    - Enables dead_reckoning for GPS send-to-server.
-    - **Download:** [dead_reckoning v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/dead_reckoning.v1.0.0.tar.gz)
-- **[ddns](ddns/)**
-    - Updates a dynamic DNS hostname with the IP address of the WAN device matching specified WAN profile.
-    - **Download:** [ddns v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ddns.v1.0.0.tar.gz)
-- **[dynamic_app](dynamic_app/)**
-    - Downloads apps from a self hosted url and install into app_holder app. Overcome limitates with dev_mode and app size limits.
-    - **Download:** [dynamic_app v1.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/dynamic_app.v1.0.3.tar.gz)
-- **[daily_speedtest](daily_speedtest/)**
-    - Runs a netperf speedtest daily at configured hours and put results to user defined field (asset_id).
-    - **Download:** [daily_speedtest v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.v1.1.0.tar.gz)
-- **[encrypt_appdata](encrypt_appdata/)**
-    - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
-    - **Download:** [encrypt_appdata v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/encrypt_appdata.v1.0.0.tar.gz)
-- **[failover_modem_reset](failover_modem_reset/)**
-    - Monitors all modem SIM slots and detects failover from sim1 to sim2. Logs all SIM status changes and resets the sim2 device after failover. Supports multiple modems with independent failover tracking per port.
-    - **Download:** [failover_modem_reset v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/failover_modem_reset.v1.0.0.tar.gz)
-- **[ftp_client](ftp_client/)**
-    - Creates a file and uploads it to an FTP server.
-    - **Download:** [ftp_client v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ftp_client.v2.0.0.tar.gz)
-- **[ftp_server](ftp_server/)**
-    - Creates an FTP server in the device. A USB memory device is used as the FTP directory.
-    - **Download:** [ftp_server v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ftp_server.v2.0.0.tar.gz)
-- **[geofences](geofences/)**
-    - Send alert when entering or exiting geofences. Configure geofences in SDK app data after loading app.
-    - **Download:** [geofences v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/geofences.v1.0.0.tar.gz)
-- **[gpio_any_wan_connected](gpio_any_wan_connected/)**
-    - Set GPIO out high when any wan (not just modems) is connected.
-    - **Download:** [gpio_any_wan_connected v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/gpio_any_wan_connected.v0.1.0.tar.gz)
-- **[gpio_sample](gpio_sample/)**
-    - Demonstrates GPIO (General Purpose Input/Output) functionality.
-    - **Download:** [gpio_sample v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/gpio_sample.v1.0.0.tar.gz)
-- **[gpio_wlan_control](gpio_wlan_control/)**
-    - Monitors the GPIO connector input and sets `control/wlan/enabled` to match the GPIO value.
-    - **Download:** [gpio_wlan_control v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/gpio_wlan_control.v1.0.0.tar.gz)
-- **[hello_world](hello_world/)**
-    - Outputs a 'Hello World!' log every 10 seconds.
-    - **Download:** [hello_world v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/hello_world.v1.0.0.tar.gz)
-- **[hspt](hspt/)**
-    - Sets up a custom Hot Spot landing page.
-    - **Download:** [hspt v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/hspt.v2.0.0.tar.gz)
-- **[ibr1700_gnss](ibr1700_gnss/)**
-    - Demonstrates how to access the gyroscope and accelerometer data on the IBR1700
-    - **Download:** [ibr1700_gnss v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ibr1700_gnss.v2.0.0.tar.gz)
-- **[ibr1700_obdII](ibr1700_obdII/)**
-    - Demonstrates how to access OBD-II PIDs on the IBR1700
-    - **Download:** [ibr1700_obdII v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ibr1700_obdII.v2.0.0.tar.gz)
-- **[ifttt](ifttt/)**
-    - IFTTT (If This Then That) Rule Engine with a drag-and-drop web dashboard on port 8000. Create automated rules using IF, WHILE, WHEN, and WHERE conditions against the router config/status tree, GPS location, and time schedules — then trigger actions like setting config values, sending alerts, or logging messages. Supports per-rule polling intervals or on-change callbacks, sustained condition tracking, and per-rule appdata storage.
-    - **Download:** [ifttt v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ifttt.v1.2.0.tar.gz)
-- **[iperf3](iperf3/)**
-    - Downloads and runs iPerf3 to a user defined server and puts results in asset_id. Clear the asset_id to run a new test.
-    - **Download:** [iperf3 v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/iperf3.v1.0.0.tar.gz)
-- **[ipverify_custom_action](ipverify_custom_action/)**
-    - Create a custom action in a function to be called when an IPverify test status changes.
-    - **Download:** [ipverify_custom_action v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ipverify_custom_action.v1.1.0.tar.gz)
-- **[logfile](logfile/)**
-    - Writes router logs to flash available for download via HTTP/LAN Manager.
-    - **Download:** [logfile v0.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/logfile.v0.4.0.tar.gz)
-- **[mosquitto](mosquitto/)**
-    - Demonstrates launching embedded mosquitto server
-    - **Download:** [mosquitto v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/mosquitto.v1.0.0.tar.gz)
-- **[mqtt_app](mqtt_app/)**
-    - Demonstrated MQTT using the paho library
-    - **Download:** [mqtt_app v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/mqtt_app.v2.0.0.tar.gz)
-- **[mqtt_app_tls](mqtt_app_tls/)**
-    - MQTT over TLS - extracts certificates from NCOS and uses them for TLS connection.
-    - **Download:** [mqtt_app_tls v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/mqtt_app_tls.v1.0.0.tar.gz)
-- **[mqtt_azure_client](mqtt_azure_client/)**
-    - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central.
-    - **Download:** [mqtt_azure_client v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/mqtt_azure_client.v2.0.0.tar.gz)
-- **[mqtt_azure_tls](mqtt_azure_tls/)**
-    - Sample Application which uses SDK to send sensor data to Microsoft Azure IoT Central over TLS connection.
-    - **Download:** [mqtt_azure_tls v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/mqtt_azure_tls.v2.0.0.tar.gz)
-- **[ncx_self_provision](ncx_self_provision/)**
-    - Script and accompanying SDK application to allow devices to 'sef-provision' to an NCX/SASE network.
-    - **Download:** [ncx_self_provision v2.7.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ncx_self_provision.v2.7.0.tar.gz)
-- **[network_mac_filter](network_mac_filter/)**
-    - Enforces MAC address limits per network using deny rules in firewall filter policies. When the MAC limit is reached on a specific network, the app automatically adds deny rules for any new reachable MACs seen on that network.
-    - **Download:** [network_mac_filter v1.0.4.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/network_mac_filter.v1.0.4.tar.gz)
-- **[OBDII_monitor](OBDII_monitor/)**
-    - Monitor OBD-II values, put latest values in asset_id, and alert on conditions defined in SDK AppData.
-    - **Download:** [OBDII_monitor v1.0.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/OBDII_monitor.v1.0.2.tar.gz)
-- **[ping_sample](ping_sample/)**
-    - Contains ping function and example usage.
-    - **Download:** [ping_sample v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ping_sample.v1.0.0.tar.gz)
-- **[ports_status](ports_status/)**
-    - Sets the device description to visually show the LAN/WAN/WWAN/Modem/IP Verify status.
-    - **Download:** [ports_status v1.31.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ports_status.v1.31.0.tar.gz)
-- **[power_alert](power_alert/)**
-    - Sends alerts when external power is lost and restored.
-    - **Download:** [power_alert v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_alert.v0.1.0.tar.gz)
-- **[power_dashboard](power_dashboard/)**
-    - A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface. Optional power indicator message in asset ID.
-    - **Download:** [power_dashboard v1.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_dashboard.v1.4.0.tar.gz)
-- **[python_module_list](python_module_list/)**
-    - This app will log the python version and modules in the device. It is intended to help with app development to show the python environment within the device.
-    - **Download:** [python_module_list v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/python_module_list.v2.0.0.tar.gz)
-- **[rate_limit](rate_limit/)**
-    - Enable QoS rule 1 until datacap alert is met then toggle to rule 2.
-    - **Download:** [rate_limit v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/rate_limit.v1.0.0.tar.gz)
-- **[rproxy](rproxy/)**
-    - A reverse proxy similar to port forwarding, except traffic forwarded to a udp/tcp target will be sourced from the router's IP. This reverse proxy can be dynamically added to clients as they connect.
-    - **Download:** [rproxy v0.0.15.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/rproxy.v0.0.15.tar.gz)
-- **[s400_userio](s400_userio/)**
-    - Provides example how to control the user IO on the S400.
-    - **Download:** [s400_userio v0.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/s400_userio.v0.2.0.tar.gz)
-- **[shell_sample](shell_sample/)**
-    - Provides example how to execute commands at OS shell: "ls - al".
-    - **Download:** [shell_sample v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/shell_sample.v0.1.0.tar.gz)
-- **[send_to_server](send_to_server/)**
-    - Gets the '/status' from the device config store and send it to a test server.
-    - **Download:** [send_to_server v2.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/send_to_server.v2.1.0.tar.gz)
-- **[serial_temp](serial_temp/)**
-    - This is a test application to serial data from the data logger connected.
-    - **Download:** [serial_temp v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/serial_temp.v2.0.0.tar.gz)
-- **[signal_alert](signal_alert/)**
-    - Monitors modem signal metrics on all connected modems and sends NetCloud alerts with GPS when any metric goes below its threshold. Sends one alert when signal crosses below and one when it recovers (after 60 seconds above threshold).
-    - **Download:** [signal_alert v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/signal_alert.v0.1.0.tar.gz)
-- **[simple_custom_dashboard](simple_custom_dashboard/)**
-    - Creates a simple dashboard using HTML and JS. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
-    - **Download:** [simple_custom_dashboard v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/simple_custom_dashboard.v2.0.0.tar.gz)
-- **[simple_web_server](simple_web_server/)**
-    - A simple web server to receive messages. Note that any 'server function' requires the router firewall to be correctly changed to allow client access to the router.
-    - **Download:** [simple_web_server v2.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/simple_web_server.v2.0.0.tar.gz)
-- **[speed_limit](speed_limit/)**
-    - Monitors vehicle speed via GPS and sends an NCM alert when a speed limit violation ends, including start/end timestamps, start/end locations, and maximum speed reached. Speed limit is configurable via SDK Data (default 100 MPH).
-    - **Download:** [speed_limit v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speed_limit.v1.0.0.tar.gz)
-- **[speedtest_scheduled_custom1](speedtest_scheduled_custom1/)**
-    - Run netperf speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
-    - **Download:** [speedtest_scheduled_custom1 v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.1.1.tar.gz)
-- **[speedtest_scheduled_asset_id](speedtest_scheduled_asset_id/)**
-    - Run netperf speedtests on a configurable cron schedule and write results to the asset_id field. Includes modem diagnostics (DBM, SINR) when the primary WAN is a modem.
-    - **Download:** [speedtest_scheduled_asset_id v1.1.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_asset_id.v1.1.2.tar.gz)
-- **[speedtest_web](speedtest_web/)**
-    - Web-based speed test interface with history tracking and report generation. Supports Ookla, Netperf, and iPerf3 engines with live progress streaming, CSV export, and dark mode.
-    - **Download:** [speedtest_web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_web.v1.0.0.tar.gz)
-- **[splunk_conntrack](splunk_conntrack/)**
-    - This app monitors the conntrack table and sends new connections to Splunk.
-    - **Download:** [splunk_conntrack v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_conntrack.v1.1.1.tar.gz)
-- **[splunk_log_filter](splunk_log_filter/)**
-    - This app tails /var/log/messages and sends filtered lines to Splunk.
-    - **Download:** [splunk_log_filter v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_log_filter.v1.0.0.tar.gz)
-- **[system_monitor](system_monitor/)**
-    - Get various system diagnostics, alert on thresholds, and put current status in asset_id field.
-    - **Download:** [system_monitor v0.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/system_monitor.v0.2.0.tar.gz)
-- **[system_monitor_web](system_monitor_web/)**
-    - A comprehensive real-time system monitoring application for Cradlepoint routers that tracks both memory and CPU usage with customizable alert thresholds and a professional web interface.
-    - **Download:** [system_monitor_web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/system_monitor_web.v1.0.0.tar.gz)
-- **[tailscale](tailscale/)**
-    - A 3rd party mesh VPN called [Tailscale](https://tailscale.com) that makes it easy to connect your devices, wherever they are. This application provides a way to proxy traffic from the LAN to the Tailscale network. See the README.md for more information.
-    - **Download:** [tailscale v0.0.37.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/tailscale.v0.0.37.tar.gz)
-- **[timezone_via_gnss](timezone_via_gnss/)**
-    - An app to read the device's GNSS data and send a request to timezonedb.com in order to return and set time device's timezone.
-    - **Download:** [timezone_via_gnss v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/timezone_via_gnss.v0.1.0.tar.gz)
-- **[tornado_sample](tornado_sample/)**
-    - A webserver using Tornado with NCM-themed example to set WiFi SSIDs.
-    - **Download:** [tornado_sample v0.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/tornado_sample.v0.1.0.tar.gz)
-- **[throttle_cellular_datacap](throttle_cellular_datacap/)**
-    - Upon *any* Modem interface reaching 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit (minbwup and minbwdown variables).
-    - **Download:** [throttle_cellular_datacap v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/throttle_cellular_datacap.v1.1.0.tar.gz)
-- **[throttle_cellular_datacap_rate_tiered](throttle_cellular_datacap_rate_tiered/)**
-    - Upon *any* Modem interface reaching 70, 80, 90 or 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit as set by the rate tier (minbwup and minbwdown variables).
-    - **Download:** [throttle_cellular_datacap_rate_tiered v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/throttle_cellular_datacap_rate_tiered.v1.1.0.tar.gz)
-- **[ttyd](ttyd/)**
-    - ttyd runs a Linux bash shell in a web browser on port 8022. Think of it as web-SSH for your router — access a full bash terminal from any browser on the LAN without needing an SSH client.
-    - **Download:** [ttyd v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/ttyd.v1.0.0.tar.gz)
-- **[tunnel_modem_reset](tunnel_modem_reset/)**
-    - Monitor tunnels and if down, reset modem it egresses from.
-    - **Download:** [tunnel_modem_reset v1.0.4.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/tunnel_modem_reset.v1.0.4.tar.gz)
-- **[usb_alerts](usb_alerts/)**
-    - Send alerts when USB devices are connected or disconnected.
-    - **Download:** [usb_alerts v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/usb_alerts.v1.0.0.tar.gz)
-- **[wan_dashboard](wan_dashboard/)**
-    - Live WAN interface utilization graphs in a web page. Includes cumulative graph.
-    - **Download:** [wan_dashboard v1.3.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_dashboard.v1.3.0.tar.gz)
-- **[wan_rate](wan_rate/)**
-    - Tracks WAN bandwidth rates over time and stores rolling averages in a configurable field.
-    - **Download:** [wan_rate v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_rate.v1.0.0.tar.gz)
-- **[wan_ip_change_alert](wan_ip_change_alert/)**
-    - Tracks the WAN IP address and sends an alert when it changes. Includes a confirmation delay to prevent false alerts from temporary IP changes.
-    - **Download:** [wan_ip_change_alert v1.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_ip_change_alert.v1.4.0.tar.gz)
-- **[web_app_template](web_app_template/)**
-    - An interactive style guide and component library for building dashboards and internal tools. Use it as a visual reference, copy/paste-ready HTML source, or a playground to explore layout ideas.
-
-    - **Download:** [web_app_template v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/web_app_template.v1.0.0.tar.gz)
-----------
+```
+├── apps/                   # Sample applications organized by category
+│   ├── connectivity/       # Speed tests, WAN management, failover
+│   ├── monitoring/         # System metrics, signal, power, clients
+│   ├── networking/         # QoS, VPN, MAC filtering, hotspot
+│   ├── integrations/       # MQTT, Splunk, FTP, IFTTT
+│   ├── gpio/              # GPIO, USB, hardware control
+│   ├── vehicle/           # GPS, OBD-II, geofencing, speed limits
+│   ├── security/          # Encryption, IP Verify
+│   ├── web_tools/         # Dashboards, packet capture, CS explorer
+│   └── examples/          # Hello world, shell, ping, templates
+├── app_template/           # Skeleton for new apps
+├── web_app_template/       # Skeleton for web-based apps
+├── archive/               # Retired/inactive apps
+├── docs/                  # API documentation and app store site
+├── make.py                # Build/deploy tool
+└── sdk_settings.ini       # Router connection settings
+```
 
 ---
 
@@ -279,7 +61,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
 
 ### 1. Install Python
 
-Install Python 3.8 or later from [python.org](https://www.python.org/downloads/) if you don't already have it.
+Install Python 3.8 or later from [python.org](https://www.python.org/downloads/).
 
 ### 2. Clone and set up
 
@@ -300,156 +82,50 @@ python make.py setup
 python3 make.py setup
 ```
 
-This creates a `.venv` virtual environment and installs all Python dependencies from `requirements.txt`.
+This creates a `.venv` virtual environment and installs all Python dependencies.
 
-Using [Kiro](https://kiro.dev)? See [docs/SETUP.md](docs/SETUP.md) for a guided walkthrough — the Python environment is set up automatically.
+### 3. Configure router connection
 
-### 3. System-level dependencies (one-time, manual)
+Edit `sdk_settings.ini` with your dev router's IP and credentials:
 
-The setup scripts handle Python libraries. These system tools are needed for app signing and device deployment:
-
-#### Windows
-
-Install OpenSSL (Light version) from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html). Choose Win64 or Win32 based on your machine.
-
-#### macOS
-
-```bash
-brew install openssl
-brew install hudochenkov/sshpass/sshpass
-```
-
-If you don't have Homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"`
-
-#### Linux (Debian/Ubuntu)
-
-```bash
-sudo apt-get install libffi-dev libssl-dev sshpass
+```ini
+[sdk]
+app_name=hello_world
+dev_client_ip=192.168.0.1
+dev_client_username=admin
+dev_client_password=your_password
 ```
 
 ---
 
 ## Quick Start — make.py
 
-The `make.py` tool manages the full lifecycle of SDK applications: create, build, install, and maintain.
-
-### Usage
-
-```bash
-python make.py <action> [app_name]
-```
-
-### Actions
-
-| Action | Description |
-|--------|-------------|
-| **create** | Create a new application from the `app_template` directory. Example: `python3 make.py create my_new_app` |
-| **build** | Produce a distributable application archive (`.tar.gz`). Use `all` to build every app. |
-| **install** | Securely copy the built archive to a locally connected NCOS device (requires SDK DEV mode). |
-| **status** | Retrieve and print the current status of the app on the device. |
-| **uninstall** | Remove the application from the locally connected NCOS device. |
-| **purge** | Remove all installed applications from the device. |
-| **update** | Update core SDK helper files (`cp.py`, `cp_methods_reference.md`, `make.py`, etc.) from the upstream repository. |
-
-### Examples
-
 ```bash
 # Create a new app
-python3 make.py create my_new_app
+python3 make.py create my_app
 
-# Build a single app
-python3 make.py build my_new_app
+# Build a single app (searches apps/ recursively)
+python3 make.py build my_app
 
 # Build all apps
 python3 make.py build all
 
-# Clean artifacts for all apps
-python3 make.py clean all
+# Deploy to connected router (purge + build + install + start)
+python3 make.py deploy my_app
+
+# Check status
+python3 make.py status my_app
 ```
 
-### Prerequisites
-
-- **Python 3** is required.
-- **SSH access** (scp/ssh) to the target NCOS device is required for `install`, `start`, `stop`, `uninstall`, `purge`, and `status`.
-- The NCOS device must be in **SDK DEV mode** — enabled via NetCloud Manager (not the router UI).
-- Any directory containing a `package.ini` file is treated as an application.
-- Run `python3 make.py help` for full help from the tool.
-
----
-
-## Build Ignore File (buildignore)
-
-You can exclude files and directories from the built app package by placing a `buildignore` file in the app directory. This works similarly to `.gitignore` — one entry per line.
-
-### Default Exclusions
-
-The following are always excluded, even without a `buildignore` file:
-
-- `__pycache__/`
-- `buildignore`
-- `.DS_Store`
-
-### Format
-
-- One filename or directory per line
-- Directories must end with `/`
-- Lines starting with `#` are comments
-- Blank lines are ignored
-
-### Example `buildignore`
-
-```
-# Development files
-test_data.json
-requirements.txt
-
-# Directories
-tests/
-docs/
-```
-
----
-
-## Key Files
-
-| File | Description |
-|------|-------------|
-| **cp.py** | The Python library used in applications to communicate with the router (NCOS). |
-| **cp_methods_reference.md** | Reference for all available methods/functions when importing `cp.py`. |
-| **make.py** | The main tool for managing application packages: create, build, install, uninstall, start, stop, purge, and update. |
-| **sdk_settings.ini** | Configuration settings used by `make.py` (device connection, app name, etc.). |
-| **tools/bin** | Contains `pscp.exe` for Windows-based transfers. |
-
----
-
-## Code Example
-
-```python
-import cp
-
-# Get router uptime
-uptime = cp.get_uptime()
-cp.log(f"Router uptime: {uptime} seconds")
-
-# Get connected clients
-clients = cp.get_ipv4_lan_clients()
-cp.log(f"Total clients: {len(clients)}")
-
-# Get device location
-lat_long = cp.get_lat_long()
-if lat_long:
-    cp.log(f"Device location: {lat_long}")
-
-# Get connected WANs
-wans = cp.get_connected_wans()
-cp.log(f"Connected WANs: {len(wans)}")
-
-# Get SIM information
-sims = cp.get_sims()
-cp.log(f"SIM details: {sims}")
-```
-
-See the [cp_methods_reference](https://github.com/cradlepoint/sdk-samples/blob/master/cp_methods_reference.md) for the full API.
+| Action | Description |
+|--------|-------------|
+| **create** | Scaffold a new app from `app_template` |
+| **build** | Package an app as `.tar.gz` for deployment |
+| **deploy** | Full lifecycle: purge → build → install → verify |
+| **status** | Show app state on the connected router |
+| **start / stop** | Control a running app |
+| **uninstall** | Remove app from router |
+| **clean** | Remove local build artifacts |
 
 ---
 
@@ -460,92 +136,3 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

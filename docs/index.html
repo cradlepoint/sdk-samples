@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NCOS SDK App Store</title>
+<title>Ericsson NCOS SDK App Store</title>
 <style>
 :root {
   --bg-primary: #1a1a2e;
@@ -124,8 +124,8 @@ a:hover { color: var(--accent-hover); }
 /* App Grid */
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
 }
 
 /* App Card */
@@ -133,9 +133,12 @@ a:hover { color: var(--accent-hover); }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 1.25rem;
+  padding: 1.5rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
 }
 .app-card:hover {
   background: var(--bg-card-hover);
@@ -166,14 +169,17 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-secondary);
   margin-bottom: 0.75rem;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  flex: 1;
 }
 .app-card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: auto;
+  padding-top: 0.75rem;
 }
 .app-card-category {
   font-size: 0.7rem;
@@ -205,6 +211,7 @@ a:hover { color: var(--accent-hover); }
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  overflow-y: auto;
 }
 .modal-overlay.active { display: flex; }
 .modal {
@@ -216,6 +223,7 @@ a:hover { color: var(--accent-hover); }
   max-height: 90vh;
   overflow-y: auto;
   padding: 2rem;
+  overflow-x: hidden;
 }
 .modal-close {
   float: right;
@@ -251,16 +259,63 @@ a:hover { color: var(--accent-hover); }
 .modal-rating .stars .star { font-size: 1.4rem; cursor: pointer; }
 .modal-readme {
   margin-top: 1.5rem;
-  padding: 1rem;
+  padding: 1.5rem;
   background: var(--bg-primary);
   border-radius: 8px;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
   font-size: 0.85rem;
-  white-space: pre-wrap;
-  font-family: monospace;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.modal-readme h1, .modal-readme h2, .modal-readme h3 {
+  color: var(--text-primary);
+  margin: 1rem 0 0.5rem;
+}
+.modal-readme h1 { font-size: 1.3rem; }
+.modal-readme h2 { font-size: 1.1rem; }
+.modal-readme h3 { font-size: 0.95rem; }
+.modal-readme p { margin: 0.5rem 0; }
+.modal-readme code {
+  background: var(--bg-card);
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+.modal-readme pre {
+  background: var(--bg-card);
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+.modal-readme pre code { background: none; padding: 0; }
+.modal-readme img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.5rem 0; }
+.modal-readme ul, .modal-readme ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.modal-readme li { margin: 0.25rem 0; }
+.modal-readme a { color: var(--accent); }
+.modal-readme blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  color: var(--text-muted);
+  margin: 0.5rem 0;
+}
+.modal-flags {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--bg-primary);
+  border-radius: 8px;
+}
+.modal-flag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
 }
+.modal-flag .indicator { width: 10px; height: 10px; }
 .btn-download {
   display: inline-block;
   padding: 0.6rem 1.5rem;
@@ -338,7 +393,7 @@ a:hover { color: var(--accent-hover); }
 <body>
 
 <div class="header">
-  <h1><span>NCOS SDK</span> App Store</h1>
+  <h1><span>Ericsson</span> NCOS SDK App Store</h1>
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Find an app...">
   </div>
@@ -546,10 +601,12 @@ function openAppDetail(appName) {
     <div class="modal-meta">
       <div class="meta-item"><label>Version</label><span>${app.version}</span></div>
       <div class="meta-item"><label>NCOS Firmware</label><span>${app.firmware}</span></div>
-      <div class="meta-item"><label>Auto Start</label><span><span class="indicator ${app.auto_start ? 'on' : 'off'}"></span>${app.auto_start ? 'Yes' : 'No'}</span></div>
-      <div class="meta-item"><label>Restart</label><span><span class="indicator ${app.restart ? 'on' : 'off'}"></span>${app.restart ? 'Yes' : 'No'}</span></div>
-      <div class="meta-item"><label>Reboot</label><span><span class="indicator ${app.reboot ? 'on' : 'off'}"></span>${app.reboot ? 'Yes' : 'No'}</span></div>
       <div class="meta-item"><label>Category</label><span>${app.category.replace(/_/g, ' ')}</span></div>
+    </div>
+    <div class="modal-flags">
+      <div class="modal-flag"><span class="indicator ${app.auto_start ? 'on' : 'off'}"></span>Auto Start</div>
+      <div class="modal-flag"><span class="indicator ${app.restart ? 'on' : 'off'}"></span>Restart on Crash</div>
+      <div class="modal-flag"><span class="indicator ${app.reboot ? 'on' : 'off'}"></span>Start on Reboot</div>
     </div>
     <div class="modal-rating">
       <label style="font-size:0.75rem;text-transform:uppercase;color:var(--text-muted);">Your Rating</label><br>
@@ -558,7 +615,7 @@ function openAppDetail(appName) {
       </span>
     </div>
     <button class="btn-download" data-url="${app.download_url}">Download ${app.download_filename}</button>
-    ${app.readme ? `<div class="modal-readme">${escapeHtml(app.readme)}</div>` : ''}
+    ${app.readme ? `<div class="modal-readme">${renderMarkdown(app.readme)}</div>` : ''}
   `;
 
   // Bind events
@@ -577,16 +634,71 @@ function openAppDetail(appName) {
   });
 
   document.getElementById('modalOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('active');
+  document.body.style.overflow = '';
 }
 
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function renderMarkdown(text) {
+  // Simple markdown renderer — handles headings, bold, italic, links, images, code, lists
+  let html = escapeHtml(text);
+
+  // Code blocks (``` ... ```)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // Images ![alt](url)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Headings
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Bold and italic
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  // Unordered lists
+  html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+  // Blockquotes
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // Paragraphs (double newlines)
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = '<p>' + html + '</p>';
+
+  // Clean up empty paragraphs around block elements
+  html = html.replace(/<p>\s*(<h[123]>)/g, '$1');
+  html = html.replace(/(<\/h[123]>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<pre>)/g, '$1');
+  html = html.replace(/(<\/pre>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<ul>)/g, '$1');
+  html = html.replace(/(<\/ul>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<blockquote>)/g, '$1');
+  html = html.replace(/(<\/blockquote>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p><\/p>/g, '');
+
+  // Single newlines to <br> within paragraphs
+  html = html.replace(/\n/g, '<br>');
+
+  return html;
 }
 
 // Event listeners
