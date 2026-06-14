@@ -55,8 +55,8 @@ Default/placeholder values that indicate unconfigured settings:
 ## Project Structure
 
 ```text
-apps/{category}/{app_name}/
-├── package.ini          # Metadata with uuid, version, vendor
+apps/{app_name}/
+├── package.ini          # Metadata with uuid, version, vendor, tags
 ├── cp.py               # CP module copy
 ├── {app_name}.py       # Main logic
 ├── start.sh            # Uses cppython
@@ -65,10 +65,10 @@ apps/{category}/{app_name}/
 └── mylib/              # Subdirectories with Python modules work fine
 ```
 
-Categories: connectivity, monitoring, networking, integrations, gpio, vehicle, security, web_tools, examples
+Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio, vehicle, security, web, tools, examples, speedtest, mqtt, etc.
 
 - **Multi-file apps work** - apps can have subdirectories with Python modules (e.g., `taky/taky/cot/`). Imports work normally. Include `__init__.py` in each package directory
-- **make.py searches recursively** - `build`, `deploy`, `clean` all find apps by name regardless of category folder
+- **make.py finds apps by name** - `build`, `deploy`, `clean` all find apps in `apps/` or repo root
 
 ## Create App
 
@@ -79,7 +79,7 @@ Categories: connectivity, monitoring, networking, integrations, gpio, vehicle, s
 .venv/bin/python make.py create {app_name}
 ```
 
-This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. When the app is ready, move it to a category: `mv {app_name} apps/{category}/`
+This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. When the app is ready, move it to apps: `mv {app_name} apps/`
 
 **CRITICAL: Before writing ANY app code:**
 1. **RTFM FIRST** - Use `#rtfm.md` steering file to verify API paths, fields, and structures

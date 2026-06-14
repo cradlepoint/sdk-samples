@@ -38,22 +38,19 @@ Browse, search, and download ready-to-use sample applications:
 ## Repository Structure
 
 ```
-├── apps/                   # Sample applications organized by category
-│   ├── connectivity/       # Speed tests, WAN management, failover
-│   ├── monitoring/         # System metrics, signal, power, clients
-│   ├── networking/         # QoS, VPN, MAC filtering, hotspot
-│   ├── integrations/       # MQTT, Splunk, FTP, IFTTT
-│   ├── gpio/              # GPIO, USB, hardware control
-│   ├── vehicle/           # GPS, OBD-II, geofencing, speed limits
-│   ├── security/          # Encryption, IP Verify
-│   ├── web_tools/         # Dashboards, packet capture, CS explorer
-│   ├── examples/          # Hello world, shell, ping
-│   ├── templates/         # app_template, web_app_template
-│   └── archive/           # Retired/inactive apps
+├── apps/                   # Sample applications (flat, tagged via package.ini)
+│   ├── 5GSpeed/            # Each app is a self-contained folder
+│   ├── hello_world/        # with package.ini, start.sh, readme.md, etc.
+│   ├── mqtt_app/
+│   ├── ...                 # 75+ apps total
+│   ├── templates/          # app_template, web_app_template
+│   └── archive/            # Retired/inactive apps
 ├── docs/                  # API documentation and app store site
 ├── make.py                # Build/deploy tool
 └── sdk_settings.ini       # Router connection settings
 ```
+
+Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags = connectivity, speedtest`).
 
 ---
 

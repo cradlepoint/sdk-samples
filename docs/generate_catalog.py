@@ -37,6 +37,9 @@ def parse_package_ini(ini_path):
         app['version'] = f"{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
         app['firmware'] = f"{app['firmware_major']}.{app['firmware_minor']}.x"
 
+        # Parse tags into a list
+        app['tags_list'] = [t.strip() for t in app['tags'].split(',') if t.strip()]
+
         # Determine developer label
         dev = app['developer'].lower()
         if dev == 'ericsson':
@@ -78,18 +81,8 @@ def scan_apps(base_dir, archived=False):
             ini_path = app_dir / 'package.ini'
             app = parse_package_ini(ini_path)
             if app:
-                # Determine category from folder structure
-                rel = app_dir.relative_to(REPO_ROOT)
-                parts = rel.parts
-                if len(parts) >= 2 and parts[0] == 'apps':
-                    app['category'] = parts[1]
-                elif parts[0] == 'archive':
-                    app['category'] = 'archive'
-                else:
-                    app['category'] = 'templates'
-
                 app['archived'] = archived
-                app['path'] = str(rel)
+                app['path'] = str(app_dir.relative_to(REPO_ROOT))
                 app['readme'] = find_readme(app_dir)
                 apps.append(app)
             # Don't descend into app subdirectories
@@ -107,11 +100,14 @@ def main():
     # Sort by name
     catalog.sort(key=lambda a: a['name'].lower())
 
-    # Get unique categories
-    categories = sorted(set(a['category'] for a in catalog if a['category'] != 'archive'))
+    # Collect all unique tags across apps
+    all_tags = set()
+    for app in catalog:
+        all_tags.update(app['tags_list'])
+    tags = sorted(all_tags)
 
     output = {
-        'categories': categories,
+        'tags': tags,
         'apps': catalog,
         'total': len(catalog),
     }
@@ -120,7 +116,7 @@ def main():
     with open(out_path, 'w') as f:
         json.dump(output, f, indent=2)
 
-    print(f"Generated catalog.json with {len(catalog)} apps in {len(categories)} categories")
+    print(f"Generated catalog.json with {len(catalog)} apps and {len(tags)} unique tags")
 
 
 if __name__ == '__main__':

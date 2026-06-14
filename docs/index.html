@@ -67,6 +67,18 @@ a:hover { color: var(--accent-hover); }
 }
 .search-box input:focus { outline: none; border-color: var(--accent); }
 .result-count { color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap; }
+.gear-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.gear-btn:hover { color: var(--text-primary); }
+.gear-btn.configured { color: var(--success); }
 
 /* Layout */
 .container {
@@ -220,7 +232,10 @@ a:hover { color: var(--accent-hover); }
   justify-content: center;
   padding: 2rem;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.modal-overlay::-webkit-scrollbar { display: none; }
 .modal-overlay.active { display: flex; }
 .modal {
   background: var(--bg-secondary);
@@ -338,9 +353,97 @@ a:hover { color: var(--accent-hover); }
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 1rem;
 }
 .btn-download:hover { background: var(--accent-hover); }
+.btn-ncm {
+  display: inline-block;
+  padding: 0.6rem 1.5rem;
+  background: var(--success);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-ncm:hover { background: #0d9668; }
+
+/* Settings / API keys modal */
+.settings-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.settings-overlay.active { display: flex; }
+.settings-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 100%;
+}
+.settings-box h3 { margin-bottom: 0.5rem; }
+.settings-box p { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; }
+.settings-field { margin-bottom: 1rem; }
+.settings-field label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+.settings-field .input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.settings-field input[type="password"],
+.settings-field input[type="text"] {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+.settings-field input:focus { outline: none; border-color: var(--accent); }
+.toggle-vis {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+}
+.toggle-vis:hover { color: var(--text-primary); }
+.settings-field input[type="text"] {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.settings-checkbox input { accent-color: var(--accent); }
+.settings-field-ncm-account { margin-bottom: 1rem; }
+.settings-buttons { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
 
 /* Confirmation modal */
 .confirm-overlay {
@@ -383,6 +486,18 @@ a:hover { color: var(--accent-hover); }
   font-weight: 600;
 }
 
+/* NCM upload status */
+.ncm-status {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  display: none;
+}
+.ncm-status.success { display: block; background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid var(--success); }
+.ncm-status.error { display: block; background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid var(--danger); }
+.ncm-status.loading { display: block; background: rgba(59,130,246,0.15); color: var(--accent); border: 1px solid var(--accent); }
+
 /* License footer */
 .license-footer {
   border-top: 1px solid var(--border);
@@ -410,6 +525,7 @@ a:hover { color: var(--accent-hover); }
     <input type="text" id="searchInput" placeholder="Find an app...">
   </div>
   <span class="result-count" id="resultCount"></span>
+  <button class="gear-btn" id="gearBtn" title="NCM API Settings">&#9881;</button>
 </div>
 
 <div class="container">
@@ -419,7 +535,7 @@ a:hover { color: var(--accent-hover); }
       <label for="sortSelect" style="color:var(--text-muted);font-size:0.85rem;margin-right:0.5rem;">Sort by</label>
       <select id="sortSelect">
         <option value="rating">Rating</option>
-        <option value="category">Category</option>
+        <option value="tag">Tag</option>
       </select>
     </div>
     <div class="app-grid" id="appGrid"></div>
@@ -452,11 +568,106 @@ a:hover { color: var(--accent-hover); }
   </div>
 </div>
 
+<!-- NCM API Settings Modal -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-box">
+    <h3>&#9881; NetCloud Manager API Keys</h3>
+    <p>Enter your NCM API credentials. These are stored only in your browser (cookie) and never sent to any server other than NCM.</p>
+    <p style="margin-bottom:1rem;">Generate API keys in NetCloud Manager: <strong>Tools</strong> &rarr; <strong>NetCloud API</strong> tab &rarr; click <strong>+ Add</strong> to create X-ECM keys.</p>
+    <div class="settings-field">
+      <label for="ncmApiId">X-ECM-API-ID</label>
+      <div class="input-wrap">
+        <input type="password" id="ncmApiId" placeholder="Enter API ID" autocomplete="off">
+        <button class="toggle-vis" data-target="ncmApiId" title="Toggle visibility">&#128065;</button>
+      </div>
+    </div>
+    <div class="settings-field">
+      <label for="ncmApiKey">X-ECM-API-KEY</label>
+      <div class="input-wrap">
+        <input type="password" id="ncmApiKey" placeholder="Enter API Key" autocomplete="off">
+        <button class="toggle-vis" data-target="ncmApiKey" title="Toggle visibility">&#128065;</button>
+      </div>
+    </div>
+    <div class="settings-field">
+      <label for="ncmAccountId">NCM Account ID</label>
+      <div class="input-wrap">
+        <input type="text" id="ncmAccountId" placeholder="e.g. 3644" autocomplete="off">
+      </div>
+    </div>
+    <label class="settings-checkbox">
+      <input type="checkbox" id="ncmSaveCookie"> Save keys in cookie for next visit
+    </label>
+    <div class="settings-buttons">
+      <button class="btn-cancel" id="settingsCancel">Cancel</button>
+      <button class="btn-cancel" id="settingsClear" style="color:var(--danger);border-color:var(--danger);">Clear Keys</button>
+      <button class="btn-confirm" id="settingsSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let catalog = null;
 let ratings = JSON.parse(localStorage.getItem('appRatings') || '{}');
-let filters = { developers: [], categories: [], tags: [], minRating: 0 };
+let filters = { developers: [], tags: [], minRating: 0 };
 let pendingDownloadUrl = null;
+
+// NCM API key management (in-memory + optional cookie)
+let ncmKeys = { apiId: '', apiKey: '', accountId: '' };
+
+function loadNcmKeys() {
+  const raw = getCookie('ncm_keys');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(atob(raw));
+      ncmKeys.apiId = parsed.apiId || '';
+      ncmKeys.apiKey = parsed.apiKey || '';
+      ncmKeys.accountId = parsed.accountId || '';
+    } catch (e) { /* ignore corrupt cookie */ }
+  }
+  updateGearIcon();
+}
+
+function saveNcmKeysToCookie() {
+  const encoded = btoa(JSON.stringify(ncmKeys));
+  // Set cookie for 90 days, SameSite=Strict, Secure
+  document.cookie = `ncm_keys=${encoded}; max-age=${90*86400}; path=/; SameSite=Strict; Secure`;
+}
+
+function clearNcmCookie() {
+  document.cookie = 'ncm_keys=; max-age=0; path=/; SameSite=Strict; Secure';
+}
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : '';
+}
+
+function hasNcmKeys() {
+  return ncmKeys.apiId && ncmKeys.apiKey && ncmKeys.accountId;
+}
+
+function updateGearIcon() {
+  const btn = document.getElementById('gearBtn');
+  if (hasNcmKeys()) {
+    btn.classList.add('configured');
+    btn.title = 'NCM API Settings (configured)';
+  } else {
+    btn.classList.remove('configured');
+    btn.title = 'NCM API Settings';
+  }
+}
+
+function openSettings() {
+  document.getElementById('ncmApiId').value = ncmKeys.apiId;
+  document.getElementById('ncmApiKey').value = ncmKeys.apiKey;
+  document.getElementById('ncmAccountId').value = ncmKeys.accountId;
+  document.getElementById('ncmSaveCookie').checked = !!getCookie('ncm_keys');
+  document.getElementById('settingsOverlay').classList.add('active');
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('active');
+}
 
 async function loadCatalog() {
   const resp = await fetch('catalog.json');
@@ -468,32 +679,27 @@ async function loadCatalog() {
 function buildSidebar() {
   const sidebar = document.getElementById('sidebar');
   const developers = ['Ericsson', 'Partners', 'Community'];
-  const categories = catalog.categories;
+  const tags = catalog.tags;
 
   let html = '';
-  // Built By
   html += '<div class="filter-section"><h3>Built By</h3>';
   developers.forEach(d => {
     html += `<label><input type="checkbox" data-filter="developer" value="${d}"> ${d}</label>`;
   });
   html += '</div>';
 
-  // Category
-  html += '<div class="filter-section"><h3>Category</h3>';
-  categories.forEach(c => {
-    const label = c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    html += `<label><input type="checkbox" data-filter="category" value="${c}"> ${label}</label>`;
+  html += '<div class="filter-section"><h3>Tags</h3>';
+  tags.forEach(t => {
+    const label = t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    html += `<label><input type="checkbox" data-filter="tag" value="${t}"> ${label}</label>`;
   });
   html += '</div>';
 
-  // Rating
   html += '<div class="filter-section"><h3>Rating</h3>';
   html += '<label><input type="checkbox" data-filter="rating" value="4"> 4+ stars</label>';
   html += '</div>';
 
   sidebar.innerHTML = html;
-
-  // Bind filter events
   sidebar.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', applyFilters);
   });
@@ -502,21 +708,18 @@ function buildSidebar() {
 function applyFilters() {
   const sidebar = document.getElementById('sidebar');
   filters.developers = [...sidebar.querySelectorAll('[data-filter="developer"]:checked')].map(e => e.value);
-  filters.categories = [...sidebar.querySelectorAll('[data-filter="category"]:checked')].map(e => e.value);
+  filters.tags = [...sidebar.querySelectorAll('[data-filter="tag"]:checked')].map(e => e.value);
   filters.minRating = sidebar.querySelector('[data-filter="rating"]:checked') ? 4 : 0;
   renderGrid();
 }
 
-function getAppRating(name) {
-  return ratings[name] || 0;
-}
-
+function getAppRating(name) { return ratings[name] || 0; }
 function setAppRating(name, stars) {
   ratings[name] = stars;
   localStorage.setItem('appRatings', JSON.stringify(ratings));
 }
 
-function renderStars(rating, size) {
+function renderStars(rating) {
   let html = '<span class="stars">';
   for (let i = 1; i <= 5; i++) {
     html += `<span class="star ${i <= rating ? 'filled' : ''}">&#9733;</span>`;
@@ -530,13 +733,12 @@ function matchesSearch(app, query) {
   const q = query.toLowerCase();
   return app.name.toLowerCase().includes(q) ||
          app.notes.toLowerCase().includes(q) ||
-         app.tags.toLowerCase().includes(q) ||
-         app.category.toLowerCase().includes(q);
+         app.tags.toLowerCase().includes(q);
 }
 
 function matchesFilters(app) {
   if (filters.developers.length && !filters.developers.includes(app.developer_label)) return false;
-  if (filters.categories.length && !filters.categories.includes(app.category)) return false;
+  if (filters.tags.length && !filters.tags.some(t => app.tags_list.includes(t))) return false;
   if (filters.minRating > 0 && getAppRating(app.name) < filters.minRating) return false;
   return true;
 }
@@ -544,12 +746,10 @@ function matchesFilters(app) {
 function renderGrid() {
   const query = document.getElementById('searchInput').value;
   const sortBy = document.getElementById('sortSelect').value;
-
   let apps = catalog.apps.filter(a => matchesSearch(a, query) && matchesFilters(a));
 
-  // Sort — always alphabetical within the selected grouping
   if (sortBy === 'rating') apps.sort((a, b) => (getAppRating(b.name) - getAppRating(a.name)) || a.name.localeCompare(b.name));
-  else if (sortBy === 'category') apps.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  else if (sortBy === 'tag') apps.sort((a, b) => (a.tags_list[0] || '').localeCompare(b.tags_list[0] || '') || a.name.localeCompare(b.name));
 
   const grid = document.getElementById('appGrid');
   document.getElementById('resultCount').textContent = `${apps.length} of ${catalog.total} apps`;
@@ -562,15 +762,15 @@ function renderGrid() {
   grid.innerHTML = apps.map(app => {
     const initials = app.name.substring(0, 2).toUpperCase();
     const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
-    const catLabel = app.category.replace(/_/g, ' ');
     const rating = getAppRating(app.name);
     const vendorLine = app.developer_label === 'Ericsson'
       ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
       : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
-    const catColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web_tools:'informational',examples:'lightgrey'};
-    const catColor = catColors[app.category] || 'lightgrey';
-    const catName = catLabel.charAt(0).toUpperCase() + catLabel.slice(1);
-    const catBadge = `<img src="https://img.shields.io/badge/Category-${encodeURIComponent(catName).replace(/-/g,'--')}-${catColor}" alt="${catLabel}" style="height:20px;vertical-align:middle;">`;
+    const tagColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web:'informational',tools:'lightgrey',examples:'yellow',speedtest:'blue',mqtt:'red',qos:'green',alerting:'important',gps:'blueviolet'};
+    const primaryTag = app.tags_list[0] || 'uncategorized';
+    const tagColor = tagColors[primaryTag] || 'lightgrey';
+    const tagName = primaryTag.charAt(0).toUpperCase() + primaryTag.slice(1);
+    const tagBadge = `<img src="https://img.shields.io/badge/Tag-${encodeURIComponent(tagName).replace(/-/g,'--')}-${tagColor}" alt="${primaryTag}" style="height:20px;vertical-align:middle;">`;
     return `
       <div class="app-card" data-app="${app.name}">
         <div class="app-card-header">
@@ -584,13 +784,12 @@ function renderGrid() {
         <div class="app-card-footer">
           <div>
             <span>${renderStars(rating)}</span>
-            <div class="app-card-category">${catBadge}</div>
+            <div class="app-card-category">${tagBadge}</div>
           </div>
         </div>
       </div>`;
   }).join('');
 
-  // Bind click events
   grid.querySelectorAll('.app-card').forEach(card => {
     card.addEventListener('click', () => openAppDetail(card.dataset.app));
   });
@@ -604,39 +803,40 @@ function openAppDetail(appName) {
   const modal = document.getElementById('modalContent');
   const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
 
-  const catColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web_tools:'informational',examples:'lightgrey'};
-  const catColor = catColors[app.category] || 'lightgrey';
-  const catLabel = app.category.replace(/_/g, ' ');
-  const catName = catLabel.charAt(0).toUpperCase() + catLabel.slice(1);
-  const catBadgeModal = `<img src="https://img.shields.io/badge/Category-${encodeURIComponent(catName).replace(/-/g,'--')}-${catColor}" alt="${catLabel}" style="height:20px;vertical-align:middle;">`;
+  const tagColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web:'informational',tools:'lightgrey',examples:'yellow',speedtest:'blue',mqtt:'red',qos:'green',alerting:'important',gps:'blueviolet'};
+  const allTagBadges = app.tags_list.map(t => {
+    const tc = tagColors[t] || 'lightgrey';
+    const tn = t.charAt(0).toUpperCase() + t.slice(1);
+    return `<img src="https://img.shields.io/badge/-${encodeURIComponent(tn).replace(/-/g,'--')}-${tc}" alt="${t}" style="height:18px;vertical-align:middle;margin-right:4px;">`;
+  }).join('');
 
   modal.innerHTML = `
     <button class="modal-close" id="closeModal">&times;</button>
-    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.25rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.25rem;flex-wrap:wrap;">
       <h2 style="margin:0;">${app.name}</h2>
       ${app.developer_label === 'Ericsson'
         ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
         : `<span style="color:var(--text-muted)">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`}
+      <span class="stars" id="ratingStars" style="margin-left:0.5rem;">
+        ${[1,2,3,4,5].map(i => `<span class="star ${i <= rating ? 'filled' : ''}" data-star="${i}" style="font-size:1.2rem;cursor:pointer;">&#9733;</span>`).join('')}
+      </span>
     </div>
     <p style="color:var(--text-secondary);margin-bottom:0.75rem;">${app.notes}</p>
     <div class="modal-meta">
       <div class="meta-item"><label>Version</label><span>${app.version}</span></div>
       <div class="meta-item"><label>NCOS Firmware</label><span>${app.firmware}</span></div>
-      <div class="meta-item"><label>Category</label><span>${catBadgeModal}</span></div>
+      <div class="meta-item"><label>Tags</label><span>${allTagBadges}</span></div>
     </div>
     <div class="modal-flags">
       <div class="modal-flag"><span class="indicator ${app.auto_start ? 'on' : 'off'}"></span>Auto Start</div>
       <div class="modal-flag"><span class="indicator ${app.restart ? 'on' : 'off'}"></span>Restart on Crash</div>
       <div class="modal-flag"><span class="indicator ${app.reboot ? 'on' : 'off'}"></span>Start on Reboot</div>
     </div>
-    <div style="display:flex;align-items:center;gap:1.5rem;margin:1rem 0;">
+    <div style="display:flex;align-items:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;">
       <button class="btn-download" data-url="${app.download_url}">Download ${app.download_filename}</button>
-      <div>
-        <span class="stars" id="ratingStars">
-          ${[1,2,3,4,5].map(i => `<span class="star ${i <= rating ? 'filled' : ''}" data-star="${i}" style="font-size:1.4rem;cursor:pointer;">&#9733;</span>`).join('')}
-        </span>
-      </div>
+      <button class="btn-ncm" data-url="${app.download_url}" data-filename="${app.download_filename}">Add to NetCloud Manager</button>
     </div>
+    <div class="ncm-status" id="ncmStatus"></div>
     ${app.readme ? `<div class="modal-readme">${renderMarkdown(app.readme)}</div>` : ''}
   `;
 
@@ -646,7 +846,7 @@ function openAppDetail(appName) {
     star.addEventListener('click', () => {
       const val = parseInt(star.dataset.star);
       setAppRating(app.name, val);
-      openAppDetail(app.name); // refresh
+      openAppDetail(app.name);
       renderGrid();
     });
   });
@@ -654,9 +854,62 @@ function openAppDetail(appName) {
     pendingDownloadUrl = e.target.dataset.url;
     document.getElementById('confirmOverlay').classList.add('active');
   });
+  modal.querySelector('.btn-ncm').addEventListener('click', (e) => {
+    const url = e.target.dataset.url;
+    const filename = e.target.dataset.filename;
+    addToNcm(url, filename);
+  });
 
   document.getElementById('modalOverlay').classList.add('active');
   document.body.style.overflow = 'hidden';
+}
+
+async function addToNcm(downloadUrl, filename) {
+  if (!hasNcmKeys()) {
+    if (confirm('NCM API keys are not configured. Would you like to enter them now?')) {
+      openSettings();
+    }
+    return;
+  }
+
+  const statusEl = document.getElementById('ncmStatus');
+  statusEl.className = 'ncm-status loading';
+  statusEl.textContent = 'Downloading app package...';
+
+  try {
+    // Fetch the tar.gz file from GitHub releases
+    const fileResp = await fetch(downloadUrl);
+    if (!fileResp.ok) throw new Error(`Failed to download: ${fileResp.status} ${fileResp.statusText}`);
+    const fileBlob = await fileResp.blob();
+
+    statusEl.textContent = 'Uploading to NetCloud Manager...';
+
+    // Build multipart form data
+    const formData = new FormData();
+    formData.append('account', `/api/v1/accounts/${ncmKeys.accountId}/`);
+    formData.append('archive', fileBlob, filename);
+
+    // Send to NCM
+    const ncmResp = await fetch('https://www.us0.cradlepointecm.com/api/v1/device_app_versions/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `SecurityToken ${ncmKeys.apiId}:${ncmKeys.apiKey}`,
+        'Accept': 'application/vnd.api+json'
+      },
+      body: formData
+    });
+
+    if (ncmResp.ok) {
+      statusEl.className = 'ncm-status success';
+      statusEl.textContent = 'Successfully uploaded to NetCloud Manager.';
+    } else {
+      const errText = await ncmResp.text();
+      throw new Error(`NCM returned ${ncmResp.status}: ${errText}`);
+    }
+  } catch (err) {
+    statusEl.className = 'ncm-status error';
+    statusEl.textContent = `Error: ${err.message}`;
+  }
 }
 
 function closeModal() {
@@ -671,42 +924,21 @@ function escapeHtml(text) {
 }
 
 function renderMarkdown(text) {
-  // Simple markdown renderer — handles headings, bold, italic, links, images, code, lists
   let html = escapeHtml(text);
-
-  // Code blocks (``` ... ```)
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-
-  // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-  // Images ![alt](url)
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
-
-  // Links [text](url)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-
-  // Headings
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-
-  // Bold and italic
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-  // Unordered lists
   html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-
-  // Blockquotes
   html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-
-  // Paragraphs (double newlines)
   html = html.replace(/\n\n/g, '</p><p>');
   html = '<p>' + html + '</p>';
-
-  // Clean up empty paragraphs around block elements
   html = html.replace(/<p>\s*(<h[123]>)/g, '$1');
   html = html.replace(/(<\/h[123]>)\s*<\/p>/g, '$1');
   html = html.replace(/<p>\s*(<pre>)/g, '$1');
@@ -716,10 +948,7 @@ function renderMarkdown(text) {
   html = html.replace(/<p>\s*(<blockquote>)/g, '$1');
   html = html.replace(/(<\/blockquote>)\s*<\/p>/g, '$1');
   html = html.replace(/<p><\/p>/g, '');
-
-  // Single newlines to <br> within paragraphs
   html = html.replace(/\n/g, '<br>');
-
   return html;
 }
 
@@ -734,14 +963,55 @@ document.getElementById('confirmCancel').addEventListener('click', () => {
   pendingDownloadUrl = null;
 });
 document.getElementById('confirmDownload').addEventListener('click', () => {
-  if (pendingDownloadUrl) {
-    window.open(pendingDownloadUrl, '_blank');
-  }
+  if (pendingDownloadUrl) window.open(pendingDownloadUrl, '_blank');
   document.getElementById('confirmOverlay').classList.remove('active');
   pendingDownloadUrl = null;
 });
 
-// Load
+// Gear / Settings events
+document.getElementById('gearBtn').addEventListener('click', openSettings);
+document.getElementById('settingsCancel').addEventListener('click', closeSettings);
+document.getElementById('settingsOverlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeSettings();
+});
+document.getElementById('settingsSave').addEventListener('click', () => {
+  ncmKeys.apiId = document.getElementById('ncmApiId').value.trim();
+  ncmKeys.apiKey = document.getElementById('ncmApiKey').value.trim();
+  ncmKeys.accountId = document.getElementById('ncmAccountId').value.trim();
+  if (document.getElementById('ncmSaveCookie').checked) {
+    saveNcmKeysToCookie();
+  } else {
+    clearNcmCookie();
+  }
+  updateGearIcon();
+  closeSettings();
+});
+document.getElementById('settingsClear').addEventListener('click', () => {
+  ncmKeys = { apiId: '', apiKey: '', accountId: '' };
+  clearNcmCookie();
+  document.getElementById('ncmApiId').value = '';
+  document.getElementById('ncmApiKey').value = '';
+  document.getElementById('ncmAccountId').value = '';
+  document.getElementById('ncmSaveCookie').checked = false;
+  updateGearIcon();
+});
+
+// Visibility toggle for password fields
+document.querySelectorAll('.toggle-vis').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = document.getElementById(btn.dataset.target);
+    if (target.type === 'password') {
+      target.type = 'text';
+      btn.innerHTML = '&#128064;';
+    } else {
+      target.type = 'password';
+      btn.innerHTML = '&#128065;';
+    }
+  });
+});
+
+// Init
+loadNcmKeys();
 loadCatalog();
 </script>
 </body>

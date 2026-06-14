@@ -379,16 +379,15 @@ def get_app_list():
     cwd = os.getcwd()
     print("Scanning {} for app directories.".format(cwd))
 
-    # Search recursively under apps/ directory for package.ini files
+    # Search under apps/ directory for package.ini files (flat structure)
     apps_dir = os.path.join(cwd, 'apps')
     if os.path.isdir(apps_dir):
-        for dirpath, dirnames, filenames in os.walk(apps_dir):
-            # Skip metadata, hidden dirs, and templates/archive
-            dirnames[:] = [d for d in dirnames if d not in
-                           ['METADATA', '__pycache__', '.git', '.venv', 'templates', 'archive']]
-            if 'package.ini' in filenames:
-                app_dirs.append(dirpath)
-                dirnames.clear()  # Don't descend into app subdirs
+        for item in os.listdir(apps_dir):
+            if item in ('templates', 'archive', '__pycache__', 'METADATA', '.git', '.venv'):
+                continue
+            item_path = os.path.join(apps_dir, item)
+            if os.path.isdir(item_path) and os.path.isfile(os.path.join(item_path, 'package.ini')):
+                app_dirs.append(item_path)
     else:
         # Fallback: look in cwd for flat structure (backward compat)
         dirs_in_cwd = os.listdir(cwd)
@@ -398,7 +397,7 @@ def get_app_list():
                 if 'package.ini' in contents:
                     app_dirs.append(item)
 
-    # Also check repo root for apps in active development (created but not yet categorized)
+    # Also check repo root for apps in active development (created but not yet moved)
     dirs_in_cwd = os.listdir(cwd)
     for item in dirs_in_cwd:
         item_path = os.path.join(cwd, item)
@@ -407,7 +406,7 @@ def get_app_list():
                 if item_path not in app_dirs:
                     app_dirs.append(item_path)
 
-    # Warn about duplicate app names (same basename in different categories)
+    # Warn about duplicate app names
     names_seen = {}
     for app_dir in app_dirs:
         name = os.path.basename(app_dir)
@@ -671,21 +670,13 @@ def package(app=None):
 
     # If app_name is not a directory, try to find it under apps/
     if not os.path.isdir(app_path):
-        app_path = os.path.join(app_name)
-        if not os.path.isdir(app_path):
-            # Search for it recursively under apps/
-            for dirpath, dirnames, filenames in os.walk('apps'):
-                dirnames[:] = [d for d in dirnames if d not in ['METADATA', '__pycache__']]
-                if os.path.basename(dirpath) == app_name and 'package.ini' in filenames:
-                    app_path = dirpath
-                    break
-                if 'package.ini' in filenames:
-                    dirnames.clear()
-
-    # Verify the app directory exists
-    if not os.path.isdir(app_path):
-        print("ERROR: App directory '{}' does not exist. Skipping.".format(app_name))
-        return False
+        # Check apps/{app_name} directly (flat structure)
+        candidate = os.path.join('apps', app_name)
+        if os.path.isdir(candidate):
+            app_path = candidate
+        else:
+            print("ERROR: App directory '{}' does not exist. Skipping.".format(app_name))
+            return False
 
     # The app_name for packaging must match the folder basename
     actual_app_name = os.path.basename(app_path)
@@ -756,22 +747,18 @@ def create(app_name=None):
         print('ERROR: No app name provided. Please provide a name. If you are using Cursor AI, it will generate a name for you based on your requested functionality.')
         return
 
-    # Create at repo root for easy dev iteration — move to apps/{category}/ when done
+    # Create at repo root for easy dev iteration — move to apps/ when done
     target_dir = app_name
 
     if os.path.exists(target_dir):
         print('App already exists.  Please choose a different name.')
         return
 
-    # Check if an app with this name already exists anywhere under apps/
-    if os.path.isdir('apps'):
-        for dirpath, dirnames, filenames in os.walk('apps'):
-            dirnames[:] = [d for d in dirnames if d not in ['METADATA', '__pycache__']]
-            if os.path.basename(dirpath) == app_name and 'package.ini' in filenames:
-                print(f'App already exists at {dirpath}. Please choose a different name.')
-                return
-            if 'package.ini' in filenames:
-                dirnames.clear()
+    # Check if an app with this name already exists under apps/
+    candidate = os.path.join('apps', app_name)
+    if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, 'package.ini')):
+        print(f'App already exists at {candidate}. Please choose a different name.')
+        return
 
     # Find app_template
     template_path = os.path.join('apps', 'templates', 'app_template')
@@ -797,7 +784,7 @@ def create(app_name=None):
                 with open(path, 'w') as out_file:
                     out_file.write(filedata)
         print(f'App {app_name} created at ./{app_name}/')
-        print(f'When ready, move to a category: mv {app_name} apps/{{category}}/')
+        print(f'When ready, move to apps/: mv {app_name} apps/')
     except Exception as e:
         print(f'Error creating app: {e}')
 
