@@ -153,9 +153,8 @@ a:hover { color: var(--accent-hover); }
   transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
-  aspect-ratio: 5 / 3;
+  min-height: 180px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  overflow: hidden;
 }
 .app-card:hover {
   background: var(--bg-card-hover);
@@ -355,19 +354,6 @@ a:hover { color: var(--accent-hover); }
   cursor: pointer;
 }
 .btn-download:hover { background: var(--accent-hover); }
-.btn-ncm {
-  display: inline-block;
-  padding: 0.6rem 1.5rem;
-  background: var(--success);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-ncm:hover { background: #0d9668; }
-
 /* Settings / API keys modal */
 .settings-overlay {
   display: none;
@@ -485,18 +471,6 @@ a:hover { color: var(--accent-hover); }
   cursor: pointer;
   font-weight: 600;
 }
-
-/* NCM upload status */
-.ncm-status {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  display: none;
-}
-.ncm-status.success { display: block; background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid var(--success); }
-.ncm-status.error { display: block; background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid var(--danger); }
-.ncm-status.loading { display: block; background: rgba(59,130,246,0.15); color: var(--accent); border: 1px solid var(--accent); }
 
 /* License footer */
 .license-footer {
@@ -682,6 +656,7 @@ function buildSidebar() {
   const tags = catalog.tags;
 
   let html = '';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><span style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Filters</span><button id="clearFilters" style="font-size:0.7rem;padding:0.2rem 0.5rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-secondary);cursor:pointer;display:none;">Clear All</button></div>';
   html += '<div class="filter-section"><h3>Built By</h3>';
   developers.forEach(d => {
     html += `<label><input type="checkbox" data-filter="developer" value="${d}"> ${d}</label>`;
@@ -703,6 +678,7 @@ function buildSidebar() {
   sidebar.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', applyFilters);
   });
+  document.getElementById('clearFilters').addEventListener('click', clearAllFilters);
 }
 
 function applyFilters() {
@@ -710,6 +686,18 @@ function applyFilters() {
   filters.developers = [...sidebar.querySelectorAll('[data-filter="developer"]:checked')].map(e => e.value);
   filters.tags = [...sidebar.querySelectorAll('[data-filter="tag"]:checked')].map(e => e.value);
   filters.minRating = sidebar.querySelector('[data-filter="rating"]:checked') ? 4 : 0;
+  // Show/hide clear button
+  const hasActive = filters.developers.length || filters.tags.length || filters.minRating;
+  document.getElementById('clearFilters').style.display = hasActive ? 'inline-block' : 'none';
+  renderGrid();
+}
+
+function clearAllFilters() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  filters = { developers: [], tags: [], minRating: 0 };
+  document.getElementById('clearFilters').style.display = 'none';
+  document.getElementById('searchInput').value = '';
   renderGrid();
 }
 
@@ -717,6 +705,12 @@ function getAppRating(name) { return ratings[name] || 0; }
 function setAppRating(name, stars) {
   ratings[name] = stars;
   localStorage.setItem('appRatings', JSON.stringify(ratings));
+}
+
+const TAG_ACRONYMS = new Set(['gps','api','ftp','mqtt','qos','tls','usb','dns','http','vpn','wan','cli','obd2','gpio','ip']);
+function formatTagName(t) {
+  if (TAG_ACRONYMS.has(t)) return t.toUpperCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 function renderStars(rating) {
@@ -767,10 +761,11 @@ function renderGrid() {
       ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
       : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
     const tagColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web:'informational',tools:'lightgrey',examples:'yellow',speedtest:'blue',mqtt:'red',qos:'green',alerting:'important',gps:'blueviolet'};
-    const primaryTag = app.tags_list[0] || 'uncategorized';
-    const tagColor = tagColors[primaryTag] || 'lightgrey';
-    const tagName = primaryTag.charAt(0).toUpperCase() + primaryTag.slice(1);
-    const tagBadge = `<img src="https://img.shields.io/badge/Tag-${encodeURIComponent(tagName).replace(/-/g,'--')}-${tagColor}" alt="${primaryTag}" style="height:20px;vertical-align:middle;">`;
+    const allTagBadges = app.tags_list.map(t => {
+      const tc = tagColors[t] || 'lightgrey';
+      const tn = formatTagName(t);
+      return `<img src="https://img.shields.io/badge/-${encodeURIComponent(tn).replace(/-/g,'--')}-${tc}" alt="${t}" style="height:18px;vertical-align:middle;">`;
+    }).join(' ');
     return `
       <div class="app-card" data-app="${app.name}">
         <div class="app-card-header">
@@ -784,7 +779,7 @@ function renderGrid() {
         <div class="app-card-footer">
           <div>
             <span>${renderStars(rating)}</span>
-            <div class="app-card-category">${tagBadge}</div>
+            <div class="app-card-category">${allTagBadges}</div>
           </div>
         </div>
       </div>`;
@@ -806,7 +801,7 @@ function openAppDetail(appName) {
   const tagColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web:'informational',tools:'lightgrey',examples:'yellow',speedtest:'blue',mqtt:'red',qos:'green',alerting:'important',gps:'blueviolet'};
   const allTagBadges = app.tags_list.map(t => {
     const tc = tagColors[t] || 'lightgrey';
-    const tn = t.charAt(0).toUpperCase() + t.slice(1);
+    const tn = formatTagName(t);
     return `<img src="https://img.shields.io/badge/-${encodeURIComponent(tn).replace(/-/g,'--')}-${tc}" alt="${t}" style="height:18px;vertical-align:middle;margin-right:4px;">`;
   }).join('');
 
@@ -834,9 +829,7 @@ function openAppDetail(appName) {
     </div>
     <div style="display:flex;align-items:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;">
       <button class="btn-download" data-url="${app.download_url}">Download ${app.download_filename}</button>
-      <button class="btn-ncm" data-url="${app.download_url}" data-filename="${app.download_filename}">Add to NetCloud Manager</button>
     </div>
-    <div class="ncm-status" id="ncmStatus"></div>
     ${app.readme ? `<div class="modal-readme">${renderMarkdown(app.readme)}</div>` : ''}
   `;
 
@@ -854,62 +847,9 @@ function openAppDetail(appName) {
     pendingDownloadUrl = e.target.dataset.url;
     document.getElementById('confirmOverlay').classList.add('active');
   });
-  modal.querySelector('.btn-ncm').addEventListener('click', (e) => {
-    const url = e.target.dataset.url;
-    const filename = e.target.dataset.filename;
-    addToNcm(url, filename);
-  });
 
   document.getElementById('modalOverlay').classList.add('active');
   document.body.style.overflow = 'hidden';
-}
-
-async function addToNcm(downloadUrl, filename) {
-  if (!hasNcmKeys()) {
-    if (confirm('NCM API keys are not configured. Would you like to enter them now?')) {
-      openSettings();
-    }
-    return;
-  }
-
-  const statusEl = document.getElementById('ncmStatus');
-  statusEl.className = 'ncm-status loading';
-  statusEl.textContent = 'Downloading app package...';
-
-  try {
-    // Fetch the tar.gz file from GitHub releases
-    const fileResp = await fetch(downloadUrl);
-    if (!fileResp.ok) throw new Error(`Failed to download: ${fileResp.status} ${fileResp.statusText}`);
-    const fileBlob = await fileResp.blob();
-
-    statusEl.textContent = 'Uploading to NetCloud Manager...';
-
-    // Build multipart form data
-    const formData = new FormData();
-    formData.append('account', `/api/v1/accounts/${ncmKeys.accountId}/`);
-    formData.append('archive', fileBlob, filename);
-
-    // Send to NCM
-    const ncmResp = await fetch('https://www.us0.cradlepointecm.com/api/v1/device_app_versions/', {
-      method: 'POST',
-      headers: {
-        'Authorization': `SecurityToken ${ncmKeys.apiId}:${ncmKeys.apiKey}`,
-        'Accept': 'application/vnd.api+json'
-      },
-      body: formData
-    });
-
-    if (ncmResp.ok) {
-      statusEl.className = 'ncm-status success';
-      statusEl.textContent = 'Successfully uploaded to NetCloud Manager.';
-    } else {
-      const errText = await ncmResp.text();
-      throw new Error(`NCM returned ${ncmResp.status}: ${errText}`);
-    }
-  } catch (err) {
-    statusEl.className = 'ncm-status error';
-    statusEl.textContent = `Error: ${err.message}`;
-  }
 }
 
 function closeModal() {
