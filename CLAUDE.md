@@ -52,9 +52,7 @@ dev_client_password=your_password
 - **Router architecture is ARM64 (aarch64) with musl libc**
 
 ### JavaScript (for web UIs)
-- **ALWAYS use ES5** — NO arrow functions `=>`, NO template literals, NO `let`/`const`
-- Use `function(){}` for all functions
-- Use string concatenation `'text' + var + 'more'` instead of template literals
+- **ES6+ is fine** — arrow functions, template literals, const/let, async/await all work in modern browsers
 - **NEVER pass parameters in onclick attributes** — use data attributes and `this`
 
 ### Web Development
@@ -247,7 +245,7 @@ Only document GENERAL learnings (API behavior, router constraints, SDK patterns)
 - `cppython` HAS: `threading`, `ssl`, `http.server`, `socket`, `configparser`, `json`, `os`, `sys`, `time`, `xml.etree.ElementTree`, `hashlib`, `base64`, `uuid`, `logging`, `struct`
 - For CSV: prefer `','.join(fields) + '\n'` over the csv module
 - For NMEA parsing: use `pynmeagps` (install fresh, never copy from other apps)
-- For speedtest: copy `speedtest_ookla.py` and `ookla` binary from `5GSpeed/`
+- For speedtest: use `cp.speed_test()` (netperf, built-in). For Ookla BYOB, copy `speedtest_ookla.py` from `5GSpeed/`
 
 ---
 
@@ -295,7 +293,7 @@ except Exception as e:
 |------|---------|
 | `app_template/` | Standard app skeleton |
 | `web_app_template/` | Web app skeleton with UI framework |
-| `5GSpeed/speedtest_ookla.py` | Ookla speedtest wrapper |
+| `5GSpeed/speedtest_ookla.py` | Ookla speedtest wrapper (BYOB only) |
 | `docs/ncos-api/README.md` | API quick reference |
 | `docs/ncos-api/api-structures.md` | Detailed API response formats |
 | `docs/ncos-api/config/PATHS.md` | All config paths |

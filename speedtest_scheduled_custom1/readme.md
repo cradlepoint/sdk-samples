@@ -1,6 +1,6 @@
 # speedtest_scheduled_custom1
 
-Runs Ookla speedtests on a cron schedule and writes results to the NCM `custom1` field.
+Runs netperf speedtests on a cron schedule and writes results to the NCM `custom1` field.
 
 ## Appdata Fields
 

@@ -20,7 +20,7 @@ None
 
 Application Purpose
 ===================
-daily_speedtest - run an ookla speedtest daily at configured hours and put results to user defined field (asset_id)
+daily_speedtest - run a netperf speedtest daily at configured hours and put results to user defined field (asset_id)
 
 Testing hours and results field are configurable in SDK Appdata.  Default hours are 8am, 12pm, 4pm.
 

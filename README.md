@@ -35,10 +35,10 @@ Ready-to-use applications you can install from the [releases page](https://githu
 ## Sample Application Descriptions
 
 - **5GSpeed**
-    - Run Ookla speedtests via NCM API. Results are put in asset_id field (configurable in SDK Data). Clearing the results starts a new test. This can be done easily via NCM API v2 /routers/ endpoint.
+    - Run netperf speedtests via NCM API. Results are put in asset_id field (configurable in SDK Data). Clearing the results starts a new test. This can be done easily via NCM API v2 /routers/ endpoint.
     - **Download:** [5GSpeed v0.3.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.v0.3.0.tar.gz)
 - **Autoinstall**
-    - Automatically choose fastest SIM on install. On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs Ookla speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed. Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.
+    - Automatically choose fastest SIM on install. On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs netperf speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed. Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.
     - **Download:** [AutoInstall v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.0.1.tar.gz)
 - **AutoInstall_Web**
     - Detects SIMs, speedtests each, collects diagnostics, picks fastest. Default: reprioritizes WAN by speed. With group_by_sim/carrier: moves router to matching NCM group. Optionally enforces min_speed, sends alerts, and updates NCM custom fields.
@@ -94,7 +94,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - Downloads apps from a self hosted url and install into app_holder app. Overcome limitates with dev_mode and app size limits.
     - **Download:** [dynamic_app v1.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/dynamic_app.v1.0.3.tar.gz)
 - **daily_speedtest**
-    - Runs an ookla speedtest daily at configured hours and put results to user defined field (asset_id).
+    - Runs a netperf speedtest daily at configured hours and put results to user defined field (asset_id).
     - **Download:** [daily_speedtest v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.v1.0.0.tar.gz)
 - **encrypt_appdata**
     - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
@@ -214,10 +214,10 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - Monitors vehicle speed via GPS and sends an NCM alert when a speed limit violation ends, including start/end timestamps, start/end locations, and maximum speed reached. Speed limit is configurable via SDK Data (default 100 MPH).
     - **Download:** [speed_limit v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speed_limit.v1.0.0.tar.gz)
 - **speedtest_scheduled_custom1**
-    - Run Ookla speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
+    - Run netperf speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
     - **Download:** [speedtest_scheduled_custom1 v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.0.1.tar.gz)
 - **speedtest_scheduled_asset_id**
-    - Run Ookla speedtests on a configurable cron schedule and write results to the asset_id field. Includes modem diagnostics (DBM, SINR) when the primary WAN is a modem.
+    - Run netperf speedtests on a configurable cron schedule and write results to the asset_id field. Includes modem diagnostics (DBM, SINR) when the primary WAN is a modem.
     - **Download:** [speedtest_scheduled_asset_id v1.0.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_asset_id.v1.0.2.tar.gz)
 - **speedtest_web**
     - Web-based speed test interface with history tracking and report generation. Supports Ookla, Netperf, and iPerf3 engines with live progress streaming, CSV export, and dark mode.

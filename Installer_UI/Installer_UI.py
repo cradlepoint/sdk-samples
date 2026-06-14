@@ -182,15 +182,19 @@ def run_speedtest():
         return 'Speedtest failed: ' + str(e)
 
 
+OOKLA_BINARIES = ('ookla', 'speedtest', 'speedtest-cli')
+
+
 def has_ookla():
-    """Check if ookla binary is present."""
-    if os.path.exists('ookla'):
-        if not os.access('ookla', os.X_OK):
-            try:
-                os.chmod('ookla', 0o755)
-            except Exception:
-                pass
-        return True
+    """Check if ookla binary is present (BYOB)."""
+    for binary in OOKLA_BINARIES:
+        if os.path.exists(binary):
+            if not os.access(binary, os.X_OK):
+                try:
+                    os.chmod(binary, 0o755)
+                except Exception:
+                    pass
+            return True
     return False
 
 

@@ -11,6 +11,22 @@ import sys
 sdk_data = 'iperf3_server'
 default_server = ''
 
+IPERF3_BINARIES = ('iperf3', 'iperf3-arm64v8', 'iperf3-aarch64')
+
+
+def find_iperf3():
+    """Find the iperf3 binary path."""
+    for binary in IPERF3_BINARIES:
+        if os.path.exists(binary):
+            if not os.access(binary, os.X_OK):
+                try:
+                    os.chmod(binary, 0o755)
+                except Exception:
+                    pass
+            return './' + binary
+    return None
+
+
 def process_results(download, upload):
     # put results in asset_id
     msg = f'{download}Mbps Download {upload}Mbps Upload'
@@ -22,8 +38,12 @@ def process_results(download, upload):
 
 def run_iperf3(server):
     try:
+        binary = find_iperf3()
+        if not binary:
+            cp.log('No iperf3 binary found')
+            return None
         args = f'-c {server} -J'
-        command = f'./iperf3-arm64v8 {args}'.split(' ')
+        command = f'{binary} {args}'.split(' ')
         results = ''
         with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
             try:

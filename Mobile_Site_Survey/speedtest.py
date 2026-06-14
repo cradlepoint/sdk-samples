@@ -44,16 +44,17 @@ _port_end = 5201
 
 # Engine detection
 _engine = None  # 'ookla' or 'iperf3', detected on first use
+_iperf3_binary = None  # path to iperf3 binary
 
 
 def _detect_engine():
     """Detect which speedtest engine to use."""
-    global _engine
+    global _engine, _iperf3_binary
     if _engine is not None:
         return _engine
 
-    # Check for Ookla binary (either 'ookla' or 'speedtest' name)
-    for binary in ('ookla', 'speedtest'):
+    # Check for Ookla binary (BYOB)
+    for binary in ('ookla', 'speedtest', 'speedtest-cli'):
         if os.path.exists(binary):
             if not os.access(binary, os.X_OK):
                 try:
@@ -64,14 +65,16 @@ def _detect_engine():
             return _engine
 
     # Fall back to iperf3
-    if os.path.exists('iperf3-arm64v8'):
-        if not os.access('iperf3-arm64v8', os.X_OK):
-            try:
-                os.chmod('iperf3-arm64v8', 0o755)
-            except Exception:
-                pass
-        _engine = 'iperf3'
-        return _engine
+    for binary in ('iperf3', 'iperf3-arm64v8', 'iperf3-aarch64'):
+        if os.path.exists(binary):
+            if not os.access(binary, os.X_OK):
+                try:
+                    os.chmod(binary, 0o755)
+                except Exception:
+                    pass
+            _engine = 'iperf3'
+            _iperf3_binary = './' + binary
+            return _engine
 
     _engine = 'none'
     return _engine
@@ -183,7 +186,7 @@ class Speedtest:
         elif self._engine == 'iperf3':
             return self._run_iperf3()
         else:
-            raise Exception("No speedtest binary found (need 'ookla', 'speedtest', or 'iperf3-arm64v8')")
+            raise Exception("No speedtest binary found (need 'ookla', 'speedtest', 'speedtest-cli', 'iperf3', or 'iperf3-arm64v8')")
 
     # =========================================================================
     # OOKLA ENGINE
@@ -192,7 +195,13 @@ class Speedtest:
     def _run_ookla(self):
         """Run Ookla speedtest using the binary."""
         # Determine binary name
-        binary = './ookla' if os.path.exists('ookla') else './speedtest'
+        binary = None
+        for name in ('ookla', 'speedtest', 'speedtest-cli'):
+            if os.path.exists(name):
+                binary = './' + name
+                break
+        if not binary:
+            return None
 
         # Build command
         if 'ookla' in binary:
@@ -339,7 +348,7 @@ class Speedtest:
 
     def _iperf3_run(self, port, reverse=False):
         """Run a single iperf3 test direction."""
-        cmd = ['./iperf3-arm64v8', '-c', _server, '-p', str(port),
+        cmd = [_iperf3_binary, '-c', _server, '-p', str(port),
                '-t', '10', '-J']
         if reverse:
             cmd.append('-R')

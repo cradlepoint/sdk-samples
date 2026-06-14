@@ -2,7 +2,7 @@ daily_speedtest
 ===============
 **Download Built App:** [**daily_speedtest.tar.gz**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.tar.gz)
 
-This SDK Application runs Ookla speedtests at configurable times (on the hour) each day.  
+This SDK Application runs netperf speedtests at configurable times (on the hour) each day.  
 
 > Default hours are 8am, 12pm, 4pm.
 

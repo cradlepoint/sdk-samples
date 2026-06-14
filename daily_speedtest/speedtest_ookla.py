@@ -18,6 +18,7 @@ from datetime import datetime
 # Constants
 SPEEDTEST_TIMEOUT = 90
 OOKLA_ERROR_WITH_IFACE = "Server Selection - Failed to find a working test server. (NoServers)"
+OOKLA_BINARIES = ('ookla', 'speedtest', 'speedtest-cli')
 WAN_STATUS_BASE_PATH = "/status/wan/devices/"
 
 
@@ -304,7 +305,7 @@ class Speedtest:
         # Always use -c flag with trial config URL to get fresh license (avoids expired settings.json)
         # Note: Ookla binary doesn't support --no-upload or --no-download flags
         # We always run the full test and filter results based on test_type
-        cmd = ['./ookla', '-f', 'jsonl', '-c', self._config_url]
+        cmd = [self._binary, '-f', 'jsonl', '-c', self._config_url]
         
         # Handle standby interfaces - use routing only, no binding
         if connection_state == "standby":
@@ -382,11 +383,16 @@ class Speedtest:
         """Run the actual speedtest using the binary executable
         test_type: 'download', 'upload', or 'both' (default)"""
         try:
-            # Check if ookla binary exists, if not try to download it
-            if not os.path.exists('ookla'):
-                log("Ookla binary not found, attempting to download...")
-                # Note: Download logic would go here if needed
+            # Check if ookla binary exists
+            binary = None
+            for name in OOKLA_BINARIES:
+                if os.path.exists(name):
+                    binary = name
+                    break
+            if not binary:
+                log("Ookla binary not found")
                 raise Exception("Ookla binary not found")
+            self._binary = './' + binary
             
             # Get interface information for routing
             iface, gateway, iface_ip, connection_state = self._get_interface_info()

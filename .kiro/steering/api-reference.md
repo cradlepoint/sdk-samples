@@ -37,6 +37,50 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 
 **See `#rtfm.md` for the full API verification workflow before writing any API code.**
 
+## Netperf Speed Test API (control/netperf)
+
+The router has a built-in netperf service for speed testing. Use via `cp.speed_test()` helper or direct control API.
+
+### cp.speed_test() helper (recommended):
+```python
+result = cp.speed_test(interface='rmnet501', duration=10, direction='both')
+# Returns: {'download_bps': float, 'upload_bps': float, 'interface': str, ...}
+```
+
+### Direct control API:
+```python
+# Start a download test on a specific interface:
+cp.put('control/netperf', {
+    "input": {
+        "options": {
+            "limit": {"size": 0, "time": 10},
+            "port": None, "fwport": None, "host": "",
+            "ifc_wan": "rmnet501",  # WAN interface to test through
+            "tcp": True, "udp": False,
+            "send": False, "recv": True, "rr": False
+        },
+        "tests": None
+    },
+    "run": 1
+})
+
+# Poll for completion:
+out = cp.get('control/netperf/output')
+# out = {"status": "complete", "results_path": "status/wan/devices/mdm-xxx/status/perf_results", ...}
+
+# Read results:
+results = cp.get('status/wan/devices/mdm-xxx/status/perf_results')
+# results = {"tcp_down": {"THROUGHPUT": "96.82", "THROUGHPUT_UNITS": "10^6bits/s", ...}}
+```
+
+### Key fields:
+- `ifc_wan`: Interface name (e.g. `rmnet501`) — routes test through specific modem, no source routing needed
+- `recv: True, send: False` = download test → results in `tcp_down`
+- `send: True, recv: False` = upload test → results in `tcp_up`
+- `rr: True` = TCP request/response latency test → results in `tcp_rr`
+- **Reset state between tests**: `cp.put('/state/system/netperf', {"run_count": 0})` + sleep 1s
+- **Single resource**: Only one netperf test can run at a time (no concurrent per-modem testing)
+
 ## Key Gotchas (Quick Reference)
 
 - status/lan/clients does NOT have rx_bytes/tx_bytes — use status/client_usage

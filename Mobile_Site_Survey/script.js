@@ -463,23 +463,7 @@ class MobileSiteSurvey {
 
     async showConfirmDialog(title, message, type = 'warning') {
         return new Promise((resolve) => {
-            if (typeof swal !== 'undefined') {
-                swal({
-                    title: title,
-                    text: message,
-                    icon: type,
-                    buttons: {
-                        cancel: 'Cancel',
-                        confirm: 'Confirm'
-                    },
-                    dangerMode: type === 'warning'
-                }).then((confirmed) => {
-                    resolve(confirmed);
-                });
-            } else {
-                // Fallback to native confirm
-                resolve(confirm(`${title}\n\n${message}`));
-            }
+            resolve(confirm(`${title}\n\n${message}`));
         });
     }
 

@@ -7,7 +7,7 @@ Application Name
 
 Application Purpose
 ===================
-5GSpeed runs Ookla speedtests using the official Ookla CLI binary and puts results into configurable field. Designed to enable NCM API support for Ookla speedtests.
+5GSpeed runs netperf speedtests and puts results into configurable field. Designed to enable NCM API support for speedtests.
 
 Steps to use:
 =============

@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Test</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        .speedtest-gauge {
+            text-align: center;
+            padding: 2rem 1rem;
+        }
+        .gauge-value {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            line-height: 1.2;
+        }
+        .gauge-unit {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+        .gauge-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        .speed-results {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 0.75rem;
+            margin: 1rem 0;
+            max-width: 70%;
+        }
+        .speed-card {
+            background: var(--card-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 0.75rem;
+            text-align: center;
+        }
+        .speed-card .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .speed-card .label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.15rem;
+        }
+        .speed-card.download .value { color: var(--success-color); }
+        .speed-card.upload .value { color: var(--info-color); }
+        .speed-card.ping .value { color: var(--warning-color); }
+
+        .progress-bar-container {
+            background: var(--border-color);
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: var(--primary-color);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .progress-status {
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+        .test-controls select,
+        .test-controls input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            background: var(--light-surface);
+            color: var(--text-primary);
+        }
+        .test-controls select:focus,
+        .test-controls input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        .history-table th,
+        .history-table td {
+            padding: 0.6rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .history-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+        }
+        .history-table tr:hover td {
+            background: rgba(79, 70, 229, 0.04);
+        }
+
+        .report-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .report-stat {
+            background: var(--card-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+        }
+        .report-stat .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        .report-stat .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .engine-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .engine-badge.ookla { background: #e0f2fe; color: #0369a1; }
+        .engine-badge.netperf { background: #dcfce7; color: #166534; }
+        .engine-badge.iperf3 { background: #fef3c7; color: #92400e; }
+
+        [data-theme="dark"] .engine-badge.ookla { background: #0c4a6e; color: #7dd3fc; }
+        [data-theme="dark"] .engine-badge.netperf { background: #14532d; color: #86efac; }
+        [data-theme="dark"] .engine-badge.iperf3 { background: #78350f; color: #fde68a; }
+
+        .iperf-server-input {
+            display: none;
+        }
+        .iperf-server-input.visible {
+            display: block;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+        .no-data i {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.4;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-primary {
+            background: var(--primary-color);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background: var(--danger-color);
+            color: #fff;
+        }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-secondary {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+        .btn-secondary:hover { background: #9ca3af; color: #fff; }
+
+        .hidden { display: none; }
+
+        /* Fix double scrollbar from template CSS */
+        .content-area { overflow: visible; height: auto; }
+        .app-main { overflow: visible; }
+
+        .graph-container { margin-bottom: 1.5rem; }
+        .graph-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary); }
+        .graph-bar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem; font-size: 0.75rem; }
+        .graph-bar-label { width: 110px; text-align: right; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .graph-bar-track { flex: 1; height: 16px; background: var(--border-color); border-radius: 3px; overflow: hidden; position: relative; }
+        .graph-bar-fill-dl { height: 100%; background: var(--success-color); border-radius: 3px; position: absolute; top: 0; left: 0; }
+        .graph-bar-fill-ul { height: 100%; background: var(--info-color); border-radius: 3px; position: absolute; top: 0; left: 0; opacity: 0.7; }
+        .graph-bar-value { width: 70px; font-size: 0.7rem; color: var(--text-secondary); }
+        .graph-legend { display: flex; gap: 1rem; font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .graph-legend span { display: flex; align-items: center; gap: 0.25rem; }
+        .graph-legend .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+        .report-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 0.75rem; }
+        .report-stat-avg { background: var(--card-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem; }
+        .report-stat-avg .stat-value { font-size: 1.3rem; font-weight: 700; color: var(--primary-color); }
+        .report-stat-avg .stat-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .report-stat-minmax { background: linear-gradient(135deg, rgba(16,185,129,0.05), rgba(16,185,129,0.02)); border: 1px solid rgba(16,185,129,0.3); border-radius: var(--radius-md); padding: 0.75rem; }
+        .report-stat-minmax .stat-value { font-size: 1.3rem; font-weight: 700; color: var(--success-color); }
+        .report-stat-minmax .stat-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+        .report-stat-meta { background: linear-gradient(135deg, rgba(79,70,229,0.05), rgba(79,70,229,0.02)); border: 1px solid rgba(79,70,229,0.3); border-radius: var(--radius-md); padding: 0.75rem; }
+        .report-stat-meta .stat-value { font-size: 1.3rem; font-weight: 700; color: var(--info-color); }
+        .report-stat-meta .stat-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+
+        .status-failed { color: var(--danger-color); font-weight: 600; }
+        .status-complete { color: var(--success-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">Speed Test</h1>
+                </div>
+                <div id="header-status" style="flex:1; text-align:center; font-size:0.8rem; color:var(--text-secondary);"></div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-tachometer-alt"></i> Speed Test</a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li>
+                            <a href="#" class="nav-item active" data-section="run-test">
+                                <i class="fas fa-play-circle"></i> Run Tests
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-section="history">
+                                <i class="fas fa-chart-bar"></i> History & Reports
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-section="servers">
+                                <i class="fas fa-server"></i> Servers
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-section="outputs">
+                                <i class="fas fa-share-alt"></i> Outputs
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+
+                    <!-- RUN TEST SECTION -->
+                    <section class="element-section active" id="run-test">
+                        <h2 class="section-title">Run Tests</h2>
+
+                        <div class="test-controls">
+                            <select id="engine-select">
+                                <option value="netperf">Netperf (Built-in)</option>
+                                <option value="iperf3">iPerf3</option>
+                            </select>
+                            <select id="interface-select">
+                                <option value="">Loading...</option>
+                            </select>
+                            <select id="duration-select">
+                                <option value="5">5 seconds</option>
+                                <option value="10" selected>10 seconds</option>
+                                <option value="20">20 seconds</option>
+                                <option value="30">30 seconds</option>
+                            </select>
+                            <input type="number" id="size-limit" placeholder="Size MB (0=unlimited)" value="0" min="0" style="width:130px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.875rem; background:var(--light-surface); color:var(--text-primary);" title="Data limit in MB (0 = time-based only)">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" id="latency-checkbox"> TCP Latency/Jitter
+                            </label>
+                            <button type="button" class="btn btn-primary" id="btn-start">
+                                <i class="fas fa-play"></i> Start Test
+                            </button>
+                            <button type="button" class="btn btn-danger hidden" id="btn-stop">
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
+                        </div>
+
+                        <div class="iperf-server-input" id="netperf-server-row">
+                            <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-bottom:0.75rem; max-width:50%;">
+                                <select id="netperf-server-select" style="flex:1; min-width:200px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                                    <option value="">Auto (default server)</option>
+                                </select>
+                            </div>
+                            <div id="netperf-custom-row" style="display:none; margin-bottom:1rem; max-width:50%;">
+                                <input type="text" id="netperf-server" placeholder="Custom netperf server IP (blank = auto)" style="width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            </div>
+                        </div>
+
+                        <div class="iperf-server-input" id="iperf-server-row">
+                            <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-bottom:0.75rem; max-width:50%;">
+                                <select id="iperf-server-select" style="flex:1; min-width:200px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                                    <option value="">Loading servers...</option>
+                                </select>
+                            </div>
+                            <div id="iperf-custom-row" style="display:none; margin-bottom:1rem; max-width:50%;">
+                                <input type="text" id="iperf-server" placeholder="server:port or server:start-end (e.g. iperf.example.com:5201-5210)" style="width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            </div>
+                        </div>
+
+                        <!-- Progress -->
+                        <div id="progress-section" class="hidden">
+                            <div class="progress-status" id="progress-status">Initializing...</div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill" id="progress-bar"></div>
+                            </div>
+                        </div>
+
+                        <!-- Results -->
+                        <div id="results-section">
+                            <div class="speed-results">
+                                <div class="speed-card download">
+                                    <div class="value" id="result-download">--</div>
+                                    <div class="label">Download Mbps</div>
+                                </div>
+                                <div class="speed-card upload">
+                                    <div class="value" id="result-upload">--</div>
+                                    <div class="label">Upload Mbps</div>
+                                </div>
+                                <div class="speed-card ping" id="latency-card" style="display:none;">
+                                    <div class="value" id="result-latency">--</div>
+                                    <div class="label">Latency ms</div>
+                                </div>
+                                <div class="speed-card ping" id="jitter-card" style="display:none;">
+                                    <div class="value" id="result-jitter">--</div>
+                                    <div class="label">Jitter ms</div>
+                                </div>
+                            </div>
+                            <div id="result-meta" style="text-align:center; font-size:0.8rem; color:var(--text-secondary);"></div>
+                        </div>
+
+                        <!-- Schedule Section -->
+                        <div style="margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
+                            <h3 style="font-size:0.95rem; margin-bottom:0.75rem;"><i class="fas fa-clock"></i> Scheduled Tests</h3>
+                            <div style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start;">
+                                <div style="flex:1; min-width:320px;">
+                                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; cursor:pointer; margin-bottom:0.5rem;">
+                                        <input type="checkbox" id="schedule-enabled"> Enable Schedule
+                                    </label>
+                                    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; cursor:pointer; margin-bottom:0.75rem;">
+                                        <input type="checkbox" id="schedule-autostart"> Auto-start on boot
+                                    </label>
+
+                                    <!-- Preset selector -->
+                                    <div style="margin-bottom:0.75rem;">
+                                        <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.25rem;">Quick Preset</label>
+                                        <select id="schedule-preset" style="width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                                            <option value="">Use builder below</option>
+                                            <option value="custom">Custom cron expression...</option>
+                                            <option value="*/5 * * * *">Every 5 minutes</option>
+                                            <option value="*/15 * * * *">Every 15 minutes</option>
+                                            <option value="*/30 * * * *">Every 30 minutes</option>
+                                            <option value="0 * * * *">Every hour</option>
+                                            <option value="0 */2 * * *">Every 2 hours</option>
+                                            <option value="0 */4 * * *">Every 4 hours</option>
+                                            <option value="0 */6 * * *">Every 6 hours</option>
+                                            <option value="0 */12 * * *">Every 12 hours</option>
+                                            <option value="0 8,12,17 * * *">3x daily (8am, 12pm, 5pm)</option>
+                                            <option value="0 0 * * *">Daily at midnight</option>
+                                            <option value="0 6 * * *">Daily at 6am</option>
+                                            <option value="0 12 * * *">Daily at noon</option>
+                                            <option value="0 2 * * 1">Weekly (Mon 2am)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Custom cron input (hidden by default) -->
+                                    <div id="schedule-custom-row" style="display:none; margin-bottom:0.75rem;">
+                                        <input type="text" id="schedule-cron-custom" placeholder="min hour dom month dow (e.g. 0 */4 * * 1-5)" style="width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                                    </div>
+
+                                    <!-- Visual cron builder -->
+                                    <div id="schedule-builder-wrap" style="border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.75rem; background:var(--card-surface);">
+                                        <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.5rem;">Schedule Builder</label>
+                                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                                            <div>
+                                                <label style="font-size:0.75rem; color:var(--text-secondary);">Run every</label>
+                                                <select id="cron-repeat" style="width:100%; padding:0.4rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.8rem;">
+                                                    <option value="minutes">X minutes</option>
+                                                    <option value="hours">X hours</option>
+                                                    <option value="daily">day</option>
+                                                    <option value="weekdays">weekday (M-F)</option>
+                                                    <option value="weekly">week</option>
+                                                </select>
+                                            </div>
+                                            <div id="cron-interval-wrap">
+                                                <label style="font-size:0.75rem; color:var(--text-secondary);">Interval</label>
+                                                <select id="cron-interval" style="width:100%; padding:0.4rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.8rem;">
+                                                    <option value="5">5</option>
+                                                    <option value="10">10</option>
+                                                    <option value="15">15</option>
+                                                    <option value="30">30</option>
+                                                </select>
+                                            </div>
+                                            <div id="cron-hour-wrap" style="display:none;">
+                                                <label style="font-size:0.75rem; color:var(--text-secondary);">At hour (UTC)</label>
+                                                <select id="cron-hour" style="width:100%; padding:0.4rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.8rem;">
+                                                    <option value="0">12:00 AM</option>
+                                                    <option value="1">1:00 AM</option>
+                                                    <option value="2">2:00 AM</option>
+                                                    <option value="3">3:00 AM</option>
+                                                    <option value="4">4:00 AM</option>
+                                                    <option value="5">5:00 AM</option>
+                                                    <option value="6">6:00 AM</option>
+                                                    <option value="7">7:00 AM</option>
+                                                    <option value="8">8:00 AM</option>
+                                                    <option value="9">9:00 AM</option>
+                                                    <option value="10">10:00 AM</option>
+                                                    <option value="11">11:00 AM</option>
+                                                    <option value="12">12:00 PM</option>
+                                                    <option value="13">1:00 PM</option>
+                                                    <option value="14">2:00 PM</option>
+                                                    <option value="15">3:00 PM</option>
+                                                    <option value="16">4:00 PM</option>
+                                                    <option value="17">5:00 PM</option>
+                                                    <option value="18">6:00 PM</option>
+                                                    <option value="19">7:00 PM</option>
+                                                    <option value="20">8:00 PM</option>
+                                                    <option value="21">9:00 PM</option>
+                                                    <option value="22">10:00 PM</option>
+                                                    <option value="23">11:00 PM</option>
+                                                </select>
+                                            </div>
+                                            <div id="cron-minute-wrap" style="display:none;">
+                                                <label style="font-size:0.75rem; color:var(--text-secondary);">At minute</label>
+                                                <select id="cron-minute" style="width:100%; padding:0.4rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.8rem;">
+                                                    <option value="0">:00</option>
+                                                    <option value="15">:15</option>
+                                                    <option value="30">:30</option>
+                                                    <option value="45">:45</option>
+                                                </select>
+                                            </div>
+                                            <div id="cron-dow-wrap" style="display:none;">
+                                                <label style="font-size:0.75rem; color:var(--text-secondary);">Day of week</label>
+                                                <select id="cron-dow" style="width:100%; padding:0.4rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:0.8rem;">
+                                                    <option value="0">Sunday</option>
+                                                    <option value="1">Monday</option>
+                                                    <option value="2">Tuesday</option>
+                                                    <option value="3">Wednesday</option>
+                                                    <option value="4">Thursday</option>
+                                                    <option value="5">Friday</option>
+                                                    <option value="6">Saturday</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Cron expression display (always visible) -->
+                                    <div style="margin-top:0.5rem; font-size:0.75rem; color:var(--text-secondary);">
+                                        Cron: <code id="cron-preview" style="background:var(--border-color); padding:0.15rem 0.4rem; border-radius:3px;">* * * * *</code>
+                                    </div>
+
+                                    <button type="button" class="btn btn-primary" id="btn-save-schedule" style="margin-top:0.75rem;">
+                                        <i class="fas fa-save"></i> Save Schedule
+                                    </button>
+                                </div>
+                                <div id="schedule-status" style="flex:1; min-width:200px; font-size:0.8rem; color:var(--text-secondary); padding:0.75rem; background:var(--card-surface); border:1px solid var(--border-color); border-radius:var(--radius-md);">
+                                    <p><strong>Status:</strong> <span id="schedule-status-text">Not configured</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- HISTORY (combined stats + graphs + table) -->
+                    <section class="element-section" id="history">
+                        <h2 class="section-title">History &amp; Reports</h2>
+                        <div style="margin-bottom: 1rem; display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:space-between;">
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="button" class="btn btn-secondary" id="btn-refresh-history">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
+                                <button type="button" class="btn btn-danger" id="btn-clear-history">
+                                    <i class="fas fa-trash"></i> Clear All
+                                </button>
+                            </div>
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="button" class="btn btn-primary" id="btn-export-csv">
+                                    <i class="fas fa-file-csv"></i> CSV Report
+                                </button>
+                                <button type="button" class="btn btn-primary" id="btn-dl-html">
+                                    <i class="fas fa-file-code"></i> HTML Report
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- All Tests Summary -->
+                        <div id="history-all-stats"></div>
+
+                        <!-- Per-engine sections -->
+                        <div id="history-per-engine"></div>
+
+                        <!-- Raw table -->
+                        <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                            <h3 style="font-size:0.95rem; margin-bottom:0.75rem;">Test Log</h3>
+                            <div id="history-table-content"></div>
+                        </div>
+                    </section>
+
+                    <!-- REPORTS section removed - merged into History -->
+
+                    <!-- SERVERS SECTION -->
+                    <section class="element-section" id="servers">
+                        <h2 class="section-title">Server Management</h2>
+                        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                            Save servers to SDK appdata for use in speed tests. Saved servers persist across reboots and can be pushed via NCM group configs.
+                        </p>
+
+                        <h3 style="font-size:0.95rem; margin:1.5rem 0 0.75rem;">Netperf Servers</h3>
+                        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+                            <input type="text" id="add-netperf-server" placeholder="IP address (e.g. 54.215.247.100)" style="flex:1; min-width:200px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            <input type="text" id="add-netperf-label" placeholder="Label (optional)" style="width:150px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            <button type="button" class="btn btn-primary" id="btn-save-netperf"><i class="fas fa-plus"></i> Save</button>
+                        </div>
+                        <div id="netperf-server-list"></div>
+
+                        <h3 style="font-size:0.95rem; margin:1.5rem 0 0.75rem;">iPerf3 Servers</h3>
+                        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+                            <input type="text" id="add-iperf3-server" placeholder="hostname or IP" style="flex:1; min-width:150px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            <input type="text" id="add-iperf3-port" placeholder="port or range (5201-5210)" style="width:140px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            <input type="text" id="add-iperf3-city" placeholder="City" style="width:120px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            <input type="text" id="add-iperf3-country" placeholder="Country" style="width:80px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            <button type="button" class="btn btn-primary" id="btn-save-iperf3"><i class="fas fa-plus"></i> Save</button>
+                        </div>
+                        <div id="iperf3-server-list"></div>
+                    </section>
+
+                    <!-- OUTPUTS SECTION -->
+                    <section class="element-section" id="outputs">
+                        <h2 class="section-title">Result Outputs</h2>
+                        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                            Select where speed test results are written after each test completes. Multiple outputs can be active simultaneously.
+                        </p>
+
+                        <div style="display:flex; flex-direction:column; gap:0.75rem; max-width:500px;">
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" id="output-desc" data-output="config/system/desc">
+                                <span>Description <span style="color:var(--text-secondary);">(config/system/desc)</span></span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" id="output-asset" data-output="config/system/asset_id">
+                                <span>Asset ID <span style="color:var(--text-secondary);">(config/system/asset_id)</span></span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" id="output-appdata" data-output="appdata:speedtest_results">
+                                <span>SDK Data <span style="color:var(--text-secondary);">(speedtest_results)</span></span>
+                            </label>
+                            <div style="display:flex; gap:0.5rem; align-items:center;">
+                                <input type="checkbox" id="output-custom-check" data-output="custom">
+                                <input type="text" id="output-custom-path" placeholder="Custom path (e.g. config/system/snmp/persisted_config)" style="flex:1; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.85rem; background:var(--light-surface); color:var(--text-primary);">
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" id="btn-save-outputs" style="margin-top:1rem;">
+                            <i class="fas fa-save"></i> Save Outputs
+                        </button>
+                        <div id="outputs-status" style="margin-top:0.75rem; font-size:0.8rem; color:var(--text-secondary);"></div>
+                    </section>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    (function() {
+        var pollTimer = null;
+        var engines = [];
+        var testStartTime = 0;
+        var testDuration = 10;
+        var testStages = ['download', 'upload'];  // stages for this test
+        var includeLatency = false;
+
+        // ===== NAVIGATION =====
+        var navItems = document.querySelectorAll('.nav-item[data-section]');
+        for (var i = 0; i < navItems.length; i++) {
+            navItems[i].addEventListener('click', function(e) {
+                e.preventDefault();
+                var sectionId = this.getAttribute('data-section');
+                showSection(sectionId);
+                for (var j = 0; j < navItems.length; j++) {
+                    navItems[j].classList.remove('active');
+                }
+                this.classList.add('active');
+            });
+        }
+
+        var homepageLink = document.getElementById('homepage-link');
+        if (homepageLink) {
+            homepageLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                showSection('run-test');
+                for (var j = 0; j < navItems.length; j++) {
+                    navItems[j].classList.remove('active');
+                }
+                navItems[0].classList.add('active');
+            });
+        }
+
+        function showSection(id) {
+            var sections = document.querySelectorAll('.element-section');
+            for (var i = 0; i < sections.length; i++) {
+                sections[i].classList.remove('active');
+            }
+            var target = document.getElementById(id);
+            if (target) target.classList.add('active');
+            if (id === 'history') loadHistory();
+            if (id === 'servers') loadServerList();
+            localStorage.setItem('speedtest_tab', id);
+        }
+
+        // Restore last active tab on page load
+        var savedTab = localStorage.getItem('speedtest_tab');
+        if (savedTab) {
+            showSection(savedTab);
+            for (var j = 0; j < navItems.length; j++) {
+                navItems[j].classList.remove('active');
+                if (navItems[j].getAttribute('data-section') === savedTab) {
+                    navItems[j].classList.add('active');
+                }
+            }
+        }
+
+        // ===== DARK MODE =====
+        var darkToggle = document.getElementById('dark-mode-toggle');
+        if (darkToggle) {
+            darkToggle.addEventListener('click', function() {
+                var html = document.documentElement;
+                var current = html.getAttribute('data-theme');
+                var next = current === 'dark' ? 'light' : 'dark';
+                html.setAttribute('data-theme', next);
+                localStorage.setItem('theme', next);
+                var icon = darkToggle.querySelector('i');
+                icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+            });
+            var saved = localStorage.getItem('theme');
+            if (saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                darkToggle.querySelector('i').className = 'fas fa-sun';
+            }
+        }
+
+        // ===== INIT =====
+        var routerHostname = 'router';
+        fetch('/api/router_info').then(function(r) { return r.json(); }).then(function(data) {
+            routerHostname = data.hostname || 'router';
+        });
+        loadEngines();
+        loadInterfaces();
+
+        // Header status updater
+        var headerCountdown = null;
+        var headerNextSec = 0;
+
+        function updateHeaderStatus() {
+            fetch('/api/status').then(function(r) { return r.json(); }).then(function(status) {
+                var el = document.getElementById('header-status');
+                if (status.running) {
+                    headerWasRunning = true;
+                    var p = status.progress || {};
+                    var stage = p.stage || 'starting';
+                    var info = '';
+                    if (stage === 'download') {
+                        info = '<i class="fas fa-arrow-down" style="color:var(--success-color);"></i> Downloading';
+                        if (p.bandwidth_bps) info += ' ' + (p.bandwidth_bps / 1e6).toFixed(1) + ' Mbps';
+                    } else if (stage === 'upload') {
+                        info = '<i class="fas fa-arrow-up" style="color:var(--info-color);"></i> Uploading';
+                        if (p.bandwidth_bps) info += ' ' + (p.bandwidth_bps / 1e6).toFixed(1) + ' Mbps';
+                    } else if (stage === 'latency') {
+                        info = '<i class="fas fa-stopwatch" style="color:var(--warning-color);"></i> Measuring latency';
+                    } else if (stage === 'complete') {
+                        var r = p.result;
+                        if (r) info = '<i class="fas fa-check" style="color:var(--success-color);"></i> ' + r.download_mbps + ' / ' + r.upload_mbps + ' Mbps';
+                    } else {
+                        info = '<i class="fas fa-spinner fa-spin"></i> Starting test...';
+                    }
+                    el.innerHTML = info;
+                    return;
+                }
+
+                // Test just finished — refresh countdown and history
+                if (headerWasRunning) {
+                    headerWasRunning = false;
+                    loadScheduleCountdown();
+                    loadHistory();
+                }
+
+                // Not running — show schedule countdown
+                if (headerNextSec > 0) {
+                    var mins = Math.floor(headerNextSec / 60);
+                    var secs = headerNextSec % 60;
+                    el.innerHTML = '<i class="fas fa-clock" style="color:var(--text-secondary);"></i> Next test in ' + mins + 'm ' + secs + 's';
+                } else if (headerNextSec <= 0 && headerNextSec > -15 && !headerWasRunning && scheduleEnabled) {
+                    el.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting test...';
+                } else {
+                    el.innerHTML = '';
+                }
+            });
+        }
+
+        var headerWasRunning = false;
+        var scheduleEnabled = false;
+
+        function loadScheduleCountdown() {
+            fetch('/api/schedule').then(function(r) { return r.json(); }).then(function(data) {
+                scheduleEnabled = data.enabled || false;
+                if (data.enabled && data.next_run_seconds) {
+                    headerNextSec = data.next_run_seconds;
+                } else {
+                    headerNextSec = 0;
+                }
+            });
+        }
+
+        // Poll header every 2 seconds
+        setInterval(function() {
+            updateHeaderStatus();
+            if (headerNextSec > 0) headerNextSec -= 2;
+        }, 2000);
+
+        // Refresh countdown from server every 60 seconds
+        loadScheduleCountdown();
+        setInterval(loadScheduleCountdown, 60000);
+
+        // ===== ENGINE SELECT =====
+        var engineSelect = document.getElementById('engine-select');
+        var iperfRow = document.getElementById('iperf-server-row');
+        var netperfRow = document.getElementById('netperf-server-row');
+        var durationSelect = document.getElementById('duration-select');
+        var latencyCheckbox = document.getElementById('latency-checkbox');
+
+        engineSelect.addEventListener('change', function() {
+            var val = this.value;
+            if (val === 'iperf3') {
+                iperfRow.classList.add('visible');
+                netperfRow.classList.remove('visible');
+                loadIperf3Servers();
+            } else if (val === 'netperf') {
+                iperfRow.classList.remove('visible');
+                netperfRow.classList.add('visible');
+                loadNetperfServers();
+            } else {
+                iperfRow.classList.remove('visible');
+                netperfRow.classList.remove('visible');
+            }
+            // Hide duration for ookla (it manages its own timing)
+            if (val === 'ookla') {
+                durationSelect.style.display = 'none';
+                latencyCheckbox.parentElement.style.display = 'none';
+            } else {
+                durationSelect.style.display = '';
+                latencyCheckbox.parentElement.style.display = '';
+            }
+        });
+
+        // iPerf3 server select change handler
+        var iperfServerSelect = document.getElementById('iperf-server-select');
+        var iperfCustomRow = document.getElementById('iperf-custom-row');
+        iperfServerSelect.addEventListener('change', function() {
+            if (this.value === '__custom__') {
+                iperfCustomRow.style.display = '';
+            } else {
+                iperfCustomRow.style.display = 'none';
+            }
+        });
+
+        // Netperf server select change handler
+        var netperfServerSelect = document.getElementById('netperf-server-select');
+        var netperfCustomRow = document.getElementById('netperf-custom-row');
+        netperfServerSelect.addEventListener('change', function() {
+            if (this.value === '__custom__') {
+                netperfCustomRow.style.display = '';
+            } else {
+                netperfCustomRow.style.display = 'none';
+            }
+        });
+
+        function loadNetperfServers() {
+            fetch('/api/servers').then(function(r) { return r.json(); }).then(function(data) {
+                var sel = document.getElementById('netperf-server-select');
+                sel.innerHTML = '<option value="">Auto (default server)</option>';
+                var servers = data.netperf || [];
+                for (var i = 0; i < servers.length; i++) {
+                    var s = servers[i];
+                    var opt = document.createElement('option');
+                    opt.value = s.server;
+                    opt.textContent = (s.label || s.server) + ' (' + s.server + ')';
+                    sel.appendChild(opt);
+                }
+                var customOpt = document.createElement('option');
+                customOpt.value = '__custom__';
+                customOpt.textContent = '— Enter custom server —';
+                sel.appendChild(customOpt);
+                netperfCustomRow.style.display = 'none';
+            });
+        }
+
+        function loadIperf3Servers() {
+            fetch('/api/iperf3_servers').then(function(r) { return r.json(); }).then(function(data) {
+                var sel = document.getElementById('iperf-server-select');
+                sel.innerHTML = '';
+                if (data && data.length > 0) {
+                    for (var i = 0; i < data.length; i++) {
+                        var s = data[i];
+                        var opt = document.createElement('option');
+                        var port = s.port || '5201';
+                        opt.value = s.server + ':' + port;
+                        opt.textContent = s.city + ', ' + s.country + ' - ' + s.server + ':' + port;
+                        sel.appendChild(opt);
+                    }
+                }
+                // Add custom option at end
+                var customOpt = document.createElement('option');
+                customOpt.value = '__custom__';
+                customOpt.textContent = '— Enter custom server —';
+                sel.appendChild(customOpt);
+                // Reset custom row visibility
+                iperfCustomRow.style.display = 'none';
+            });
+        }
+
+        // Show/hide latency cards based on checkbox
+        latencyCheckbox.addEventListener('change', function() {
+            var show = this.checked;
+            document.getElementById('latency-card').style.display = show ? '' : 'none';
+            document.getElementById('jitter-card').style.display = show ? '' : 'none';
+        });
+
+        function loadEngines() {
+            fetch('/api/engines').then(function(r) { return r.json(); }).then(function(data) {
+                engines = data;
+                engineSelect.innerHTML = '';
+                for (var i = 0; i < data.length; i++) {
+                    var opt = document.createElement('option');
+                    opt.value = data[i].id;
+                    opt.textContent = data[i].name;
+                    engineSelect.appendChild(opt);
+                }
+                // Trigger change to set initial UI state
+                engineSelect.dispatchEvent(new Event('change'));
+            });
+        }
+
+        function loadInterfaces() {
+            fetch('/api/interfaces').then(function(r) { return r.json(); }).then(function(data) {
+                var sel = document.getElementById('interface-select');
+                sel.innerHTML = '';
+                if (!data || data.length === 0) {
+                    var opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No connected interfaces';
+                    sel.appendChild(opt);
+                    sel.disabled = true;
+                } else if (data.length === 1) {
+                    // Single interface - display only, not selectable
+                    var s = data[0];
+                    var opt = document.createElement('option');
+                    opt.value = s.iface;
+                    opt.textContent = s.name + ' (' + s.iface + ' - ' + s.ip + ')';
+                    sel.appendChild(opt);
+                    sel.disabled = true;
+                } else {
+                    // Multiple interfaces - first one is highest priority (pre-selected)
+                    sel.disabled = false;
+                    for (var i = 0; i < data.length; i++) {
+                        var s = data[i];
+                        var opt = document.createElement('option');
+                        opt.value = s.iface;
+                        opt.textContent = s.name + ' (' + s.iface + ' - ' + s.ip + ')';
+                        if (i === 0) opt.selected = true;
+                        sel.appendChild(opt);
+                    }
+                }
+            });
+        }
+
+        // ===== START/STOP =====
+        var btnStart = document.getElementById('btn-start');
+        var btnStop = document.getElementById('btn-stop');
+
+        btnStart.addEventListener('click', function() {
+            var engine = engineSelect.value;
+            var iface = document.getElementById('interface-select').value;
+            var duration = parseInt(durationSelect.value);
+            var sizeLimit = parseInt(document.getElementById('size-limit').value) || 0;
+            includeLatency = latencyCheckbox.checked;
+            var params = {
+                engine: engine,
+                interface: iface,
+                duration: duration,
+                size: sizeLimit,
+                include_latency: includeLatency
+            };
+
+            if (engine === 'iperf3') {
+                var serverSelect = document.getElementById('iperf-server-select');
+                var serverVal = serverSelect.value;
+                var server = '';
+                var port = '5201';
+                if (serverVal === '__custom__') {
+                    var custom = document.getElementById('iperf-server').value.trim();
+                    if (!custom) {
+                        alert('Please enter an iPerf3 server address.');
+                        return;
+                    }
+                    // Parse server:port or server:start-end (keep range as string)
+                    if (custom.indexOf(':') > -1) {
+                        var parts = custom.split(':');
+                        server = parts[0];
+                        port = parts[1] || '5201';
+                    } else {
+                        server = custom;
+                    }
+                } else if (serverVal) {
+                    var parts = serverVal.split(':');
+                    server = parts[0];
+                    port = parts[1] || '5201';
+                } else {
+                    alert('Please select an iPerf3 server.');
+                    return;
+                }
+                params.server = server;
+                params.port = port;
+            }
+
+            // Netperf server (optional host)
+            if (engine === 'netperf') {
+                var npSelect = document.getElementById('netperf-server-select');
+                var npVal = npSelect.value;
+                if (npVal === '__custom__') {
+                    var npCustom = document.getElementById('netperf-server').value.trim();
+                    if (npCustom) params.host = npCustom;
+                } else if (npVal) {
+                    params.host = npVal;
+                }
+            }
+
+            // Set up stages for progress tracking
+            testDuration = duration;
+            testStages = ['download', 'upload'];
+            if (includeLatency && engine !== 'ookla') {
+                testStages.push('latency');
+            }
+
+            // Show latency/jitter cards if latency checked
+            document.getElementById('latency-card').style.display = includeLatency ? '' : 'none';
+            document.getElementById('jitter-card').style.display = includeLatency ? '' : 'none';
+
+            fetch('/api/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                testStartTime = Date.now();
+                setRunningUI(true);
+                startPolling();
+            });
+        });
+
+        btnStop.addEventListener('click', function() {
+            fetch('/api/stop', { method: 'POST' });
+            setRunningUI(false);
+            stopPolling();
+        });
+
+        function setRunningUI(running) {
+            btnStart.classList.toggle('hidden', running);
+            btnStop.classList.toggle('hidden', !running);
+            document.getElementById('progress-section').classList.toggle('hidden', !running);
+            // Disable/enable controls while running
+            engineSelect.disabled = running;
+            document.getElementById('interface-select').disabled = running;
+            durationSelect.disabled = running;
+            latencyCheckbox.disabled = running;
+            document.getElementById('netperf-server-select').disabled = running;
+            document.getElementById('iperf-server-select').disabled = running;
+            document.getElementById('size-limit').disabled = running;
+            if (running) {
+                document.getElementById('result-download').textContent = '--';
+                document.getElementById('result-upload').textContent = '--';
+                document.getElementById('result-latency').textContent = '--';
+                document.getElementById('result-jitter').textContent = '--';
+                document.getElementById('result-meta').textContent = '';
+                document.getElementById('progress-bar').style.width = '0%';
+            }
+        }
+
+        // ===== POLLING =====
+        function startPolling() {
+            stopPolling();
+            pollTimer = setInterval(pollStatus, 500);
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function getOverallProgress(stage, stagePercent) {
+            // Calculate overall progress based on which stage we're in
+            var stageIndex = testStages.indexOf(stage);
+            if (stageIndex < 0) stageIndex = 0;
+            var stageWeight = 100 / testStages.length;
+            var baseProgress = stageIndex * stageWeight;
+
+            // If we have a time-based estimate (netperf doesn't report percent)
+            if (stagePercent <= 0 && testStartTime > 0) {
+                var elapsed = (Date.now() - testStartTime) / 1000;
+                // Each stage takes roughly testDuration + 4s overhead
+                var stageTime = testDuration + 4;
+                var stageElapsed = elapsed - (stageIndex * stageTime);
+                stagePercent = Math.min(95, Math.max(0, (stageElapsed / stageTime) * 100));
+            }
+
+            return Math.min(99, baseProgress + (stagePercent * stageWeight / 100));
+        }
+
+        function pollStatus() {
+            fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+                var progress = data.progress || {};
+                var stage = progress.stage || '';
+                var pct = progress.percent || 0;
+                var bar = document.getElementById('progress-bar');
+                var statusEl = document.getElementById('progress-status');
+
+                if (stage === 'download') {
+                    var overall = getOverallProgress('download', pct);
+                    statusEl.textContent = 'Downloading... ' + (progress.bandwidth_bps ? formatSpeed(progress.bandwidth_bps) + ' Mbps' : '');
+                    bar.style.width = overall + '%';
+                    bar.style.background = 'var(--success-color)';
+                    if (progress.bandwidth_bps) {
+                        document.getElementById('result-download').textContent = formatSpeed(progress.bandwidth_bps);
+                    }
+                } else if (stage === 'upload') {
+                    var overall = getOverallProgress('upload', pct);
+                    statusEl.textContent = 'Uploading... ' + (progress.bandwidth_bps ? formatSpeed(progress.bandwidth_bps) + ' Mbps' : '');
+                    bar.style.width = overall + '%';
+                    bar.style.background = 'var(--info-color)';
+                    if (progress.bandwidth_bps) {
+                        document.getElementById('result-upload').textContent = formatSpeed(progress.bandwidth_bps);
+                    }
+                } else if (stage === 'latency') {
+                    var overall = getOverallProgress('latency', pct);
+                    statusEl.textContent = 'Measuring latency/jitter...';
+                    bar.style.width = overall + '%';
+                    bar.style.background = 'var(--warning-color)';
+                } else if (stage === 'ping') {
+                    statusEl.textContent = 'Measuring latency...';
+                    bar.style.width = '30%';
+                    bar.style.background = 'var(--warning-color)';
+                    if (progress.latency) {
+                        document.getElementById('result-latency').textContent = progress.latency.toFixed(1);
+                    }
+                } else if (stage === 'complete') {
+                    var r = progress.result;
+                    document.getElementById('result-download').textContent = r.download_mbps.toFixed(2);
+                    document.getElementById('result-upload').textContent = r.upload_mbps.toFixed(2);
+                    if (r.latency_ms != null) {
+                        document.getElementById('result-latency').textContent = r.latency_ms.toFixed(2);
+                        document.getElementById('latency-card').style.display = '';
+                    }
+                    if (r.jitter_ms != null) {
+                        document.getElementById('result-jitter').textContent = r.jitter_ms.toFixed(2);
+                        document.getElementById('jitter-card').style.display = '';
+                    }
+                    if (r.ping_ms != null && !r.latency_ms) {
+                        document.getElementById('result-latency').textContent = r.ping_ms.toFixed(1);
+                        document.getElementById('latency-card').style.display = '';
+                    }
+                    var meta = r.engine.toUpperCase();
+                    if (r.server) meta += ' | ' + r.server;
+                    if (r.isp) meta += ' | ' + r.isp;
+                    document.getElementById('result-meta').textContent = meta;
+                    bar.style.width = '100%';
+                    bar.style.background = 'var(--success-color)';
+                    statusEl.textContent = 'Complete';
+                    setTimeout(function() {
+                        setRunningUI(false);
+                        stopPolling();
+                    }, 1500);
+                } else if (stage === 'starting' || stage === 'testing') {
+                    statusEl.textContent = 'Starting test...';
+                    bar.style.width = '2%';
+                    bar.style.background = 'var(--primary-color)';
+                }
+
+                if (data.error && !data.running) {
+                    statusEl.textContent = 'Error: ' + data.error;
+                    bar.style.width = '100%';
+                    bar.style.background = 'var(--danger-color)';
+                    setTimeout(function() {
+                        setRunningUI(false);
+                        stopPolling();
+                    }, 2000);
+                }
+            });
+        }
+
+        function formatSpeed(bps) {
+            return (bps / 1000000).toFixed(2);
+        }
+
+        // ===== HISTORY =====
+        document.getElementById('btn-refresh-history').addEventListener('click', loadHistory);
+        document.getElementById('btn-clear-history').addEventListener('click', function() {
+            if (confirm('Clear all test history?')) {
+                fetch('/api/clear_history', { method: 'POST' }).then(function() { loadHistory(); });
+            }
+        });
+        document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+
+        function loadHistory() {
+            fetch('/api/history').then(function(r) { return r.json(); }).then(function(data) {
+                var allStats = document.getElementById('history-all-stats');
+                var perEngine = document.getElementById('history-per-engine');
+                var tableDiv = document.getElementById('history-table-content');
+
+                if (!data || data.length === 0) {
+                    allStats.innerHTML = '<div class="no-data"><i class="fas fa-clipboard-list"></i><p>No test history yet. Run a test to get started.</p></div>';
+                    perEngine.innerHTML = '';
+                    tableDiv.innerHTML = '';
+                    return;
+                }
+
+                // All tests stats + graph
+                allStats.innerHTML = '<h3 style="font-size:1rem; margin-bottom:0.75rem;">All Tests Summary</h3>' + buildStatsAndGraph(data);
+
+                // Per-engine sections
+                var byEngine = {};
+                for (var i = 0; i < data.length; i++) {
+                    var eng = data[i].engine || 'unknown';
+                    if (!byEngine[eng]) byEngine[eng] = [];
+                    byEngine[eng].push(data[i]);
+                }
+                var engineHtml = '';
+                var engineNames = Object.keys(byEngine);
+                for (var e = 0; e < engineNames.length; e++) {
+                    var ename = engineNames[e];
+                    if (byEngine[ename].length > 0) {
+                        engineHtml += '<div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border-color);">';
+                        engineHtml += '<h3 style="font-size:1rem; margin-bottom:0.75rem;"><span class="engine-badge ' + ename + '">' + ename + '</span> (' + byEngine[ename].length + ' tests)</h3>';
+                        engineHtml += buildStatsAndGraph(byEngine[ename]);
+                        engineHtml += '</div>';
+                    }
+                }
+                perEngine.innerHTML = engineHtml;
+
+                // Store for save/download
+                window._currentReport = buildReportData(data);
+
+                // Table
+                var html = '<table class="history-table"><thead><tr>';
+                html += '<th>Time</th><th>Engine</th><th>Status</th><th>Download</th><th>Upload</th><th>Latency</th><th>Jitter</th><th>Interface</th><th>Server</th><th>Duration</th><th>Size</th>';
+                html += '</tr></thead><tbody>';
+                for (var i = data.length - 1; i >= 0; i--) {
+                    var r = data[i];
+                    var t = r.timestamp ? r.timestamp.replace('T', ' ').replace('Z', '') : '';
+                    var statusCls = r.status === 'failed' ? 'status-failed' : 'status-complete';
+                    var statusTxt = r.status === 'failed' ? 'Failed' : 'OK';
+                    var serverInfo = r.server || r.host || '--';
+                    if (r.port && r.server) serverInfo = r.server + ':' + r.port;
+                    html += '<tr>';
+                    html += '<td>' + t + '</td>';
+                    html += '<td><span class="engine-badge ' + r.engine + '">' + r.engine + '</span></td>';
+                    html += '<td><span class="' + statusCls + '">' + statusTxt + '</span></td>';
+                    html += '<td>' + r.download_mbps + '</td>';
+                    html += '<td>' + r.upload_mbps + '</td>';
+                    html += '<td>' + (r.latency_ms != null ? r.latency_ms : (r.ping_ms != null ? r.ping_ms : '--')) + '</td>';
+                    html += '<td>' + (r.jitter_ms != null ? r.jitter_ms : '--') + '</td>';
+                    html += '<td>' + (r.interface || '--') + '</td>';
+                    html += '<td>' + serverInfo + '</td>';
+                    html += '<td>' + (r.duration ? r.duration + 's' : '--') + '</td>';
+                    html += '<td>' + (r.size ? r.size + 'MB' : '--') + '</td>';
+                    html += '</tr>';
+                }
+                html += '</tbody></table>';
+                tableDiv.innerHTML = html;
+            });
+        }
+
+        function buildStatsAndGraph(tests) {
+            var complete = tests.filter(function(r) { return r.status !== 'failed'; });
+            var failed = tests.filter(function(r) { return r.status === 'failed'; });
+            var cnt = complete.length || 1;
+            var totalDl = 0, totalUl = 0, totalLat = 0, latCount = 0, totalJitter = 0, jitterCount = 0;
+            var maxDl = 0, maxUl = 0, minDl = Infinity, minUl = Infinity;
+            for (var i = 0; i < complete.length; i++) {
+                var r = complete[i];
+                totalDl += r.download_mbps; totalUl += r.upload_mbps;
+                if (r.latency_ms != null) { totalLat += r.latency_ms; latCount++; }
+                else if (r.ping_ms != null) { totalLat += r.ping_ms; latCount++; }
+                if (r.jitter_ms != null) { totalJitter += r.jitter_ms; jitterCount++; }
+                if (r.download_mbps > maxDl) maxDl = r.download_mbps;
+                if (r.upload_mbps > maxUl) maxUl = r.upload_mbps;
+                if (r.download_mbps < minDl) minDl = r.download_mbps;
+                if (r.upload_mbps < minUl) minUl = r.upload_mbps;
+            }
+            if (minDl === Infinity) minDl = 0;
+            if (minUl === Infinity) minUl = 0;
+            var avgDl = (totalDl / cnt).toFixed(2);
+            var avgUl = (totalUl / cnt).toFixed(2);
+            var avgLat = latCount > 0 ? (totalLat / latCount).toFixed(2) : '--';
+            var avgJitter = jitterCount > 0 ? (totalJitter / jitterCount).toFixed(2) : '--';
+            var first = tests[0].timestamp || '';
+            var last = tests[tests.length - 1].timestamp || '';
+
+            var html = '<div class="report-row">';
+            html += rstat('report-stat-avg', 'Avg Download', avgDl + ' Mbps');
+            html += rstat('report-stat-avg', 'Avg Upload', avgUl + ' Mbps');
+            html += rstat('report-stat-avg', 'Avg Latency', avgLat + ' ms');
+            html += rstat('report-stat-avg', 'Avg Jitter', avgJitter + ' ms');
+            html += '</div><div class="report-row">';
+            html += rstat('report-stat-minmax', 'Max Download', maxDl.toFixed(2) + ' Mbps');
+            html += rstat('report-stat-minmax', 'Max Upload', maxUl.toFixed(2) + ' Mbps');
+            html += rstat('report-stat-minmax', 'Min Download', minDl.toFixed(2) + ' Mbps');
+            html += rstat('report-stat-minmax', 'Min Upload', minUl.toFixed(2) + ' Mbps');
+            html += '</div><div class="report-row">';
+            html += rstat('report-stat-meta', 'Total', tests.length);
+            html += rstat('report-stat-meta', 'Completed', complete.length);
+            html += rstat('report-stat-meta', 'Failed', failed.length);
+            html += rstat('report-stat-meta', 'Range', first.substring(0, 10) + ' to ' + last.substring(0, 10));
+            html += '</div>';
+
+            // Bar graph
+            var maxSpeed = 1;
+            for (var j = 0; j < tests.length; j++) {
+                if (tests[j].download_mbps > maxSpeed) maxSpeed = tests[j].download_mbps;
+                if (tests[j].upload_mbps > maxSpeed) maxSpeed = tests[j].upload_mbps;
+            }
+            html += '<div class="graph-container" style="margin-top:0.75rem;">';
+            html += '<div class="graph-legend"><span><span class="dot" style="background:var(--success-color);"></span> Download</span><span><span class="dot" style="background:var(--info-color);"></span> Upload</span></div>';
+            var start = Math.max(0, tests.length - 20);
+            for (var j = start; j < tests.length; j++) {
+                var t = tests[j];
+                var dlPct = maxSpeed > 0 ? (t.download_mbps / maxSpeed * 100) : 0;
+                var ulPct = maxSpeed > 0 ? (t.upload_mbps / maxSpeed * 100) : 0;
+                var label = t.timestamp ? t.timestamp.substring(5, 16).replace('T', ' ') : '';
+                var isFailed = (t.status === 'failed');
+                html += '<div class="graph-bar-row">';
+                html += '<div class="graph-bar-label">' + label + '</div>';
+                html += '<div class="graph-bar-track" style="display:flex;gap:1px;">';
+                if (isFailed) {
+                    html += '<div style="height:100%;width:100%;background:var(--danger-color);opacity:0.25;border-radius:3px;"></div>';
+                } else {
+                    html += '<div style="height:100%;width:' + dlPct + '%;background:var(--success-color);border-radius:3px 0 0 3px;"></div>';
+                    html += '<div style="height:100%;width:' + ulPct + '%;background:var(--info-color);border-radius:0 3px 3px 0;opacity:0.8;"></div>';
+                }
+                html += '</div>';
+                html += '<div class="graph-bar-value">' + (isFailed ? '<span class="status-failed">FAIL</span>' : t.download_mbps + ' / ' + t.upload_mbps) + '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function buildReportData(data) {
+            var complete = data.filter(function(r) { return r.status !== 'failed'; });
+            var cnt = complete.length || 1;
+            var totalDl = 0, totalUl = 0, totalLat = 0, latCount = 0, totalJitter = 0, jitterCount = 0;
+            var maxDl = 0, maxUl = 0, minDl = Infinity, minUl = Infinity;
+            for (var i = 0; i < complete.length; i++) {
+                var r = complete[i];
+                totalDl += r.download_mbps; totalUl += r.upload_mbps;
+                if (r.latency_ms != null) { totalLat += r.latency_ms; latCount++; }
+                else if (r.ping_ms != null) { totalLat += r.ping_ms; latCount++; }
+                if (r.jitter_ms != null) { totalJitter += r.jitter_ms; jitterCount++; }
+                if (r.download_mbps > maxDl) maxDl = r.download_mbps;
+                if (r.upload_mbps > maxUl) maxUl = r.upload_mbps;
+                if (r.download_mbps < minDl) minDl = r.download_mbps;
+                if (r.upload_mbps < minUl) minUl = r.upload_mbps;
+            }
+            if (minDl === Infinity) minDl = 0;
+            if (minUl === Infinity) minUl = 0;
+            return {
+                avgDl: (totalDl / cnt).toFixed(2), avgUl: (totalUl / cnt).toFixed(2),
+                avgLat: latCount > 0 ? (totalLat / latCount).toFixed(2) : '--',
+                avgJitter: jitterCount > 0 ? (totalJitter / jitterCount).toFixed(2) : '--',
+                maxDl: maxDl.toFixed(2), maxUl: maxUl.toFixed(2),
+                minDl: minDl.toFixed(2), minUl: minUl.toFixed(2),
+                total: data.length, complete: complete.length, failed: data.length - complete.length,
+                dateFrom: data[0].timestamp || '', dateTo: data[data.length - 1].timestamp || ''
+            };
+        }
+
+        function rstat(cls, label, value) {
+            return '<div class="' + cls + '"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div>';
+        }
+
+        function exportCSV() {
+            fetch('/api/history').then(function(r) { return r.json(); }).then(function(data) {
+                if (!data || data.length === 0) { alert('No data.'); return; }
+                var csv = 'Timestamp,Engine,Status,Download_Mbps,Upload_Mbps,Latency_ms,Jitter_ms,Interface,Server,Port,Duration_s,Size_MB,Error\n';
+                for (var i = 0; i < data.length; i++) {
+                    var r = data[i];
+                    csv += r.timestamp + ',' + r.engine + ',' + (r.status || 'complete') + ',';
+                    csv += r.download_mbps + ',' + r.upload_mbps + ',';
+                    csv += (r.latency_ms != null ? r.latency_ms : (r.ping_ms != null ? r.ping_ms : '')) + ',';
+                    csv += (r.jitter_ms != null ? r.jitter_ms : '') + ',';
+                    csv += (r.interface || '') + ',' + (r.server || r.host || '') + ',';
+                    csv += (r.port || '') + ',' + (r.duration || '') + ',';
+                    csv += (r.size || '') + ',' + (r.error || '') + '\n';
+                }
+                var blob = new Blob([csv], { type: 'text/csv' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                var ts = new Date().toISOString().substring(0, 19).replace(/[T:]/g, '-');
+                a.download = routerHostname + '_speedtest_' + ts + '.csv';
+                a.click();
+            });
+        }
+
+        document.getElementById('btn-dl-html').addEventListener('click', function() {
+            if (!window._currentReport) { alert('Run tests first.'); return; }
+            // Fetch full history for per-engine breakdown
+            fetch('/api/history').then(function(r) { return r.json(); }).then(function(data) {
+                var rp = window._currentReport;
+                var name = 'Speed Test Report';
+                var h = '<!DOCTYPE html><html><head><title>' + name + '</title>';
+                h += '<style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;padding:2rem;max-width:960px;margin:0 auto;background:#f8fafc;color:#1e293b;}h1{color:#4f46e5;margin-bottom:0.25rem;}h2{color:#334155;margin:2rem 0 0.75rem;padding-top:1rem;border-top:1px solid #e2e8f0;}p.meta{color:#64748b;font-size:0.85rem;margin-bottom:1.5rem;}.row{display:flex;gap:1rem;margin-bottom:1rem;}.card{border:1px solid #e2e8f0;border-radius:10px;padding:1rem;flex:1;text-align:center;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.05);}.card .val{font-size:1.4rem;font-weight:700;}.card .lbl{font-size:0.7rem;color:#64748b;text-transform:uppercase;letter-spacing:0.03em;margin-top:0.2rem;}.row-avg .card .val{color:#4f46e5;}.row-minmax .card .val{color:#059669;}.row-minmax .card{border-color:#d1fae5;background:#f0fdf4;}.row-meta .card .val{color:#0284c7;}.row-meta .card{border-color:#bae6fd;background:#f0f9ff;}.badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:999px;font-size:0.7rem;font-weight:600;}</style></head><body>';
+                h += '<h1>' + routerHostname + ' — Speed Test Report</h1>';
+                h += '<p class="meta">Generated: ' + new Date().toISOString().substring(0, 19).replace('T', ' ') + ' UTC</p>';
+
+                // All tests section
+                h += '<h2>All Tests</h2>';
+                h += buildHtmlReportCards(rp);
+
+                // Per-engine sections
+                if (data && data.length > 0) {
+                    var byEngine = {};
+                    for (var i = 0; i < data.length; i++) {
+                        var eng = data[i].engine || 'unknown';
+                        if (!byEngine[eng]) byEngine[eng] = [];
+                        byEngine[eng].push(data[i]);
+                    }
+                    var engineNames = Object.keys(byEngine);
+                    for (var e = 0; e < engineNames.length; e++) {
+                        var ename = engineNames[e];
+                        var edata = buildReportData(byEngine[ename]);
+                        h += '<h2>' + ename.charAt(0).toUpperCase() + ename.slice(1) + ' (' + byEngine[ename].length + ' tests)</h2>';
+                        h += buildHtmlReportCards(edata);
+                    }
+                }
+
+                h += '</body></html>';
+                var blob = new Blob([h], { type: 'text/html' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                var ts = new Date().toISOString().substring(0, 19).replace(/[T:]/g, '-');
+                a.download = routerHostname + '_speedtest_report_' + ts + '.html';
+                a.click();
+            });
+        });
+
+        function buildHtmlReportCards(rp) {
+            var h = '';
+            h += '<div class="row row-avg"><div class="card"><div class="val">' + rp.avgDl + ' Mbps</div><div class="lbl">Avg Download</div></div>';
+            h += '<div class="card"><div class="val">' + rp.avgUl + ' Mbps</div><div class="lbl">Avg Upload</div></div>';
+            h += '<div class="card"><div class="val">' + rp.avgLat + ' ms</div><div class="lbl">Avg Latency</div></div>';
+            h += '<div class="card"><div class="val">' + rp.avgJitter + ' ms</div><div class="lbl">Avg Jitter</div></div></div>';
+            h += '<div class="row row-minmax"><div class="card"><div class="val">' + rp.maxDl + ' Mbps</div><div class="lbl">Max Download</div></div>';
+            h += '<div class="card"><div class="val">' + rp.maxUl + ' Mbps</div><div class="lbl">Max Upload</div></div>';
+            h += '<div class="card"><div class="val">' + rp.minDl + ' Mbps</div><div class="lbl">Min Download</div></div>';
+            h += '<div class="card"><div class="val">' + rp.minUl + ' Mbps</div><div class="lbl">Min Upload</div></div></div>';
+            h += '<div class="row row-meta"><div class="card"><div class="val">' + rp.total + '</div><div class="lbl">Total</div></div>';
+            h += '<div class="card"><div class="val">' + rp.complete + '</div><div class="lbl">Completed</div></div>';
+            h += '<div class="card"><div class="val">' + rp.failed + '</div><div class="lbl">Failed</div></div>';
+            h += '<div class="card"><div class="val">' + (rp.dateFrom || '').substring(0, 10) + ' - ' + (rp.dateTo || '').substring(0, 10) + '</div><div class="lbl">Range</div></div></div>';
+            return h;
+        }
+
+        // ===== SCHEDULE =====
+        var schedulePreset = document.getElementById('schedule-preset');
+        var cronRepeat = document.getElementById('cron-repeat');
+        var cronInterval = document.getElementById('cron-interval');
+        var cronHour = document.getElementById('cron-hour');
+        var cronMinute = document.getElementById('cron-minute');
+        var cronDow = document.getElementById('cron-dow');
+        var cronPreview = document.getElementById('cron-preview');
+
+        function updateBuilderVisibility() {
+            var mode = cronRepeat.value;
+            document.getElementById('cron-interval-wrap').style.display = (mode === 'minutes' || mode === 'hours') ? '' : 'none';
+            document.getElementById('cron-hour-wrap').style.display = (mode === 'daily' || mode === 'weekly' || mode === 'weekdays') ? '' : 'none';
+            document.getElementById('cron-minute-wrap').style.display = (mode === 'daily' || mode === 'weekly' || mode === 'weekdays') ? '' : 'none';
+            document.getElementById('cron-dow-wrap').style.display = (mode === 'weekly') ? '' : 'none';
+
+            // Update interval options based on mode
+            if (mode === 'minutes') {
+                cronInterval.innerHTML = '<option value="1">1</option><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="30">30</option>';
+            } else if (mode === 'hours') {
+                cronInterval.innerHTML = '<option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="12">12</option>';
+            }
+            updateCronPreview();
+        }
+
+        function buildCronFromBuilder() {
+            var mode = cronRepeat.value;
+            var interval = cronInterval.value;
+            var hour = cronHour.value;
+            var minute = cronMinute.value;
+            var dow = cronDow.value;
+
+            if (mode === 'minutes') return '*/' + interval + ' * * * *';
+            if (mode === 'hours') return '0 */' + interval + ' * * *';
+            if (mode === 'daily') return minute + ' ' + hour + ' * * *';
+            if (mode === 'weekdays') return minute + ' ' + hour + ' * * 1-5';
+            if (mode === 'weekly') return minute + ' ' + hour + ' * * ' + dow;
+            return '0 * * * *';
+        }
+
+        function updateCronPreview() {
+            cronPreview.textContent = buildCronFromBuilder();
+        }
+
+        cronRepeat.addEventListener('change', updateBuilderVisibility);
+        cronInterval.addEventListener('change', updateCronPreview);
+        cronHour.addEventListener('change', updateCronPreview);
+        cronMinute.addEventListener('change', updateCronPreview);
+        cronDow.addEventListener('change', updateCronPreview);
+        updateBuilderVisibility();
+
+        // Preset overrides builder
+        schedulePreset.addEventListener('change', function() {
+            var customRow = document.getElementById('schedule-custom-row');
+            var builderWrap = document.getElementById('schedule-builder-wrap');
+            if (this.value === 'custom') {
+                customRow.style.display = '';
+                builderWrap.style.display = 'none';
+            } else if (this.value === '') {
+                customRow.style.display = 'none';
+                builderWrap.style.display = '';
+                updateCronPreview();
+            } else {
+                customRow.style.display = 'none';
+                builderWrap.style.display = 'none';
+                cronPreview.textContent = this.value;
+            }
+        });
+
+        function getCronValue() {
+            // Custom text takes priority
+            if (schedulePreset.value === 'custom') {
+                return document.getElementById('schedule-cron-custom').value.trim();
+            }
+            // Preset takes priority if selected
+            if (schedulePreset.value) return schedulePreset.value;
+            // Otherwise use builder
+            return buildCronFromBuilder();
+        }
+
+        // Load current schedule on init
+        fetch('/api/schedule').then(function(r) { return r.json(); }).then(function(data) {
+            if (data.enabled) document.getElementById('schedule-enabled').checked = true;
+            if (data.autostart) document.getElementById('schedule-autostart').checked = true;
+            if (data.cron) {
+                // Try to match a preset
+                var opts = schedulePreset.options;
+                var matched = false;
+                for (var i = 0; i < opts.length; i++) {
+                    if (opts[i].value === data.cron) {
+                        schedulePreset.value = data.cron;
+                        matched = true;
+                        document.getElementById('schedule-builder-wrap').style.display = 'none';
+                        break;
+                    }
+                }
+                if (!matched) {
+                    // Try to set builder from cron
+                    parseCronToBuilder(data.cron);
+                    // If builder didn't match well, show custom
+                    if (buildCronFromBuilder() !== data.cron) {
+                        schedulePreset.value = 'custom';
+                        document.getElementById('schedule-custom-row').style.display = '';
+                        document.getElementById('schedule-builder-wrap').style.display = 'none';
+                        document.getElementById('schedule-cron-custom').value = data.cron;
+                    }
+                }
+                cronPreview.textContent = data.cron;
+            }
+            updateScheduleStatus(data);
+        });
+
+        function parseCronToBuilder(cron) {
+            var parts = cron.split(' ');
+            if (parts.length !== 5) return;
+            var min = parts[0], hr = parts[1], dom = parts[2], mon = parts[3], dow = parts[4];
+
+            if (min.indexOf('/') > -1 && hr === '*') {
+                cronRepeat.value = 'minutes';
+                cronInterval.value = min.split('/')[1];
+            } else if (min === '0' && hr.indexOf('/') > -1) {
+                cronRepeat.value = 'hours';
+                cronInterval.value = hr.split('/')[1];
+            } else if (dow === '1-5' && dom === '*') {
+                cronRepeat.value = 'weekdays';
+                cronHour.value = hr;
+                cronMinute.value = min;
+            } else if (dow !== '*' && dom === '*') {
+                cronRepeat.value = 'weekly';
+                cronHour.value = hr;
+                cronMinute.value = min;
+                cronDow.value = dow;
+            } else if (dom === '*' && mon === '*') {
+                cronRepeat.value = 'daily';
+                cronHour.value = hr;
+                cronMinute.value = min;
+            }
+            updateBuilderVisibility();
+        }
+
+        document.getElementById('btn-save-schedule').addEventListener('click', function() {
+            var enabled = document.getElementById('schedule-enabled').checked;
+            var autostart = document.getElementById('schedule-autostart').checked;
+            var cron = getCronValue();
+            if (enabled && !cron) {
+                alert('Configure a schedule first.');
+                return;
+            }
+            var engine = engineSelect.value;
+            var iface = document.getElementById('interface-select').value;
+            var duration = parseInt(durationSelect.value);
+            var sizeLimit = parseInt(document.getElementById('size-limit').value) || 0;
+            var params = { interface: iface, duration: duration, size: sizeLimit, include_latency: latencyCheckbox.checked };
+
+            // Include server info based on engine
+            if (engine === 'netperf') {
+                var npSelect = document.getElementById('netperf-server-select');
+                var npVal = npSelect.value;
+                if (npVal === '__custom__') {
+                    var npCustom = document.getElementById('netperf-server').value.trim();
+                    if (npCustom) params.host = npCustom;
+                } else if (npVal) {
+                    params.host = npVal;
+                }
+            } else if (engine === 'iperf3') {
+                var ipSelect = document.getElementById('iperf-server-select');
+                var ipVal = ipSelect.value;
+                if (ipVal === '__custom__') {
+                    var custom = document.getElementById('iperf-server').value.trim();
+                    if (custom && custom.indexOf(':') > -1) {
+                        var pts = custom.split(':');
+                        params.server = pts[0];
+                        params.port = pts[1];
+                    } else if (custom) {
+                        params.server = custom;
+                        params.port = '5201';
+                    }
+                } else if (ipVal) {
+                    var pts = ipVal.split(':');
+                    params.server = pts[0];
+                    params.port = pts[1] || '5201';
+                }
+            }
+
+            fetch('/api/schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled, autostart: autostart, cron: cron, engine: engine, params: params })
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                updateScheduleStatus(data.schedule || data);
+                loadScheduleCountdown();
+            });
+        });
+
+        function updateScheduleStatus(data) {
+            var el = document.getElementById('schedule-status-text');
+            if (data && data.cron) {
+                var desc = describeSchedule(data.cron);
+                var details = '';
+                if (data.engine) details += '<br>Engine: <strong>' + data.engine + '</strong>';
+                var p = data.params || {};
+                if (p.interface) {
+                    // Show carrier from interface list if available
+                    var ifaceName = p.interface;
+                    var ifaceEl = document.getElementById('interface-select');
+                    if (ifaceEl) {
+                        for (var i = 0; i < ifaceEl.options.length; i++) {
+                            if (ifaceEl.options[i].value === p.interface) {
+                                ifaceName = ifaceEl.options[i].textContent;
+                                break;
+                            }
+                        }
+                    }
+                    details += '<br>Interface: <strong>' + ifaceName + '</strong>';
+                }
+                if (p.host) details += '<br>Server: <strong>' + p.host + '</strong>';
+                if (p.server) details += '<br>Server: <strong>' + p.server + (p.port ? ':' + p.port : '') + '</strong>';
+                if (p.duration) details += '<br>Duration: <strong>' + p.duration + 's</strong>';
+                if (p.size) details += '<br>Size limit: <strong>' + p.size + ' MB</strong>';
+                if (p.include_latency) details += '<br>Latency/Jitter: <strong>Yes</strong>';
+
+                if (data.enabled) {
+                    el.innerHTML = '<span style="color:var(--success-color);font-weight:600;">Active</span> — ' + desc + details +
+                        (data.autostart ? '<br><i class="fas fa-check" style="color:var(--success-color);"></i> Starts on boot' : '');
+                } else {
+                    el.innerHTML = '<span style="color:var(--warning-color);font-weight:600;">Disabled</span> — ' + desc + details +
+                        (data.autostart ? '<br><i class="fas fa-check" style="color:var(--text-secondary);"></i> Will start on boot' : '');
+                }
+            } else {
+                el.textContent = 'Not configured';
+            }
+        }
+
+        function describeSchedule(cron) {
+            var map = {
+                '*/5 * * * *': 'Every 5 minutes', '*/10 * * * *': 'Every 10 minutes',
+                '*/15 * * * *': 'Every 15 minutes', '*/30 * * * *': 'Every 30 minutes',
+                '0 * * * *': 'Every hour', '0 */2 * * *': 'Every 2 hours',
+                '0 */3 * * *': 'Every 3 hours', '0 */4 * * *': 'Every 4 hours',
+                '0 */6 * * *': 'Every 6 hours', '0 */8 * * *': 'Every 8 hours',
+                '0 */12 * * *': 'Every 12 hours', '0 8,12,17 * * *': '3x daily (8am, 12pm, 5pm)',
+                '0 0 * * *': 'Daily at midnight', '0 6 * * *': 'Daily at 6am',
+                '0 12 * * *': 'Daily at noon', '0 2 * * 1': 'Weekly (Mon 2am)'
+            };
+            if (map[cron]) return map[cron];
+            // Try to describe
+            var parts = cron.split(' ');
+            if (parts.length === 5) {
+                var min = parts[0], hr = parts[1], dow = parts[4];
+                var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                if (min.indexOf('/') > -1) return 'Every ' + min.split('/')[1] + ' minutes';
+                if (hr.indexOf('/') > -1) return 'Every ' + hr.split('/')[1] + ' hours';
+                if (dow === '1-5') return 'Weekdays (M-F) at ' + hr + ':' + (min.length < 2 ? '0' + min : min);
+                if (dow !== '*') return days[parseInt(dow)] + ' at ' + hr + ':' + (min.length < 2 ? '0' + min : min);
+                return 'Daily at ' + hr + ':' + (min.length < 2 ? '0' + min : min);
+            }
+            return cron;
+        }
+
+        // ===== SERVER MANAGEMENT =====
+        document.getElementById('btn-save-netperf').addEventListener('click', function() {
+            var server = document.getElementById('add-netperf-server').value.trim();
+            if (!server) { alert('Enter a server address.'); return; }
+            var label = document.getElementById('add-netperf-label').value.trim() || server;
+            fetch('/api/servers/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ engine: 'netperf', server: { server: server, label: label } })
+            }).then(function(r) { return r.json(); }).then(function() {
+                document.getElementById('add-netperf-server').value = '';
+                document.getElementById('add-netperf-label').value = '';
+                loadServerList();
+            });
+        });
+
+        document.getElementById('btn-save-iperf3').addEventListener('click', function() {
+            var server = document.getElementById('add-iperf3-server').value.trim();
+            var port = document.getElementById('add-iperf3-port').value.trim() || '5201';
+            var city = document.getElementById('add-iperf3-city').value.trim() || '';
+            var country = document.getElementById('add-iperf3-country').value.trim() || '';
+            if (!server) { alert('Enter a server address.'); return; }
+            fetch('/api/servers/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ engine: 'iperf3', server: { server: server, port: port, city: city, country: country } })
+            }).then(function(r) { return r.json(); }).then(function() {
+                document.getElementById('add-iperf3-server').value = '';
+                document.getElementById('add-iperf3-port').value = '';
+                document.getElementById('add-iperf3-city').value = '';
+                document.getElementById('add-iperf3-country').value = '';
+                loadServerList();
+            });
+        });
+
+        function loadServerList() {
+            fetch('/api/servers').then(function(r) { return r.json(); }).then(function(data) {
+                // Netperf list
+                var npList = document.getElementById('netperf-server-list');
+                var npServers = data.netperf || [];
+                if (npServers.length === 0) {
+                    npList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-secondary);">No saved netperf servers. Default server will be used.</p>';
+                } else {
+                    var html = '<table class="history-table"><thead><tr><th>Server</th><th>Label</th><th></th></tr></thead><tbody>';
+                    for (var i = 0; i < npServers.length; i++) {
+                        var s = npServers[i];
+                        html += '<tr><td>' + s.server + '</td><td>' + (s.label || '') + '</td>';
+                        html += '<td><button type="button" class="btn btn-danger" style="padding:0.3rem 0.6rem; font-size:0.75rem;" data-engine="netperf" data-server="' + s.server + '" onclick="deleteServer(this)"><i class="fas fa-trash"></i></button></td></tr>';
+                    }
+                    html += '</tbody></table>';
+                    npList.innerHTML = html;
+                }
+
+                // iPerf3 list
+                var ipList = document.getElementById('iperf3-server-list');
+                var ipServers = data.iperf3 || [];
+                if (ipServers.length === 0) {
+                    ipList.innerHTML = '<p style="font-size:0.8rem; color:var(--text-secondary);">No saved iPerf3 servers. Use bundled list or enter custom server.</p>';
+                } else {
+                    var html = '<table class="history-table"><thead><tr><th>Server</th><th>Port</th><th>City</th><th>Country</th><th></th></tr></thead><tbody>';
+                    for (var i = 0; i < ipServers.length; i++) {
+                        var s = ipServers[i];
+                        html += '<tr><td>' + s.server + '</td><td>' + (s.port || '5201') + '</td><td>' + (s.city || '') + '</td><td>' + (s.country || '') + '</td>';
+                        html += '<td><button type="button" class="btn btn-danger" style="padding:0.3rem 0.6rem; font-size:0.75rem;" data-engine="iperf3" data-server="' + s.server + '" onclick="deleteServer(this)"><i class="fas fa-trash"></i></button></td></tr>';
+                    }
+                    html += '</tbody></table>';
+                    ipList.innerHTML = html;
+                }
+            });
+        }
+
+        // Make deleteServer accessible globally for onclick
+        window.deleteServer = function(btn) {
+            var engine = btn.getAttribute('data-engine');
+            var server = btn.getAttribute('data-server');
+            fetch('/api/servers/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ engine: engine, server: server })
+            }).then(function(r) { return r.json(); }).then(function() {
+                loadServerList();
+            });
+        };
+
+        // ===== OUTPUTS =====
+        function loadOutputs() {
+            fetch('/api/outputs').then(function(r) { return r.json(); }).then(function(data) {
+                var outputs = data.outputs || [];
+                document.getElementById('output-desc').checked = outputs.indexOf('config/system/desc') > -1;
+                document.getElementById('output-asset').checked = outputs.indexOf('config/system/asset_id') > -1;
+                document.getElementById('output-appdata').checked = outputs.indexOf('appdata:speedtest_results') > -1;
+                // Check for custom
+                var customPath = '';
+                for (var i = 0; i < outputs.length; i++) {
+                    if (outputs[i] !== 'config/system/desc' && outputs[i] !== 'config/system/asset_id' && outputs[i] !== 'appdata:speedtest_results') {
+                        customPath = outputs[i];
+                    }
+                }
+                if (customPath) {
+                    document.getElementById('output-custom-check').checked = true;
+                    document.getElementById('output-custom-path').value = customPath;
+                }
+                updateOutputsStatus(outputs);
+            });
+        }
+
+        function updateOutputsStatus(outputs) {
+            var el = document.getElementById('outputs-status');
+            if (outputs.length === 0) {
+                el.textContent = 'No outputs configured. Results will only be saved to history.';
+            } else {
+                el.textContent = 'Active outputs: ' + outputs.join(', ');
+            }
+        }
+
+        document.getElementById('btn-save-outputs').addEventListener('click', function() {
+            var outputs = [];
+            if (document.getElementById('output-desc').checked) outputs.push('config/system/desc');
+            if (document.getElementById('output-asset').checked) outputs.push('config/system/asset_id');
+            if (document.getElementById('output-appdata').checked) outputs.push('appdata:speedtest_results');
+            if (document.getElementById('output-custom-check').checked) {
+                var custom = document.getElementById('output-custom-path').value.trim();
+                if (custom) outputs.push(custom);
+            }
+            fetch('/api/outputs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ outputs: outputs })
+            }).then(function(r) { return r.json(); }).then(function() {
+                updateOutputsStatus(outputs);
+            });
+        });
+
+        // Load outputs when tab shown
+        var origShowSection = showSection;
+        showSection = function(id) {
+            origShowSection(id);
+            if (id === 'outputs') loadOutputs();
+        };
+    })();
+    </script>
+</body>
+</html>

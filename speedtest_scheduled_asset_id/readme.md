@@ -1,6 +1,6 @@
 # speedtest_scheduled_asset_id
 
-Runs an Ookla speedtest on a configurable cron schedule and writes results to the router's asset_id field. Can also be triggered manually by setting asset_id to "start".
+Runs a netperf speedtest on a configurable cron schedule and writes results to the router's asset_id field. Can also be triggered manually by setting asset_id to "start".
 
 ## Result Format
 
@@ -42,7 +42,7 @@ PUT https://www.cradlepointecm.com/api/v2/routers/{router_id}/
 2. Reads `cron_schedule` from appdata every 15 seconds (uses default if not set)
 3. Checks if the current time matches the cron schedule
 4. Also checks if asset_id is set to "start" for manual triggering
-5. When triggered, runs an Ookla speedtest
+5. When triggered, runs a netperf speedtest
 6. Reads modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) from the primary WAN device if it's a modem
 7. Writes formatted results to `config/system/asset_id`
 
