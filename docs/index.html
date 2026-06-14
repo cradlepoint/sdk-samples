@@ -108,7 +108,7 @@ a:hover { color: var(--accent-hover); }
 .filter-section input[type="checkbox"] { accent-color: var(--accent); }
 
 /* Main content */
-.main { padding: 1.5rem 2rem; }
+.main { padding: 1.5rem 2rem; overflow-x: hidden; }
 .sort-bar {
   display: flex;
   justify-content: flex-end;
@@ -126,7 +126,7 @@ a:hover { color: var(--accent-hover); }
 /* App Grid */
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 3rem;
   padding: 0.5rem;
 }
@@ -141,8 +141,9 @@ a:hover { color: var(--accent-hover); }
   transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 5 / 3;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  overflow: hidden;
 }
 .app-card:hover {
   background: var(--bg-card-hover);
@@ -564,13 +565,16 @@ function renderGrid() {
     const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
     const catLabel = app.category.replace(/_/g, ' ');
     const rating = getAppRating(app.name);
+    const vendorLine = app.developer_label === 'Ericsson'
+      ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
+      : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
     return `
       <div class="app-card" data-app="${app.name}">
         <div class="app-card-header">
           <div class="app-icon">${initials}</div>
           <div>
             <div class="app-card-title">${app.name}</div>
-            <span class="badge ${badgeClass}">${app.developer_label}</span>
+            ${vendorLine}
           </div>
         </div>
         <div class="app-card-desc">${app.notes}</div>
@@ -601,8 +605,9 @@ function openAppDetail(appName) {
     <button class="modal-close" id="closeModal">&times;</button>
     <h2>${app.name}</h2>
     <div class="modal-vendor">
-      <span class="badge ${badgeClass}">${app.developer_label}</span>
-      &nbsp;By ${app.vendor}
+      ${app.developer_label === 'Ericsson'
+        ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
+        : `${app.vendor} &nbsp;<span class="badge ${badgeClass}">${app.developer_label}</span>`}
     </div>
     <p style="color:var(--text-secondary);margin-bottom:0.5rem;">${app.notes}</p>
     <div class="modal-meta">
