@@ -455,7 +455,7 @@ a:hover { color: var(--accent-hover); }
 <script>
 let catalog = null;
 let ratings = JSON.parse(localStorage.getItem('appRatings') || '{}');
-let filters = { developers: [], categories: [], tags: [], minRating: 0, showArchived: false };
+let filters = { developers: [], categories: [], tags: [], minRating: 0 };
 let pendingDownloadUrl = null;
 
 async function loadCatalog() {
@@ -491,11 +491,6 @@ function buildSidebar() {
   html += '<label><input type="checkbox" data-filter="rating" value="4"> 4+ stars</label>';
   html += '</div>';
 
-  // Archived
-  html += '<div class="filter-section"><h3>Other</h3>';
-  html += '<label><input type="checkbox" data-filter="archived" value="true"> Show Archived Apps</label>';
-  html += '</div>';
-
   sidebar.innerHTML = html;
 
   // Bind filter events
@@ -509,7 +504,6 @@ function applyFilters() {
   filters.developers = [...sidebar.querySelectorAll('[data-filter="developer"]:checked')].map(e => e.value);
   filters.categories = [...sidebar.querySelectorAll('[data-filter="category"]:checked')].map(e => e.value);
   filters.minRating = sidebar.querySelector('[data-filter="rating"]:checked') ? 4 : 0;
-  filters.showArchived = !!sidebar.querySelector('[data-filter="archived"]:checked');
   renderGrid();
 }
 
@@ -541,7 +535,6 @@ function matchesSearch(app, query) {
 }
 
 function matchesFilters(app) {
-  if (!filters.showArchived && app.archived) return false;
   if (filters.developers.length && !filters.developers.includes(app.developer_label)) return false;
   if (filters.categories.length && !filters.categories.includes(app.category)) return false;
   if (filters.minRating > 0 && getAppRating(app.name) < filters.minRating) return false;

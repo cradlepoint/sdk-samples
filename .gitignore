@@ -6,3 +6,4 @@ __pycache__/
 *.tar
 built_apps/
 METADATA/
+.vscode/
