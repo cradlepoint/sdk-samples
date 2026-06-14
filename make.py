@@ -383,9 +383,9 @@ def get_app_list():
     apps_dir = os.path.join(cwd, 'apps')
     if os.path.isdir(apps_dir):
         for dirpath, dirnames, filenames in os.walk(apps_dir):
-            # Skip metadata, hidden dirs, and templates
+            # Skip metadata, hidden dirs, and templates/archive
             dirnames[:] = [d for d in dirnames if d not in
-                           ['METADATA', '__pycache__', '.git', '.venv', 'templates']]
+                           ['METADATA', '__pycache__', '.git', '.venv', 'templates', 'archive']]
             if 'package.ini' in filenames:
                 app_dirs.append(dirpath)
                 dirnames.clear()  # Don't descend into app subdirs

@@ -47,14 +47,10 @@ jobs:
         
         def get_reference_cp_py():
             """Get the reference cp.py from app_template"""
-            reference_path = './cp.py'
+            reference_path = './apps/templates/app_template/cp.py'
             if os.path.exists(reference_path):
                 return reference_path
-            # Try new location
-            alt_path = './apps/templates/app_template/cp.py'
-            if os.path.exists(alt_path):
-                return alt_path
-            print(f"Error: Reference cp.py not found")
+            print(f"Error: Reference cp.py not found at {reference_path}")
             return None
         
         def update_cp_py_files():

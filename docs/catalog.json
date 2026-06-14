@@ -1260,30 +1260,6 @@
       "readme": "# send_to_server\n\n![Python](https://img.shields.io/badge/Python-3.8-yellow)\n\nUses SDK Appdata to store settings for Server URL, Interval, and Payload. Payload keys are field names and values are the NCOS path to get the data. Data is collected and posted to the server URL every interval seconds.\n\n## Requirements\n\nThis application uses test server `http://httpbin.org/post`.\n"
     },
     {
-      "name": "serial_temp",
-      "vendor": "Ericsson",
-      "developer": "Ericsson",
-      "notes": "Router SDK to read serial temp data",
-      "tags": "",
-      "version_major": "2",
-      "version_minor": "0",
-      "version_patch": "0",
-      "firmware_major": "7",
-      "firmware_minor": "26",
-      "auto_start": true,
-      "restart": true,
-      "reboot": true,
-      "version": "2.0.0",
-      "firmware": "7.26.x",
-      "developer_label": "Ericsson",
-      "download_url": "https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/serial_temp.v2.0.0.tar.gz",
-      "download_filename": "serial_temp.v2.0.0.tar.gz",
-      "category": "archive",
-      "archived": true,
-      "path": "archive/serial_temp",
-      "readme": "Application Name\n================\nserial_temp\n\n\nApplication Version\n===================\n2.0\n\n\nNCOS Devices Supported\n======================\nAll\n\n\nApplication Purpose\n===================\nThis is a test application to serial data from the data logger connected\nto the router and output that to MQTT messages that are forwarded from the\nrouter to Azure IoT Central.\n\n"
-    },
-    {
       "name": "shell_sample",
       "vendor": "Ericsson",
       "developer": "Ericsson",
@@ -1836,5 +1812,5 @@
       "readme": "# WAN Rate Tracker\n\n![Python](https://img.shields.io/badge/Python-3.8-yellow)\n\nTracks WAN bandwidth rates over time and stores rolling averages in a configurable field.\n\n## What it does\n\n- Samples WAN inbound (ibps) and outbound (obps) rates at regular intervals\n- Maintains a rolling buffer of recent samples\n- Calculates averages from collected samples\n- Stores average rates in human-readable format to a configurable system field\n\n## Appdata Configuration\n\n- `wan_rate_poll_interval` (default: 10) - Seconds between samples\n- `wan_rate_buffer_size` (default: 30) - Number of samples to keep\n- `wan_rate_report_interval` (default: 300) - Seconds between field updates\n- `wan_rate_output_path` (default: `/config/system/asset_id`) - Where to store results\n\n## Output Format\n\nHuman-readable format with Unicode arrows and appropriate units:\n```\n\u2193 1.2 Gbps, \u2191 850.5 Mbps\n\u2193 125.8 Mbps, \u2191 89.3 Mbps\n\u2193 1.2 Kbps, \u2191 890.3 Bps\n```\n"
     }
   ],
-  "total": 76
+  "total": 75
 }

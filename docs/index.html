@@ -229,10 +229,14 @@ a:hover { color: var(--accent-hover); }
   max-width: 800px;
   width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: auto;
   padding: 2rem;
-  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.modal::-webkit-scrollbar { width: 6px; }
+.modal::-webkit-scrollbar-track { background: transparent; }
+.modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 .modal-close {
   float: right;
   background: none;
@@ -420,6 +424,8 @@ a:hover { color: var(--accent-hover); }
     </div>
     <div class="app-grid" id="appGrid"></div>
     <div class="license-footer">
+      <a href="https://github.com/cradlepoint/sdk-samples" target="_blank" style="display:inline-block;margin-bottom:1rem;"><img src="https://img.shields.io/badge/GitHub-Source_Code-181717?logo=github" alt="GitHub Repo"></a>
+      <a href="https://github.com/cradlepoint/sdk-samples/blob/master/docs/NCOS_SDK_Developer_Guide.md" target="_blank" style="display:inline-block;margin-bottom:1rem;margin-left:0.5rem;"><img src="https://img.shields.io/badge/Documentation-Dev_Guide-blue?logo=readthedocs" alt="Dev Guide"></a>
       <h4>License</h4>
       <p>This software, including any sample applications, and associated documentation (the "Software"), are subject to the Cradlepoint Terms of Service and License Agreement available at <a href="https://cradlepoint.com/terms-of-service">https://cradlepoint.com/terms-of-service</a> ("TSLA").</p>
       <p style="margin-top:0.5rem">NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.</p>
@@ -568,9 +574,10 @@ function renderGrid() {
     const vendorLine = app.developer_label === 'Ericsson'
       ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
       : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
-    const catColors = {connectivity:'0969da',monitoring:'8250df',networking:'1a7f37',integrations:'cf222e',gpio:'bf8700',vehicle:'6639ba',security:'d1242f',web_tools:'0550ae',examples:'57606a'};
-    const catColor = catColors[app.category] || '57606a';
-    const catBadge = `<img src="https://img.shields.io/badge/${encodeURIComponent(catLabel)}-${catColor}" alt="${catLabel}" style="height:18px;vertical-align:middle;">`;
+    const catColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web_tools:'informational',examples:'lightgrey'};
+    const catColor = catColors[app.category] || 'lightgrey';
+    const catName = catLabel.charAt(0).toUpperCase() + catLabel.slice(1);
+    const catBadge = `<img src="https://img.shields.io/badge/Category-${encodeURIComponent(catName).replace(/-/g,'--')}-${catColor}" alt="${catLabel}" style="height:20px;vertical-align:middle;">`;
     return `
       <div class="app-card" data-app="${app.name}">
         <div class="app-card-header">
@@ -604,32 +611,39 @@ function openAppDetail(appName) {
   const modal = document.getElementById('modalContent');
   const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
 
+  const catColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web_tools:'informational',examples:'lightgrey'};
+  const catColor = catColors[app.category] || 'lightgrey';
+  const catLabel = app.category.replace(/_/g, ' ');
+  const catName = catLabel.charAt(0).toUpperCase() + catLabel.slice(1);
+  const catBadgeModal = `<img src="https://img.shields.io/badge/Category-${encodeURIComponent(catName).replace(/-/g,'--')}-${catColor}" alt="${catLabel}" style="height:20px;vertical-align:middle;">`;
+
   modal.innerHTML = `
     <button class="modal-close" id="closeModal">&times;</button>
-    <h2>${app.name}</h2>
-    <div class="modal-vendor">
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.25rem;">
+      <h2 style="margin:0;">${app.name}</h2>
       ${app.developer_label === 'Ericsson'
         ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
-        : `${app.vendor} &nbsp;<span class="badge ${badgeClass}">${app.developer_label}</span>`}
+        : `<span style="color:var(--text-muted)">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`}
     </div>
-    <p style="color:var(--text-secondary);margin-bottom:0.5rem;">${app.notes}</p>
+    <p style="color:var(--text-secondary);margin-bottom:0.75rem;">${app.notes}</p>
     <div class="modal-meta">
       <div class="meta-item"><label>Version</label><span>${app.version}</span></div>
       <div class="meta-item"><label>NCOS Firmware</label><span>${app.firmware}</span></div>
-      <div class="meta-item"><label>Category</label><span>${app.category.replace(/_/g, ' ')}</span></div>
+      <div class="meta-item"><label>Category</label><span>${catBadgeModal}</span></div>
     </div>
     <div class="modal-flags">
       <div class="modal-flag"><span class="indicator ${app.auto_start ? 'on' : 'off'}"></span>Auto Start</div>
       <div class="modal-flag"><span class="indicator ${app.restart ? 'on' : 'off'}"></span>Restart on Crash</div>
       <div class="modal-flag"><span class="indicator ${app.reboot ? 'on' : 'off'}"></span>Start on Reboot</div>
     </div>
-    <div class="modal-rating">
-      <label style="font-size:0.75rem;text-transform:uppercase;color:var(--text-muted);">Your Rating</label><br>
-      <span class="stars" id="ratingStars">
-        ${[1,2,3,4,5].map(i => `<span class="star ${i <= rating ? 'filled' : ''}" data-star="${i}" style="font-size:1.4rem;cursor:pointer;">&#9733;</span>`).join('')}
-      </span>
+    <div style="display:flex;align-items:center;gap:1.5rem;margin:1rem 0;">
+      <button class="btn-download" data-url="${app.download_url}">Download ${app.download_filename}</button>
+      <div>
+        <span class="stars" id="ratingStars">
+          ${[1,2,3,4,5].map(i => `<span class="star ${i <= rating ? 'filled' : ''}" data-star="${i}" style="font-size:1.4rem;cursor:pointer;">&#9733;</span>`).join('')}
+        </span>
+      </div>
     </div>
-    <button class="btn-download" data-url="${app.download_url}">Download ${app.download_filename}</button>
     ${app.readme ? `<div class="modal-readme">${renderMarkdown(app.readme)}</div>` : ''}
   `;
 

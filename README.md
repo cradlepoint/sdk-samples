@@ -29,6 +29,7 @@ Browse, search, and download ready-to-use sample applications:
 | Resource | Link |
 |----------|------|
 | **App Store** | [Browse & download apps](https://cradlepoint.github.io/sdk-samples/) |
+| **SDK Developer Guide** | [docs/NCOS_SDK_Developer_Guide.md](docs/NCOS_SDK_Developer_Guide.md) |
 | **NCOS SDK Developers Guide** | [Documentation](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide) |
 | **NetCloud Manager — SDK apps** | [Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
 
@@ -47,8 +48,8 @@ Browse, search, and download ready-to-use sample applications:
 │   ├── security/          # Encryption, IP Verify
 │   ├── web_tools/         # Dashboards, packet capture, CS explorer
 │   ├── examples/          # Hello world, shell, ping
-│   └── templates/         # app_template, web_app_template (for make.py create)
-├── archive/               # Retired/inactive apps
+│   ├── templates/         # app_template, web_app_template
+│   └── archive/           # Retired/inactive apps
 ├── docs/                  # API documentation and app store site
 ├── make.py                # Build/deploy tool
 └── sdk_settings.ini       # Router connection settings
