@@ -383,9 +383,9 @@ def get_app_list():
     apps_dir = os.path.join(cwd, 'apps')
     if os.path.isdir(apps_dir):
         for dirpath, dirnames, filenames in os.walk(apps_dir):
-            # Skip metadata and hidden dirs
+            # Skip metadata, hidden dirs, and templates
             dirnames[:] = [d for d in dirnames if d not in
-                           ['METADATA', '__pycache__', '.git', '.venv']]
+                           ['METADATA', '__pycache__', '.git', '.venv', 'templates']]
             if 'package.ini' in filenames:
                 app_dirs.append(dirpath)
                 dirnames.clear()  # Don't descend into app subdirs
@@ -398,12 +398,14 @@ def get_app_list():
                 if 'package.ini' in contents:
                     app_dirs.append(item)
 
-    # Also include templates at root level
-    for tmpl in ['app_template', 'web_app_template']:
-        tmpl_path = os.path.join(cwd, tmpl)
-        if os.path.isdir(tmpl_path) and os.path.isfile(os.path.join(tmpl_path, 'package.ini')):
-            if tmpl_path not in app_dirs:
-                app_dirs.append(tmpl_path)
+    # Also check repo root for apps in active development (created but not yet categorized)
+    dirs_in_cwd = os.listdir(cwd)
+    for item in dirs_in_cwd:
+        item_path = os.path.join(cwd, item)
+        if os.path.isdir(item_path) and item not in ['apps', 'archive', 'docs', '.git', '.github', '.kiro', '.venv', '__pycache__']:
+            if os.path.isfile(os.path.join(item_path, 'package.ini')):
+                if item_path not in app_dirs:
+                    app_dirs.append(item_path)
 
     # Warn about duplicate app names (same basename in different categories)
     names_seen = {}
@@ -559,7 +561,20 @@ def create_signature(meta_data_folder, pkey):
     with open(os.path.join(meta_data_folder, SIGNATURE_FILE), 'wb') as sf:
         checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
         if pkey:
-            sf.write(crypto.sign(pkey, checksum, 'sha256'))
+            try:
+                from cryptography.hazmat.primitives import hashes, serialization
+                from cryptography.hazmat.primitives.asymmetric import padding
+                with open(pkey, 'rb') as kf:
+                    private_key = serialization.load_pem_private_key(kf.read(), password=None)
+                signature = private_key.sign(checksum, padding.PKCS1v15(), hashes.SHA256())
+                sf.write(signature)
+            except ImportError:
+                # Fallback to pyopenssl if cryptography not available
+                if crypto:
+                    sf.write(crypto.sign(pkey, checksum, 'sha256'))
+                else:
+                    print("WARNING: No signing library available. Writing unsigned checksum.")
+                    sf.write(checksum)
         else:
             sf.write(checksum)
 
@@ -740,7 +755,11 @@ def create(app_name=None):
     if not app_name:
         print('ERROR: No app name provided. Please provide a name. If you are using Cursor AI, it will generate a name for you based on your requested functionality.')
         return
-    if os.path.exists(app_name):
+
+    # Create at repo root for easy dev iteration — move to apps/{category}/ when done
+    target_dir = app_name
+
+    if os.path.exists(target_dir):
         print('App already exists.  Please choose a different name.')
         return
 
@@ -754,21 +773,31 @@ def create(app_name=None):
             if 'package.ini' in filenames:
                 dirnames.clear()
 
+    # Find app_template
+    template_path = os.path.join('apps', 'templates', 'app_template')
+    if not os.path.isdir(template_path):
+        # Fallback to old location
+        template_path = 'app_template'
+    if not os.path.isdir(template_path):
+        print('ERROR: app_template not found.')
+        return
+
     try:
-        # Copy app_template folder and rename to new app name
-        shutil.copytree('app_template', app_name)
-        os.rename(f'{app_name}/app_template.py', f'{app_name}/{app_name}.py')
+        shutil.copytree(template_path, target_dir)
+        os.rename(f'{target_dir}/app_template.py', f'{target_dir}/{app_name}.py')
 
         # Replace app_template with new app name in all files
         files = [f'{app_name}.py', 'package.ini', 'readme.md', 'start.sh']
         for file in files:
-            path = f'{app_name}/{file}'
-            with open(path, 'r') as in_file:
-                filedata = in_file.read()
-            filedata = filedata.replace('app_template', app_name)
-            with open(path, 'w') as out_file:
-                out_file.write(filedata)
-        print(f'App {app_name} created successfully.')
+            path = f'{target_dir}/{file}'
+            if os.path.isfile(path):
+                with open(path, 'r') as in_file:
+                    filedata = in_file.read()
+                filedata = filedata.replace('app_template', app_name)
+                with open(path, 'w') as out_file:
+                    out_file.write(filedata)
+        print(f'App {app_name} created at ./{app_name}/')
+        print(f'When ready, move to a category: mv {app_name} apps/{{category}}/')
     except Exception as e:
         print(f'Error creating app: {e}')
 
@@ -780,38 +809,57 @@ def install():
             package_ini_path = os.path.join(g_app_name, 'package.ini')
             config = configparser.ConfigParser()
             config.read(package_ini_path)
-            
+
             version_major = config[g_app_name].get('version_major', '0')
-            version_minor = config[g_app_name].get('version_minor', '0') 
+            version_minor = config[g_app_name].get('version_minor', '0')
             version_patch = config[g_app_name].get('version_patch', '0')
-            
+
             app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
             if not os.path.exists(app_archive):
                 app_archive = f"{g_app_name}.tar.gz"
         except Exception as e:
             app_archive = f"{g_app_name}.tar.gz"
 
-        # Use sshpass for Linux or OS X
-        cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
-               g_dev_client_password, app_archive,
-               g_dev_client_username, g_dev_client_ip)
-
-        # For Windows, use pscp.exe in the tools directory
-        if sys.platform == 'win32':
-            cmd = './tools/bin/pscp.exe -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
-                   g_dev_client_password, app_archive,
-                   g_dev_client_username, g_dev_client_ip)
-
         print('Installing {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
+
         try:
+            import paramiko
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            try:
+                ssh.connect(g_dev_client_ip, username=g_dev_client_username,
+                            password=g_dev_client_password,
+                            look_for_keys=False, allow_agent=False, timeout=10)
+                sftp = ssh.open_sftp()
+                remote_path = '/app_upload/{}'.format(os.path.basename(app_archive))
+                sftp.put(app_archive, remote_path)
+                sftp.close()
+            except Exception:
+                # Router drops the connection after receiving the file — this is expected
+                pass
+            finally:
+                ssh.close()
+        except ImportError:
+            # Fallback to scp/pscp if paramiko not installed
+            print('WARNING: paramiko not installed. Falling back to scp/pscp.')
+            print('Install paramiko: pip install paramiko')
             if sys.platform == 'win32':
-                subprocess.check_output(cmd)
+                cmd = './tools/bin/pscp.exe -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
+                       g_dev_client_password, app_archive,
+                       g_dev_client_username, g_dev_client_ip)
+                try:
+                    subprocess.check_output(cmd)
+                except subprocess.CalledProcessError:
+                    pass
             else:
-                subprocess.check_output(cmd, shell=True)
-        except subprocess.CalledProcessError as err:
-            # There is always an error because the NCOS device will drop the connection.
-            # print('Error installing: {}'.format(err))
-            return 0
+                cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
+                       g_dev_client_password, app_archive,
+                       g_dev_client_username, g_dev_client_ip)
+                try:
+                    subprocess.check_output(cmd, shell=True)
+                except subprocess.CalledProcessError:
+                    pass
+        return 0
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
 

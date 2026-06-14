@@ -46,9 +46,8 @@ Browse, search, and download ready-to-use sample applications:
 │   ├── vehicle/           # GPS, OBD-II, geofencing, speed limits
 │   ├── security/          # Encryption, IP Verify
 │   ├── web_tools/         # Dashboards, packet capture, CS explorer
-│   └── examples/          # Hello world, shell, ping, templates
-├── app_template/           # Skeleton for new apps
-├── web_app_template/       # Skeleton for web-based apps
+│   ├── examples/          # Hello world, shell, ping
+│   └── templates/         # app_template, web_app_template (for make.py create)
 ├── archive/               # Retired/inactive apps
 ├── docs/                  # API documentation and app store site
 ├── make.py                # Build/deploy tool

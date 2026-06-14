@@ -40,8 +40,7 @@ Ericsson publishes and supports the SDK toolkit. However, custom applications bu
 
 ### Prerequisites
 
-- Python 3.8 or later on your development machine (Windows users: see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md) for detailed install steps)
-- OpenSSL tools (for application signing)
+- Python 3.8 or later on your development machine
 - SSH access to a Cradlepoint router in Developer Mode (enabled via NetCloud Manager, not the router UI)
 
 ### SDK Installation
@@ -85,28 +84,15 @@ The setup scripts handle Python libraries, but some system-level tools must be i
 
 #### Windows
 
-1. Install OpenSSL (Light version) from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html). Choose Win64 or Win32 based on your machine.
+No additional system-level installs needed. All dependencies are handled by `python make.py setup`.
 
 #### macOS
 
-```bash
-# Install Homebrew (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-
-# Required for app signing and device deployment
-brew install openssl
-brew install hudochenkov/sshpass/sshpass
-```
+No additional system-level installs needed. All dependencies are handled by `python3 make.py setup`.
 
 #### Linux (Debian/Ubuntu)
 
-```bash
-sudo apt-get install libffi-dev libssl-dev sshpass python3-pip
-```
-
-### Recommended Tools
-
-- A terminal with SSH/SCP support (PuTTY on Windows, native terminal on macOS/Linux)
+No additional system-level installs needed. All dependencies are handled by `python3 make.py setup`.
 
 ### Running Applications Locally
 
@@ -543,7 +529,7 @@ while True:
 python3 make.py create my_app
 ```
 
-This generates all required files from the `app_template` directory. After creation, edit only `my_app.py` and `readme.md` — do not modify `package.ini`, `start.sh`, or `cp.py`.
+This generates all required files from the `apps/templates/app_template` directory into the repo root. After creation, edit only `my_app.py` and `readme.md` — do not modify `package.ini`, `start.sh`, or `cp.py`. When the app is ready, move it to a category: `mv my_app apps/{category}/`.
 
 ### SDK Settings
 

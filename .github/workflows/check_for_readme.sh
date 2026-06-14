@@ -9,7 +9,7 @@ while IFS= read -r -d '' ini_file; do
         echo "The app \"$folder\" is missing a readme. Please ensure it's named \"readme.txt\" or \"readme.md\"."
         find_errors=1
     fi
-done < <(find ./apps ./app_template ./web_app_template -name 'package.ini' -print0 2>/dev/null)
+done < <(find ./apps -path ./apps/templates -prune -o -name 'package.ini' -print0 2>/dev/null)
 
 if [ $find_errors -eq 1 ]; then
     exit 1

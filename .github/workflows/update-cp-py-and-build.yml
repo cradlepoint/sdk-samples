@@ -50,9 +50,12 @@ jobs:
             reference_path = './cp.py'
             if os.path.exists(reference_path):
                 return reference_path
-            else:
-                print(f"Error: Reference file {reference_path} not found")
-                return None
+            # Try new location
+            alt_path = './apps/templates/app_template/cp.py'
+            if os.path.exists(alt_path):
+                return alt_path
+            print(f"Error: Reference cp.py not found")
+            return None
         
         def update_cp_py_files():
             """Update all cp.py files with the reference version"""
@@ -151,9 +154,6 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
-      - name: Update README with release download links
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        run: python3 .github/workflows/update_readme_links.py
       - name: Generate release body
         if: github.event_name == 'push'
         run: python3 .github/workflows/generate_release_body.py
@@ -183,18 +183,3 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ./built_apps/README.md
           name: "Built Apps"
-      - name: Commit and push README updates
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        run: |
-          if git diff --quiet README.md; then
-            echo "No README changes"
-          else
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add README.md
-            git commit -m "Add release download links to app descriptions in README"
-            git stash --include-untracked
-            git pull --rebase origin ${{ github.ref_name }}
-            git stash pop || true
-            git push origin HEAD:${{ github.ref_name }}
-          fi

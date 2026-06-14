@@ -8,7 +8,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APPS_DIR = REPO_ROOT / 'apps'
 ARCHIVE_DIR = REPO_ROOT / 'archive'
-TEMPLATES = [REPO_ROOT / 'app_template', REPO_ROOT / 'web_app_template']
 
 # GitHub release base URL for downloads
 GITHUB_REPO = 'cradlepoint/sdk-samples'
@@ -74,7 +73,7 @@ def scan_apps(base_dir, archived=False):
     apps = []
     for dirpath, dirnames, filenames in os.walk(base_dir):
         dirnames[:] = [d for d in dirnames if d not in
-                       ['.git', '.github', '.kiro', 'METADATA', '__pycache__', '.venv']]
+                       ['.git', '.github', '.kiro', 'METADATA', '__pycache__', '.venv', 'templates']]
         if 'package.ini' in filenames:
             app_dir = Path(dirpath)
             ini_path = app_dir / 'package.ini'
@@ -105,11 +104,6 @@ def main():
     # Scan main apps
     if APPS_DIR.exists():
         catalog.extend(scan_apps(APPS_DIR, archived=False))
-
-    # Scan templates
-    for tmpl in TEMPLATES:
-        if tmpl.exists():
-            catalog.extend(scan_apps(tmpl, archived=False))
 
     # Scan archive
     if ARCHIVE_DIR.exists():
