@@ -126,8 +126,8 @@ a:hover { color: var(--accent-hover); }
 /* App Grid */
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2.25rem;
   padding: 0.5rem;
 }
 
@@ -192,6 +192,7 @@ a:hover { color: var(--accent-hover); }
   text-transform: uppercase;
   color: var(--text-muted);
   letter-spacing: 0.03em;
+  margin-top: 0.25rem;
 }
 .badge {
   font-size: 0.65rem;
@@ -569,14 +570,15 @@ function renderGrid() {
           <div class="app-icon">${initials}</div>
           <div>
             <div class="app-card-title">${app.name}</div>
-            <div class="app-card-vendor">By ${app.vendor}</div>
+            <span class="badge ${badgeClass}">${app.developer_label}</span>
           </div>
         </div>
         <div class="app-card-desc">${app.notes}</div>
         <div class="app-card-footer">
-          <span class="app-card-category">${catLabel}</span>
-          <span>${renderStars(rating)}</span>
-          <span class="badge ${badgeClass}">${app.developer_label}</span>
+          <div>
+            <span>${renderStars(rating)}</span>
+            <div class="app-card-category">${catLabel}</div>
+          </div>
         </div>
       </div>`;
   }).join('');
