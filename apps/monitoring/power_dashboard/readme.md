@@ -1,11 +1,11 @@
 # Power Dashboard
 
-A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface.  Optional power indicator message in asset ID.  
+![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
 
-[Download the built app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_dashboard.v1.4.0.tar.gz)  
+A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface. Optional power indicator message in asset ID.
 
-<img width="1334" height="808" alt="image" src="https://github.com/user-attachments/assets/bcf7ae9a-0194-4db1-a7e6-a7e6a54d89d3" />
-<img width="1334" height="849" alt="image" src="https://github.com/user-attachments/assets/1963d7be-d660-4078-9b22-6e0339f9cbd5" />
+![image](https://github.com/user-attachments/assets/bcf7ae9a-0194-4db1-a7e6-a7e6a54d89d3)
+![image](https://github.com/user-attachments/assets/1963d7be-d660-4078-9b22-6e0339f9cbd5)
 
 ## Known Supported Devices:
 **Total (W), Voltage (V), Current (A)**: R980, S400  

@@ -1,6 +1,6 @@
-daily_speedtest  
-===============
-**Download Built App:** [**daily_speedtest.tar.gz**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.tar.gz)
+# daily_speedtest
+
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
 This SDK Application runs netperf speedtests at configurable times (on the hour) each day.  
 

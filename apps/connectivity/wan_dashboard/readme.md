@@ -1,8 +1,8 @@
 # WAN Dashboard
 
-[Download the built-app here!](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/wan_dashboard.v1.3.0.tar.gz)
+![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
 
-<img width="1257" height="793" alt="image" src="https://github.com/user-attachments/assets/ca55cbc2-28fd-4851-be8d-5f63eef2d652" />
+![image](https://github.com/user-attachments/assets/ca55cbc2-28fd-4851-be8d-5f63eef2d652)
 
 ## Features
 

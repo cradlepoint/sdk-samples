@@ -1,5 +1,6 @@
-logfile
-================
+# logfile
+
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
 SDK Application that writes log to files on flash available for download via HTTP/Remote Connect.
 

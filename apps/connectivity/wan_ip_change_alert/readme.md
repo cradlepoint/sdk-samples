@@ -1,5 +1,7 @@
 # WAN IP Change Alert
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 Tracks the WAN IP address and sends an alert when it changes. Includes a confirmation delay to prevent false alerts from temporary IP changes.
 
 ## Configuration

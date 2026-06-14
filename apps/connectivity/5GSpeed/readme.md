@@ -1,43 +1,43 @@
-Application Name
-================
-5GSpeed  
+# 5GSpeed
 
-[Download the built app from our releases page!](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
+Runs netperf speedtests and puts results into a configurable field. Designed to enable NCM API support for speedtests.
 
-Application Purpose
-===================
-5GSpeed runs netperf speedtests and puts results into configurable field. Designed to enable NCM API support for speedtests.
+## Steps to Use
 
-Steps to use:
-=============
 The app will create an entry in the router configuration under System > SDK Data named "5GSpeed" with the path for the results field.
-Default is "config/system/asset_id"  
+Default is `config/system/asset_id`.
 
-Clear the results by performing any of the following:  
+Clear the results by performing any of the following:
 
-1. Use NCM API PUT router request to clear the results field and to run the SDK speedtest. Wait for 1 min, and run NCM API Get router request to get the result.  
+1. Use NCM API PUT router request to clear the results field and to run the SDK speedtest. Wait for 1 min, and run NCM API GET router request to get the result.
+2. Clear the results in NCM > Devices tab (if using description or asset_id).
+3. Go to device console and clear results field:
+   ```
+   put {results_path} ""
+   ```
 
-2. Clear the results in NCM > Devices tab (if using description or asset_id)  
+**Sample result:**
 
-3. Go to device console and clear results field:  
-put {results_path} ""  
+```
+DL:23.47Mbps UL:9.02Mbps Ping:47.02ms Server:XMission ISP:Verizon Wireless Time:2026-03-07T19:54:30.875162Z
+```
 
-Sample result:  
-DL:23.47Mbps UL:9.02Mbps Ping:47.02ms Server:XMission ISP:Verizon Wireless Time:2026-03-07T19:54:30.875162Z  
+## Retrieve Results via NCM API
 
-Retrieve Results via NCM API:
-=============================
-- Generate NCM API v2 API Keys on the Tools page > NetCloud API tab in NCM.  
-- Use those keys in the headers of an HTTP GET request to https://www.cradlepointecm.com/api/v2/routers/{router_id/  
-- router_id can be found in NCM or at CLI: get status/ecm/client_id  
-- The results are in the field defined in SDK Data (default is asset_id)  
+- Generate NCM API v2 API Keys on the Tools page > NetCloud API tab in NCM.
+- Use those keys in the headers of an HTTP GET request to `https://www.cradlepointecm.com/api/v2/routers/{router_id}/`
+- `router_id` can be found in NCM or at CLI: `get status/ecm/client_id`
+- The results are in the field defined in SDK Data (default is asset_id)
 
-Clear results and run new test via NCM API:
-===========================================
-- Use API keys in headers of an HTTP PUT request to https://www.cradlepointecm.com/api/v2/routers/{router_id/  
-- Content-Type: application/json  
-- Body contains blank field defined in SDK Data (default is asset_id):  
-{"asset_id": ""}  
+## Clear Results and Run New Test via NCM API
+
+- Use API keys in headers of an HTTP PUT request to `https://www.cradlepointecm.com/api/v2/routers/{router_id}/`
+- Content-Type: `application/json`
+- Body contains blank field defined in SDK Data (default is asset_id):
+  ```json
+  {"asset_id": ""}
+  ```
 
 In a few minutes, new results should populate.

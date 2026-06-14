@@ -1,5 +1,7 @@
 # signal_alert
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 Monitors modem signal metrics on all connected modems and sends NetCloud alerts with GPS when any metric goes below its threshold. Sends one alert when signal crosses below and one when it recovers (after 60 seconds above threshold).
 
 ## Requirements

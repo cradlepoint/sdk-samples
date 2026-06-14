@@ -1,29 +1,19 @@
-timezone_via_gnss
-================
-Automatically set device timezone using GNSS and TimezoneDB
+# timezone_via_gnss
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
-Application Version
-===================
-0.1.0
+Automatically set device timezone using GNSS and TimezoneDB.
 
+## Requirements
 
-NCOS Devices Supported
-======================
-ALL
+- TimezoneDB account and API key
+- GNSS antenna
+- `timezone_api_key` configured at group or device level under System > SDK Data
 
+## Optional Configuration
 
-External Requirements
-=====================
-TimezoneDB account and API key
+- `timezone_notify` — Set under System > SDK Data with values `desc`, `asset_id`, and/or `alert`
 
-GNSS
+## How It Works
 
-timezone_api_key confgiured at group or device level under System -> SDK Data
-
-*optional timezone_notify configured at group or device level under System -> SDK Data using values 'desc', 'asset_id' and / or 'alert'
-
-
-Application Purpose
-===================
-Use GNSS data to query TimezoneDB and request a UTC offset value which will be applied to the device config under System -> Administration -> System Clock
+Uses GNSS data to query TimezoneDB and request a UTC offset value which will be applied to the device config under System > Administration > System Clock.

@@ -1,5 +1,7 @@
 # speedtest_scheduled_asset_id
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 Runs a netperf speedtest on a configurable cron schedule and writes results to the router's asset_id field. Can also be triggered manually by setting asset_id to "start".
 
 ## Result Format

@@ -1,22 +1,9 @@
-power_alert
-================
-[**Download Built App**](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/power_alert.tar.gz)
+# power_alert
 
-Application Version
-===================
-0.1.0
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
-
-NCOS Devices Supported
-======================
-E100, X10
-
-
-External Requirements
-=====================
-None
-
-
-Application Purpose
-===================
 Send a custom NetCloud alert when external power is lost and restored.
+
+## Supported Devices
+
+E100, X10

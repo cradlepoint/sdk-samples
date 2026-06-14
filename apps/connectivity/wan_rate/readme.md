@@ -1,5 +1,7 @@
 # WAN Rate Tracker
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 Tracks WAN bandwidth rates over time and stores rolling averages in a configurable field.
 
 ## What it does

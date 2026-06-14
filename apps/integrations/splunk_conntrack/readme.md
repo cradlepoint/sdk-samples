@@ -1,5 +1,7 @@
 # splunk_conntrack
- 
+
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 Cradlepoint Ericsson -> Splunk Connection Tracking Application
 
 ![image](https://github.com/user-attachments/assets/16a4ba8e-d179-46af-8435-3d34d40a20c5)

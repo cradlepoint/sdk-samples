@@ -1,5 +1,6 @@
-Failover Modem Reset
-===========================
+# Failover Modem Reset
+
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
 Monitors all modem SIM slots and detects failover from sim1 to sim2. Logs all SIM status changes, sends an NCM alert on failover detection, and resets the sim2 device after failover. Supports multiple modems with independent failover tracking per port. Configuration changes via appdata are picked up automatically without restarting the app.
 

@@ -1,5 +1,7 @@
 # User Manual for iPerf3 Application
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 ## Overview
 The iPerf3 application is designed to test network performance by measuring the bandwidth between your device and a specified server. This application automates the process of downloading the iPerf3 tool, configuring the server, and running tests. Results are logged, alerted, and stored in the asset identifier for easy access.
 

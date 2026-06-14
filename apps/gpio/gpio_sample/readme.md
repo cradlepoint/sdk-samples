@@ -1,5 +1,7 @@
 # GPIO Sample
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 A simple Ericsson Cradlepoint SDK application that demonstrates GPIO (General Purpose Input/Output) functionality.
 
 ## What it does

@@ -1,8 +1,8 @@
 # AutoInstall
 
-AutoInstall automatically tests and prioritizes multiple SIMs based on TCP download speed. The application detects all available SIMs, ensures each has a unique WAN profile, runs netperf speedtests on each SIM, and then prioritizes them by download speed.  
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
-[Download the built app from our releases page!](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)
+AutoInstall automatically tests and prioritizes multiple SIMs based on TCP download speed. The application detects all available SIMs, ensures each has a unique WAN profile, runs netperf speedtests on each SIM, and then prioritizes them by download speed.
 
 ## SDK Appdata Configuration
 

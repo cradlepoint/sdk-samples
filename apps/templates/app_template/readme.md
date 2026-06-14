@@ -1,5 +1,4 @@
-App Name
-========
+# App Name
 
 Description of application functionality.
 

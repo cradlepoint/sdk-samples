@@ -1,23 +1,5 @@
-Application Name
-================
-clients
+# clients
 
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
 
-Application Version
-===================
-1.0.0
-
-
-NCOS Devices Supported
-======================
-All
-
-
-External Requirements
-=====================
-None
-
-
-Application Purpose
-===================
-Puts clients into asset ID every 5 minutes
+Puts connected client information into the asset_id field every 5 minutes.

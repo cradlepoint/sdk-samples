@@ -568,6 +568,9 @@ function renderGrid() {
     const vendorLine = app.developer_label === 'Ericsson'
       ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
       : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
+    const catColors = {connectivity:'0969da',monitoring:'8250df',networking:'1a7f37',integrations:'cf222e',gpio:'bf8700',vehicle:'6639ba',security:'d1242f',web_tools:'0550ae',examples:'57606a'};
+    const catColor = catColors[app.category] || '57606a';
+    const catBadge = `<img src="https://img.shields.io/badge/${encodeURIComponent(catLabel)}-${catColor}" alt="${catLabel}" style="height:18px;vertical-align:middle;">`;
     return `
       <div class="app-card" data-app="${app.name}">
         <div class="app-card-header">
@@ -581,7 +584,7 @@ function renderGrid() {
         <div class="app-card-footer">
           <div>
             <span>${renderStars(rating)}</span>
-            <div class="app-card-category">${catLabel}</div>
+            <div class="app-card-category">${catBadge}</div>
           </div>
         </div>
       </div>`;

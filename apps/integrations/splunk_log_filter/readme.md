@@ -1,5 +1,7 @@
 # splunk_log_filter
- 
+
+![Python](https://img.shields.io/badge/Python-3.8-yellow)
+
 Ericsson Cradlepoint -> Splunk Log Filtering Application
 
 ![image](https://github.com/user-attachments/assets/353000e8-607f-4782-93b8-42e837236ff3)

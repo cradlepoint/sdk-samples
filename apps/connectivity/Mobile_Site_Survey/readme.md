@@ -1,14 +1,14 @@
 # Mobile Site Survey v3
 
-Professional cellular network drive testing application with modern web interface and high-performance speed testing.  
+![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
 
-[Download the built app from our releases page!](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)
+Professional cellular network drive testing application with modern web interface and high-performance speed testing.
 
 Light Side:
-<img width="1409" height="852" alt="image" src="https://github.com/user-attachments/assets/712a198b-4930-49f9-9e6a-0c6acb1ae96b" />
+![image](https://github.com/user-attachments/assets/712a198b-4930-49f9-9e6a-0c6acb1ae96b)
 
 Dark Side:
-<img width="1409" height="852" alt="image" src="https://github.com/user-attachments/assets/117ce0fd-7389-48cd-a995-3dfc0e619d40" />
+![image](https://github.com/user-attachments/assets/117ce0fd-7389-48cd-a995-3dfc0e619d40)
 
 ## Key Features
 
