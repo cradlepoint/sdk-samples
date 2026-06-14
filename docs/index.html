@@ -70,14 +70,16 @@ a:hover { color: var(--accent-hover); }
 .gear-btn {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 1.3rem;
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: color 0.15s;
+  padding: 0.4rem;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
 }
-.gear-btn:hover { color: var(--text-primary); }
+.gear-btn:hover { color: var(--text-primary); background: var(--bg-card); }
 .gear-btn.configured { color: var(--success); }
 
 /* Layout */
@@ -499,7 +501,7 @@ a:hover { color: var(--accent-hover); }
     <input type="text" id="searchInput" placeholder="Find an app...">
   </div>
   <span class="result-count" id="resultCount"></span>
-  <button class="gear-btn" id="gearBtn" title="NCM API Settings">&#9881;</button>
+  <button class="gear-btn" id="gearBtn" title="NCM API Settings" style="margin-left:auto;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </div>
 
 <div class="container">
