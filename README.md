@@ -36,19 +36,19 @@ Ready-to-use applications you can install from the [releases page](https://githu
 
 - **5GSpeed**
     - Run netperf speedtests via NCM API. Results are put in asset_id field (configurable in SDK Data). Clearing the results starts a new test. This can be done easily via NCM API v2 /routers/ endpoint.
-    - **Download:** [5GSpeed v0.3.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.v0.3.0.tar.gz)
+    - **Download:** [5GSpeed v0.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/5GSpeed.v0.4.0.tar.gz)
 - **Autoinstall**
     - Automatically choose fastest SIM on install. On bootup, AutoInstall detects SIMs, and ensures (clones) they have unique WAN profiles for prioritization. Then the app collects diagnostics and runs netperf speedtests on each SIM. Then the app prioritizes the SIMs WAN Profiles by TCP download speed. Results are written to the log, set as the description field, and sent as a custom alert. The app can be manually triggered again by clearing out the description field in NCM.
-    - **Download:** [AutoInstall v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.0.1.tar.gz)
+    - **Download:** [AutoInstall v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall.v1.1.1.tar.gz)
 - **AutoInstall_Web**
     - Detects SIMs, speedtests each, collects diagnostics, picks fastest. Default: reprioritizes WAN by speed. With group_by_sim/carrier: moves router to matching NCM group. Optionally enforces min_speed, sends alerts, and updates NCM custom fields.
-    - **Download:** [AutoInstall_Web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall_Web.v1.0.0.tar.gz)
+    - **Download:** [AutoInstall_Web v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/AutoInstall_Web.v1.1.0.tar.gz)
 - **Installer_UI**
     - Provide a web interface for installers to configure WiFi and run speedtests.
-    - **Download:** [Installer_UI v1.3.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.3.0.tar.gz)
+    - **Download:** [Installer_UI v1.4.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Installer_UI.v1.4.0.tar.gz)
 - **Mobile_Site_Survey**
     - Field survey tool that runs speedtests and collects modem diagnostics with GPS locations, uploading results for network coverage and throughput analysis to 5g-ready.io
-    - **Download:** [Mobile_Site_Survey v3.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.0.3.tar.gz)
+    - **Download:** [Mobile_Site_Survey v3.1.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Mobile_Site_Survey.v3.1.3.tar.gz)
 - **Motorola**
     - Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs.
     - **Download:** [Motorola v1.2.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/Motorola.v1.2.0.tar.gz)
@@ -95,7 +95,7 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [dynamic_app v1.0.3.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/dynamic_app.v1.0.3.tar.gz)
 - **daily_speedtest**
     - Runs a netperf speedtest daily at configured hours and put results to user defined field (asset_id).
-    - **Download:** [daily_speedtest v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.v1.0.0.tar.gz)
+    - **Download:** [daily_speedtest v1.1.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/daily_speedtest.v1.1.0.tar.gz)
 - **encrypt_appdata**
     - Uses ECC encryption to automatically encrypt app data values that start with specific prefixes (`enc_`, `secret_`, `password_`, or `encrypt_`).
     - **Download:** [encrypt_appdata v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/encrypt_appdata.v1.0.0.tar.gz)
@@ -215,12 +215,13 @@ Ready-to-use applications you can install from the [releases page](https://githu
     - **Download:** [speed_limit v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speed_limit.v1.0.0.tar.gz)
 - **speedtest_scheduled_custom1**
     - Run netperf speedtests on a cron schedule from appdata. Results are written to NCM custom1 field via the ncm PyPI library.
-    - **Download:** [speedtest_scheduled_custom1 v1.0.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.0.1.tar.gz)
+    - **Download:** [speedtest_scheduled_custom1 v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_custom1.v1.1.1.tar.gz)
 - **speedtest_scheduled_asset_id**
     - Run netperf speedtests on a configurable cron schedule and write results to the asset_id field. Includes modem diagnostics (DBM, SINR) when the primary WAN is a modem.
-    - **Download:** [speedtest_scheduled_asset_id v1.0.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_asset_id.v1.0.2.tar.gz)
+    - **Download:** [speedtest_scheduled_asset_id v1.1.2.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_scheduled_asset_id.v1.1.2.tar.gz)
 - **speedtest_web**
     - Web-based speed test interface with history tracking and report generation. Supports Ookla, Netperf, and iPerf3 engines with live progress streaming, CSV export, and dark mode.
+    - **Download:** [speedtest_web v1.0.0.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/speedtest_web.v1.0.0.tar.gz)
 - **splunk_conntrack**
     - This app monitors the conntrack table and sends new connections to Splunk.
     - **Download:** [splunk_conntrack v1.1.1.tar.gz](https://github.com/cradlepoint/sdk-samples/releases/download/built_apps/splunk_conntrack.v1.1.1.tar.gz)
@@ -459,6 +460,7 @@ This software, including any sample applications, and associated documentation (
 NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.
 
 Copyright © 2018 Cradlepoint, Inc. All rights reserved.
+
 
 
 
