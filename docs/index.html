@@ -47,6 +47,7 @@ a:hover { color: var(--accent-hover); }
   position: sticky;
   top: 0;
   z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
 }
 .header h1 { font-size: 1.25rem; white-space: nowrap; }
 .header h1 span { color: var(--accent); }
@@ -84,6 +85,7 @@ a:hover { color: var(--accent-hover); }
   max-height: calc(100vh - 60px);
   position: sticky;
   top: 60px;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.3);
 }
 .filter-section { margin-bottom: 1.5rem; }
 .filter-section h3 {
@@ -124,25 +126,29 @@ a:hover { color: var(--accent-hover); }
 /* App Grid */
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.5rem;
+  padding: 0.5rem;
 }
 
 /* App Card */
 .app-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.5rem;
+  border-radius: 10px;
+  padding: 1.25rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  aspect-ratio: 1 / 1;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
+  aspect-ratio: 1 / 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 .app-card:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(0,0,0,0.4);
 }
 .app-card-header {
   display: flex;
@@ -393,7 +399,7 @@ a:hover { color: var(--accent-hover); }
 <body>
 
 <div class="header">
-  <h1><span>Ericsson</span> NCOS SDK App Store</h1>
+  <h1><span>Ericsson</span> NCOS SDK <span style="color:var(--text-secondary)">App Store</span></h1>
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="Find an app...">
   </div>
@@ -404,8 +410,8 @@ a:hover { color: var(--accent-hover); }
   <aside class="sidebar" id="sidebar"></aside>
   <main class="main">
     <div class="sort-bar">
+      <label for="sortSelect" style="color:var(--text-muted);font-size:0.85rem;margin-right:0.5rem;">Sort by</label>
       <select id="sortSelect">
-        <option value="name">Name</option>
         <option value="rating">Rating</option>
         <option value="category">Category</option>
       </select>
@@ -540,9 +546,8 @@ function renderGrid() {
 
   let apps = catalog.apps.filter(a => matchesSearch(a, query) && matchesFilters(a));
 
-  // Sort
-  if (sortBy === 'name') apps.sort((a, b) => a.name.localeCompare(b.name));
-  else if (sortBy === 'rating') apps.sort((a, b) => (getAppRating(b.name) - getAppRating(a.name)) || a.name.localeCompare(b.name));
+  // Sort — always alphabetical within the selected grouping
+  if (sortBy === 'rating') apps.sort((a, b) => (getAppRating(b.name) - getAppRating(a.name)) || a.name.localeCompare(b.name));
   else if (sortBy === 'category') apps.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 
   const grid = document.getElementById('appGrid');
