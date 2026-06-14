@@ -762,9 +762,9 @@ function renderGrid() {
     const vendorLine = app.developer_label === 'Ericsson'
       ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
       : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
-    const tagColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web:'informational',tools:'lightgrey',examples:'yellow',speedtest:'blue',mqtt:'red',qos:'green',alerting:'important',gps:'blueviolet'};
+    const tagColors = {connectivity:'0969da',monitoring:'8250df',networking:'1a7f37',integrations:'cf222e',gpio:'bc4c00',vehicle:'5e4db2',security:'d1242f',web:'0550ae',tools:'57606a',examples:'bf8700',speedtest:'1f6feb',mqtt:'da3633',qos:'2da44e',alerting:'e16f24',gps:'6639ba',ftp:'6e7781',splunk:'f85149',azure:'0078d4',tls:'1b7c83',cellular:'7c3aed',vpn:'0e8a16',wan:'1d76db',dns:'c4432b',usb:'6f42c1',modem:'d4a72c',failover:'fb8f44',http:'2f81f7',hotspot:'e85aad',clients:'3fb950',system:'768390',power:'ffc107',signal:'ff7b72',logging:'a371f7',automation:'54aeff',firewall:'f47067',geofence:'56d364',gnss:'d2a8ff',obd2:'f0883e',time:'8b949e',hardware:'fb8f44',provisioning:'388bfd',proxy:'a475f9',encryption:'1f6feb',dashboard:'79c0ff',terminal:'8b949e',example:'d4a72c','site-survey':'39d353','ip-verify':'ff7b72','mac-filter':'656d76','packet-capture':'bc8cff',installer:'e3b341',wifi:'36bf5c'};
     const allTagBadges = app.tags_list.map(t => {
-      const tc = tagColors[t] || 'lightgrey';
+      const tc = tagColors[t] || '8b949e';
       const tn = formatTagName(t);
       return `<img src="https://img.shields.io/badge/-${encodeURIComponent(tn).replace(/-/g,'--')}-${tc}" alt="${t}" style="height:18px;vertical-align:middle;">`;
     }).join(' ');
@@ -800,9 +800,9 @@ function openAppDetail(appName) {
   const modal = document.getElementById('modalContent');
   const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
 
-  const tagColors = {connectivity:'blue',monitoring:'purple',networking:'green',integrations:'red',gpio:'orange',vehicle:'blueviolet',security:'critical',web:'informational',tools:'lightgrey',examples:'yellow',speedtest:'blue',mqtt:'red',qos:'green',alerting:'important',gps:'blueviolet'};
+  const tagColors = {connectivity:'0969da',monitoring:'8250df',networking:'1a7f37',integrations:'cf222e',gpio:'bc4c00',vehicle:'5e4db2',security:'d1242f',web:'0550ae',tools:'57606a',examples:'bf8700',speedtest:'1f6feb',mqtt:'da3633',qos:'2da44e',alerting:'e16f24',gps:'6639ba',ftp:'6e7781',splunk:'f85149',azure:'0078d4',tls:'1b7c83',cellular:'7c3aed',vpn:'0e8a16',wan:'1d76db',dns:'c4432b',usb:'6f42c1',modem:'d4a72c',failover:'fb8f44',http:'2f81f7',hotspot:'e85aad',clients:'3fb950',system:'768390',power:'ffc107',signal:'ff7b72',logging:'a371f7',automation:'54aeff',firewall:'f47067',geofence:'56d364',gnss:'d2a8ff',obd2:'f0883e',time:'8b949e',hardware:'fb8f44',provisioning:'388bfd',proxy:'a475f9',encryption:'1f6feb',dashboard:'79c0ff',terminal:'8b949e',example:'d4a72c','site-survey':'39d353','ip-verify':'ff7b72','mac-filter':'656d76','packet-capture':'bc8cff',installer:'e3b341',wifi:'36bf5c'};
   const allTagBadges = app.tags_list.map(t => {
-    const tc = tagColors[t] || 'lightgrey';
+    const tc = tagColors[t] || '8b949e';
     const tn = formatTagName(t);
     return `<img src="https://img.shields.io/badge/-${encodeURIComponent(tn).replace(/-/g,'--')}-${tc}" alt="${t}" style="height:18px;vertical-align:middle;margin-right:4px;">`;
   }).join('');
@@ -876,6 +876,26 @@ function renderMarkdown(text) {
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  // Tables: detect lines starting with |
+  html = html.replace(/((?:^\|.+\|$\n?)+)/gm, function(tableBlock) {
+    const rows = tableBlock.trim().split('\n');
+    if (rows.length < 2) return tableBlock;
+    let thtml = '<table style="width:100%;border-collapse:collapse;margin:0.5rem 0;font-size:0.8rem;">';
+    rows.forEach((row, i) => {
+      // Skip separator row (|---|---|)
+      if (/^\|[\s\-:]+\|$/.test(row.trim())) return;
+      const cells = row.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+      const tag = i === 0 ? 'th' : 'td';
+      const style = i === 0
+        ? 'style="text-align:left;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);color:var(--text-primary);font-weight:600;"'
+        : 'style="text-align:left;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);color:var(--text-secondary);"';
+      thtml += '<tr>' + cells.map(c => `<${tag} ${style}>${c.trim()}</${tag}>`).join('') + '</tr>';
+    });
+    thtml += '</table>';
+    return thtml;
+  });
+
   html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
   html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
@@ -889,6 +909,8 @@ function renderMarkdown(text) {
   html = html.replace(/(<\/ul>)\s*<\/p>/g, '$1');
   html = html.replace(/<p>\s*(<blockquote>)/g, '$1');
   html = html.replace(/(<\/blockquote>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<table)/g, '$1');
+  html = html.replace(/(<\/table>)\s*<\/p>/g, '$1');
   html = html.replace(/<p><\/p>/g, '');
   html = html.replace(/\n/g, '<br>');
   return html;
