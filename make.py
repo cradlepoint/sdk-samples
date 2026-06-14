@@ -378,14 +378,42 @@ def get_app_list():
     app_dirs = []
     cwd = os.getcwd()
     print("Scanning {} for app directories.".format(cwd))
-    dirs_in_cwd = os.listdir(cwd)
 
-    # Assume dir is an app_dir if it contains 'package.ini'
-    for item in dirs_in_cwd:
-        if os.path.isdir(item):
-            contents = os.listdir(item)
-            if 'package.ini' in contents:
-                app_dirs.append(item)
+    # Search recursively under apps/ directory for package.ini files
+    apps_dir = os.path.join(cwd, 'apps')
+    if os.path.isdir(apps_dir):
+        for dirpath, dirnames, filenames in os.walk(apps_dir):
+            # Skip metadata and hidden dirs
+            dirnames[:] = [d for d in dirnames if d not in
+                           ['METADATA', '__pycache__', '.git', '.venv']]
+            if 'package.ini' in filenames:
+                app_dirs.append(dirpath)
+                dirnames.clear()  # Don't descend into app subdirs
+    else:
+        # Fallback: look in cwd for flat structure (backward compat)
+        dirs_in_cwd = os.listdir(cwd)
+        for item in dirs_in_cwd:
+            if os.path.isdir(item):
+                contents = os.listdir(item)
+                if 'package.ini' in contents:
+                    app_dirs.append(item)
+
+    # Also include templates at root level
+    for tmpl in ['app_template', 'web_app_template']:
+        tmpl_path = os.path.join(cwd, tmpl)
+        if os.path.isdir(tmpl_path) and os.path.isfile(os.path.join(tmpl_path, 'package.ini')):
+            if tmpl_path not in app_dirs:
+                app_dirs.append(tmpl_path)
+
+    # Warn about duplicate app names (same basename in different categories)
+    names_seen = {}
+    for app_dir in app_dirs:
+        name = os.path.basename(app_dir)
+        if name in names_seen:
+            print("WARNING: Duplicate app name '{}' found at:\n  {}\n  {}".format(
+                name, names_seen[name], app_dir))
+        else:
+            names_seen[name] = app_dir
 
     return app_dirs
 
@@ -624,12 +652,28 @@ def package_application(app_root, pkey):
 # Package the app files into a tar.gz archive.
 def package(app=None):
     app_name = app or g_app_name
-    app_path = os.path.join(app_name)
+    app_path = app_name
+
+    # If app_name is not a directory, try to find it under apps/
+    if not os.path.isdir(app_path):
+        app_path = os.path.join(app_name)
+        if not os.path.isdir(app_path):
+            # Search for it recursively under apps/
+            for dirpath, dirnames, filenames in os.walk('apps'):
+                dirnames[:] = [d for d in dirnames if d not in ['METADATA', '__pycache__']]
+                if os.path.basename(dirpath) == app_name and 'package.ini' in filenames:
+                    app_path = dirpath
+                    break
+                if 'package.ini' in filenames:
+                    dirnames.clear()
 
     # Verify the app directory exists
     if not os.path.isdir(app_path):
-        print("ERROR: App directory '{}' does not exist. Skipping.".format(app_path))
+        print("ERROR: App directory '{}' does not exist. Skipping.".format(app_name))
         return False
+
+    # The app_name for packaging must match the folder basename
+    actual_app_name = os.path.basename(app_path)
 
     # Verify the app has a valid package.ini with the correct section
     app_config_file = os.path.join(app_path, CONFIG_FILE)
@@ -639,11 +683,11 @@ def package(app=None):
 
     config = configparser.ConfigParser()
     config.read(app_config_file)
-    if app_name not in config:
-        print("ERROR: The '{}' section does not exist in {}. Skipping.".format(app_name, app_config_file))
+    if actual_app_name not in config:
+        print("ERROR: The '{}' section does not exist in {}. Skipping.".format(actual_app_name, app_config_file))
         return False
 
-    print("Packaging {}".format(app_name))
+    print("Packaging {}".format(actual_app_name))
     scan_for_cr(app_path)
     setup_script(app_path)
 
@@ -651,7 +695,7 @@ def package(app=None):
         package_application(app_path, None)
         return True
     except Exception as err:
-        print('Error packaging {}: {}'.format(app_name, err))
+        print('Error packaging {}: {}'.format(actual_app_name, err))
         return False
 
 
@@ -699,6 +743,16 @@ def create(app_name=None):
     if os.path.exists(app_name):
         print('App already exists.  Please choose a different name.')
         return
+
+    # Check if an app with this name already exists anywhere under apps/
+    if os.path.isdir('apps'):
+        for dirpath, dirnames, filenames in os.walk('apps'):
+            dirnames[:] = [d for d in dirnames if d not in ['METADATA', '__pycache__']]
+            if os.path.basename(dirpath) == app_name and 'package.ini' in filenames:
+                print(f'App already exists at {dirpath}. Please choose a different name.')
+                return
+            if 'package.ini' in filenames:
+                dirnames.clear()
 
     try:
         # Copy app_template folder and rename to new app name
@@ -954,6 +1008,17 @@ def init(app=None):
         os.environ["COPYFILE_DISABLE"] = "1"
 
     settings_file = os.path.join(os.getcwd(), 'sdk_settings.ini')
+    # Also check parent directories (in case running from a subdirectory)
+    if not os.path.isfile(settings_file):
+        # Walk up to find sdk_settings.ini
+        check_dir = os.path.dirname(os.getcwd())
+        for _ in range(3):
+            candidate = os.path.join(check_dir, 'sdk_settings.ini')
+            if os.path.isfile(candidate):
+                settings_file = candidate
+                break
+            check_dir = os.path.dirname(check_dir)
+
     config = configparser.ConfigParser()
     config.read(settings_file)
 

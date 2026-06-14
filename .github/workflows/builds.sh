@@ -23,4 +23,6 @@ find . -maxdepth 1 -name '*.tar.gz' -exec cp {} built_apps/ \;
 run_cmd "python3 make.py clean"
 run_cmd "python3 make.py clean all"
 
-# Release body (built_apps/README.md) is created by workflow after update_readme_links runs
+# Generate app store catalog
+echo "Generating app store catalog..."
+python3 docs/appstore/generate_catalog.py

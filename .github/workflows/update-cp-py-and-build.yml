@@ -39,9 +39,8 @@ jobs:
             """Find all cp.py files in the repository"""
             cp_files = []
             for root, dirs, files in os.walk('.'):
-                # Skip .git directory
-                if '.git' in root:
-                    continue
+                # Skip .git, .venv, docs directories
+                dirs[:] = [d for d in dirs if d not in ['.git', '.venv', 'docs', '.kiro', 'METADATA']]
                 if 'cp.py' in files:
                     cp_files.append(os.path.join(root, 'cp.py'))
             return cp_files
