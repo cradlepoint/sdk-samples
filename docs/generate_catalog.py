@@ -5,7 +5,7 @@ import json
 import configparser
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 APPS_DIR = REPO_ROOT / 'apps'
 ARCHIVE_DIR = REPO_ROOT / 'archive'
 TEMPLATES = [REPO_ROOT / 'app_template', REPO_ROOT / 'web_app_template']
