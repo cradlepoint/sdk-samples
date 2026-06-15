@@ -78,8 +78,9 @@ def fetch_paths_list(token):
 
 
 def fetch_path_count(token, path_id):
-    """Fetch total hit count for a specific path."""
-    url = f'{API_BASE}/stats/total?filter_path={path_id}'
+    """Fetch total hit count for a specific path by ID."""
+    # GoatCounter stats/hits returns daily breakdown for a path
+    url = f'{API_BASE}/stats/hits/{path_id}?limit=0'
     req = Request(url)
     req.add_header('Authorization', f'Bearer {token}')
     req.add_header('Content-Type', 'application/json')
@@ -87,9 +88,41 @@ def fetch_path_count(token, path_id):
     try:
         with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
-            return data.get('total', {}).get('total', 0)
-    except (HTTPError, URLError):
+            # Sum all daily counts
+            total = data.get('total', 0)
+            if total:
+                return total
+            # Fallback: sum the stats array
+            stats = data.get('stats', [])
+            return sum(day.get('daily', 0) for day in stats)
+    except (HTTPError, URLError) as e:
+        # Try alternative: use count from path listing
         return 0
+
+
+def fetch_all_path_counts(token, path_ids):
+    """Fetch counts for multiple paths using stats/total endpoint."""
+    # Try the stats/total endpoint with path filter
+    counts = {}
+    for pid in path_ids:
+        url = f'{API_BASE}/stats/total?filter={pid}'
+        req = Request(url)
+        req.add_header('Authorization', f'Bearer {token}')
+        req.add_header('Content-Type', 'application/json')
+
+        try:
+            with urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode())
+                # Try different response formats
+                total = 0
+                if isinstance(data, dict):
+                    total = data.get('total', 0)
+                    if isinstance(total, dict):
+                        total = total.get('total', 0) or total.get('count', 0)
+                counts[pid] = total
+        except (HTTPError, URLError):
+            counts[pid] = 0
+    return counts
 
 
 def compute_ratings(paths, token):
@@ -107,21 +140,36 @@ def compute_ratings(paths, token):
         parts = normalized.split('/')
         # Expected: ['rate', 'app_name', 'stars']
         if len(parts) != 3:
+            print(f'  Skipping path with wrong parts count: {path} -> {parts}')
             continue
 
         app_name = parts[1]
         try:
             stars = int(parts[2])
         except ValueError:
+            print(f'  Skipping non-integer stars: {path}')
             continue
 
         if stars < 1 or stars > 5:
             continue
 
-        # Get hit count for this path (= number of times this rating was given)
+        # Get hit count - try 'total' field first, then API calls
         count = path_info.get('total', 0)
-        if count == 0:
-            count = fetch_path_count(token, path_info.get('id', 0))
+        if not count:
+            count = path_info.get('count', 0)
+        if not count:
+            count = path_info.get('title_count', 0)
+        if not count:
+            # Use the path ID to fetch count from stats endpoint
+            pid = path_info.get('id', 0)
+            if pid:
+                count = fetch_path_count(token, pid)
+                print(f'  Fetched count for {path} (id={pid}): {count}')
+
+        # If we still can't get a count, assume 1 (path exists = at least 1 hit)
+        if not count:
+            count = 1
+            print(f'  Defaulting to count=1 for {path}')
 
         if count > 0:
             app_votes[app_name].append((stars, count))
@@ -160,6 +208,10 @@ def main():
 
     rate_paths = [p for p in paths if '/rate/' in p.get('path', '') or p.get('path', '').startswith('rate/')]
     print(f'Found {len(rate_paths)} rating paths out of {len(paths)} total')
+    if rate_paths:
+        # Debug: show the first few rating paths with all their fields
+        for rp in rate_paths[:3]:
+            print(f'  Path data: {json.dumps(rp, indent=None)}')
     if not rate_paths and paths:
         # Debug: show what paths exist so we can diagnose
         sample = [p.get('path', '') for p in paths[:20]]
