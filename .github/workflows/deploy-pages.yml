@@ -24,6 +24,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Fetch community ratings
+        env:
+          GOATCOUNTER_TOKEN: ${{ secrets.GOATCOUNTER_TOKEN }}
+        run: python3 docs/fetch_ratings.py
+
       - name: Generate catalog
         run: python3 docs/generate_catalog.py
 

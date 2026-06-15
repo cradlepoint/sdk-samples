@@ -7,3 +7,4 @@ __pycache__/
 built_apps/
 METADATA/
 .vscode/
+docs/ratings.json

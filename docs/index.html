@@ -578,10 +578,26 @@ function clearAllFilters() {
   renderGrid();
 }
 
-function getAppRating(name) { return ratings[name] || 0; }
+function getAppRating(name) {
+  if (ratings[name]) return ratings[name];
+  // Fallback to community rating from catalog
+  const app = catalog && catalog.apps.find(a => a.name === name);
+  if (app && app.community_rating > 0) return Math.round(app.community_rating);
+  return 0;
+}
+function getAppRatingDetails(name) {
+  // Returns {rating, isLocal, community_avg, community_votes}
+  const app = catalog && catalog.apps.find(a => a.name === name);
+  const community = app ? { avg: app.community_rating || 0, votes: app.community_votes || 0 } : { avg: 0, votes: 0 };
+  if (ratings[name]) return { rating: ratings[name], isLocal: true, ...community };
+  if (community.avg > 0) return { rating: Math.round(community.avg), isLocal: false, ...community };
+  return { rating: 0, isLocal: false, ...community };
+}
 function setAppRating(name, stars) {
   ratings[name] = stars;
   localStorage.setItem('appRatings', JSON.stringify(ratings));
+  // Track rating event with GoatCounter for cross-user analytics
+  if (window.goatcounter) window.goatcounter.count({ path: '/rate/' + name + '/' + stars, event: true });
 }
 
 const TAG_ACRONYMS = new Set(['gps','api','ftp','mqtt','qos','tls','usb','dns','http','vpn','wan','cli','obd2','gpio','ip','gnss','mac']);
@@ -671,7 +687,8 @@ function openAppDetail(appName) {
   const app = catalog.apps.find(a => a.name === appName);
   if (!app) return;
 
-  const rating = getAppRating(app.name);
+  const ratingDetails = getAppRatingDetails(app.name);
+  const rating = ratingDetails.rating;
   const modal = document.getElementById('modalContent');
   const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
 
@@ -681,6 +698,10 @@ function openAppDetail(appName) {
     const tn = formatTagName(t);
     return `<img src="https://img.shields.io/badge/-${encodeURIComponent(tn).replace(/-/g,'--')}-${tc}" alt="${t}" style="height:18px;vertical-align:middle;margin-right:4px;">`;
   }).join('');
+
+  const ratingHint = ratingDetails.votes > 0
+    ? `<span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.5rem;">${ratingDetails.avg.toFixed(1)}★ avg · ${ratingDetails.votes} vote${ratingDetails.votes === 1 ? '' : 's'}</span>`
+    : '';
 
   modal.innerHTML = `
     <button class="modal-close" id="closeModal">&times;</button>
@@ -692,6 +713,7 @@ function openAppDetail(appName) {
       <span class="stars" id="ratingStars" style="margin-left:0.5rem;">
         ${[1,2,3,4,5].map(i => `<span class="star ${i <= rating ? 'filled' : ''}" data-star="${i}" style="font-size:1.2rem;cursor:pointer;">&#9733;</span>`).join('')}
       </span>
+      ${ratingHint}
     </div>
     <p style="color:var(--text-secondary);margin-bottom:0.75rem;">${app.notes}</p>
     <div class="modal-meta">

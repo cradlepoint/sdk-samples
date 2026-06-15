@@ -100,6 +100,18 @@ def scan_apps(base_dir, archived=False):
     return apps
 
 
+def load_community_ratings():
+    """Load community ratings from ratings.json if it exists."""
+    ratings_path = Path(__file__).parent / 'ratings.json'
+    if ratings_path.exists():
+        try:
+            with open(ratings_path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
 def main():
     catalog = []
 
@@ -116,6 +128,13 @@ def main():
         all_tags.update(app['tags_list'])
     tags = sorted(all_tags)
 
+    # Merge community ratings
+    ratings = load_community_ratings()
+    for app in catalog:
+        rating_data = ratings.get(app['name'], {})
+        app['community_rating'] = rating_data.get('average', 0)
+        app['community_votes'] = rating_data.get('count', 0)
+
     output = {
         'tags': tags,
         'apps': catalog,
@@ -126,7 +145,9 @@ def main():
     with open(out_path, 'w') as f:
         json.dump(output, f, indent=2)
 
-    print(f"Generated catalog.json with {len(catalog)} apps and {len(tags)} unique tags")
+    rated_count = sum(1 for a in catalog if a['community_rating'] > 0)
+    print(f"Generated catalog.json with {len(catalog)} apps, {len(tags)} unique tags, "
+          f"{rated_count} community-rated")
 
 
 if __name__ == '__main__':
