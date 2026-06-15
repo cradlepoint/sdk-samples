@@ -159,11 +159,15 @@ jobs:
         with:
            github-token: ${{ github.token }}
            script: |
-             await github.rest.git.deleteRef({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               ref: "tags/built_apps"
-             })
+             try {
+               await github.rest.git.deleteRef({
+                 owner: context.repo.owner,
+                 repo: context.repo.repo,
+                 ref: "tags/built_apps"
+               })
+             } catch (e) {
+               // Tag doesn't exist yet — that's fine
+             }
              await github.rest.git.createRef({
                owner: context.repo.owner,
                repo: context.repo.repo,
