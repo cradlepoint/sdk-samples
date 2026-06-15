@@ -258,12 +258,10 @@ a:hover { color: var(--accent-hover); }
   max-height: 90vh;
   overflow: auto;
   padding: 2rem;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.modal::-webkit-scrollbar { width: 6px; }
-.modal::-webkit-scrollbar-track { background: transparent; }
-.modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.modal::-webkit-scrollbar { display: none; }
 .modal-close {
   float: right;
   background: none;
