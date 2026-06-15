@@ -663,9 +663,10 @@ function renderGrid() {
     const initials = app.name.substring(0, 2).toUpperCase();
     const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
     const rating = getAppRating(app.name);
+    const badgePillText = app.developer_label === 'Partners' ? 'Partner' : app.developer_label;
     const vendorLine = app.developer_label === 'Ericsson'
-      ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
-      : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
+      ? `<span class="badge ${badgeClass}">${badgePillText}</span>`
+      : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${badgePillText}</span>`;
     const tagColors = {connectivity:'2563eb',monitoring:'7c3aed',networking:'16a34a',integrations:'dc2626',gpio:'ea580c',vehicle:'4f46e5',security:'be123c',web:'0891b2',tools:'6b7280',examples:'ca8a04',speedtest:'0d9488',mqtt:'e11d48',qos:'65a30d',alerting:'f97316',gps:'9333ea',ftp:'78716c',splunk:'e63946',azure:'0284c7',tls:'115e59',cellular:'c026d3',vpn:'15803d',wan:'2dd4bf',dns:'b45309',usb:'a855f7',modem:'eab308',failover:'f472b6',http:'6366f1',hotspot:'ec4899',clients:'22c55e',system:'64748b',power:'facc15',signal:'fb923c',logging:'a78bfa',automation:'06b6d4',firewall:'ef4444',geofence:'4ade80',gnss:'c084fc',obd2:'d97706',time:'94a3b8',hardware:'f59e0b',provisioning:'3b82f6',proxy:'8b5cf6',encryption:'0e7490',dashboard:'38bdf8',terminal:'475569',example:'a16207','site-survey':'34d399','ip-verify':'fca5a5','mac-filter':'9ca3af','packet-capture':'d946ef',installer:'84cc16',wifi:'14b8a6'};
     const allTagBadges = app.tags_list.map(t => {
       const tc = tagColors[t] || '8b949e';
@@ -717,7 +718,7 @@ function openAppDetail(appName) {
       <h2 style="margin:0;">${app.name}</h2>
       ${app.developer_label === 'Ericsson'
         ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
-        : `<span style="color:var(--text-muted)">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`}
+        : `<span style="color:var(--text-muted)">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label === 'Partners' ? 'Partner' : app.developer_label}</span>`}
       <span class="stars" id="ratingStars" style="margin-left:0.5rem;">
         ${[1,2,3,4,5].map(i => `<span class="star ${i <= rating ? 'filled' : ''}" data-star="${i}" style="font-size:1.2rem;cursor:pointer;">&#9733;</span>`).join('')}
       </span>
