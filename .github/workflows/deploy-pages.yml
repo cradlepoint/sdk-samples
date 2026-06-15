@@ -27,11 +27,19 @@ jobs:
       - name: Generate catalog
         run: python3 docs/generate_catalog.py
 
+      - name: Build all apps
+        run: |
+          mkdir -p built_apps
+          python3 make.py build all
+          find . -maxdepth 1 -name '*.tar.gz' -exec mv {} built_apps/ \;
+          python3 make.py clean all
+
       - name: Prepare pages content
         run: |
-          mkdir -p _site
+          mkdir -p _site/apps
           cp docs/index.html _site/
           cp docs/catalog.json _site/
+          cp built_apps/*.tar.gz _site/apps/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -8,9 +8,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APPS_DIR = REPO_ROOT / 'apps'
 
-# GitHub release base URL for downloads
-GITHUB_REPO = 'cradlepoint/sdk-samples'
-RELEASE_BASE = f'https://github.com/{GITHUB_REPO}/releases/download/built_apps'
+# Download URLs - same-origin Pages path (avoids CORS)
+DOWNLOAD_BASE = 'apps'
 
 
 def parse_package_ini(ini_path):
@@ -49,9 +48,9 @@ def parse_package_ini(ini_path):
         else:
             app['developer_label'] = 'Community'
 
-        # Download URL
+        # Download URL (same-origin, served from Pages)
         filename = f"{section}.v{app['version']}.tar.gz"
-        app['download_url'] = f"{RELEASE_BASE}/{filename}"
+        app['download_url'] = f"{DOWNLOAD_BASE}/{filename}"
         app['download_filename'] = filename
 
         return app

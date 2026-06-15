@@ -418,6 +418,8 @@ a:hover { color: var(--accent-hover); }
     <input type="text" id="searchInput" placeholder="Find an app...">
   </div>
   <span class="result-count" id="resultCount"></span>
+  <button id="helpBtn" title="Help" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:1rem;font-weight:700;width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color 0.15s,border-color 0.15s;">?</button>
+  <button id="gearBtn" title="NCM API Settings" style="background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:1rem;width:28px;height:28px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color 0.15s,border-color 0.15s;margin-left:0.5rem;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </div>
 
 <div class="container">
@@ -456,6 +458,86 @@ a:hover { color: var(--accent-hover); }
     <div class="confirm-buttons">
       <button class="btn-cancel" id="confirmCancel">Cancel</button>
       <button class="btn-confirm" id="confirmDownload">I Agree &mdash; Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- NCM API Settings Modal -->
+<div class="modal-overlay" id="ncmSettingsOverlay">
+  <div class="modal" style="max-width:450px;">
+    <button class="modal-close" id="ncmSettingsClose">&times;</button>
+    <h2 style="margin-bottom:0.5rem;">NCM API Keys</h2>
+    <p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:1rem;">Keys are stored in your browser only (cookie). Never sent to any server other than NCM.<br>Generate keys in NCM: <strong>Tools</strong> &rarr; <strong>NetCloud API</strong> tab &rarr; <strong>+ Add</strong>.</p>
+    <div style="margin-bottom:1rem;">
+      <label style="display:block;font-size:0.7rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.25rem;">X-ECM-API-ID</label>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="password" id="ncmApiId" placeholder="Enter API ID" autocomplete="off" style="flex:1;padding:0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-family:monospace;font-size:0.85rem;">
+        <button id="toggleApiId" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;">&#128065;</button>
+      </div>
+    </div>
+    <div style="margin-bottom:1rem;">
+      <label style="display:block;font-size:0.7rem;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.25rem;">X-ECM-API-KEY</label>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="password" id="ncmApiKey" placeholder="Enter API Key" autocomplete="off" style="flex:1;padding:0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-family:monospace;font-size:0.85rem;">
+        <button id="toggleApiKey" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;">&#128065;</button>
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--text-secondary);margin:1rem 0;">
+      <input type="checkbox" id="ncmSaveCookie" style="accent-color:var(--accent);"> Save keys in cookie for next visit
+    </label>
+    <div style="display:flex;gap:1rem;justify-content:flex-end;margin-top:1.5rem;">
+      <button id="ncmClearKeys" class="btn-cancel" style="color:var(--danger);border-color:var(--danger);">Clear</button>
+      <button id="ncmSaveKeys" class="btn-confirm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal-overlay" id="helpOverlay">
+  <div class="modal" id="helpModal" style="max-width:650px;">
+    <button class="modal-close" id="helpClose">&times;</button>
+    <h2 style="margin-bottom:1rem;">Help</h2>
+    <div class="modal-readme" style="max-height:none;overflow:visible;">
+      <h3>Using the App Store</h3>
+      <ul>
+        <li><strong>Search</strong> — type in the search bar to filter by app name, description, or tags</li>
+        <li><strong>Filter by tags</strong> — check tags in the left sidebar to narrow results</li>
+        <li><strong>Filter by developer</strong> — check Ericsson, Partners, or Community</li>
+        <li><strong>Rate apps</strong> — click the stars in the app detail view (saved in your browser)</li>
+        <li><strong>Download</strong> — click an app card, then click the Download button</li>
+      </ul>
+      <h3 style="margin-top:1.5rem;">Deploying to NetCloud Manager</h3>
+      <p>After downloading an app package (.tar.gz), follow these steps to deploy it to your fleet:</p>
+      <ol style="padding-left:1.5rem;">
+        <li><strong>Log in to NetCloud Manager</strong><br><a href="https://www.cradlepointecm.com/" target="_blank">https://www.cradlepointecm.com/</a></li>
+        <li style="margin-top:0.75rem;"><strong>Enable NCOS SDK</strong> (account-wide, one-time)
+          <ul>
+            <li>In the left sidebar, click <strong>Tools</strong></li>
+            <li>Click the <strong>SDK</strong> tab</li>
+            <li>On the Available Applications sub-tab, toggle <strong>Enable NCOS SDK</strong> to On</li>
+            <li>Acknowledge the security warning banner</li>
+          </ul>
+        </li>
+        <li style="margin-top:0.75rem;"><strong>Upload an SDK Application</strong>
+          <ul>
+            <li>Stay on Tools &rarr; SDK &rarr; Available Applications</li>
+            <li>Click <strong>+ Add SDK Application</strong> in the toolbar</li>
+            <li>Upload your downloaded .tar.gz package</li>
+            <li>The app will appear in the table with Status = "Ready"</li>
+          </ul>
+        </li>
+        <li style="margin-top:0.75rem;"><strong>Assign the SDK App to a Group</strong>
+          <ul>
+            <li>In the left sidebar, click <strong>Groups</strong></li>
+            <li>Click the target group name to open the group view</li>
+            <li>Click the <strong>Extensibility</strong> tab</li>
+            <li>Click the <strong>SDK</strong> sub-tab</li>
+            <li>Click <strong>+ Assign SDK</strong> in the toolbar</li>
+            <li>Select the uploaded app and confirm</li>
+          </ul>
+        </li>
+      </ol>
+      <p style="margin-top:1rem;color:var(--text-muted);font-size:0.8rem;">The app will automatically deploy to all routers in the assigned group.</p>
     </div>
   </div>
 </div>
@@ -653,7 +735,9 @@ function openAppDetail(appName) {
     </div>
     <div style="display:flex;align-items:center;gap:1rem;margin:1rem 0;flex-wrap:wrap;">
       <button class="btn-download" data-url="${app.download_url}">Download ${app.download_filename}</button>
+      <button class="btn-download" style="background:var(--success);" data-url="${app.download_url}" data-filename="${app.download_filename}" id="ncmUploadBtn">Add to NetCloud Manager</button>
     </div>
+    <div id="ncmStatus" style="font-size:0.8rem;margin-bottom:0.75rem;"></div>
     ${app.readme ? `<div class="modal-readme">${renderMarkdown(app.readme)}</div>` : ''}
   `;
 
@@ -670,6 +754,9 @@ function openAppDetail(appName) {
   modal.querySelector('.btn-download').addEventListener('click', (e) => {
     pendingDownloadUrl = e.target.dataset.url;
     document.getElementById('confirmOverlay').classList.add('active');
+  });
+  document.getElementById('ncmUploadBtn').addEventListener('click', (e) => {
+    addToNcm(e.target.dataset.url, e.target.dataset.filename);
   });
 
   document.getElementById('modalOverlay').classList.add('active');
@@ -710,7 +797,136 @@ document.getElementById('confirmDownload').addEventListener('click', () => {
   pendingDownloadUrl = null;
 });
 
+// NCM API key management
+let ncmKeys = { apiId: '', apiKey: '' };
+
+function loadNcmKeys() {
+  const raw = document.cookie.match(/(^| )ncm_keys=([^;]+)/);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(atob(raw[2]));
+      ncmKeys.apiId = parsed.apiId || '';
+      ncmKeys.apiKey = parsed.apiKey || '';
+    } catch (e) {}
+  }
+  updateGearState();
+}
+
+function updateGearState() {
+  const btn = document.getElementById('gearBtn');
+  btn.style.color = (ncmKeys.apiId && ncmKeys.apiKey) ? 'var(--success)' : 'var(--text-secondary)';
+}
+
+function openNcmSettings() {
+  document.getElementById('ncmApiId').value = ncmKeys.apiId;
+  document.getElementById('ncmApiKey').value = ncmKeys.apiKey;
+  document.getElementById('ncmSaveCookie').checked = !!document.cookie.match(/ncm_keys=/);
+  document.getElementById('ncmSettingsOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeNcmSettings() {
+  document.getElementById('ncmSettingsOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+async function addToNcm(downloadUrl, filename) {
+  if (!ncmKeys.apiId || !ncmKeys.apiKey) {
+    if (confirm('NCM API keys are not configured. Would you like to enter them now?')) {
+      openNcmSettings();
+    }
+    return;
+  }
+
+  if (!confirm(`Upload "${filename}" to NetCloud Manager?`)) return;
+
+  const statusEl = document.getElementById('ncmStatus');
+  statusEl.style.color = 'var(--accent)';
+  statusEl.textContent = 'Downloading package...';
+
+  try {
+    const fileResp = await fetch(downloadUrl);
+    if (!fileResp.ok) throw new Error(`Download failed: ${fileResp.status}`);
+    const fileBlob = await fileResp.blob();
+
+    statusEl.textContent = 'Uploading to NetCloud Manager...';
+
+    const formData = new FormData();
+    formData.append('archive', fileBlob, filename);
+
+    const ncmResp = await fetch('https://www.us0.cradlepointecm.com/api/v1/device_app_versions/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `SecurityToken ${ncmKeys.apiId}:${ncmKeys.apiKey}`,
+        'Accept': 'application/vnd.api+json'
+      },
+      body: formData
+    });
+
+    if (ncmResp.ok) {
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent = 'Successfully uploaded to NetCloud Manager.';
+    } else {
+      const errText = await ncmResp.text();
+      throw new Error(`NCM returned ${ncmResp.status}: ${errText.substring(0, 200)}`);
+    }
+  } catch (err) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = `Error: ${err.message}`;
+  }
+}
+
+// NCM settings events
+document.getElementById('gearBtn').addEventListener('click', openNcmSettings);
+document.getElementById('ncmSettingsClose').addEventListener('click', closeNcmSettings);
+document.getElementById('ncmSettingsOverlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeNcmSettings();
+});
+document.getElementById('ncmSaveKeys').addEventListener('click', () => {
+  ncmKeys.apiId = document.getElementById('ncmApiId').value.trim();
+  ncmKeys.apiKey = document.getElementById('ncmApiKey').value.trim();
+  if (document.getElementById('ncmSaveCookie').checked) {
+    document.cookie = `ncm_keys=${btoa(JSON.stringify(ncmKeys))}; max-age=${90*86400}; path=/; SameSite=Strict; Secure`;
+  } else {
+    document.cookie = 'ncm_keys=; max-age=0; path=/; SameSite=Strict; Secure';
+  }
+  updateGearState();
+  closeNcmSettings();
+});
+document.getElementById('ncmClearKeys').addEventListener('click', () => {
+  ncmKeys = { apiId: '', apiKey: '' };
+  document.getElementById('ncmApiId').value = '';
+  document.getElementById('ncmApiKey').value = '';
+  document.cookie = 'ncm_keys=; max-age=0; path=/; SameSite=Strict; Secure';
+  updateGearState();
+});
+document.getElementById('toggleApiId').addEventListener('click', () => {
+  const el = document.getElementById('ncmApiId');
+  el.type = el.type === 'password' ? 'text' : 'password';
+});
+document.getElementById('toggleApiKey').addEventListener('click', () => {
+  const el = document.getElementById('ncmApiKey');
+  el.type = el.type === 'password' ? 'text' : 'password';
+});
+
+// Help modal
+document.getElementById('helpBtn').addEventListener('click', () => {
+  document.getElementById('helpOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+});
+document.getElementById('helpClose').addEventListener('click', () => {
+  document.getElementById('helpOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+});
+document.getElementById('helpOverlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('helpOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+  }
+});
+
 // Init
+loadNcmKeys();
 loadCatalog();
 </script>
 </body>

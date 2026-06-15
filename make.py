@@ -1060,7 +1060,7 @@ def init(app=None):
     # Initialize the globals based on the sdk_settings.ini contents.
     if sdk_key in config:
         if app is not None:
-            g_app_name = app
+            g_app_name = os.path.basename(app.rstrip('/'))
         elif app_key in config[sdk_key]:
             g_app_name = config[sdk_key][app_key]
         else:
