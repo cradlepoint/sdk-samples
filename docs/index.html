@@ -579,19 +579,14 @@ function clearAllFilters() {
 }
 
 function getAppRating(name) {
-  if (ratings[name]) return ratings[name];
-  // Fallback to community rating from catalog
-  const app = catalog && catalog.apps.find(a => a.name === name);
-  if (app && app.community_rating > 0) return Math.round(app.community_rating);
-  return 0;
+  // Stars reflect the user's personal rating only
+  return ratings[name] || 0;
 }
 function getAppRatingDetails(name) {
-  // Returns {rating, isLocal, community_avg, community_votes}
   const app = catalog && catalog.apps.find(a => a.name === name);
-  const community = app ? { avg: app.community_rating || 0, votes: app.community_votes || 0 } : { avg: 0, votes: 0 };
-  if (ratings[name]) return { rating: ratings[name], isLocal: true, ...community };
-  if (community.avg > 0) return { rating: Math.round(community.avg), isLocal: false, ...community };
-  return { rating: 0, isLocal: false, ...community };
+  const communityAvg = app ? (app.community_rating || 0) : 0;
+  const communityVotes = app ? (app.community_votes || 0) : 0;
+  return { rating: ratings[name] || 0, avg: communityAvg, votes: communityVotes };
 }
 function setAppRating(name, stars) {
   ratings[name] = stars;
