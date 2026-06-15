@@ -529,7 +529,7 @@ while True:
 python3 make.py create my_app
 ```
 
-This generates all required files from the `apps/templates/app_template` directory into the repo root. After creation, edit only `my_app.py` and `readme.md` — do not modify `package.ini`, `start.sh`, or `cp.py`. When the app is ready, move it to a category: `mv my_app apps/{category}/`.
+This generates all required files from the `apps/templates/app_template` directory into the repo root. After creation, edit only `my_app.py` and `readme.md` — do not modify `package.ini`, `start.sh`, or `cp.py`. When the app is ready, move it to apps: `mv my_app apps/`.
 
 ### SDK Settings
 

@@ -10,7 +10,7 @@
   - Control API (actions): reboot, ping, GPIO, speedtest
 
 ## Quick Links
-- Project guidelines: `../.amazonq/rules/project-guidelines.md`
-- App template: `../app_template/`
+- Steering rules: `../.kiro/steering/`
+- App template: `../apps/templates/app_template/`
 - Build tool: `../make.py`
 - Deploy command: `python3 ../make.py deploy <app_name>`
