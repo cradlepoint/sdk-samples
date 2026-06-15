@@ -674,7 +674,8 @@ function buildSidebar() {
   });
   html += '</div>';
 
-  html += '<div class="tags-scroll"><div class="filter-section"><h3>Tags</h3>';
+  html += '<h3 style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:0.5rem;">Tags</h3>';
+  html += '<div class="tags-scroll"><div class="filter-section" style="margin-bottom:0;">';
   tags.forEach(t => {
     const label = formatTagName(t);
     html += `<label><input type="checkbox" data-filter="tag" value="${t}"> ${label}</label>`;
