@@ -667,7 +667,7 @@ function buildSidebar() {
 
   html += '<div class="filter-section"><h3>Tags</h3>';
   tags.forEach(t => {
-    const label = t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const label = formatTagName(t);
     html += `<label><input type="checkbox" data-filter="tag" value="${t}"> ${label}</label>`;
   });
   html += '</div>';
@@ -709,10 +709,9 @@ function setAppRating(name, stars) {
   localStorage.setItem('appRatings', JSON.stringify(ratings));
 }
 
-const TAG_ACRONYMS = new Set(['gps','api','ftp','mqtt','qos','tls','usb','dns','http','vpn','wan','cli','obd2','gpio','ip']);
+const TAG_ACRONYMS = new Set(['gps','api','ftp','mqtt','qos','tls','usb','dns','http','vpn','wan','cli','obd2','gpio','ip','gnss','mac']);
 function formatTagName(t) {
-  if (TAG_ACRONYMS.has(t)) return t.toUpperCase();
-  return t.charAt(0).toUpperCase() + t.slice(1);
+  return t.split('-').map(w => TAG_ACRONYMS.has(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function renderStars(rating) {
@@ -762,7 +761,7 @@ function renderGrid() {
     const vendorLine = app.developer_label === 'Ericsson'
       ? `<span class="badge ${badgeClass}">${app.developer_label}</span>`
       : `<span class="app-card-vendor">${app.vendor}</span> <span class="badge ${badgeClass}">${app.developer_label}</span>`;
-    const tagColors = {connectivity:'0969da',monitoring:'8250df',networking:'1a7f37',integrations:'cf222e',gpio:'bc4c00',vehicle:'5e4db2',security:'d1242f',web:'0550ae',tools:'57606a',examples:'bf8700',speedtest:'1f6feb',mqtt:'da3633',qos:'2da44e',alerting:'e16f24',gps:'6639ba',ftp:'6e7781',splunk:'f85149',azure:'0078d4',tls:'1b7c83',cellular:'7c3aed',vpn:'0e8a16',wan:'1d76db',dns:'c4432b',usb:'6f42c1',modem:'d4a72c',failover:'fb8f44',http:'2f81f7',hotspot:'e85aad',clients:'3fb950',system:'768390',power:'ffc107',signal:'ff7b72',logging:'a371f7',automation:'54aeff',firewall:'f47067',geofence:'56d364',gnss:'d2a8ff',obd2:'f0883e',time:'8b949e',hardware:'fb8f44',provisioning:'388bfd',proxy:'a475f9',encryption:'1f6feb',dashboard:'79c0ff',terminal:'8b949e',example:'d4a72c','site-survey':'39d353','ip-verify':'ff7b72','mac-filter':'656d76','packet-capture':'bc8cff',installer:'e3b341',wifi:'36bf5c'};
+    const tagColors = {connectivity:'2563eb',monitoring:'7c3aed',networking:'16a34a',integrations:'dc2626',gpio:'ea580c',vehicle:'4f46e5',security:'be123c',web:'0891b2',tools:'6b7280',examples:'ca8a04',speedtest:'0d9488',mqtt:'e11d48',qos:'65a30d',alerting:'f97316',gps:'9333ea',ftp:'78716c',splunk:'e63946',azure:'0284c7',tls:'115e59',cellular:'c026d3',vpn:'15803d',wan:'2dd4bf',dns:'b45309',usb:'a855f7',modem:'eab308',failover:'f472b6',http:'6366f1',hotspot:'ec4899',clients:'22c55e',system:'64748b',power:'facc15',signal:'fb923c',logging:'a78bfa',automation:'06b6d4',firewall:'ef4444',geofence:'4ade80',gnss:'c084fc',obd2:'d97706',time:'94a3b8',hardware:'f59e0b',provisioning:'3b82f6',proxy:'8b5cf6',encryption:'0e7490',dashboard:'38bdf8',terminal:'475569',example:'a16207','site-survey':'34d399','ip-verify':'fca5a5','mac-filter':'9ca3af','packet-capture':'d946ef',installer:'84cc16',wifi:'14b8a6'};
     const allTagBadges = app.tags_list.map(t => {
       const tc = tagColors[t] || '8b949e';
       const tn = formatTagName(t);
@@ -800,7 +799,7 @@ function openAppDetail(appName) {
   const modal = document.getElementById('modalContent');
   const badgeClass = `badge-${app.developer_label.toLowerCase()}`;
 
-  const tagColors = {connectivity:'0969da',monitoring:'8250df',networking:'1a7f37',integrations:'cf222e',gpio:'bc4c00',vehicle:'5e4db2',security:'d1242f',web:'0550ae',tools:'57606a',examples:'bf8700',speedtest:'1f6feb',mqtt:'da3633',qos:'2da44e',alerting:'e16f24',gps:'6639ba',ftp:'6e7781',splunk:'f85149',azure:'0078d4',tls:'1b7c83',cellular:'7c3aed',vpn:'0e8a16',wan:'1d76db',dns:'c4432b',usb:'6f42c1',modem:'d4a72c',failover:'fb8f44',http:'2f81f7',hotspot:'e85aad',clients:'3fb950',system:'768390',power:'ffc107',signal:'ff7b72',logging:'a371f7',automation:'54aeff',firewall:'f47067',geofence:'56d364',gnss:'d2a8ff',obd2:'f0883e',time:'8b949e',hardware:'fb8f44',provisioning:'388bfd',proxy:'a475f9',encryption:'1f6feb',dashboard:'79c0ff',terminal:'8b949e',example:'d4a72c','site-survey':'39d353','ip-verify':'ff7b72','mac-filter':'656d76','packet-capture':'bc8cff',installer:'e3b341',wifi:'36bf5c'};
+  const tagColors = {connectivity:'2563eb',monitoring:'7c3aed',networking:'16a34a',integrations:'dc2626',gpio:'ea580c',vehicle:'4f46e5',security:'be123c',web:'0891b2',tools:'6b7280',examples:'ca8a04',speedtest:'0d9488',mqtt:'e11d48',qos:'65a30d',alerting:'f97316',gps:'9333ea',ftp:'78716c',splunk:'e63946',azure:'0284c7',tls:'115e59',cellular:'c026d3',vpn:'15803d',wan:'2dd4bf',dns:'b45309',usb:'a855f7',modem:'eab308',failover:'f472b6',http:'6366f1',hotspot:'ec4899',clients:'22c55e',system:'64748b',power:'facc15',signal:'fb923c',logging:'a78bfa',automation:'06b6d4',firewall:'ef4444',geofence:'4ade80',gnss:'c084fc',obd2:'d97706',time:'94a3b8',hardware:'f59e0b',provisioning:'3b82f6',proxy:'8b5cf6',encryption:'0e7490',dashboard:'38bdf8',terminal:'475569',example:'a16207','site-survey':'34d399','ip-verify':'fca5a5','mac-filter':'9ca3af','packet-capture':'d946ef',installer:'84cc16',wifi:'14b8a6'};
   const allTagBadges = app.tags_list.map(t => {
     const tc = tagColors[t] || '8b949e';
     const tn = formatTagName(t);
