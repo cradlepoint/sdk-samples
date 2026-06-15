@@ -49,7 +49,7 @@ def parse_package_ini(ini_path):
             app['developer_label'] = 'Community'
 
         # Download URL (same-origin, served from Pages)
-        filename = f"{section}.v{app['version']}.tar.gz"
+        filename = f"{section} v{app['version']}.tar.gz"
         app['download_url'] = f"{DOWNLOAD_BASE}/{filename}"
         app['download_filename'] = filename
 

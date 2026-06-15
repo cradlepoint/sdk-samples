@@ -847,17 +847,59 @@ async function addToNcm(downloadUrl, filename) {
     return;
   }
 
-  const result = await Swal.fire({
-    title: 'Upload to NetCloud Manager?',
-    text: `Upload "${filename}" to your NCM account.`,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Upload',
-    cancelButtonText: 'Cancel',
-    background: '#16213e',
-    color: '#e2e8f0'
-  });
-  if (!result.isConfirmed) return;
+  // Extract app name and version from filename (e.g. "speed_limit v1.0.0.tar.gz")
+  const match = filename.match(/^(.+)\sv(\d+\.\d+\.\d+)\.tar\.gz$/);
+  const appName = match ? match[1] : filename;
+  const appVersion = match ? match[2] : '';
+
+  // Check if app already exists in NCM
+  Swal.fire({ title: 'Checking NCM...', text: 'Looking for existing versions', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#16213e', color: '#e2e8f0' });
+
+  let existingApp = null;
+  try {
+    const checkResp = await fetch('https://www.us0.cradlepointecm.com/api/v1/device_app_versions/?expand=app', {
+      headers: {
+        'Authorization': `SecurityToken ${ncmKeys.apiId}:${ncmKeys.apiKey}`,
+        'Accept': 'application/vnd.api+json'
+      }
+    });
+    if (checkResp.ok) {
+      const checkData = await checkResp.json();
+      existingApp = (checkData.data || []).find(v =>
+        v.app && v.app.name === appName && v.version === appVersion
+      );
+    }
+  } catch (e) { /* ignore check errors, proceed with upload */ }
+
+  Swal.close();
+
+  // Show confirmation with duplicate warning if needed
+  let confirmResult;
+  if (existingApp) {
+    confirmResult = await Swal.fire({
+      title: '⚠️ App Already Exists!',
+      html: `<strong>${appName} v${appVersion}</strong> is already in your NCM account (state: ${existingApp.state}).<br><br>Uploading again will create a duplicate entry.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Upload Anyway',
+      confirmButtonColor: '#ef4444',
+      cancelButtonText: 'Cancel',
+      background: '#16213e',
+      color: '#e2e8f0'
+    });
+  } else {
+    confirmResult = await Swal.fire({
+      title: 'Upload to NetCloud Manager?',
+      text: `Upload "${appName} v${appVersion}" to your NCM account.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Upload',
+      cancelButtonText: 'Cancel',
+      background: '#16213e',
+      color: '#e2e8f0'
+    });
+  }
+  if (!confirmResult.isConfirmed) return;
 
   Swal.fire({ title: 'Downloading...', text: 'Fetching app package', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#16213e', color: '#e2e8f0' });
 
@@ -881,7 +923,7 @@ async function addToNcm(downloadUrl, filename) {
     });
 
     if (ncmResp.ok) {
-      Swal.fire({ title: 'Success', text: 'App uploaded to NetCloud Manager.', icon: 'success', background: '#16213e', color: '#e2e8f0' });
+      Swal.fire({ title: 'Success', text: `${appName} v${appVersion} uploaded to NetCloud Manager.`, icon: 'success', background: '#16213e', color: '#e2e8f0' });
     } else {
       const errText = await ncmResp.text();
       throw new Error(`NCM returned ${ncmResp.status}: ${errText.substring(0, 200)}`);
