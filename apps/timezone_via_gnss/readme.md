@@ -1,7 +1,4 @@
 # timezone_via_gnss
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Automatically set device timezone using GNSS and TimezoneDB.
 
 ## Requirements

@@ -1,7 +1,4 @@
 # Packet Capture Web
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Web interface for running and managing packet captures on Cradlepoint routers. Designed for **automated, unattended packet capture** — configure once, enable Auto Start, and the router captures traffic on every boot until disk is full, with NCM alerts when it stops.
 
 ![image](https://github.com/user-attachments/assets/b641c856-4dea-45a4-87ad-cd4a36d62e22)

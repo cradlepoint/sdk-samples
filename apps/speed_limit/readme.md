@@ -1,7 +1,4 @@
 # speed_limit
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Monitors vehicle speed via GPS and sends an alert when a speed limit violation ends, including start/end timestamps, start/end locations, and maximum speed reached.
 
 ## Behavior

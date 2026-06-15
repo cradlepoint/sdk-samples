@@ -95,7 +95,8 @@ a:hover { color: var(--accent-hover); }
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   padding: 1.5rem;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   max-height: calc(100vh - 60px);
   position: sticky;
   top: 60px;
@@ -120,6 +121,16 @@ a:hover { color: var(--accent-hover); }
 }
 .filter-section label:hover { color: var(--text-primary); }
 .filter-section input[type="checkbox"] { accent-color: var(--accent); }
+.tags-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.tags-scroll::-webkit-scrollbar { width: 5px; }
+.tags-scroll::-webkit-scrollbar-track { background: transparent; }
+.tags-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 /* Main content */
 .main { padding: 1.5rem 2rem; overflow-x: hidden; }
@@ -665,12 +676,12 @@ function buildSidebar() {
   });
   html += '</div>';
 
-  html += '<div class="filter-section"><h3>Tags</h3>';
+  html += '<div class="tags-scroll"><div class="filter-section"><h3>Tags</h3>';
   tags.forEach(t => {
     const label = formatTagName(t);
     html += `<label><input type="checkbox" data-filter="tag" value="${t}"> ${label}</label>`;
   });
-  html += '</div>';
+  html += '</div></div>';
 
   html += '<div class="filter-section"><h3>Rating</h3>';
   html += '<label><input type="checkbox" data-filter="rating" value="4"> 4+ stars</label>';

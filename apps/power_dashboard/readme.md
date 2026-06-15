@@ -1,7 +1,4 @@
 # Power Dashboard
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 A comprehensive real-time power usage monitoring application for Cradlepoint routers that tracks current, total energy consumption, and voltage with a professional web interface. Optional power indicator message in asset ID.
 
 ![image](https://github.com/user-attachments/assets/bcf7ae9a-0194-4db1-a7e6-a7e6a54d89d3)
@@ -131,4 +128,3 @@ Example alert messages:
   - 10-minute intervals: 4,320 points for 30 days
 
 **Live Mode**: Live mode data is displayed in real-time but is not saved to files. The regular monitoring thread continues collecting data in the background, so switching back to historical views will show all collected data.
-

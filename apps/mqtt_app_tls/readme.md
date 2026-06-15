@@ -1,7 +1,4 @@
 # mqtt_app_tls  
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 This application demonstrates secure MQTT communication using TLS certificates. It connects to an MQTT broker, subscribes to configured topics, and publishes device data at regular intervals.
 
 ## Features

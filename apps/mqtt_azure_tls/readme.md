@@ -1,7 +1,4 @@
 # mqtt_azure_tls
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Communicates with MS Azure IoT Hub using MQTT directly without the use of the IoT Hub SDK. Developed based on the [MS Azure MQTT support documentation](https://github.com/MicrosoftDocs/azure-docs/blob/master/articles/iot-hub/iot-hub-mqtt-support.md) — refer to section "Using the MQTT protocol directly".
 
 ## Requirements

@@ -1,7 +1,4 @@
 # 5GSpeed
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Runs netperf speedtests and puts results into a configurable field. Designed to enable NCM API support for speedtests.
 
 ## Steps to Use

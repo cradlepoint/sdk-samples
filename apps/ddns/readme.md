@@ -1,7 +1,4 @@
 # ddns
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 This application automatically updates a Dynamic DNS (DDNS) record with the IP address of the specific WAN profile.
 
 ## Required Configuration

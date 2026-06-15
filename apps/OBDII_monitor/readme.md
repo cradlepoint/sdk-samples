@@ -1,7 +1,4 @@
 # OBDII_monitor
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Monitors OBD-II values, puts latest values in asset_id, and alerts on conditions defined in SDK AppData.
 
 ## Requirements

@@ -1,7 +1,4 @@
 # Client Bandwidth Throttle
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Web-based QoS bandwidth limiting for individual LAN clients.
 
 ![image](https://github.com/user-attachments/assets/30798d71-913c-4e68-9ab5-c8203f7e3231)

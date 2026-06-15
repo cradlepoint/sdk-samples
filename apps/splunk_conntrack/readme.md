@@ -1,7 +1,4 @@
 # splunk_conntrack
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Cradlepoint Ericsson -> Splunk Connection Tracking Application
 
 ![image](https://github.com/user-attachments/assets/16a4ba8e-d179-46af-8435-3d34d40a20c5)
@@ -20,8 +17,6 @@ Configure the following parameters under **System > SDK Data**:
 |----------------|-------|
 | `splunk_url`   | `https://your-splunk-instance.splunkcloud.com:8088/services/collector` |
 | `splunk_token` | `your-hec-token-here` |
-
-
 ## Output
 
 Application status and error messages are written to the router logs. Check the router console for startup messages and any configuration or connectivity issues.

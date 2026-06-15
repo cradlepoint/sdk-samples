@@ -1,7 +1,4 @@
 # ping_sample
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Contains a ping function and example usage.
 
 ## API

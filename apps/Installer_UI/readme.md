@@ -1,7 +1,4 @@
 # Installer_UI
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Installer_UI provides a simple web interface for installers to configure WiFi settings and run speedtests on the router.
 
 ![image](https://github.com/user-attachments/assets/a0af6ae2-a9dd-46de-a294-10c8468cec8d)

@@ -1,7 +1,4 @@
 # WAN Dashboard
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 ![image](https://github.com/user-attachments/assets/ca55cbc2-28fd-4851-be8d-5f63eef2d652)
 
 ## Features

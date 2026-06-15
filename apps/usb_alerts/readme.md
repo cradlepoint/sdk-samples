@@ -1,7 +1,4 @@
 # usb_alerts
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Send alerts when USB devices are connected or disconnected.
 
 ![image](https://github.com/user-attachments/assets/96278aa3-8cca-4a02-be92-65e39cdef5b6)

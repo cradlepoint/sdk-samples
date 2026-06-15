@@ -1,7 +1,4 @@
 # NCX Self-Provisioning SDK Application
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 ![NCX Self-Provisioning Header](docs/images/wizard-header.png)
 
 ## Table of Contents

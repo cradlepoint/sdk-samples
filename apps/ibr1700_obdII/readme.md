@@ -1,7 +1,4 @@
 # ibr1700_obdII
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Demonstrates how to use MQTT to subscribe to the OBD-II PIDs. Callback functions will be invoked based on the configured PID update interval.
 
 ## Requirements

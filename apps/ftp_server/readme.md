@@ -1,7 +1,4 @@
 # ftp_server
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Creates an FTP Server on port 2121. You will need to manually open this port in the device firewall to allow external access.
 
 ## Requirements

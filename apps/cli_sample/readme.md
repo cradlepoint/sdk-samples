@@ -1,7 +1,4 @@
 # cli_sample
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Includes a `csterm.py` library that uses csclient control tree access to local CLI to send commands and return output. Example sends "arpdump".
 
 ## Expected Output

@@ -1,7 +1,4 @@
 # ibr1700_gnss
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Demonstrates accessing the gyroscope and accelerometer data in the IBR1700 by reading from the GNSS socket. The app sends the ALL and IMU commands and then logs what it reads from the GNSS socket.
 
 ## Requirements

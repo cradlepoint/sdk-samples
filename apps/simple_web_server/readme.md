@@ -1,7 +1,4 @@
 # simple_web_server
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Demonstrates a very basic web server using the `http` library which is included in NCOS.
 
 ## Setup

@@ -1,7 +1,4 @@
 # GPIO WLAN Control
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Monitors the GPIO connector input and sets `control/wlan/enabled` to match the GPIO value.
 
 The app continuously reads the GPIO connector input and sets WLAN enabled/disabled based on the GPIO value (1 = enabled, 0 = disabled).

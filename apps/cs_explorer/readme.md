@@ -1,7 +1,4 @@
 **CS Explorer** is a powerful web-based interface for exploring and visualizing your Cradlepoint router's configuration store data in real-time. Built as an Ericsson Cradlepoint SDK application, it provides an intuitive file explorer-like interface for browsing router configuration, status, control, and state data.
-
-![CS Explorer Interface](https://img.shields.io/badge/Interface-Web_Based-blue) ![Python](https://img.shields.io/badge/Python-3.x-yellow)
-
 ## ✨ Features
 
 ### 🌐 **Web Interface**

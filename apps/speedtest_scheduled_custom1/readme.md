@@ -1,7 +1,4 @@
 # speedtest_scheduled_custom1
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Runs netperf speedtests on a cron schedule and writes results to the NCM `custom1` field.
 
 ## Appdata Fields

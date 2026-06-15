@@ -1,7 +1,4 @@
 # system_monitor
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Gets various system diagnostics, alerts on thresholds, and puts current status in the asset_id field.
 
 ## What It Monitors

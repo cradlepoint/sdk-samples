@@ -1,7 +1,4 @@
 # Mobile Site Survey v3
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Professional cellular network drive testing application with modern web interface and high-performance speed testing.
 
 Light Side:

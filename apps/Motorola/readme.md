@@ -1,7 +1,4 @@
 # Motorola SmartConnect
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs. A web UI provides configuration.
 
 ## What It Does

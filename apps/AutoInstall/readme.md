@@ -1,7 +1,4 @@
 # AutoInstall
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 AutoInstall automatically tests and prioritizes multiple SIMs based on TCP download speed. The application detects all available SIMs, ensures each has a unique WAN profile, runs netperf speedtests on each SIM, and then prioritizes them by download speed.
 
 ## SDK Appdata Configuration
@@ -21,4 +18,3 @@ AutoInstall runs automatically at boot (if SCHEDULE is 0) or on the configured s
 ## Results
 
 Results are written to the router log, set in the description field (visible in NetCloud Manager), and sent as custom alerts. Results include timestamp, carrier information, band, RSRP, and download/upload speeds for each SIM.
-

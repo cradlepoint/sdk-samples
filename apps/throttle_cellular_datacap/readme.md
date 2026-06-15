@@ -1,7 +1,4 @@
 # throttle_cellular_datacap
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Works in conjunction with Connection Manager Data Usage thresholds configured on Modem profiles (does not pertain to Ethernet or WWAN profiles).
 
 ## Behavior

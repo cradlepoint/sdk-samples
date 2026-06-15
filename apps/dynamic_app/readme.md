@@ -1,7 +1,4 @@
 # Dynamic App
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 This SDK app drives the downloading of an SDK from a specified URL into the app_holder app. This overcomes the size limitation of NCM, as well as makes it easier to build and test SDK apps without having the router in DEV mode.
 
 ## Usage

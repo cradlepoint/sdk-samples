@@ -1,7 +1,4 @@
 # tornado_sample
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Simple framework for starting a Tornado webserver with a GET method. Runs webserver on port 9001.
 
 ## Requirements

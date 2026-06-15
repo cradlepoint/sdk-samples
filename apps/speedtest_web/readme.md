@@ -1,7 +1,4 @@
 # speedtest_web
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Web-based speed test interface with scheduling, history tracking, and report generation.
 
 ## Features

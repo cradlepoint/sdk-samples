@@ -1,7 +1,4 @@
 # IFTTT Rule Engine
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 ![IFTTT Rule Engine Homepage](docs/images/homepage.png)
 *IFTTT Rule Engine homepage with condition type badges and feature highlights*
 

@@ -1,7 +1,4 @@
 # rproxy
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 A reverse proxy similar to port forwarding, except traffic forwarded to a UDP/TCP target will be sourced from the router's IP. This reverse proxy can be dynamically added to clients as they connect.
 
 ## Usage

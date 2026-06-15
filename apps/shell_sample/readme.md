@@ -1,7 +1,4 @@
 # shell_sample
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 Demonstrates how to execute commands at the OS shell: `ls -al`.
 
 ## Expected Output

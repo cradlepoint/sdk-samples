@@ -1,7 +1,4 @@
 # ttyd
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Runs a Linux bash shell in a web browser on port 8022. Think of it as web-SSH for your router — access a full bash terminal from any browser on the LAN without needing an SSH client.
 
 ## How It Works

@@ -1,7 +1,4 @@
 # mqtt_app
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow)
-
 An MQTT App example using the paho library.
 
 Reference: https://www.eclipse.org/paho/clients/python/docs/

@@ -1,7 +1,4 @@
 # System Monitor Web Application
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 A comprehensive real-time system monitoring application for Cradlepoint routers that tracks both memory and CPU usage with customizable alert thresholds and a professional web interface.
 
 ![image](https://github.com/user-attachments/assets/0d27b139-5550-4c57-a204-d65f78327ec3)
@@ -88,4 +85,3 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 - **File Storage**: 30 days (43,200 data points) stored on disk for long-term analysis
 - **Initial Delay**: First 2 measurements discarded for accurate baseline
 - **File Writes**: Data saved to disk every 10 minutes (10 measurements)
-

@@ -1,7 +1,4 @@
 # Network MAC Filter
-
-![Python](https://img.shields.io/badge/Python-3.8-yellow) ![Web App](https://img.shields.io/badge/Interface-Web_App-blue)
-
 Enforces MAC address limits per network using Zone-Based Firewall deny rules. Automatically blocks new devices when limits are reached, with support for whitelisted MAC prefixes and manual blocking.
 
 ![image](https://github.com/user-attachments/assets/05aee15f-524e-4fdd-a74e-1a838f7d344a)
