@@ -63,7 +63,18 @@ def find_readme(app_dir):
         readme_path = app_dir / name
         if readme_path.exists():
             try:
-                return readme_path.read_text(encoding='utf-8', errors='replace')
+                content = readme_path.read_text(encoding='utf-8', errors='replace')
+                # Rewrite relative image paths to raw GitHub URLs
+                rel_path = app_dir.relative_to(REPO_ROOT)
+                raw_base = f'https://raw.githubusercontent.com/phate999/sdk-samples/master/{rel_path}'
+                # Match ![alt](relative_path) but not ![alt](http...)
+                import re
+                content = re.sub(
+                    r'!\[([^\]]*)\]\((?!https?://)([^)]+)\)',
+                    lambda m: f'![{m.group(1)}]({raw_base}/{m.group(2)})',
+                    content
+                )
+                return content
             except Exception:
                 return ''
     return ''
