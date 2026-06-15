@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tcpdumpster</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #fff;
+            --text-color: #000;
+            --text-secondary: #333;
+            --input-bg: #fff;
+            --input-border: #ccc;
+            --display-bg: #fff;
+            --display-border: #ccc;
+            --modal-bg: #fff;
+            --modal-shadow: rgba(0,0,0,0.3);
+            --btn-disabled-bg: #bbb;
+            --label-color: #000;
+            --close-color: #666;
+            --close-hover: #000;
+        }
+        body.dark-mode {
+            --bg-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --input-bg: #2c2c2c;
+            --input-border: #555;
+            --display-bg: #1a1a1a;
+            --display-border: #444;
+            --modal-bg: #2c2c2c;
+            --modal-shadow: rgba(0,0,0,0.6);
+            --btn-disabled-bg: #555;
+            --label-color: #e0e0e0;
+            --close-color: #aaa;
+            --close-hover: #fff;
+        }
+        body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        .page-container { max-width: 960px; margin: 0 auto; }
+        .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .icon-img { width: 120px; height: auto; }
+        .section-label { font-size: 12pt; font-weight: bold; color: var(--label-color); margin-bottom: 6px; }
+        .section-label .required { color: red; }
+        .form-section { margin-bottom: 18px; }
+        .wifi-options { display: flex; flex-direction: row; gap: 20px; align-items: center; margin-top: 10px; }
+        .wifi-options label { font-size: 13px; margin-right: 6px; color: var(--text-color); }
+        .wifi-options select { min-width: 70px; font-size: 13px; padding: 4px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); }
+        #iface-select { min-width: 160px; font-size: 13px; padding: 4px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); }
+        #iface-select option { padding: 4px 8px; }
+        .iface-row { display: flex; align-items: center; gap: 8px; }
+        .btn-refresh { background: #2196F3; color: #fff; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-size: 13px; }
+        .btn-refresh:hover { background: #1976D2; }
+        .mode-row { display: flex; align-items: center; gap: 20px; }
+        .mode-item { display: flex; align-items: center; gap: 6px; }
+        .mode-item label { color: var(--text-color); }
+        .mode-item input[type="number"] { width: 60px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); }
+        .filter-row { display: flex; align-items: center; gap: 10px; }
+        #filter-input { width: 500px; padding: 4px 8px; font-size: 13px; background: var(--input-bg); color: var(--text-color); border: 1px solid var(--input-border); }
+        .btn-verify { background: #2196F3; color: #fff; border: none; padding: 6px 14px; cursor: pointer; font-weight: bold; border-radius: 3px; }
+        .btn-verify:hover { background: #1976D2; }
+        .capture-display-container { border: 1px solid var(--display-border); margin-bottom: 18px; }
+        #capture-display { width: 100%; height: 384px; overflow-y: auto; padding: 8px 10px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; background: var(--display-bg); color: var(--text-color); box-sizing: border-box; }
+        .btn-row { display: flex; justify-content: center; gap: 16px; }
+        .btn-capture { padding: 10px 22px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; color: #fff; }
+        .btn-start { background: #f44336; }
+        .btn-start:hover:not(:disabled) { background: #d32f2f; }
+        .btn-stop { background: #2196F3; }
+        .btn-stop:hover:not(:disabled) { background: #1976D2; }
+        .btn-download { background: #2196F3; }
+        .btn-download:hover:not(:disabled) { background: #1976D2; }
+        .btn-capture:disabled { background: var(--btn-disabled-bg); cursor: not-allowed; }
+        .hidden { display: none !important; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-box { background: var(--modal-bg); padding: 24px 32px; border-radius: 6px; max-width: 480px; box-shadow: 0 4px 20px var(--modal-shadow); position: relative; color: var(--text-color); }
+        .modal-msg { font-size: 14px; line-height: 1.5; margin: 0 0 18px 0; }
+        .modal-buttons { display: flex; justify-content: center; gap: 16px; }
+        .modal-close { position: absolute; top: 8px; right: 12px; background: none; border: none; font-size: 22px; cursor: pointer; color: var(--close-color); }
+        .modal-close:hover { color: var(--close-hover); }
+
+        /* Dark Mode Toggle */
+        .theme-toggle { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .theme-toggle input { opacity: 0; width: 0; height: 0; }
+        .theme-toggle .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 26px; transition: background-color 0.3s; }
+        .theme-toggle .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: transform 0.3s; }
+        .theme-toggle input:checked + .slider { background-color: #2196F3; }
+        .theme-toggle input:checked + .slider:before { transform: translateX(24px); }
+        .theme-toggle-label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div class="header-row">
+            <div class="form-area">
+                <!-- Capture Interface -->
+                <div class="form-section">
+                    <div class="section-label">Capture Interface<span class="required">*</span></div>
+                    <div class="iface-row">
+                        <select id="iface-select">
+                            <option value="any" selected>All Interfaces</option>
+                        </select>
+                        <button type="button" class="btn-refresh" id="btn-refresh" title="Refresh interface list"><i class="fas fa-sync-alt"></i></button>
+                    </div>
+                    <div class="wifi-options hidden" id="wifi-options">
+                        <div>
+                            <label>Wi-Fi Channel</label>
+                            <select id="wifi-channel"><option value="">--</option></select>
+                        </div>
+                        <div>
+                            <label>Channel Width</label>
+                            <select id="wifi-width">
+                                <option value="">--</option>
+                                <option value="20">20 MHz</option>
+                                <option value="40">40 MHz</option>
+                                <option value="80">80 MHz</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Capture Mode -->
+                <div class="form-section">
+                    <div class="section-label">Capture Mode<span class="required">*</span></div>
+                    <div class="mode-row">
+                        <div class="mode-item">
+                            <label for="pkt-count-val">Packet Count</label>
+                            <input type="number" id="pkt-count-val" value="0" min="0" max="65535" title="Capture will terminate after the entered number of packets captured is reached or if the timeout expires.">
+                        </div>
+                        <div class="mode-item">
+                            <label for="timeout-val">Timeout</label>
+                            <input type="number" id="timeout-val" value="600" min="0" max="28800" title="Capture will terminate after the number of seconds entered or if the packet count has been exceeded before time expires. Default is 600 seconds (10 min).">
+                        </div>
+                        <div class="mode-item" id="l2-toggle-item">
+                            <label for="show-l2-toggle">Show L2 info</label>
+                            <input type="checkbox" id="show-l2-toggle" title="Toggle between L3 only and L2+L3 packet display">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Capture Filter -->
+                <div class="form-section">
+                    <div class="section-label">Capture Filter</div>
+                    <div class="filter-row">
+                        <input type="text" id="filter-input" maxlength="256" placeholder="e.g. host 192.168.1.10 and tcp port 53">
+                        <button type="button" class="btn-verify" id="btn-verify">Verify Filter</button>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="theme-toggle-label">
+                    <label class="theme-toggle">
+                        <input type="checkbox" id="darkModeToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <img src="static/tcpdumpster-icon.png" alt="tcpdumpster" class="icon-img">
+            </div>
+        </div>
+
+        <!-- Capture Display -->
+        <div class="capture-display-container">
+            <div id="capture-display"></div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="btn-row">
+            <button type="button" class="btn-capture btn-start" id="btn-start">Start Capture</button>
+            <button type="button" class="btn-capture btn-stop" id="btn-stop" disabled>Stop Capture</button>
+            <button type="button" class="btn-capture btn-download" id="btn-download" disabled>Download PCAP</button>
+        </div>
+
+        <!-- Monitor Mode Warning Dialog -->
+        <div class="modal-overlay hidden" id="monitor-modal">
+            <div class="modal-box">
+                <button type="button" class="modal-close" id="modal-close">&times;</button>
+                <p class="modal-msg">WARNING: The router is currently serving Wi-Fi clients. Running the capture will disconnect all associated clients. Do you want to continue?</p>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-capture btn-stop" id="modal-run">Run Capture</button>
+                    <button type="button" class="btn-capture btn-start" id="modal-abort">Abort Capture</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var pollTimer = null;
+        var capturing = false;
+        var packets = [];
+
+        // Dark mode toggle
+        var darkToggle = document.getElementById('darkModeToggle');
+        if (localStorage.getItem('tcpdumpster-dark-mode') === 'true') {
+            document.body.classList.add('dark-mode');
+            darkToggle.checked = true;
+        }
+        darkToggle.addEventListener('change', function() {
+            document.body.classList.toggle('dark-mode', this.checked);
+            localStorage.setItem('tcpdumpster-dark-mode', this.checked);
+        });
+
+        function renderDisplay() {
+            var showL2 = document.getElementById('show-l2-toggle').checked;
+            var el = document.getElementById('capture-display');
+            var lines = [];
+            for (var i = 0; i < packets.length; i++) {
+                var pkt = packets[i];
+                if (showL2 && pkt.l2) {
+                    lines.push(pkt.l2 + pkt.l3);
+                } else {
+                    lines.push(pkt.l3);
+                }
+            }
+            el.textContent = lines.join('\n');
+            if (lines.length > 0) {
+                el.textContent += '\n';
+            }
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function appendPackets(newPkts) {
+            for (var i = 0; i < newPkts.length; i++) {
+                packets.push(newPkts[i]);
+            }
+            renderDisplay();
+        }
+
+        function appendDisplay(text) {
+            packets.push({l2: '', l3: text});
+            renderDisplay();
+        }
+
+        function clearDisplay() {
+            packets = [];
+            document.getElementById('capture-display').textContent = '';
+        }
+
+        function setButtons(state) {
+            document.getElementById('btn-start').disabled = (state === 'capturing');
+            document.getElementById('btn-stop').disabled = (state !== 'capturing');
+            document.getElementById('btn-download').disabled = (state !== 'stopped_with_data');
+        }
+
+        function loadInterfaces() {
+            $.ajax({
+                url: '/api/interfaces',
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    var sel = document.getElementById('iface-select');
+                    // Keep the ANY option
+                    sel.innerHTML = '<option value="any">All Interfaces</option>';
+                    if (data && data.interfaces) {
+                        for (var i = 0; i < data.interfaces.length; i++) {
+                            var iface = data.interfaces[i];
+                            var opt = document.createElement('option');
+                            opt.value = iface.device;
+                            opt.textContent = iface.description;
+                            opt.setAttribute('data-type', iface.type);
+                            opt.setAttribute('data-radio', iface.radio_index !== null ? iface.radio_index : '');
+                            sel.appendChild(opt);
+                        }
+                    }
+                }
+            });
+        }
+
+        function onIfaceChange() {
+            var sel = document.getElementById('iface-select');
+            var opt = sel.options[sel.selectedIndex];
+            var ifType = opt ? opt.getAttribute('data-type') : '';
+            var radioIdx = opt ? opt.getAttribute('data-radio') : '';
+            var wifiDiv = document.getElementById('wifi-options');
+            var l2Item = document.getElementById('l2-toggle-item');
+
+            if (ifType === 'wifi' && radioIdx !== '') {
+                wifiDiv.classList.remove('hidden');
+                l2Item.style.display = 'none';
+                loadWifiChannels(radioIdx);
+            } else {
+                wifiDiv.classList.add('hidden');
+                l2Item.style.display = '';
+            }
+        }
+
+        function loadWifiChannels(radioIndex) {
+            $.ajax({
+                url: '/api/wifi_channels?radio=' + radioIndex,
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    var chanSel = document.getElementById('wifi-channel');
+                    chanSel.innerHTML = '<option value="">--</option>';
+                    if (data && data.channels) {
+                        for (var i = 0; i < data.channels.length; i++) {
+                            var opt = document.createElement('option');
+                            opt.value = data.channels[i];
+                            opt.textContent = 'Ch ' + data.channels[i];
+                            chanSel.appendChild(opt);
+                        }
+                    }
+                }
+            });
+        }
+
+        function validateInput(name, value, min, max) {
+            var raw = String(value);
+            if (raw === '') return {valid: true, val: 0};
+            var num = Number(raw);
+            if (isNaN(num)) {
+                appendDisplay('Error: ' + name + ' must be a number. Accepted range: ' + min + ' to ' + max + '.');
+                return {valid: false};
+            }
+            if (num !== Math.floor(num)) {
+                appendDisplay('Error: ' + name + ' must be an integer (whole number). Accepted range: ' + min + ' to ' + max + '.');
+                return {valid: false};
+            }
+            if (num < 0) {
+                appendDisplay('Error: ' + name + ' cannot be a negative number. Accepted range: ' + min + ' to ' + max + '.');
+                return {valid: false};
+            }
+            if (num > max) {
+                appendDisplay('Error: ' + name + ' exceeds maximum. Accepted range: ' + min + ' to ' + max + '.');
+                return {valid: false};
+            }
+            return {valid: true, val: num};
+        }
+
+        function startCapture() {
+            var iface = document.getElementById('iface-select').value;
+
+            if (iface.indexOf('mon') === 0) {
+                // Check if router is already in monitor mode
+                $.ajax({
+                    url: '/api/wlan_state',
+                    method: 'GET',
+                    dataType: 'json',
+                    success: function(data) {
+                        if (data && data.state === 'Monitor') {
+                            doStartCapture(true);
+                        } else {
+                            document.getElementById('monitor-modal').classList.remove('hidden');
+                        }
+                    },
+                    error: function() {
+                        document.getElementById('monitor-modal').classList.remove('hidden');
+                    }
+                });
+            } else {
+                doStartCapture(false);
+            }
+        }
+
+        function doStartCapture(wasInMonitor) {
+            var iface = document.getElementById('iface-select').value;
+            var countRaw = document.getElementById('pkt-count-val').value;
+            var timeoutRaw = document.getElementById('timeout-val').value;
+            var filter = document.getElementById('filter-input').value;
+            var wifichannel = document.getElementById('wifi-channel').value;
+            var wifichannelwidth = document.getElementById('wifi-width').value;
+
+            clearDisplay();
+            var countResult = validateInput('Packet Count', countRaw, 0, 65535);
+            if (!countResult.valid) return;
+            var timeoutResult = validateInput('Timeout', timeoutRaw, 0, 28800);
+            if (!timeoutResult.valid) return;
+
+            var count = countResult.val;
+            var timeout = timeoutResult.val;
+
+            if (count === 0 && timeout === 0) {
+                appendDisplay('Error: Both Packet Count and Timeout cannot be zero. At least one must be greater than zero.');
+                return;
+            }
+
+            clearDisplay();
+            var sel = document.getElementById('iface-select');
+            var ifaceDesc = sel.options[sel.selectedIndex].textContent;
+            var modeNote = '';
+            if (count === 0 && timeout === 0) {
+                modeNote = ' (auto-timeout: 10 min)';
+            }
+            appendDisplay('Starting capture on ' + ifaceDesc + modeNote + '...');
+            setButtons('capturing');
+            capturing = true;
+
+            $.ajax({
+                url: '/api/start_capture',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    iface: iface,
+                    count: count,
+                    timeout: timeout,
+                    filter: filter,
+                    wifichannel: wifichannel,
+                    wifichannelwidth: wifichannelwidth,
+                    was_in_monitor: wasInMonitor
+                }),
+                success: function(resp) {
+                    if (resp && resp.error) {
+                        appendDisplay('Error: ' + resp.error);
+                        setButtons('idle');
+                        capturing = false;
+                    } else {
+                        startPolling();
+                    }
+                },
+                error: function() {
+                    appendDisplay('Error: failed to start capture');
+                    setButtons('idle');
+                    capturing = false;
+                }
+            });
+        }
+
+        function stopCapture() {
+            appendDisplay('Stopping packet capture...');
+            $.ajax({
+                url: '/api/stop_capture',
+                method: 'POST',
+                success: function(resp) {
+                    // polling will detect stop
+                }
+            });
+        }
+
+        function startPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(pollPackets, 1000);
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function pollPackets() {
+            $.ajax({
+                url: '/api/packets',
+                method: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    if (data && data.lines && data.lines.length > 0) {
+                        appendPackets(data.lines);
+                    }
+                    if (data && data.status === 'stopped') {
+                        stopPolling();
+                        appendDisplay('Stopped packet capture.');
+                        setButtons('stopped_with_data');
+                        capturing = false;
+                    }
+                },
+                error: function() {
+                    stopPolling();
+                    setButtons('idle');
+                    capturing = false;
+                }
+            });
+        }
+
+        function downloadPcap() {
+            window.location.href = '/api/download_pcap';
+        }
+
+        // Event bindings
+        document.getElementById('iface-select').addEventListener('change', onIfaceChange);
+        document.getElementById('btn-refresh').addEventListener('click', loadInterfaces);
+        document.getElementById('btn-start').addEventListener('click', startCapture);
+        document.getElementById('btn-stop').addEventListener('click', stopCapture);
+        document.getElementById('btn-download').addEventListener('click', downloadPcap);
+        document.getElementById('modal-run').addEventListener('click', function() {
+            document.getElementById('monitor-modal').classList.add('hidden');
+            clearDisplay();
+            appendDisplay('Router entering monitor mode.');
+            doStartCapture(false);
+        });
+        document.getElementById('modal-abort').addEventListener('click', function() {
+            document.getElementById('monitor-modal').classList.add('hidden');
+            clearDisplay();
+            appendDisplay('Capture aborted.');
+        });
+        document.getElementById('modal-close').addEventListener('click', function() {
+            document.getElementById('monitor-modal').classList.add('hidden');
+            clearDisplay();
+            appendDisplay('Capture aborted.');
+        });
+        document.getElementById('show-l2-toggle').addEventListener('change', renderDisplay);
+        document.getElementById('btn-verify').addEventListener('click', function() {
+            var filter = document.getElementById('filter-input').value.trim();
+            if (!filter) {
+                clearDisplay();
+                appendDisplay('Error: No filter to verify. Enter a capture filter first.');
+                return;
+            }
+            clearDisplay();
+            appendDisplay('Verifying filter...');
+            $.ajax({
+                url: '/api/verify_filter',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({filter: filter}),
+                success: function(resp) {
+                    clearDisplay();
+                    if (resp && resp.valid) {
+                        appendDisplay('Valid capture filter.');
+                    } else {
+                        appendDisplay('Invalid capture filter: ' + (resp.error || 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    clearDisplay();
+                    appendDisplay('Error: Unable to verify filter.');
+                }
+            });
+        });
+
+        // Initial load
+        loadInterfaces();
+    })();
+    </script>
+</body>
+</html>
