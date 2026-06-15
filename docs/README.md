@@ -2,6 +2,7 @@
 
 ## Quick Start
 - **[SETUP.md](SETUP.md)** - Setup Kiro
+- **[NCOS_SDK_Developer_Manual.md](NCOS_SDK_Developer_Manual.md)** - Complete SDK developer manual
 
 ## NCOS API Reference
 - **[ncos-api/](ncos-api/README.md)** - Complete NCOS API documentation
