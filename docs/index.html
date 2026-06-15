@@ -666,7 +666,7 @@ function renderGrid() {
         <div class="app-card-desc">${app.notes}</div>
         <div class="app-card-footer">
           <div>
-            <span>${renderStars(rating)}</span>
+            <span>${renderStars(rating)}</span><span style="font-size:0.7rem;color:var(--text-muted);margin-left:0.4rem;">${app.community_rating ? app.community_rating.toFixed(1) + '★' : ''}</span>
             <div class="app-card-category">${allTagBadges}</div>
           </div>
         </div>
@@ -696,7 +696,7 @@ function openAppDetail(appName) {
 
   const ratingHint = ratingDetails.votes > 0
     ? `<span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.5rem;">${ratingDetails.avg.toFixed(1)}★ avg · ${ratingDetails.votes} vote${ratingDetails.votes === 1 ? '' : 's'}</span>`
-    : '';
+    : '<span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.5rem;">No community ratings yet</span>';
 
   modal.innerHTML = `
     <button class="modal-close" id="closeModal">&times;</button>
