@@ -67,21 +67,6 @@ a:hover { color: var(--accent-hover); }
 }
 .search-box input:focus { outline: none; border-color: var(--accent); }
 .result-count { color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap; }
-.gear-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.3rem;
-  cursor: pointer;
-  padding: 0.4rem;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
-  display: flex;
-  align-items: center;
-}
-.gear-btn:hover { color: var(--text-primary); background: var(--bg-card); }
-.gear-btn.configured { color: var(--success); }
-
 /* Layout */
 .container {
   display: grid;
@@ -365,83 +350,6 @@ a:hover { color: var(--accent-hover); }
   cursor: pointer;
 }
 .btn-download:hover { background: var(--accent-hover); }
-/* Settings / API keys modal */
-.settings-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.8);
-  z-index: 3000;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-.settings-overlay.active { display: flex; }
-.settings-box {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 2rem;
-  max-width: 480px;
-  width: 100%;
-}
-.settings-box h3 { margin-bottom: 0.5rem; }
-.settings-box p { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; }
-.settings-field { margin-bottom: 1rem; }
-.settings-field label {
-  display: block;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 0.25rem;
-}
-.settings-field .input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.settings-field input[type="password"],
-.settings-field input[type="text"] {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  font-family: monospace;
-}
-.settings-field input:focus { outline: none; border-color: var(--accent); }
-.toggle-vis {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 1.1rem;
-  padding: 0.25rem;
-}
-.toggle-vis:hover { color: var(--text-primary); }
-.settings-field input[type="text"] {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-}
-.settings-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 1rem 0;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-.settings-checkbox input { accent-color: var(--accent); }
-.settings-field-ncm-account { margin-bottom: 1rem; }
-.settings-buttons { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
-
 /* Confirmation modal */
 .confirm-overlay {
   display: none;
@@ -510,7 +418,6 @@ a:hover { color: var(--accent-hover); }
     <input type="text" id="searchInput" placeholder="Find an app...">
   </div>
   <span class="result-count" id="resultCount"></span>
-  <button class="gear-btn" id="gearBtn" title="NCM API Settings" style="margin-left:auto;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 </div>
 
 <div class="container">
@@ -553,106 +460,12 @@ a:hover { color: var(--accent-hover); }
   </div>
 </div>
 
-<!-- NCM API Settings Modal -->
-<div class="settings-overlay" id="settingsOverlay">
-  <div class="settings-box">
-    <h3>&#9881; NetCloud Manager API Keys</h3>
-    <p>Enter your NCM API credentials. These are stored only in your browser (cookie) and never sent to any server other than NCM.</p>
-    <p style="margin-bottom:1rem;">Generate API keys in NetCloud Manager: <strong>Tools</strong> &rarr; <strong>NetCloud API</strong> tab &rarr; click <strong>+ Add</strong> to create X-ECM keys.</p>
-    <div class="settings-field">
-      <label for="ncmApiId">X-ECM-API-ID</label>
-      <div class="input-wrap">
-        <input type="password" id="ncmApiId" placeholder="Enter API ID" autocomplete="off">
-        <button class="toggle-vis" data-target="ncmApiId" title="Toggle visibility">&#128065;</button>
-      </div>
-    </div>
-    <div class="settings-field">
-      <label for="ncmApiKey">X-ECM-API-KEY</label>
-      <div class="input-wrap">
-        <input type="password" id="ncmApiKey" placeholder="Enter API Key" autocomplete="off">
-        <button class="toggle-vis" data-target="ncmApiKey" title="Toggle visibility">&#128065;</button>
-      </div>
-    </div>
-    <div class="settings-field">
-      <label for="ncmAccountId">NCM Account ID</label>
-      <div class="input-wrap">
-        <input type="text" id="ncmAccountId" placeholder="e.g. 3644" autocomplete="off">
-      </div>
-    </div>
-    <label class="settings-checkbox">
-      <input type="checkbox" id="ncmSaveCookie"> Save keys in cookie for next visit
-    </label>
-    <div class="settings-buttons">
-      <button class="btn-cancel" id="settingsCancel">Cancel</button>
-      <button class="btn-cancel" id="settingsClear" style="color:var(--danger);border-color:var(--danger);">Clear Keys</button>
-      <button class="btn-confirm" id="settingsSave">Save</button>
-    </div>
-  </div>
-</div>
-
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 let catalog = null;
 let ratings = JSON.parse(localStorage.getItem('appRatings') || '{}');
 let filters = { developers: [], tags: [], minRating: 0 };
 let pendingDownloadUrl = null;
-
-// NCM API key management (in-memory + optional cookie)
-let ncmKeys = { apiId: '', apiKey: '', accountId: '' };
-
-function loadNcmKeys() {
-  const raw = getCookie('ncm_keys');
-  if (raw) {
-    try {
-      const parsed = JSON.parse(atob(raw));
-      ncmKeys.apiId = parsed.apiId || '';
-      ncmKeys.apiKey = parsed.apiKey || '';
-      ncmKeys.accountId = parsed.accountId || '';
-    } catch (e) { /* ignore corrupt cookie */ }
-  }
-  updateGearIcon();
-}
-
-function saveNcmKeysToCookie() {
-  const encoded = btoa(JSON.stringify(ncmKeys));
-  // Set cookie for 90 days, SameSite=Strict, Secure
-  document.cookie = `ncm_keys=${encoded}; max-age=${90*86400}; path=/; SameSite=Strict; Secure`;
-}
-
-function clearNcmCookie() {
-  document.cookie = 'ncm_keys=; max-age=0; path=/; SameSite=Strict; Secure';
-}
-
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? match[2] : '';
-}
-
-function hasNcmKeys() {
-  return ncmKeys.apiId && ncmKeys.apiKey && ncmKeys.accountId;
-}
-
-function updateGearIcon() {
-  const btn = document.getElementById('gearBtn');
-  if (hasNcmKeys()) {
-    btn.classList.add('configured');
-    btn.title = 'NCM API Settings (configured)';
-  } else {
-    btn.classList.remove('configured');
-    btn.title = 'NCM API Settings';
-  }
-}
-
-function openSettings() {
-  document.getElementById('ncmApiId').value = ncmKeys.apiId;
-  document.getElementById('ncmApiKey').value = ncmKeys.apiKey;
-  document.getElementById('ncmAccountId').value = ncmKeys.accountId;
-  document.getElementById('ncmSaveCookie').checked = !!getCookie('ncm_keys');
-  document.getElementById('settingsOverlay').classList.add('active');
-}
-
-function closeSettings() {
-  document.getElementById('settingsOverlay').classList.remove('active');
-}
 
 async function loadCatalog() {
   const resp = await fetch('catalog.json');
@@ -875,54 +688,10 @@ function escapeHtml(text) {
 }
 
 function renderMarkdown(text) {
-  let html = escapeHtml(text);
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-  // Tables: detect lines starting with |
-  html = html.replace(/((?:^\|.+\|$\n?)+)/gm, function(tableBlock) {
-    const rows = tableBlock.trim().split('\n');
-    if (rows.length < 2) return tableBlock;
-    let thtml = '<table style="width:100%;border-collapse:collapse;margin:0.5rem 0;font-size:0.8rem;">';
-    rows.forEach((row, i) => {
-      // Skip separator row (|---|---|)
-      if (/^\|[\s\-:]+\|$/.test(row.trim())) return;
-      const cells = row.split('|').filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
-      const tag = i === 0 ? 'th' : 'td';
-      const style = i === 0
-        ? 'style="text-align:left;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);color:var(--text-primary);font-weight:600;"'
-        : 'style="text-align:left;padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);color:var(--text-secondary);"';
-      thtml += '<tr>' + cells.map(c => `<${tag} ${style}>${c.trim()}</${tag}>`).join('') + '</tr>';
-    });
-    thtml += '</table>';
-    return thtml;
-  });
-
-  html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
-  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-  html = html.replace(/\n\n/g, '</p><p>');
-  html = '<p>' + html + '</p>';
-  html = html.replace(/<p>\s*(<h[123]>)/g, '$1');
-  html = html.replace(/(<\/h[123]>)\s*<\/p>/g, '$1');
-  html = html.replace(/<p>\s*(<pre>)/g, '$1');
-  html = html.replace(/(<\/pre>)\s*<\/p>/g, '$1');
-  html = html.replace(/<p>\s*(<ul>)/g, '$1');
-  html = html.replace(/(<\/ul>)\s*<\/p>/g, '$1');
-  html = html.replace(/<p>\s*(<blockquote>)/g, '$1');
-  html = html.replace(/(<\/blockquote>)\s*<\/p>/g, '$1');
-  html = html.replace(/<p>\s*(<table)/g, '$1');
-  html = html.replace(/(<\/table>)\s*<\/p>/g, '$1');
-  html = html.replace(/<p><\/p>/g, '');
-  html = html.replace(/\n/g, '<br>');
-  return html;
+  if (typeof marked !== 'undefined') {
+    return marked.parse(text);
+  }
+  return '<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>';
 }
 
 // Event listeners
@@ -941,50 +710,7 @@ document.getElementById('confirmDownload').addEventListener('click', () => {
   pendingDownloadUrl = null;
 });
 
-// Gear / Settings events
-document.getElementById('gearBtn').addEventListener('click', openSettings);
-document.getElementById('settingsCancel').addEventListener('click', closeSettings);
-document.getElementById('settingsOverlay').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeSettings();
-});
-document.getElementById('settingsSave').addEventListener('click', () => {
-  ncmKeys.apiId = document.getElementById('ncmApiId').value.trim();
-  ncmKeys.apiKey = document.getElementById('ncmApiKey').value.trim();
-  ncmKeys.accountId = document.getElementById('ncmAccountId').value.trim();
-  if (document.getElementById('ncmSaveCookie').checked) {
-    saveNcmKeysToCookie();
-  } else {
-    clearNcmCookie();
-  }
-  updateGearIcon();
-  closeSettings();
-});
-document.getElementById('settingsClear').addEventListener('click', () => {
-  ncmKeys = { apiId: '', apiKey: '', accountId: '' };
-  clearNcmCookie();
-  document.getElementById('ncmApiId').value = '';
-  document.getElementById('ncmApiKey').value = '';
-  document.getElementById('ncmAccountId').value = '';
-  document.getElementById('ncmSaveCookie').checked = false;
-  updateGearIcon();
-});
-
-// Visibility toggle for password fields
-document.querySelectorAll('.toggle-vis').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const target = document.getElementById(btn.dataset.target);
-    if (target.type === 'password') {
-      target.type = 'text';
-      btn.innerHTML = '&#128064;';
-    } else {
-      target.type = 'password';
-      btn.innerHTML = '&#128065;';
-    }
-  });
-});
-
 // Init
-loadNcmKeys();
 loadCatalog();
 </script>
 </body>
