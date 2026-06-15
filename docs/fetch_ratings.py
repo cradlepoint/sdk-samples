@@ -99,17 +99,19 @@ def compute_ratings(paths, token):
 
     for path_info in paths:
         path = path_info.get('path', '')
-        if not path.startswith('/rate/'):
+        # Normalize: strip leading slash if present
+        normalized = path.lstrip('/')
+        if not normalized.startswith('rate/'):
             continue
 
-        parts = path.split('/')
-        # Expected: ['', 'rate', 'app_name', 'stars']
-        if len(parts) != 4:
+        parts = normalized.split('/')
+        # Expected: ['rate', 'app_name', 'stars']
+        if len(parts) != 3:
             continue
 
-        app_name = parts[2]
+        app_name = parts[1]
         try:
-            stars = int(parts[3])
+            stars = int(parts[2])
         except ValueError:
             continue
 
@@ -156,8 +158,12 @@ def main():
             json.dump({}, f)
         return
 
-    rate_paths = [p for p in paths if p.get('path', '').startswith('/rate/')]
+    rate_paths = [p for p in paths if '/rate/' in p.get('path', '') or p.get('path', '').startswith('rate/')]
     print(f'Found {len(rate_paths)} rating paths out of {len(paths)} total')
+    if not rate_paths and paths:
+        # Debug: show what paths exist so we can diagnose
+        sample = [p.get('path', '') for p in paths[:20]]
+        print(f'  Sample paths: {sample}')
 
     ratings = compute_ratings(rate_paths, token)
     print(f'Computed ratings for {len(ratings)} apps')
