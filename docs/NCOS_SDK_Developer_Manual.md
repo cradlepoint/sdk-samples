@@ -20,11 +20,12 @@ A comprehensive reference for building, deploying, and managing Python applicati
 12. [GPS and Location](#12-gps-and-location)
 13. [Speed Testing](#13-speed-testing)
 14. [GPIO](#14-gpio)
-15. [Containers on NCOS](#15-containers-on-ncos)
-16. [Local Development](#16-local-development)
-17. [Production Deployment via NCM](#17-production-deployment-via-ncm)
-18. [Debugging and Troubleshooting](#18-debugging-and-troubleshooting)
-19. [Complete Examples](#19-complete-examples)
+15. [CLI Access (csterm) and Web Terminal (ttyd)](#15-cli-access-csterm-and-web-terminal-ttyd)
+16. [Containers on NCOS](#16-containers-on-ncos)
+17. [Local Development](#17-local-development)
+18. [Production Deployment via NCM](#18-production-deployment-via-ncm)
+19. [Debugging and Troubleshooting](#19-debugging-and-troubleshooting)
+20. [Complete Examples](#20-complete-examples)
 
 ---
 
@@ -1020,7 +1021,228 @@ cp.put('config/gpio/CONNECTOR_OUTPUT', 0)
 
 ---
 
-## 15. Containers on NCOS
+## 15. CLI Access (csterm) and Web Terminal (ttyd)
+
+NCOS routers have a built-in CLI accessible via SSH. SDK apps can execute CLI commands programmatically using the **csterm** control tree, or provide a full web-based terminal using the **ttyd** binary.
+
+### 15.1 CSTerm — Programmatic CLI Access
+
+The `csterm.py` module (from the `cli_sample` app) lets your app execute NCOS CLI commands and capture their output. It works by writing commands to `control/csterm/{session_id}` and reading responses back.
+
+#### Setup
+
+Copy `csterm.py` from `apps/cli_sample/` into your app directory.
+
+#### Basic Usage
+
+```python
+import cp
+from csterm import CSTerm
+
+cp.log('Starting...')
+
+# Create a terminal session
+ct = CSTerm(cp)
+
+# Execute a single command
+output = ct.exec('arpdump')
+cp.log(f'ARP table:\n{output}')
+
+# Execute multiple commands in sequence
+output = ct.exec(['clients', 'arpdump'])
+cp.log(output)
+```
+
+#### How It Works
+
+1. CSTerm creates a unique session ID (`term-{random}`)
+2. Commands are written to `control/csterm/{session_id}` with `cp.put()`
+3. Responses are read from the same path with `cp.get()`
+4. Output is polled at 0.3s intervals until a prompt is detected or timeout
+5. ANSI escape sequences are stripped from the output (when `clean=True`)
+
+#### CSTerm API
+
+```python
+CSTerm(csclient, timeout=10, soft_timeout=5, user=None)
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `csclient` | required | The `cp` module (or any object with `get`/`put` methods) |
+| `timeout` | 10 | Max seconds to wait for output |
+| `soft_timeout` | 5 | Seconds before sending Ctrl+C to abort |
+| `user` | None | CLI user to execute as (e.g., `"admin"`) |
+
+```python
+ct.exec(cmds, clean=True) -> str
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cmds` | str or list | Single command string or list of commands |
+| `clean` | bool | Strip ANSI escape sequences and prompt lines |
+| **Returns** | str | Command output text |
+
+#### Examples
+
+**Run a single command:**
+```python
+ct = CSTerm(cp)
+output = ct.exec('arpdump')
+```
+
+**Run multiple commands (same session):**
+```python
+output = ct.exec(['clients', 'arpdump', 'wan'])
+```
+
+**Multiple exec calls (persistent session state):**
+```python
+ct.exec('clients')
+ct.exec('wan')
+ct.exec('arpdump')
+```
+
+**SSH into a remote host through the router CLI:**
+```python
+ct = CSTerm(cp, timeout=30, soft_timeout=15)
+output = ct.exec([
+    'ssh user@192.168.1.100',
+    'yes',           # Accept host key
+    'password123',   # Enter password
+    'ls -la',        # Run command on remote host
+    'exit'           # Exit SSH
+])
+```
+
+**Run as a specific user:**
+```python
+ct = CSTerm(cp, user="admin")
+output = ct.exec('status')
+```
+
+**Longer-running commands (increase timeout):**
+```python
+ct = CSTerm(cp, timeout=30, soft_timeout=20)
+output = ct.exec('ping 8.8.8.8 -c 10')
+```
+
+#### Common CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `arpdump` | Show ARP table (connected devices) |
+| `clients` | Show connected LAN clients |
+| `wan` | Show WAN status |
+| `status` | Show system status |
+| `ping <host>` | Ping a host |
+| `traceroute <host>` | Trace route to host |
+| `log show` | Show system logs |
+| `log show -s <app>` | Show logs for specific app |
+| `sms <number> '<msg>' <port>` | Send SMS |
+| `container list` | List running containers |
+
+#### Using cp.execute_cli() Instead
+
+The `cp` module also has a built-in `execute_cli()` function that provides similar functionality without needing the `csterm.py` file:
+
+```python
+import cp
+
+# Single command
+output = cp.execute_cli('arpdump')
+cp.log(output)
+
+# Multiple commands
+output = cp.execute_cli(['clients', 'wan'])
+cp.log(output)
+```
+
+The difference: `CSTerm` maintains a persistent session (stateful — like an interactive terminal), while `cp.execute_cli()` is stateless (each call is independent). Use `CSTerm` when you need multi-step interactions (SSH sessions, interactive commands) and `cp.execute_cli()` for simple one-off commands.
+
+### 15.2 ttyd — Web-Based Terminal
+
+The `ttyd` app provides a full Linux bash terminal accessible from any web browser on the LAN. It bundles the [ttyd](https://github.com/tsl0922/ttyd) binary — a terminal emulator served over HTTP/WebSockets.
+
+#### What It Does
+
+- Serves a full bash shell at `http://<router_ip>:8022`
+- No SSH client needed — works in any modern browser
+- WebSocket-based for real-time terminal interaction
+- Access to the full NCOS Linux userland
+
+#### App Structure
+
+```
+ttyd/
+├── package.ini
+├── start.sh          # Launches the binary directly (no cppython)
+├── cp.py
+├── csterm.py         # Optional — for programmatic access alongside
+├── ttyd              # Statically linked ARM64 binary
+└── readme.md
+```
+
+#### start.sh (Binary-Only App)
+
+```bash
+#!/bin/bash
+./ttyd -p 8022 -W bash
+```
+
+Note: This app does NOT use `cppython`. The `start.sh` launches the `ttyd` binary directly. This is the **binary-only app pattern** — no Python code needed.
+
+#### ttyd Flags
+
+| Flag | Description |
+|------|-------------|
+| `-p 8022` | Listen on port 8022 |
+| `-W` | Writable (allow keyboard input) |
+| `bash` | Shell to spawn (bash is default on NCOS) |
+
+#### How to Use
+
+1. Deploy the app to the router
+2. Open a browser: `http://<router_ip>:8022`
+3. A terminal session opens — full bash access
+
+#### Building Your Own ttyd App
+
+If you want to bundle ttyd in your own app (e.g., alongside Python code):
+
+1. Download the `ttyd` binary (ARM64/aarch64 static build) from [ttyd releases](https://github.com/tsl0922/ttyd/releases)
+2. Place it in your app directory
+3. Remember: tar extraction on the router does NOT preserve the execute bit. Set permissions before first use:
+
+```python
+import os
+import subprocess
+import cp
+
+# Ensure binary is executable
+ttyd_path = os.path.join(os.path.dirname(__file__), 'ttyd')
+if os.path.exists(ttyd_path) and not os.access(ttyd_path, os.X_OK):
+    os.chmod(ttyd_path, 0o755)
+
+# Launch ttyd in background
+subprocess.Popen(['./ttyd', '-p', '8022', '-W', 'bash'])
+cp.log('Web terminal started on port 8022')
+```
+
+#### Security Considerations
+
+- ttyd provides unauthenticated shell access to anyone on the LAN
+- Consider using ttyd's `-c username:password` flag for basic auth:
+  ```bash
+  ./ttyd -p 8022 -W -c admin:secretpass bash
+  ```
+- Restrict access via router firewall zone rules if needed
+- For production, consider limiting to specific interfaces or adding authentication
+
+---
+
+## 16. Containers on NCOS
 
 Deploy Docker containers via the REST API:
 
@@ -1064,7 +1286,7 @@ cp.post('config/container/projects', json.dumps(project))
 
 ---
 
-## 16. Local Development
+## 17. Local Development
 
 Applications can run on your development machine. The `cp.py` module auto-detects the environment:
 
@@ -1100,7 +1322,7 @@ Applications can run on your development machine. The `cp.py` module auto-detect
 
 ---
 
-## 17. Production Deployment via NCM
+## 18. Production Deployment via NCM
 
 Once tested locally and on a dev router:
 
@@ -1113,7 +1335,7 @@ Apps can be configured per-group using appdata fields pushed from NCM.
 
 ---
 
-## 18. Debugging and Troubleshooting
+## 19. Debugging and Troubleshooting
 
 ### Viewing Logs
 
@@ -1164,7 +1386,7 @@ except Exception as e:
 
 ---
 
-## 19. Complete Examples
+## 20. Complete Examples
 
 ### Hello World
 
