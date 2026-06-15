@@ -512,6 +512,7 @@ a:hover { color: var(--accent-hover); }
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script data-goatcounter="https://sdk-apps.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <script>
 let catalog = null;
 let ratings = JSON.parse(localStorage.getItem('appRatings') || '{}');
@@ -757,7 +758,11 @@ document.getElementById('confirmCancel').addEventListener('click', () => {
   pendingDownloadUrl = null;
 });
 document.getElementById('confirmDownload').addEventListener('click', () => {
-  if (pendingDownloadUrl) window.open(pendingDownloadUrl, '_blank');
+  if (pendingDownloadUrl) {
+    // Track download with GoatCounter
+    if (window.goatcounter) window.goatcounter.count({ path: '/download/' + pendingDownloadUrl, event: true });
+    window.open(pendingDownloadUrl, '_blank');
+  }
   document.getElementById('confirmOverlay').classList.remove('active');
   pendingDownloadUrl = null;
 });
