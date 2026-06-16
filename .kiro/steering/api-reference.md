@@ -94,6 +94,7 @@ results = cp.get('status/wan/devices/mdm-xxx/status/perf_results')
 - IP Verify identity names only allow `[a-zA-Z0-9_-]` — no dots. Replace dots with underscores: `target_ip.replace('.', '_')`
 - `cp.register` callback receives 3 args: `(path, value, args)` where `args` is a single tuple — do NOT use `*args` unpacking in the callback signature
 - SCP "lost connection" during `make.py install` is normal — the router drops the SSH connection after receiving the file. Exit code 1 is expected
+- **SCP remote path MUST be `/app_upload` (no trailing slash)** — `/app_upload/` causes "invalid filename" rejection. Use `scp -O` (legacy protocol) as the router's CradlepointSSHService does not support SFTP
 - IP Verify identity `name` field only allows `[a-zA-Z0-9_-]` — no dots. Replace dots with underscores (e.g., `'SDK-' + ip.replace('.', '_')`)
 - **`cp.register()` for control tree paths MUST use `'put'` (lowercase) as the action** — `cp.register('put', 'control/...', callback)`. Using `'set'` or `'PUT'` (uppercase) silently fails to trigger callbacks
 - **Do NOT `cp.put()` to seed the control tree before `cp.register()`** — the dict PUT response causes socket desync, making subsequent register calls fail silently. Register first, then seed (or don't seed at all)

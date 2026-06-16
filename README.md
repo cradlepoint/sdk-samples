@@ -67,19 +67,19 @@ git clone https://github.com/cradlepoint/sdk-samples.git
 cd sdk-samples
 ```
 
-#### Windows
-
-```cmd
-python make.py setup
-```
-
 #### macOS / Linux
 
 ```bash
-python3 make.py setup
+python3 make.py setup && source .venv/bin/activate
 ```
 
-This creates a `.venv` virtual environment and installs all Python dependencies.
+#### Windows
+
+```cmd
+python make.py setup && .venv\Scripts\activate
+```
+
+This creates a `.venv` virtual environment, installs all Python dependencies, and activates the venv.
 
 ### 3. Configure router connection
 

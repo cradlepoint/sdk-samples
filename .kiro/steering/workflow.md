@@ -18,7 +18,7 @@ This prevents the "code first, debug later" cycle. Start a spec with: "Create a 
 
 Use the project's virtual environment for all commands:
 - Windows: `.venv\Scripts\python make.py ...`
-- Mac/Linux: `.venv/bin/python make.py ...`
+- Mac/Linux: `.venv/bin/python3 make.py ...`
 
 ## Saved Prompt Shortcuts
 
@@ -31,7 +31,9 @@ Use the project's virtual environment for all commands:
 **ALWAYS deploy after creating or modifying an app.** After any code change to an app's Python files, automatically run:
 
 - Windows: `.venv\Scripts\python make.py deploy {app_name}`
-- Mac/Linux: `.venv/bin/python make.py deploy {app_name}`
+- Mac/Linux: `.venv/bin/python3 make.py deploy {app_name}`
+
+If no `{app_name}` is specified, make.py uses the `app_name` from `sdk_settings.ini`.
 
 Do NOT ask the user if they want to deploy — just do it.
 
@@ -76,7 +78,7 @@ Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio,
 # Windows:
 .venv\Scripts\python make.py create {app_name}
 # Mac/Linux:
-.venv/bin/python make.py create {app_name}
+.venv/bin/python3 make.py create {app_name}
 ```
 
 This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. When the app is ready, move it to apps: `mv {app_name} apps/`
@@ -97,11 +99,13 @@ This generates all required files from `apps/templates/app_template/` into `./{a
 
 **NEVER overwrite package.ini, start.sh, or cp.py after creation** - these are auto-generated and correct.
 
-**ALWAYS deploy after creating or modifying an app** - use `.venv/bin/python make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows) immediately after code changes.
+**ALWAYS deploy after creating or modifying an app** - use `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows) immediately after code changes.
 
 ## Deploy to Router
 
-**ALWAYS use make.py deploy** - `.venv/bin/python make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows)
+**ALWAYS use make.py deploy** - `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows)
+
+If no `{app_name}` is specified, make.py uses the `app_name` from `sdk_settings.ini`.
 
 This handles:
 - Purging old apps
@@ -129,9 +133,9 @@ This handles:
 .venv\Scripts\python make.py clean {app_name}      # Remove build artifacts
 
 # Mac/Linux:
-.venv/bin/python make.py status {app_name}
-.venv/bin/python make.py start {app_name}
-.venv/bin/python make.py stop {app_name}
-.venv/bin/python make.py uninstall {app_name}
-.venv/bin/python make.py clean {app_name}
+.venv/bin/python3 make.py status {app_name}
+.venv/bin/python3 make.py start {app_name}
+.venv/bin/python3 make.py stop {app_name}
+.venv/bin/python3 make.py uninstall {app_name}
+.venv/bin/python3 make.py clean {app_name}
 ```

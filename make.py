@@ -25,11 +25,9 @@ try:
     import urllib3
     urllib3.disable_warnings()
     from requests.auth import HTTPDigestAuth
-    from OpenSSL import crypto
 except ImportError:
     requests = None
     HTTPDigestAuth = None
-    crypto = None
     
 # Upgrade functionality for checking and updating files from GitHub
 def get_github_commit_timestamp(file_path):
@@ -428,8 +426,6 @@ def put(value):
                                 data={"data": '"{} {}"'.format(value, get_app_uuid())},
                                 verify=False)
 
-        print('status_code: {}'.format(response.status_code))
-
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
         print("Error with put for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
@@ -568,12 +564,8 @@ def create_signature(meta_data_folder, pkey):
                 signature = private_key.sign(checksum, padding.PKCS1v15(), hashes.SHA256())
                 sf.write(signature)
             except ImportError:
-                # Fallback to pyopenssl if cryptography not available
-                if crypto:
-                    sf.write(crypto.sign(pkey, checksum, 'sha256'))
-                else:
-                    print("WARNING: No signing library available. Writing unsigned checksum.")
-                    sf.write(checksum)
+                print("WARNING: 'cryptography' library not installed. Writing unsigned checksum.")
+                sf.write(checksum)
         else:
             sf.write(checksum)
 
@@ -792,63 +784,74 @@ def create(app_name=None):
 def install():
     if is_NCOS_device_in_DEV_mode():
         # Try to read version from package.ini in the app folder
+        app_archive = None
         try:
-            package_ini_path = os.path.join(g_app_name, 'package.ini')
-            config = configparser.ConfigParser()
-            config.read(package_ini_path)
+            # Check multiple possible locations for package.ini
+            candidates = [
+                os.path.join(g_app_name, 'package.ini'),
+                os.path.join('apps', g_app_name, 'package.ini'),
+            ]
+            package_ini_path = None
+            for candidate in candidates:
+                if os.path.isfile(candidate):
+                    package_ini_path = candidate
+                    break
 
-            version_major = config[g_app_name].get('version_major', '0')
-            version_minor = config[g_app_name].get('version_minor', '0')
-            version_patch = config[g_app_name].get('version_patch', '0')
+            if package_ini_path:
+                config = configparser.ConfigParser()
+                config.read(package_ini_path)
+                version_major = config[g_app_name].get('version_major', '0')
+                version_minor = config[g_app_name].get('version_minor', '0')
+                version_patch = config[g_app_name].get('version_patch', '0')
+                app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
+        except Exception:
+            pass
 
-            app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
-            if not os.path.exists(app_archive):
-                app_archive = f"{g_app_name}.tar.gz"
-        except Exception as e:
-            app_archive = f"{g_app_name}.tar.gz"
-
-        print('Installing {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
-
-        try:
-            import paramiko
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            try:
-                ssh.connect(g_dev_client_ip, username=g_dev_client_username,
-                            password=g_dev_client_password,
-                            look_for_keys=False, allow_agent=False, timeout=10)
-                sftp = ssh.open_sftp()
-                remote_path = '/app_upload/{}'.format(os.path.basename(app_archive))
-                sftp.put(app_archive, remote_path)
-                sftp.close()
-            except Exception:
-                # Router drops the connection after receiving the file — this is expected
-                pass
-            finally:
-                ssh.close()
-        except ImportError:
-            # Fallback to scp/pscp if paramiko not installed
-            print('WARNING: paramiko not installed. Falling back to scp/pscp.')
-            print('Install paramiko: pip install paramiko')
-            if sys.platform == 'win32':
-                cmd = './tools/bin/pscp.exe -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
-                       g_dev_client_password, app_archive,
-                       g_dev_client_username, g_dev_client_ip)
-                try:
-                    subprocess.check_output(cmd)
-                except subprocess.CalledProcessError:
-                    pass
+        # Fallback: find any matching tar.gz
+        if not app_archive or not os.path.exists(app_archive):
+            import glob
+            matches = glob.glob(f"{g_app_name}*.tar.gz") + glob.glob(f"{g_app_name} v*.tar.gz")
+            if matches:
+                app_archive = matches[0]
             else:
-                cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
-                       g_dev_client_password, app_archive,
-                       g_dev_client_username, g_dev_client_ip)
-                try:
-                    subprocess.check_output(cmd, shell=True)
-                except subprocess.CalledProcessError:
-                    pass
+                app_archive = f"{g_app_name}.tar.gz"
+
+        if not os.path.exists(app_archive):
+            print('ERROR: Package file not found: {}'.format(app_archive))
+            return 1
+
+        print('Installing {} to {}...'.format(app_archive, g_dev_client_ip))
+
+        cmd = [
+            'sshpass', '-p', g_dev_client_password,
+            'scp', '-O',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'StrictHostKeyChecking=no',
+            app_archive,
+            '{}@{}:/app_upload'.format(g_dev_client_username, g_dev_client_ip)
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=120)
+            if result.returncode != 0:
+                stderr = result.stderr.decode(errors='replace').strip() if result.stderr else ''
+                # Filter out SSH warnings and expected "lost connection" (router drops after upload)
+                errors = [l for l in stderr.splitlines()
+                          if not l.startswith('Warning:') and not l.startswith('**')
+                          and 'lost connection' not in l.lower()]
+                if errors:
+                    print('ERROR: SCP upload failed: {}'.format(' '.join(errors)))
+                    return 1
+        except FileNotFoundError:
+            print('ERROR: sshpass not found. Install with: brew install hudochenkov/sshpass/sshpass')
+            return 1
+        except subprocess.TimeoutExpired:
+            print('ERROR: SCP upload timed out after 120s')
+            return 1
+
         return 0
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
+        return 1
 
 
 # Start the app in the NCOS device
@@ -887,29 +890,42 @@ def uninstall():
 # Purge the app from the NCOS device
 def purge():
     if is_NCOS_device_in_DEV_mode():
-        print('Purging applications for NCOS device at {}'.format(g_dev_client_ip))
-        response = put('purge')
-        print(response)
+        put('purge')
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to purge the app from {}.'.format(g_dev_client_ip))
 
 def deploy():
-    """Full deploy: purge, build, install, and show logs."""
-    print('Deploying {} to {}...'.format(g_app_name, g_dev_client_ip))
+    """Full deploy: purge, build, install, and show recent logs."""
+    print('Purging apps from {}...'.format(g_dev_client_ip))
     purge()
     time.sleep(2)
-    package()
-    install()
+
+    if not package():
+        print('ERROR: Packaging failed.')
+        return
+
+    result = install()
+    if result != 0:
+        print('ERROR: Install failed.')
+        return
+
+    # Wait for the app to start, then show all recent logs
     time.sleep(5)
-    print('Checking logs...')
     try:
         log_url = 'https://{}/api/status/log/'.format(g_dev_client_ip)
         response = requests.get(log_url, auth=get_auth(), verify=False)
         logs = json.loads(response.text).get('data', [])
-        for entry in logs[-20:]:
-            if g_app_name in str(entry):
+        cutoff = time.time() - 7
+        recent = [e for e in logs if e[0] >= cutoff]
+        if recent:
+            print('Logs:')
+            for entry in recent:
                 ts = datetime.datetime.fromtimestamp(entry[0]).strftime('%H:%M:%S')
-                print('{} {}'.format(ts, entry[3]))
+                facility = entry[2] if len(entry) > 2 else ''
+                msg = entry[3] if len(entry) > 3 and entry[3] else ''
+                print('  {} [{}] {}'.format(ts, facility, msg))
+        else:
+            print('  No log entries in the last 7 seconds.')
     except Exception as e:
         print('Warning: Could not fetch logs: {}'.format(e))
 
@@ -942,11 +958,7 @@ def setup():
     else:
         print('No requirements.txt found, skipping dependency install.')
 
-    print('\nSetup complete! Activate the venv with:')
-    if sys.platform == 'win32':
-        print('  .venv\\Scripts\\activate.bat')
-    else:
-        print('  source .venv/bin/activate')
+    print('\nSetup complete!')
 
 
 
