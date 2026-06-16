@@ -929,55 +929,67 @@ def get_router_model() -> Optional[str]:
 # WAIT HELPERS
 # =============================================================================
 
-def wait_for_uptime(min_uptime_seconds: int = 60) -> None:
+def wait_for_uptime(min_uptime_seconds: int = 60, timeout: Optional[int] = None) -> bool:
     """Block until router uptime exceeds the specified minimum.
 
     Args:
         min_uptime_seconds: Minimum uptime to wait for (default 60).
+        timeout: Max seconds to wait, or None to wait indefinitely (default).
+
+    Returns:
+        True if uptime reached, False if timeout expired.
     """
     try:
         current = get_uptime()
-        if current < min_uptime_seconds:
-            sleep_time = min_uptime_seconds - current
-            log(f"Waiting {sleep_time}s for uptime to reach {min_uptime_seconds}s")
-            time.sleep(sleep_time)
+        if current >= min_uptime_seconds:
+            return True
+        sleep_time = min_uptime_seconds - current
+        if timeout is not None and sleep_time > timeout:
+            log(f"Uptime wait would need {sleep_time}s but timeout is {timeout}s")
+            time.sleep(timeout)
+            return get_uptime() >= min_uptime_seconds
+        log(f"Waiting {sleep_time}s for uptime to reach {min_uptime_seconds}s")
+        time.sleep(sleep_time)
+        return True
     except Exception as e:
         log(f"Error in wait_for_uptime: {e}")
+        return False
 
 
-def wait_for_ntp(timeout: int = 300, check_interval: int = 1) -> bool:
+def wait_for_ntp(timeout: Optional[int] = None, check_interval: int = 1) -> bool:
     """Wait until NTP synchronization is achieved.
 
     Args:
-        timeout: Max seconds to wait.
+        timeout: Max seconds to wait, or None to wait indefinitely (default).
         check_interval: Seconds between checks.
 
     Returns:
-        True if NTP synced within timeout, False otherwise.
+        True if NTP synced, False if timeout expired.
     """
     try:
         start = time.time()
-        while time.time() - start < timeout:
+        while True:
+            if timeout is not None and time.time() - start >= timeout:
+                log(f'NTP sync timeout after {timeout}s')
+                return False
             sync_age = get('status/system/ntp/sync_age')
             if sync_age is not None:
                 log(f'NTP sync achieved, sync_age: {sync_age}')
                 return True
             time.sleep(check_interval)
-        log(f'NTP sync timeout after {timeout}s')
-        return False
     except Exception as e:
         log(f"Error waiting for NTP: {e}")
         return False
 
 
-def wait_for_wan_connection(timeout: int = 300) -> bool:
+def wait_for_wan_connection(timeout: Optional[int] = None) -> bool:
     """Wait for WAN to reach 'connected' state.
 
     Args:
-        timeout: Max seconds to wait.
+        timeout: Max seconds to wait, or None to wait indefinitely (default).
 
     Returns:
-        True if connected within timeout, False otherwise.
+        True if connected, False if timeout expired.
     """
     try:
         state = get('status/wan/connection_state')
@@ -985,16 +997,16 @@ def wait_for_wan_connection(timeout: int = 300) -> bool:
             return True
 
         log("Waiting for WAN connection...")
-        end_time = time.time() + timeout
-        while time.time() < end_time:
+        start = time.time()
+        while True:
+            if timeout is not None and time.time() - start >= timeout:
+                log(f"WAN connection timeout after {timeout}s")
+                return False
             state = get('status/wan/connection_state')
             if state == 'connected':
                 log("WAN connected.")
                 return True
             time.sleep(1)
-
-        log(f"WAN connection timeout after {timeout}s")
-        return False
     except Exception as e:
         log(f"Error waiting for WAN: {e}")
         return False
