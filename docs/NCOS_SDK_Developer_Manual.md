@@ -49,17 +49,17 @@ The NCOS SDK enables Python applications to run directly on Ericsson Cradlepoint
 
 ```
 ┌─────────────────────────────────────────────┐
-│              Your Application                │
+│              Your Application               │
 │         (Python 3.8, pure .py files)        │
 ├─────────────────────────────────────────────┤
 │               cp.py Module                  │
-│    (communicates via Unix socket on router   │
-│     or HTTP REST when running locally)       │
+│    (communicates via Unix socket on router  │
+│     or HTTP REST when running locally)      │
 ├─────────────────────────────────────────────┤
 │         NCOS Config Store (cs.sock)         │
 │     status/  config/  control/  state/      │
 ├─────────────────────────────────────────────┤
-│            NCOS Router Hardware              │
+│            NCOS Router Hardware             │
 │   Modems │ GPS │ WiFi │ GPIO │ Ethernet     │
 └─────────────────────────────────────────────┘
 ```
