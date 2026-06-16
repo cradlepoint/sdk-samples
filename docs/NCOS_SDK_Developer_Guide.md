@@ -294,9 +294,9 @@ cp.get_asset_id() -> Optional[str]                      # Asset ID
 ### 4.4 Wait Helpers
 
 ```python
-cp.wait_for_wan_connection(timeout=300) -> bool   # Wait for WAN to connect
-cp.wait_for_uptime(min_uptime_seconds=60) -> None # Wait for minimum uptime
-cp.wait_for_ntp(timeout=300) -> bool              # Wait for NTP sync
+cp.wait_for_wan_connection(timeout=None) -> bool   # Wait for WAN to connect (no timeout by default)
+cp.wait_for_uptime(min_uptime_seconds=60, timeout=None) -> bool  # Wait for minimum uptime
+cp.wait_for_ntp(timeout=None) -> bool              # Wait for NTP sync (no timeout by default)
 ```
 
 ### 4.5 GPS and Location

@@ -1119,8 +1119,8 @@ cp.get_name() -> str
 cp.get_firmware_version() -> str
 cp.get(path: str) -> Any
 cp.log(message: str) -> None
-cp.wait_for_uptime(seconds: int) -> None
-cp.wait_for_wan_connection(timeout: int) -> bool
+cp.wait_for_uptime(min_uptime_seconds: int, timeout: Optional[int] = None) -> bool
+cp.wait_for_wan_connection(timeout: Optional[int] = None) -> bool
 cp.get_appdata(name: str) -> Optional[str]
 cp.put_appdata(name: str, value: str) -> None
 cp.post_appdata(name: str, value: str) -> None
