@@ -48,6 +48,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 try:
     import requests
+    requests.packages.urllib3.disable_warnings()
 except ImportError:
     requests = None
 
@@ -261,8 +262,8 @@ def _get_auth():
 
     # Try Basic auth first (NCOS 6.5+)
     try:
-        url = f'http://{device_ip}/api/status/product_info'
-        resp = requests.get(url, auth=requests.auth.HTTPBasicAuth(username, password))
+        url = f'https://{device_ip}/api/status/product_info'
+        resp = requests.get(url, auth=requests.auth.HTTPBasicAuth(username, password), verify=False)
         if resp.status_code == 200:
             _cached_auth = requests.auth.HTTPBasicAuth(username, password)
             return _cached_auth
@@ -337,9 +338,9 @@ def get(base: str, query: str = '', tree: int = 0) -> Any:
             log("requests library not available for remote access")
             return None
         device_ip, _, _ = _get_credentials()
-        url = f'http://{device_ip}/api/{base}/{query}'
+        url = f'https://{device_ip}/api/{base}/{query}'
         try:
-            resp = requests.get(url, auth=_get_auth())
+            resp = requests.get(url, auth=_get_auth(), verify=False)
             return json.loads(resp.text).get('data')
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             log(f"Timeout: device at {device_ip} did not respond.")
@@ -372,13 +373,14 @@ def put(base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[
         if requests is None:
             return None
         device_ip, _, _ = _get_credentials()
-        url = f'http://{device_ip}/api/{base}/{query}'
+        url = f'https://{device_ip}/api/{base}/{query}'
         try:
             resp = requests.put(
                 url,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 auth=_get_auth(),
-                data={"data": value_json}
+                data={"data": value_json},
+                verify=False
             )
             return json.loads(resp.text)
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
@@ -411,13 +413,14 @@ def post(base: str, value: Any = '', query: str = '') -> Optional[Dict[str, Any]
         if requests is None:
             return None
         device_ip, _, _ = _get_credentials()
-        url = f'http://{device_ip}/api/{base}/{query}'
+        url = f'https://{device_ip}/api/{base}/{query}'
         try:
             resp = requests.post(
                 url,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 auth=_get_auth(),
-                data={"data": value_json}
+                data={"data": value_json},
+                verify=False
             )
             return json.loads(resp.text)
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
@@ -453,13 +456,14 @@ def patch(value: List[Any]) -> Optional[Dict[str, Any]]:
         if requests is None:
             return None
         device_ip, _, _ = _get_credentials()
-        url = f'http://{device_ip}/api/'
+        url = f'https://{device_ip}/api/'
         try:
             resp = requests.patch(
                 url,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 auth=_get_auth(),
-                data={"data": json.dumps(value)}
+                data={"data": json.dumps(value)},
+                verify=False
             )
             return json.loads(resp.text)
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
@@ -490,13 +494,14 @@ def delete(base: str, query: str = '') -> Optional[Dict[str, Any]]:
         if requests is None:
             return None
         device_ip, _, _ = _get_credentials()
-        url = f'http://{device_ip}/api/{base}/{query}'
+        url = f'https://{device_ip}/api/{base}/{query}'
         try:
             resp = requests.delete(
                 url,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 auth=_get_auth(),
-                data={"data": base}
+                data={"data": base},
+                verify=False
             )
             return json.loads(resp.text)
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
@@ -3980,14 +3985,19 @@ def download_packet_capture(filename: str, local_path: Optional[str] = None,
 
         if capture_params:
             params = urllib.parse.urlencode(capture_params)
-            url = f"http://{device_ip}/api/tcpdump/{filename}?{params}"
+            url = f"https://{device_ip}/api/tcpdump/{filename}?{params}"
         else:
-            url = f"http://{device_ip}/api/tcpdump/{filename}"
+            url = f"https://{device_ip}/api/tcpdump/{filename}"
 
         pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
-        pwd_mgr.add_password(None, f"http://{device_ip}", username, password)
+        pwd_mgr.add_password(None, f"https://{device_ip}", username, password)
         handler = urllib.request.HTTPBasicAuthHandler(pwd_mgr)
-        opener = urllib.request.build_opener(handler)
+        import ssl
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        https_handler = urllib.request.HTTPSHandler(context=ssl_ctx)
+        opener = urllib.request.build_opener(handler, https_handler)
         urllib.request.install_opener(opener)
 
         urllib.request.urlretrieve(url, local_path)
