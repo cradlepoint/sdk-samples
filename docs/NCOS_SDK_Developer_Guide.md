@@ -1,4 +1,4 @@
-# Ericsson NCOS SDK — Complete Developer Manual
+# Ericsson NCOS SDK — Complete Developer Guide
 
 A comprehensive reference for building, deploying, and managing Python applications on Ericsson Cradlepoint routers running NetCloud OS (NCOS).
 
