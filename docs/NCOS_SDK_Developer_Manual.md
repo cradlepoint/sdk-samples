@@ -187,7 +187,7 @@ tags = monitoring, web
 | `auto_start` | Start automatically after install |
 | `restart` | Restart on crash |
 | `reboot` | Survive router reboots |
-| `firmware_major/minor` | Minimum NCOS firmware required |
+| `firmware_major/minor` | Latest NCOS version tested |
 | `tags` | Comma-separated categories for discovery |
 
 ### start.sh
