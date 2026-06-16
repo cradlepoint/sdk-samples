@@ -12,6 +12,26 @@ APPS_DIR = REPO_ROOT / 'apps'
 DOWNLOAD_BASE = 'apps'
 
 
+def get_github_repo():
+    """Get GitHub owner/repo from git remote origin URL."""
+    import subprocess
+    try:
+        url = subprocess.check_output(
+            ['git', 'remote', 'get-url', 'origin'],
+            cwd=str(REPO_ROOT), stderr=subprocess.DEVNULL
+        ).decode().strip()
+        # Handle both HTTPS and SSH formats
+        # https://github.com/owner/repo.git
+        # git@github.com:owner/repo.git
+        import re
+        match = re.search(r'github\.com[:/](.+?)(?:\.git)?$', url)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return 'cradlepoint/sdk-samples'
+
+
 def parse_package_ini(ini_path):
     """Parse a package.ini and return app metadata dict."""
     config = configparser.ConfigParser()
@@ -66,7 +86,8 @@ def find_readme(app_dir):
                 content = readme_path.read_text(encoding='utf-8', errors='replace')
                 # Rewrite relative image paths to raw GitHub URLs
                 rel_path = app_dir.relative_to(REPO_ROOT)
-                raw_base = f'https://raw.githubusercontent.com/phate999/sdk-samples/master/{rel_path}'
+                github_repo = get_github_repo()
+                raw_base = f'https://raw.githubusercontent.com/{github_repo}/master/{rel_path}'
                 # Match ![alt](relative_path) but not ![alt](http...)
                 import re
                 content = re.sub(

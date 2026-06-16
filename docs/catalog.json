@@ -60,7 +60,7 @@
       "name": "5GSpeed",
       "vendor": "Ericsson",
       "developer": "Ericsson",
-      "notes": "Netperf speedtests",
+      "notes": "Runs netperf speedtests and puts results into a configurable field. Designed to enable NCM API support for speedtests.",
       "tags": "connectivity, speedtest",
       "version_major": "0",
       "version_minor": "4",
