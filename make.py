@@ -822,31 +822,58 @@ def install():
 
         print('Installing {} to {}...'.format(app_archive, g_dev_client_ip))
 
-        cmd = [
-            'sshpass', '-p', g_dev_client_password,
-            'scp', '-O',
-            '-o', 'UserKnownHostsFile=/dev/null',
-            '-o', 'StrictHostKeyChecking=no',
-            app_archive,
-            '{}@{}:/app_upload'.format(g_dev_client_username, g_dev_client_ip)
-        ]
+        import paramiko
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            result = subprocess.run(cmd, capture_output=True, timeout=120)
-            if result.returncode != 0:
-                stderr = result.stderr.decode(errors='replace').strip() if result.stderr else ''
-                # Filter out SSH warnings and expected "lost connection" (router drops after upload)
-                errors = [l for l in stderr.splitlines()
-                          if not l.startswith('Warning:') and not l.startswith('**')
-                          and 'lost connection' not in l.lower()]
-                if errors:
-                    print('ERROR: SCP upload failed: {}'.format(' '.join(errors)))
-                    return 1
-        except FileNotFoundError:
-            print('ERROR: sshpass not found. Install with: brew install hudochenkov/sshpass/sshpass')
+            ssh.connect(g_dev_client_ip, username=g_dev_client_username,
+                        password=g_dev_client_password,
+                        look_for_keys=False, allow_agent=False, timeout=10)
+            transport = ssh.get_transport()
+
+            # Legacy SCP protocol — remote path MUST be /app_upload (no trailing slash)
+            channel = transport.open_session()
+            channel.exec_command('scp -t /app_upload')
+
+            # Wait for ready signal
+            response = channel.recv(1)
+            if response != b'\x00':
+                err = channel.recv(1024).decode(errors='replace') if channel.recv_ready() else ''
+                print('ERROR: SCP not ready: {}'.format(err))
+                return 1
+
+            # Send file header
+            file_size = os.path.getsize(app_archive)
+            filename = os.path.basename(app_archive)
+            header = 'C0644 {} {}\n'.format(file_size, filename)
+            channel.sendall(header.encode())
+
+            # Wait for header ack
+            response = channel.recv(1)
+            if response != b'\x00':
+                err = channel.recv(1024).decode(errors='replace') if channel.recv_ready() else ''
+                print('ERROR: SCP rejected file: {}'.format(err))
+                return 1
+
+            # Send file content
+            with open(app_archive, 'rb') as f:
+                while True:
+                    data = f.read(32768)
+                    if not data:
+                        break
+                    channel.sendall(data)
+
+            # Send completion signal
+            channel.sendall(b'\x00')
+            channel.close()
+        except (EOFError, OSError, paramiko.ssh_exception.SSHException):
+            # Router drops connection after receiving file — expected
+            pass
+        except Exception as e:
+            print('ERROR: Upload failed: {}'.format(e))
             return 1
-        except subprocess.TimeoutExpired:
-            print('ERROR: SCP upload timed out after 120s')
-            return 1
+        finally:
+            ssh.close()
 
         return 0
     else:
@@ -898,7 +925,7 @@ def deploy():
     """Full deploy: purge, build, install, and show recent logs."""
     print('Purging apps from {}...'.format(g_dev_client_ip))
     purge()
-    time.sleep(2)
+    time.sleep(3)
 
     if not package():
         print('ERROR: Packaging failed.')

@@ -1358,8 +1358,8 @@ sched_thread.start()
 
 # Start web server
 try:
+    HTTPServer.allow_reuse_address = True
     server = HTTPServer(('', PORT), SpeedtestHandler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_thread = Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
     cp.log(f'Web server started on port {PORT}')
