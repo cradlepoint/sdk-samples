@@ -1,6 +1,12 @@
 # speedtest_web
 Web-based speed test interface with scheduling, history tracking, and report generation.
 
+<img width="1519" height="841" alt="image" src="https://github.com/user-attachments/assets/ddbd71b3-e9d6-442d-94c1-5a1309be2be1" />
+<img width="1519" height="841" alt="image" src="https://github.com/user-attachments/assets/8ebf23d5-4215-4f09-9d25-67759c148cb0" />
+<img width="1519" height="841" alt="image" src="https://github.com/user-attachments/assets/54051101-c97a-43f8-bed0-f0637be0acba" />
+<img width="1519" height="841" alt="image" src="https://github.com/user-attachments/assets/4edfcc2e-69e9-4e4a-ad60-1ff0d1663122" />
+
+
 ## Features
 
 - **Multi-engine support**: Ookla (BYOB), Netperf (built-in), iPerf3
