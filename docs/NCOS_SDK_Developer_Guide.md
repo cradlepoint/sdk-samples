@@ -1,159 +1,171 @@
-# Ericsson (Cradlepoint) NetCloud OS SDK Developer Guide
+# Ericsson NCOS SDK — Complete Developer Manual
 
-A practical reference for network engineers building Python applications on Ericsson Cradlepoint routers.
-
----
-
-## 1. Introduction
-
-The NetCloud OS (NCOS) SDK enables you to write Python applications that run directly on Ericsson Cradlepoint routers. These applications execute on the device itself, giving you programmatic access to modem diagnostics, WAN status, GPS, LAN clients, GPIO, and the full NCOS configuration and status tree — without additional hardware.
-
-Use cases include automated site surveys, signal monitoring, data forwarding to cloud platforms (Splunk, Azure IoT, MQTT brokers), custom dashboards, OBD-II vehicle telemetry, geofencing, bandwidth management, and IoT device integration via serial or USB.
-
-Applications are deployed either directly to a development device over SSH or at scale through Ericsson NetCloud Manager (NCM) using group-based assignment.
-
-### What the SDK Supports
-
-- TCP/UDP/SSL socket servers (ports above 1024) and clients
-- Serial port access via PySerial (native and USB-serial)
-- ICMP ping to external hosts
-- Custom web interfaces (hotspot splash pages, dashboards, admin tools)
-- Full read/write access to the NCOS API (status, config, and control trees)
-- USB storage file access
-- Container deployment via Docker Compose
-
-### What Is Not Supported
-
-- Compiled Python bytecode (`.pyc`) and dynamically linked shared objects (`.so`) used as Python modules
-- Any operation requiring root or privileged permissions
-- Python standard library modules not included in the NCOS environment (see Section 4)
-
-Statically linked ARM64 (aarch64) ELF binaries *are* supported and can be bundled directly in your application package. See Section 5.5 for details.
-
-### Support Policy
-
-Ericsson publishes and supports the SDK toolkit. However, custom applications built with the SDK are the sole responsibility of the developer. Ericsson does not develop, maintain, or guarantee continued compatibility of third-party SDK applications across NCOS firmware releases. Test thoroughly before production deployment.
+A comprehensive reference for building, deploying, and managing Python applications on Ericsson Cradlepoint routers running NetCloud OS (NCOS).
 
 ---
 
-## 2. Development Environment Setup
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Environment Setup](#2-environment-setup)
+3. [Project Structure](#3-project-structure)
+4. [The cp Module — Full API Reference](#4-the-cp-module--full-api-reference)
+5. [Build Tool (make.py)](#5-build-tool-makepy)
+6. [Application Configuration](#6-application-configuration)
+7. [Router Environment Constraints](#7-router-environment-constraints)
+8. [Web Applications](#8-web-applications)
+9. [Working with Third-Party Libraries](#9-working-with-third-party-libraries)
+10. [Event Registration and Callbacks](#10-event-registration-and-callbacks)
+11. [Application Data (Appdata)](#11-application-data-appdata)
+12. [GPS and Location](#12-gps-and-location)
+13. [Speed Testing](#13-speed-testing)
+14. [GPIO](#14-gpio)
+15. [CLI Access (csterm) and Web Terminal (ttyd)](#15-cli-access-csterm-and-web-terminal-ttyd)
+16. [Containers on NCOS](#16-containers-on-ncos)
+17. [Local Development](#17-local-development)
+18. [Production Deployment via NCM](#18-production-deployment-via-ncm)
+19. [Debugging and Troubleshooting](#19-debugging-and-troubleshooting)
+20. [Complete Examples](#20-complete-examples)
+
+---
+
+## 1. Overview
+
+The NCOS SDK enables Python applications to run directly on Ericsson Cradlepoint routers. Applications execute on the device itself, providing programmatic access to modem diagnostics, WAN status, GPS, LAN clients, GPIO, serial ports, and the full NCOS configuration and status tree.
+
+### What You Can Build
+
+- Signal monitoring and alerting
+- Custom web dashboards
+- Cloud integrations (MQTT, Splunk, Azure IoT)
+- Automated site surveys
+- GPS tracking and geofencing
+- OBD-II vehicle telemetry
+- Bandwidth management and QoS automation
+- Hotspot splash pages and captive portals
+- IoT device integration via serial/USB
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────┐
+│              Your Application               │
+│         (Python 3.8, pure .py files)        │
+├─────────────────────────────────────────────┤
+│               cp.py Module                  │
+│    (communicates via Unix socket on router  │
+│     or HTTP REST when running locally)      │
+├─────────────────────────────────────────────┤
+│         NCOS Config Store (cs.sock)         │
+│     status/  config/  control/  state/      │
+├─────────────────────────────────────────────┤
+│            NCOS Router Hardware             │
+│   Modems │ GPS │ WiFi │ GPIO │ Ethernet     │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Environment Setup
 
 ### Prerequisites
 
 - Python 3.8 or later on your development machine
-- SSH access to a Cradlepoint router in Developer Mode (enabled via NetCloud Manager, not the router UI)
+- Git
+- An Ericsson Cradlepoint router with Developer Mode enabled (via NetCloud Manager)
 
-### SDK Installation
-
-Clone the SDK and install Python dependencies:
+### Clone and Install
 
 ```bash
 git clone https://github.com/cradlepoint/sdk-samples.git
 cd sdk-samples
 ```
 
-#### Windows
-
+**Windows:**
 ```cmd
 python make.py setup
 ```
 
-#### macOS / Linux
-
+**macOS / Linux:**
 ```bash
 python3 make.py setup
 ```
 
-This creates a `.venv` virtual environment and installs all Python dependencies from `requirements.txt` automatically.
+This creates a `.venv` virtual environment and installs all dependencies from `requirements.txt` (requests, cryptography, paramiko, pyserial).
 
-Using [Kiro](https://kiro.dev)? See [docs/SETUP.md](docs/SETUP.md) for a guided walkthrough — the Python environment is set up automatically.
+### Configure Router Connection
 
-To activate the virtual environment later:
+Edit `sdk_settings.ini` in the repository root:
 
-```bash
-# Windows
-.venv\Scripts\activate.bat
-
-# macOS / Linux
-source .venv/bin/activate
+```ini
+[sdk]
+app_name=hello_world
+dev_client_ip=192.168.0.1
+dev_client_username=admin
+dev_client_password=your_password
 ```
 
-### System-Level Dependencies (manual, one-time)
+| Field | Description |
+|-------|-------------|
+| `app_name` | Default app name for commands when not specified |
+| `dev_client_ip` | Router IP address on your network |
+| `dev_client_username` | Router admin username |
+| `dev_client_password` | Router admin password |
 
-The setup scripts handle Python libraries, but some system-level tools must be installed separately.
+### Enable Developer Mode
 
-#### Windows
+Developer Mode must be enabled in **NetCloud Manager** (not the router's local UI):
 
-No additional system-level installs needed. All dependencies are handled by `python make.py setup`.
-
-#### macOS
-
-No additional system-level installs needed. All dependencies are handled by `python3 make.py setup`.
-
-#### Linux (Debian/Ubuntu)
-
-No additional system-level installs needed. All dependencies are handled by `python3 make.py setup`.
-
-### Running Applications Locally
-
-You can run SDK applications directly on your development machine using standard Python. The `cp.py` module automatically detects whether it is running on a router (via the presence of `/var/tmp/cs.sock`) or on a computer. When running locally, all `cp.get()`, `cp.put()`, `cp.post()`, and `cp.delete()` calls are sent as HTTP REST requests to the router specified in `sdk_settings.ini`.
-
-This means you can develop and test most application logic without deploying to the router on every change:
-
-```bash
-# Run your app locally — it talks to the router over REST
-python3 my_app/my_app.py
-```
-
-#### What Works Locally
-
-- `cp.get()` / `cp.put()` / `cp.post()` / `cp.delete()` — all route through REST to the dev router
-- `cp.log()` — prints to stdout (console) instead of syslog
-- All convenience functions that use `cp.get()` internally (e.g., `cp.get_lat_long()`, `cp.get_connected_wans()`, `cp.get_signal_strength()`)
-- Reading and writing appdata
-
-#### What Does Not Work Locally
-
-| Function | Behavior When Local |
-|----------|-------------------|
-| `cp.alert()` | Logs the alert text to console but does not send to NCM |
-| `cp.register()` / `cp.unregister()` | Event callbacks require the router's socket — no REST equivalent |
-| `cp.decrypt()` | Logs a message and returns `None` — decryption requires the router |
-| Web servers (`http.server`) | Binds to your local machine's port, not the router's — LAN clients cannot reach it |
-| Serial port access | Accesses your computer's serial ports, not the router's |
-| GPIO | Not available on your computer |
-| `cppython`-specific modules | Your local Python may have different modules than the router |
-
-#### Local Development Tips
-
-- Use `sdk_settings.ini` to point at your dev router — `cp.py` reads credentials from there automatically.
-- Test your core logic (API reads, data processing, decision-making) locally for fast iteration.
-- Deploy to the router for final testing of alerts, event registration, web UIs, serial, and GPIO.
-- `cp.log()` output goes to your terminal when local, so you get immediate feedback.
+1. Log in to NetCloud Manager
+2. Navigate to the device
+3. Enable SDK Developer Mode under device settings
 
 ---
 
-## 3. Application Structure
+## 3. Project Structure
 
-Every SDK application follows a consistent directory layout:
+### Repository Layout
+
+```
+sdk-samples/
+├── apps/                       # All sample applications
+│   ├── hello_world/            # Minimal example
+│   ├── mqtt_app/               # MQTT integration
+│   ├── speedtest_web/          # Web-based speed test
+│   ├── ...                     # 75+ apps
+│   ├── templates/              # Scaffolding templates
+│   │   ├── app_template/       # Basic app template
+│   │   └── web_app_template/   # Web app with UI
+│   └── archive/                # Retired apps
+├── docs/                       # Documentation
+├── make.py                     # Build/deploy tool
+├── sdk_settings.ini            # Router connection settings
+└── requirements.txt            # Python dependencies
+```
+
+### Application Layout
+
+Every SDK application follows this structure:
 
 ```
 my_app/
-├── package.ini        # Application metadata (UUID, version, vendor)
-├── start.sh           # Entry point — must use cppython
-├── cp.py              # SDK communication library (do not modify)
-├── my_app.py          # Your application logic
-└── readme.md          # Documentation and appdata field descriptions
+├── package.ini          # Application metadata (UUID, version, vendor)
+├── start.sh             # Entry point — must use cppython
+├── cp.py                # SDK communication library (auto-generated)
+├── my_app.py            # Your application logic
+├── readme.md            # Documentation and appdata fields
+└── METADATA/            # Auto-generated during build (signatures)
+    ├── MANIFEST.json
+    └── SIGNATURE.DS
 ```
-### package.ini
 
-Defines application metadata used by the router and NetCloud Manager:
+### package.ini
 
 ```ini
 [my_app]
-uuid =
-vendor = Ericsson/Cradlepoint
-notes = SDK Application
+uuid = a58c82ba-cb00-4219-a98f-5305aa13efd7
+vendor = Ericsson
+notes = Description of your app
 version_major = 1
 version_minor = 0
 version_patch = 0
@@ -161,329 +173,539 @@ auto_start = true
 restart = true
 reboot = true
 firmware_major = 7
-firmware_minor = 25
+firmware_minor = 26
+developer = Ericsson
+tags = monitoring, web
 ```
 
-The `uuid` field is auto-generated when you create the app with `make.py`. The `auto_start`, `restart`, and `reboot` flags control whether the app starts automatically, restarts on crash, and survives device reboots.
+| Field | Description |
+|-------|-------------|
+| `uuid` | Unique identifier (auto-generated on first build) |
+| `vendor` | Your organization name |
+| `notes` | Brief description |
+| `version_major/minor/patch` | Semantic version |
+| `auto_start` | Start automatically after install |
+| `restart` | Restart on crash |
+| `reboot` | Survive router reboots |
+| `firmware_major/minor` | Latest NCOS version tested |
+| `tags` | Comma-separated categories for discovery |
 
 ### start.sh
-
-The entry point script. It must use `cppython` (the router's Python interpreter), not `python` or `python3`:
 
 ```bash
 #!/bin/bash
 cppython my_app.py
 ```
 
-### cp.py
-
-The SDK communication library. This file is auto-generated and should not be modified. It provides the `cp` module your application imports to interact with the router.
+Always use `cppython` — never `python` or `python3`. The router's Python interpreter is `cppython`.
 
 ---
 
-## 4. The NCOS Python Environment
+## 4. The cp Module — Full API Reference
 
-The router runs Python 3.8 via `cppython`, which is a constrained subset of a standard Python installation. Understanding these constraints is essential before writing code.
+Import at the top of every application:
+
+```python
+import cp
+```
+
+The `cp` module communicates with the router's config store via Unix socket (on-router) or HTTP REST (local development). All functions are module-level — no classes to instantiate.
+
+### 4.1 Logging and Alerts
+
+```python
+cp.log(value: str)
+```
+Log a message to syslog (router), stdout (container), or console (local). **Always use this instead of `print()`.**
+
+```python
+cp.alert(value: str) -> Optional[Dict]
+```
+Send a custom alert to NetCloud Manager. Only works on-router.
+
+### 4.2 CRUD Operations
+
+These are the core functions for reading and writing to the router's data tree.
+
+```python
+cp.get(base: str, query: str = '', tree: int = 0) -> Any
+```
+Read data from the status/config tree. Returns the data directly (not wrapped).
+
+```python
+cp.put(base: str, value: Any = '', query: str = '', tree: int = 0) -> Optional[Dict]
+```
+Update data in the config/control/state tree.
+
+```python
+cp.post(base: str, value: Any = '', query: str = '') -> Optional[Dict]
+```
+Create new entries in the config tree.
+
+```python
+cp.delete(base: str, query: str = '') -> Optional[Dict]
+```
+Delete entries from the config tree.
+
+```python
+cp.patch(value: List) -> Optional[Dict]
+```
+Bulk add/remove from the config tree. Value format: `[adds_dict, removals_list]`.
+
+```python
+cp.decrypt(base: str, query: str = '', tree: int = 0) -> Any
+```
+Decrypt and retrieve encrypted data (e.g., certificate private keys). Only works on-router.
+
+**Examples:**
+
+```python
+# Read system uptime
+uptime = cp.get('status/system/uptime')
+
+# Read WAN connection state
+state = cp.get('status/wan/connection_state')
+
+# Write a config value
+cp.put('config/system/asset_id', 'Site-42-Router')
+
+# Trigger a reboot
+cp.put('control/system/reboot', 'reboot hypmgr')
+
+# Create a new user
+cp.post('config/system/users/', {"username": "sdk", "password": "pass", "group": "admin"})
+```
+
+### 4.3 Device Information
+
+```python
+cp.get_name() -> Optional[str]                          # Device name (system_id)
+cp.get_mac(format_with_colons=False) -> Optional[str]   # MAC address
+cp.get_serial_number() -> Optional[str]                 # Serial number
+cp.get_product_type() -> Optional[str]                  # Product name (e.g. 'IBR900-600M')
+cp.get_router_model() -> Optional[str]                  # Model only (e.g. 'IBR900')
+cp.get_firmware_version(include_build_info=False) -> str # Firmware version string
+cp.get_uptime() -> int                                  # Uptime in seconds
+cp.get_temperature(unit='fahrenheit') -> Optional[float]# Device temperature
+cp.get_description() -> Optional[str]                   # Device description
+cp.get_asset_id() -> Optional[str]                      # Asset ID
+```
+
+### 4.4 Wait Helpers
+
+```python
+cp.wait_for_wan_connection(timeout=300) -> bool   # Wait for WAN to connect
+cp.wait_for_uptime(min_uptime_seconds=60) -> None # Wait for minimum uptime
+cp.wait_for_ntp(timeout=300) -> bool              # Wait for NTP sync
+```
+
+### 4.5 GPS and Location
+
+```python
+cp.get_lat_long(max_retries=5) -> Tuple[Optional[float], Optional[float]]
+cp.get_gps_status() -> Dict[str, Any]  # lock, satellites, lat, lon, altitude, speed, heading
+cp.dec(deg, minutes=0.0, sec=0.0) -> Optional[float]  # DMS to decimal degrees
+```
+
+### 4.6 WAN and Connectivity
+
+```python
+cp.get_wan_connection_state() -> Optional[str]     # 'connected', 'disconnected', etc.
+cp.get_wan_ip_address() -> Optional[str]           # WAN IP
+cp.get_wan_primary_device() -> Optional[str]       # Primary WAN device UID
+cp.get_connected_wans(max_retries=10) -> List[str] # Connected WAN device UIDs
+cp.get_sims(max_retries=10) -> List[str]           # Modem UIDs with SIMs installed
+cp.get_wan_status() -> Optional[Dict]              # Full WAN status with all devices
+cp.get_wan_devices() -> Optional[Dict]             # Device list with basic status
+cp.get_wan_devices_status() -> Optional[Dict]      # Raw WAN devices status tree
+cp.get_wan_device_summary() -> Optional[Dict]      # Summary with profile info
+```
+
+### 4.7 Signal Strength and Modem Diagnostics
+
+```python
+cp.get_signal_strength(uid=None, include_backlog=False) -> Optional[Dict]
+cp.get_wan_modem_diagnostics(device_id: str) -> Optional[Dict]
+cp.get_wan_modem_stats(device_id: str) -> Optional[Dict]
+cp.get_wan_ethernet_info(device_id: str) -> Optional[Dict]
+```
+
+Signal strength returns: `signal_strength`, `rsrp`, `rsrp_5g`, `rsrq`, `rsrq_5g`, `sinr`, `sinr_5g`, `dbm`, `rf_band`, `service_type`, `cellular_health_score`, `cellular_health_category`, and more.
+
+### 4.8 LAN and Clients
+
+```python
+cp.get_lan_clients() -> Dict                        # IPv4/IPv6 client counts and lists
+cp.get_ipv4_wired_clients() -> List[Dict]           # Wired clients with hostname resolution
+cp.get_ipv4_wifi_clients() -> List[Dict]            # WiFi clients with SSID, signal, band
+cp.get_ipv4_lan_clients() -> Dict                   # Combined wired + WiFi
+cp.get_lan_status() -> Optional[Dict]               # Full LAN status
+cp.get_lan_networks() -> Optional[Dict]             # LAN network info
+cp.get_lan_devices() -> Optional[Dict]              # LAN device info
+cp.get_lan_statistics() -> Optional[Dict]           # LAN traffic stats
+```
+
+### 4.9 WLAN (WiFi)
+
+```python
+cp.get_wlan_status() -> Optional[Dict]              # Full WLAN status
+cp.get_wlan_clients() -> List[Dict]                 # Connected wireless clients
+cp.get_wlan_radio_status() -> List[Dict]            # Radio status for all bands
+cp.get_wlan_radio_by_band(band='2.4 GHz') -> Optional[Dict]
+cp.get_wlan_state() -> str                          # 'On', 'Off', etc.
+cp.get_wlan_events() -> Dict                        # WLAN events
+cp.get_wlan_channel_info(band=None) -> Dict         # Channel info
+cp.get_wlan_client_count() -> int                   # Total WiFi clients
+cp.get_wlan_client_count_by_band() -> Dict[str, int]
+```
+
+### 4.10 System Status
+
+```python
+cp.get_system_status() -> Optional[Dict]  # uptime, cpu, memory, disk, services
+cp.get_comprehensive_status() -> Optional[Dict]  # Everything in one call
+```
+
+System status returns: `uptime`, `temperature`, `cpu_usage`, `memory` (total/used/free/percentage), `disk` (total/used/free/percentage), `services_running`, `services_disabled`.
+
+### 4.11 Network Services
+
+```python
+cp.get_dhcp_status() -> Optional[Dict]      # DHCP status with leases
+cp.get_dhcp_leases() -> Optional[List]      # Lease list
+cp.get_dns_status() -> Optional[Dict]       # DNS cache stats
+cp.get_firewall_status() -> Optional[Dict]  # Connection tracking, hit counters
+cp.get_openvpn_status() -> Optional[Dict]   # OpenVPN tunnel status
+cp.get_vpn_status() -> Optional[Dict]       # Combined VPN (OpenVPN, L2TP, GRE, VXLAN)
+cp.get_hotspot_status() -> Optional[Dict]   # Hotspot clients/sessions
+cp.get_qos_status() -> Optional[Dict]       # QoS queues and packets
+cp.get_routing_table() -> Optional[Dict]    # Routing information
+cp.get_services_status() -> Optional[Dict]  # System services
+cp.get_apps_status() -> Optional[Dict]      # Internal + SDK apps
+cp.get_sdwan_status() -> Optional[Dict]     # SD-WAN advanced status
+cp.get_flow_statistics() -> Optional[Dict]  # Flow stats with destinations
+cp.get_client_usage() -> Optional[Dict]     # Per-client bandwidth stats
+cp.get_power_usage() -> Optional[Dict]      # Power consumption
+cp.get_storage_status() -> Optional[Dict]   # Storage health
+cp.get_sensors_status() -> Optional[Dict]   # Level/day sensors
+cp.get_iot_status() -> Optional[Dict]       # IoT status
+cp.get_event_status() -> Optional[Dict]     # System events
+cp.get_obd_status() -> Optional[Dict]       # OBD vehicle diagnostics
+cp.get_certificate_status() -> Optional[Dict]
+cp.get_security_status() -> Optional[Dict]  # Firewall + security + certs
+```
+
+### 4.12 NCM (NetCloud Manager)
+
+```python
+cp.get_ncm_status() -> Optional[str]        # 'connected', 'disconnected'
+cp.get_ncm_router_id() -> Optional[str]     # NCM client ID
+cp.get_ncm_group_name() -> Optional[str]    # NCM group name
+cp.get_ncm_account_name() -> Optional[str]  # NCM account name
+cp.get_ncm_api_keys() -> Optional[Dict]     # API keys from cert management
+```
+
+### 4.13 Diagnostics
+
+```python
+cp.ping_host(host, count=4, packet_size=56) -> Optional[Dict]
+# Returns: host, num, size, tx, rx, loss, min, avg, max
+
+cp.traceroute_host(host, max_hops=30) -> Optional[Dict]
+# Returns: host, hops, hop_count, raw_output
+
+cp.execute_cli(commands, timeout=10, clean=True) -> Optional[str]
+# Execute CLI commands and return output
+
+cp.dns_lookup(hostname, record_type="A") -> Optional[Dict]
+cp.clear_dns_cache() -> Optional[Dict]
+cp.stop_ping() -> Optional[Dict]
+```
+
+### 4.14 Speed Test (Netperf)
+
+```python
+cp.speed_test(host="", interface="", duration=5, packet_size=0,
+              protocol="tcp", direction="both") -> Optional[Dict]
+# Returns: download_bps, upload_bps, latency_ms, test_duration, interface, host, protocol
+
+cp.stop_speed_test() -> Optional[Dict]
+```
+
+### 4.15 WAN Profile Management
+
+```python
+cp.get_wan_profiles() -> Optional[List[Dict]]           # All profiles sorted by priority
+cp.get_wan_device_profile(device_id) -> Optional[Dict]  # Profile for specific device
+cp.set_wan_device_priority(device_id, priority) -> bool # Set priority
+cp.enable_wan_device(device_id) -> bool                 # Enable device
+cp.disable_wan_device(device_id) -> bool                # Disable device
+cp.make_wan_device_highest_priority(device_id) -> bool  # Make highest priority
+cp.set_wan_device_default_connection_state(device_id, state) -> bool
+cp.set_wan_device_bandwidth(device_id, ingress_kbps=None, egress_kbps=None) -> bool
+cp.set_manual_apn(device_or_id, new_apn) -> Optional[Dict]
+cp.remove_manual_apn(device_or_id) -> Optional[Dict]
+cp.add_advanced_apn(carrier, apn) -> Optional[Dict]
+cp.delete_advanced_apn(carrier_or_apn) -> Optional[Dict]
+```
+
+### 4.16 User Management
+
+```python
+cp.create_user(username, password, group="admin") -> Dict
+cp.get_users() -> Dict
+cp.delete_user(username) -> Dict
+cp.ensure_user_exists(username, password, group="admin") -> Dict
+cp.ensure_fresh_user(username, group="admin") -> Dict  # Delete + recreate with random password
+cp.validate_password(username, password) -> Dict       # On-router only
+```
+
+### 4.17 Device Management
+
+```python
+cp.reboot_device() -> None
+cp.set_description(description) -> Optional[Dict]
+cp.set_asset_id(asset_id) -> Optional[Dict]
+cp.set_name(name) -> Optional[Dict]
+```
+
+### 4.18 GPIO
+
+```python
+cp.get_gpio(gpio_name=None, router_model=None) -> Any
+cp.get_all_gpios() -> Dict[str, Any]
+cp.get_available_gpios(router_model=None) -> List[str]
+```
+
+Supported models and GPIO names:
+
+| Model | Available GPIOs |
+|-------|----------------|
+| IBR200 | power_input, power_output |
+| IBR600 | power_input, power_output |
+| IBR900 | power_input, power_output, sata_1–4, sata_ignition_sense |
+| IBR1100 | power_input, power_output, expander_1–3 |
+| R920 | power_input, power_output |
+| R980 | power_input, power_output |
+| R1900 | power_input, power_output, expander_1–3, accessory_1 |
+
+### 4.19 Certificates
+
+```python
+cp.extract_cert_and_key(cert_name_or_uuid) -> Tuple[Optional[str], Optional[str]]
+# Returns: (cert_filename, key_filename) as .pem files
+```
+
+### 4.20 Log Monitoring and SMS
+
+```python
+cp.monitor_log(pattern=None, callback=None, follow=True, max_lines=0, timeout=0) -> Optional[Dict]
+cp.stop_monitor_log(monitor_result) -> Dict
+cp.monitor_sms(callback, timeout=0) -> Optional[Dict]
+cp.stop_monitor_sms(monitor_result) -> Dict
+cp.send_sms(phone_number, message, port=None) -> Optional[str]
+```
+
+### 4.21 Packet Capture
+
+```python
+cp.start_packet_capture(interface="any", filter_expr="", count=20,
+                        timeout=600, url="", filename="") -> Optional[Dict]
+cp.stop_packet_capture() -> Dict
+cp.download_packet_capture(filename, local_path=None, capture_params=None) -> Optional[Dict]
+```
+
+### 4.22 File Server
+
+```python
+cp.start_file_server(folder_path="files", port=8000, host="0.0.0.0",
+                     title="File Download") -> Optional[Dict]
+```
+Starts a web file server with a responsive UI for downloading files.
+
+### 4.23 Event Registration
+
+```python
+cp.register(action='put', path='', callback=None, *args) -> Optional[Dict]
+cp.unregister(eid) -> Optional[Dict]
+```
+
+See [Section 10](#10-event-registration-and-callbacks) for full details.
+
+### 4.24 Appdata
+
+```python
+cp.get_appdata(name='') -> Union[Optional[str], Optional[List[Dict]]]
+cp.put_appdata(name, value) -> None
+cp.post_appdata(name, value) -> None
+cp.delete_appdata(name) -> None
+```
+
+See [Section 11](#11-application-data-appdata) for full details.
+
+---
+
+## 5. Build Tool (make.py)
+
+All commands use the virtual environment Python:
+
+**macOS / Linux:**
+```bash
+.venv/bin/python make.py <command> [app_name]
+```
+
+**Windows:**
+```cmd
+.venv\Scripts\python make.py <command> [app_name]
+```
+
+### Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `create <name>` | Scaffold a new app from template |
+| `build <name>` | Package app as `.tar.gz` |
+| `build all` | Build all apps |
+| `deploy <name>` | Full lifecycle: purge → build → install → show logs |
+| `install <name>` | Transfer package to router via SSH |
+| `start <name>` | Start app on router |
+| `stop <name>` | Stop app on router |
+| `status` | Show SDK status on router |
+| `uninstall <name>` | Remove app from router |
+| `purge` | Remove ALL apps from router |
+| `clean <name>` | Remove local build artifacts |
+| `clean all` | Clean all apps |
+| `setup` | Create .venv and install dependencies |
+| `uuid` | Generate UUID for app |
+| `update` | Check for SDK updates from GitHub |
+
+### Creating a New App
+
+```bash
+.venv/bin/python make.py create my_new_app
+```
+
+This copies `apps/templates/app_template/` to `./my_new_app/` at the repo root, renames the main file, and updates all internal references. Edit `my_new_app.py` and `readme.md`. When ready, move to apps:
+
+```bash
+mv my_new_app apps/
+```
+
+### Deploying
+
+```bash
+.venv/bin/python make.py deploy my_app
+```
+
+This runs the full deployment cycle:
+1. **Purge** — Remove all apps from router
+2. **Build** — Package as versioned `.tar.gz`
+3. **Install** — Transfer via SSH (paramiko)
+4. **Verify** — Show recent logs to confirm startup
+
+The app auto-starts after install (`auto_start = true`).
+
+### Build Ignore
+
+Exclude files from the package by creating a `buildignore` file in your app directory:
+
+```
+# Development files
+test_data.json
+requirements.txt
+tests/
+docs/
+```
+
+Always excluded automatically: `__pycache__/`, `buildignore`, `.DS_Store`.
+
+---
+
+## 6. Application Configuration
+
+### sdk_settings.ini
+
+The build tool reads router connection details from `sdk_settings.ini`:
+
+```ini
+[sdk]
+app_name=my_app
+dev_client_ip=192.168.0.1
+dev_client_username=admin
+dev_client_password=your_password
+```
+
+The `app_name` field is the default when no app name is passed to make.py commands.
+
+### package.ini Tags
+
+Tags categorize apps for the App Store and discovery:
+
+`connectivity`, `monitoring`, `networking`, `integrations`, `gpio`, `vehicle`, `security`, `web`, `tools`, `examples`, `speedtest`, `mqtt`
+
+---
+
+## 7. Router Environment Constraints
+
+### Python 3.8
+
+The router runs `cppython` (Python 3.8). Key restrictions:
+
+```python
+# ❌ WRONG — union type syntax (Python 3.10+)
+value: str | None = None
+
+# ✅ CORRECT — use Optional
+from typing import Optional
+value: Optional[str] = None
+```
+
+### No Screen, No Keyboard
+
+```python
+# ❌ WRONG
+print("Hello")          # Use cp.log() instead
+input("Enter value:")   # No keyboard exists
+
+# ✅ CORRECT
+cp.log("Hello")
+value = cp.get_appdata('my_setting')
+```
+
+### File System Rules
+
+- **Relative paths only** — use `tmp/`, never `/tmp/`
+- **Create directories first** — `os.makedirs('tmp', exist_ok=True)`
+- **NEVER modify packaged files** — router deletes the app if any file from the original package is modified. Write to new files only
+- **No .pyc or .so files** — only pure Python (.py) is supported
 
 ### Available Standard Library Modules
-
-These modules are confirmed available on NCOS devices:
 
 `threading`, `select`, `ssl`, `http.server`, `socket`, `configparser`, `zipfile`, `io`, `hashlib`, `hmac`, `base64`, `struct`, `uuid`, `json`, `logging`, `os`, `sys`, `time`, `xml.etree.ElementTree`
 
 ### Missing Standard Library Modules
 
-These common modules are not available in `cppython`:
+`pkg_resources`, `decimal`, `csv` — copy shims from `apps/5GSpeed/` or `apps/Mobile_Site_Survey/` if needed.
 
-`pkg_resources`, `decimal`, `csv`
+### Pre-installed System Libraries
 
-If your application or a dependency requires these, copy the pure-Python shim files from existing sample apps (e.g., `decimal.py`, `csv.py`, `_csv.py` from the `5GSpeed` or `Mobile_Site_Survey` directories).
+`requests` is available system-wide on `cppython`. Do NOT bundle it in your app folder.
 
-### Adding Third-Party Libraries
+### Architecture
 
-Install libraries directly into your application directory:
-
-```bash
-pip3 install --target=my_app/ library_name
-```
-
-After installation, delete any `egg-info` or `dist-info` directories — they consume storage and are not needed at runtime.
-
-Constraints:
-- Only pure Python (`.py`) files are supported. Remove any `.pyc` or `.so` files.
-- Libraries must be compatible with Python 3.8.
-- Keep dependencies minimal — app size limit is 60MB archive.
-
-### Python 3.8 Syntax Restrictions
-
-Since the runtime is Python 3.8, avoid newer syntax:
-
-```python
-# Do NOT use union type syntax (Python 3.10+)
-# value: str | None = None        # WRONG
-
-# Use Optional instead
-from typing import Optional
-value: Optional[str] = None       # CORRECT
-```
+ARM64 (aarch64) with musl libc. When downloading binaries, always use `aarch64`/`arm64` variants.
 
 ---
-
-## 5. The cp Module — Router API Access
-
-The `cp` module is your primary interface to the router. Import it at the top of your application:
-
-```python
-import cp
-```
-
-### Logging
-
-There is no screen or console on the router. Use `cp.log()` for all output — never `print()`:
-
-```python
-cp.log('Starting my_app...')
-```
-
-Log output is visible in NetCloud Manager and via `make.py` during development.
-
-### Reading Router Data
-
-Use `cp.get()` to read from the status and config trees:
-
-```python
-# Get system status
-system = cp.get('status/system')
-
-# Get modem signal information
-wan_devices = cp.get('status/wan/devices')
-
-# Get GPS coordinates
-lat, lon = cp.get_lat_long()
-cp.log(f'Location: {lat}, {lon}')
-```
-
-### Writing Configuration
-
-Use `cp.put()` to modify configuration and `cp.post()` to create new entries:
-
-```python
-# Set the device description
-cp.put('config/system/asset_id', 'Site-42-Router')
-
-# Trigger a control action
-cp.put('control/system/reboot', '')
-```
-
-### Sending Alerts
-
-Send alerts visible in NetCloud Manager:
-
-```python
-cp.alert('WAN failover detected — switched to LTE backup')
-```
-
-### Waiting for Connectivity
-
-If your app needs internet access, wait for a WAN connection before proceeding:
-
-```python
-cp.wait_for_wan_connection()
-cp.log('WAN is up, proceeding...')
-```
-
-### Application Data (appdata)
-
-Appdata provides per-app key-value storage configurable from NetCloud Manager. Use it for user-configurable settings:
-
-```python
-# Read a setting
-server_url = cp.get_appdata('server_url')
-if not server_url:
-    server_url = 'https://default.example.com'  # Code default, not written to appdata
-    cp.log('No server_url configured, using default')
-
-# Write a value
-cp.put_appdata('last_run', '2025-01-15T10:30:00')
-```
-
-Never write default values to appdata — doing so overrides group-level configurations pushed from NCM.
-
-### Event Registration
-
-Register callbacks that fire when specific API paths change:
-
-```python
-def on_wan_change(path, value, args):
-    cp.log(f'WAN state changed: {value}')
-
-cp.register('set', 'status/wan/connection_state', on_wan_change)
-```
-
-Note: The callback receives exactly three arguments: `(path, value, args)` where `args` is a single tuple.
-
-### Convenience Functions
-
-The `cp` module includes many high-level helpers. A selection of commonly used ones:
-
-| Function | Description |
-|----------|-------------|
-| `cp.get_lat_long()` | Returns `(latitude, longitude)` tuple |
-| `cp.get_uptime()` | Router uptime in seconds |
-| `cp.get_connected_wans()` | List of connected WAN interface names |
-| `cp.get_sims()` | SIM card details for all slots |
-| `cp.get_ipv4_lan_clients()` | Connected LAN clients by interface |
-| `cp.get_signal_strength(uid)` | Modem signal metrics (RSRP, RSRQ, SINR) |
-| `cp.get_temperature()` | Device temperature |
-| `cp.get_power_usage()` | Power consumption data |
-| `cp.get_wan_device_summary()` | Summary of all WAN devices and states |
-| `cp.get_firmware_version()` | Current NCOS firmware version |
-| `cp.get_serial_number()` | Device serial number |
-| `cp.get_mac()` | Device MAC address |
-| `cp.ping_host(host)` | Ping a remote host |
-| `cp.reset_modem()` | Reset the cellular modem |
-| `cp.get_ncm_api_keys()` | Retrieve NCM API credentials |
-| `cp.extract_cert_and_key(name)` | Extract TLS certificate and private key |
-
-For the complete API reference, see [cp_methods_reference.md](https://github.com/cradlepoint/sdk-samples/blob/master/cp_methods_reference.md).
-
-### 5.5 Bundling Native Binaries
-
-SDK applications can include statically linked ARM64 ELF binaries alongside (or instead of) Python code. The router's architecture is ARM64 (aarch64) with musl libc.
-
-#### Requirements
-
-- The binary must be a statically linked, 64-bit ARM aarch64 ELF executable.
-- Do not use dynamically linked binaries — the router does not have a standard Linux userland with shared libraries.
-- Verify your binary before packaging:
-
-```bash
-file my_binary
-# Expected: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, stripped
-```
-
-#### Binary-Only Application (no Python)
-
-An application can consist entirely of a native binary with no Python code. In this case, `start.sh` launches the binary directly instead of `cppython`:
-
-```
-ttyd/
-├── package.ini
-├── start.sh          # Launches the binary directly
-├── cp.py             # Still included (auto-generated)
-├── ttyd              # Statically linked ARM64 binary
-└── readme.md
-```
-
-```bash
-# start.sh — binary-only app
-#!/bin/bash
-./ttyd -p 8022 -W bash
-```
-
-#### Mixed Application (Python + Binary)
-
-More commonly, a Python application invokes a bundled binary using `subprocess` or `os.system`. The binary is placed in the application directory and called with a relative path:
-
-```
-my_app/
-├── package.ini
-├── start.sh          # cppython my_app.py
-├── cp.py
-├── my_app.py         # Python logic that invokes the binary
-├── my_binary         # Statically linked ARM64 binary
-└── readme.md
-```
-
-```python
-import cp
-import subprocess
-
-cp.log('Running binary...')
-try:
-    result = subprocess.run(['./my_binary', '--arg1', 'value'],
-                            capture_output=True, text=True, timeout=120)
-    cp.log(f'Output: {result.stdout}')
-    if result.returncode != 0:
-        cp.log(f'Error: {result.stderr}')
-except Exception as e:
-    cp.log(f'Binary execution failed: {e}')
-```
-
-#### Where to Find ARM64 Binaries
-
-When sourcing binaries for NCOS applications, always download the `aarch64`, `arm64`, or `linux-arm64` variant. Do not use `x86_64` or `amd64` builds. Many open-source projects publish static ARM64 builds on their GitHub releases pages.
-
----
-
-## 6. Error Handling
-
-Robust error handling is critical on embedded devices where failures must not crash the application.
-
-### General Pattern
-
-Wrap all API calls and external operations in try/except blocks:
-
-```python
-try:
-    data = cp.get('status/system')
-    if data:
-        cp.log(f"System ID: {data.get('system_id', 'unknown')}")
-except Exception as e:
-    cp.log(f'Error reading system status: {e}')
-```
-
-### Rules
-
-- Never use bare `except:` — always catch a specific exception or `Exception`.
-- Never use `input()` or `KeyboardInterrupt` — there is no keyboard.
-- Log errors with enough context to diagnose the issue remotely.
-
----
-
-## 7. File System Considerations
-
-### Digital Signatures
-
-Every packaged application includes a `MANIFEST.json` with digital signatures. If any packaged file is modified at runtime, the router deletes the entire application. Always write to new files that were not part of the original package.
-
-### Path Rules
-
-- Use relative paths only (e.g., `data/results.json`, not `/tmp/results.json`).
-- Create directories before writing with `os.makedirs('data', exist_ok=True)`.
-- Any directory name is fine — just ensure it does not overwrite packaged files.
-
-### State Persistence
-
-Save application state to survive reboots:
-
-```python
-import json, os
-
-STATE_FILE = 'state.json'
-
-def save_state(state):
-    with open(STATE_FILE, 'w') as f:
-        json.dump(state, f)
-
-def load_state():
-    try:
-        with open(STATE_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-```
 
 ## 8. Web Applications
 
-SDK apps can serve web interfaces accessible from the router's LAN.
-
-### Basic Web Server Pattern
+### Basic Pattern
 
 ```python
 import cp
 import json
 import socket
+import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from threading import Thread
 
@@ -500,255 +722,529 @@ class MyHandler(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
+cp.log('Starting web server...')
 server = HTTPServer(('', PORT), MyHandler)
 server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
 Thread(target=server.serve_forever, daemon=True).start()
 cp.log(f'Web server started on port {PORT}')
 
-# Main application loop
 while True:
     time.sleep(60)
 ```
 
 ### Web Development Rules
 
-- Default to port 8000.
-- Always set `SO_REUSEADDR` before binding to avoid "Address in use" errors on redeployment.
-- Run the HTTP server in a daemon thread so the main thread can handle application logic.
-- Serve all assets locally (CSS, JS, images). Do not reference external CDNs — the router may not always have internet access.
-- All static files (HTML, CSS, JS) go in the application directory alongside your Python files.
+- **Port 8000** is the default
+- **Always set SO_REUSEADDR** before binding
+- **Run in a daemon thread** so the main thread handles app logic
+- **Serve all assets locally** — no external CDNs
+- **Use Python's built-in `http.server`** — never use Flask, Bottle, etc.
+- **Vanilla JavaScript** — ES6+ is fine (arrow functions, async/await, template literals)
+- **Never pass parameters in onclick attributes** — use data attributes instead
+
+### Web App Template
+
+When creating web apps, copy the template at `apps/templates/web_app_template/`:
+
+```
+web_app_template/
+├── package.ini
+├── start.sh
+├── cp.py
+├── web_app_template.py      # HTTP server
+├── your_web_app.html        # Starting HTML (copy as index.html)
+└── static/
+    ├── css/style.css        # Complete design system
+    ├── js/script.js         # Navigation, dark mode, search
+    └── libs/                # jQuery, Font Awesome
+```
+
+Copy `your_web_app.html` as `index.html` and the `static/` folder into your app. Modify the title, sidebar nav, and content sections.
+
+### LAN Client Access
+
+For LAN clients to reach your app's web server, the router firewall must have a forwarding rule from the Primary LAN Zone to the Router Zone. Check `config/firewall/zone_fwd` or NCOS UI → Security → Zone Firewall.
 
 ---
 
-## 9. Building and Deploying Applications
+## 9. Working with Third-Party Libraries
 
-### Creating a New Application
+### Installing
 
-```bash
-python3 make.py create my_app
-```
-
-This generates all required files from the `apps/templates/app_template` directory into the repo root. After creation, edit only `my_app.py` and `readme.md` — do not modify `package.ini`, `start.sh`, or `cp.py`. When the app is ready, move it to apps: `mv my_app apps/`.
-
-### SDK Settings
-
-Configure `sdk_settings.ini` in the repository root with your development router's connection details:
-
-```ini
-[sdk]
-app_name=my_app
-dev_client_ip=192.168.0.1
-dev_client_username=admin
-dev_client_password=your_password_here
-```
-
-### Build and Install
+Install directly into your app folder:
 
 ```bash
-# Build the application package
-python3 make.py build my_app
+# macOS / Linux
+.venv/bin/pip install -t apps/my_app/ library_name
 
-# Install to a locally connected router (must be in Developer Mode)
-python3 make.py install my_app
-
-# Check application status
-python3 make.py status
+# Windows
+.venv\Scripts\pip install -t apps\my_app\ library_name
 ```
 
-The build process creates a `.tar.gz` package containing all files in the application directory. This same package format is used for both local development and NCM deployment.
+### Rules
 
-### Application Lifecycle Commands
+- Only pure Python (`.py`) files — remove any `.pyc`, `.so`, `.pyd`
+- Libraries must be compatible with Python 3.8
+- Keep dependencies minimal (app size limit: 60 MB)
+- Delete `egg-info` and `dist-info` directories after install
+- `requests` is pre-installed on the router — do NOT bundle it
+- `redis` is NOT available — make it conditional with try/except
 
-| Command | Description |
-|---------|-------------|
-| `python3 make.py create my_app` | Scaffold a new application |
-| `python3 make.py build my_app` | Build the `.tar.gz` package |
-| `python3 make.py install my_app` | Deploy to development router |
-| `python3 make.py start my_app` | Start the application |
-| `python3 make.py stop my_app` | Stop the application |
-| `python3 make.py status` | Check status of all installed apps |
-| `python3 make.py uninstall my_app` | Remove from router |
-| `python3 make.py purge` | Remove all installed applications from router |
-| `python3 make.py clean my_app` | Remove local build artifacts |
+### Common Libraries That Work
 
-### Production Deployment via NetCloud Manager
+- `paho-mqtt` — MQTT client
+- `pynmeagps` — NMEA sentence parsing (always install fresh, never copy)
+- `pyserial` — Serial port access
 
-Once your application is tested locally:
+### CSV Workaround
 
-1. Build the `.tar.gz` package with `make.py build`.
-2. Upload the package to NetCloud Manager.
-3. Assign the application to a device group.
-4. NCM distributes and installs the application to all devices in the group.
+The `csv` module's C implementation isn't available on cppython. For simple CSV writing, use string concatenation:
 
-### Build Ignore
-
-Exclude files from the built package by creating a `buildignore` file in your app directory:
-
+```python
+line = ','.join(fields) + '\n'
 ```
-# Development files
-test_data.json
-requirements.txt
-
-# Directories
-tests/
-docs/
-```
-
-The following are always excluded automatically: `__pycache__/`, `buildignore`, `.DS_Store`.
 
 ---
 
-## 10. Practical Examples
+## 10. Event Registration and Callbacks
 
-### Read Appdata Configuration
+Register callbacks that fire when specific API paths change. **Only works on-router.**
 
 ```python
 import cp
 
-cp.log('Starting configurable app...')
+def on_wan_change(path, value, args):
+    cp.log(f'WAN state changed: {value}')
 
-# Read user-configurable values from NCM appdata
+cp.register('put', 'status/wan/connection_state', on_wan_change)
+```
+
+### Callback Signature
+
+```python
+def my_callback(path: str, value: Any, args: tuple):
+    pass
+```
+
+- `path` — the config store path that triggered the event
+- `value` — the new value at that path
+- `args` — a single tuple of any extra arguments passed during registration
+
+### Key Rules
+
+- **Use `'put'` (lowercase) for control tree paths** — `'set'` or `'PUT'` silently fails
+- **Do NOT cp.put() to seed the control tree before cp.register()** — causes socket desync
+- The callback receives exactly 3 arguments — do NOT use `*args` unpacking
+- Control tree keys persist across app redeploys (router merges, never replaces)
+
+### Control Tree Pattern
+
+Use the control tree to receive external triggers:
+
+```python
+import cp
+import time
+
+def handle_command(path, value, args):
+    cp.log(f'Received command: {value}')
+    if value == 'refresh':
+        # Do something
+        pass
+
+cp.register('put', 'control/my_app/command', handle_command)
+
+while True:
+    time.sleep(1)
+```
+
+---
+
+## 11. Application Data (Appdata)
+
+Appdata provides per-app key-value storage configurable from NetCloud Manager. Use it for user-configurable settings.
+
+### Reading
+
+```python
+server_url = cp.get_appdata('server_url')
+if not server_url:
+    server_url = 'https://default.example.com'  # Code default
+    cp.log('No server_url configured, using default')
+```
+
+### Writing
+
+```python
+cp.put_appdata('last_run', '2025-01-15T10:30:00')
+```
+
+### Critical Rules
+
+- **NEVER write default values to appdata** — this overrides NCM group-level configurations
+- **Always call with a field name** — `cp.get_appdata('field_name')`
+- `cp.get_appdata()` without args returns a LIST of all entries, not a dict
+- `cp.put_appdata(name, value)` takes TWO string arguments, not a dict
+- Appdata is stored at `config/system/sdk/appdata`
+- Document all appdata fields in your `readme.md`
+
+### Pattern
+
+```python
+# Good pattern: read with code defaults
 interval = cp.get_appdata('poll_interval')
-interval = int(interval) if interval else 30  # Default 30 seconds
+interval = int(interval) if interval else 30  # Default 30s
 
 target = cp.get_appdata('target_host')
 if not target:
     target = '8.8.8.8'
     cp.log('No target_host configured, using default')
-
-cp.log(f'Polling {target} every {interval}s')
-```
-
-### Monitor Signal Strength and Alert on Degradation
-
-```python
-import cp
-import time
-
-RSRP_THRESHOLD = -110  # dBm
-
-cp.log('Starting signal monitor...')
-cp.wait_for_wan_connection()
-
-alerted = {}  # Track which WANs have already triggered an alert
-
-while True:
-    try:
-        wans = cp.get_connected_wans()
-        for wan_id in wans:
-            signal = cp.get_signal_strength(wan_id)
-            if signal:
-                rsrp = signal.get('rsrp')
-                if rsrp is not None and rsrp < RSRP_THRESHOLD:
-                    if not alerted.get(wan_id):
-                        cp.alert(f'Low signal on {wan_id}: RSRP={rsrp} dBm')
-                        cp.log(f'Alert sent: {wan_id} RSRP={rsrp}')
-                        alerted[wan_id] = True
-                else:
-                    if alerted.get(wan_id):
-                        cp.alert(f'Signal recovered on {wan_id}: RSRP={rsrp} dBm')
-                        cp.log(f'Recovery alert sent: {wan_id} RSRP={rsrp}')
-                        alerted[wan_id] = False
-    except Exception as e:
-        cp.log(f'Error in signal monitor: {e}')
-    time.sleep(300)
-```
-
-### Log GPS Position by Distance or Time
-
-Logs a GPS point every time the device moves a configurable distance, or at a slower interval while stationary. All thresholds are configurable via appdata.
-
-```python
-import cp
-import json
-import math
-import time
-
-# Defaults — override via NCM appdata
-MOVE_DISTANCE_M = 50     # Log when moved this many meters
-STATIONARY_DIST_M = 10   # Movement below this is considered stationary
-STATIONARY_INTERVAL = 300 # Seconds between logs while stationary
-POLL_INTERVAL = 5         # Seconds between GPS checks
-
-GPS_LOG = 'gps_log.json'
-
-
-def haversine(lat1, lon1, lat2, lon2):
-    """Distance in meters between two GPS coordinates."""
-    r = 6371000
-    p = math.pi / 180
-    dlat = (lat2 - lat1) * p
-    dlon = (lon2 - lon1) * p
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(lat1 * p) * math.cos(lat2 * p) * math.sin(dlon / 2) ** 2)
-    return 2 * r * math.asin(math.sqrt(a))
-
-
-def load_config():
-    """Load thresholds from appdata, fall back to defaults."""
-    move = cp.get_appdata('move_distance_m')
-    stat_dist = cp.get_appdata('stationary_dist_m')
-    stat_int = cp.get_appdata('stationary_interval')
-    return (
-        int(move) if move else MOVE_DISTANCE_M,
-        int(stat_dist) if stat_dist else STATIONARY_DIST_M,
-        int(stat_int) if stat_int else STATIONARY_INTERVAL,
-    )
-
-
-def write_entry(lat, lon):
-    entry = {'lat': lat, 'lon': lon, 'time': time.time()}
-    with open(GPS_LOG, 'a') as f:
-        f.write(json.dumps(entry) + '\n')
-    cp.log(f'GPS logged: {lat}, {lon}')
-
-
-cp.log('Starting GPS logger...')
-cp.wait_for_wan_connection()
-
-last_lat, last_lon = None, None
-last_log_time = 0
-
-while True:
-    try:
-        move_dist, stat_dist, stat_interval = load_config()
-        lat, lon = cp.get_lat_long()
-        if lat is not None and lon is not None:
-            now = time.time()
-            if last_lat is None:
-                write_entry(lat, lon)
-                last_lat, last_lon, last_log_time = lat, lon, now
-            else:
-                dist = haversine(last_lat, last_lon, lat, lon)
-                if dist >= move_dist:
-                    # Moved — log immediately
-                    write_entry(lat, lon)
-                    last_lat, last_lon, last_log_time = lat, lon, now
-                elif dist < stat_dist and (now - last_log_time) >= stat_interval:
-                    # Stationary — log on timer
-                    write_entry(lat, lon)
-                    last_log_time = now
-    except Exception as e:
-        cp.log(f'GPS error: {e}')
-    time.sleep(POLL_INTERVAL)
 ```
 
 ---
 
-## 11. Containers on NCOS
+## 12. GPS and Location
 
-Cradlepoint routers support Docker containers via the NCOS container runtime, deployed through the REST API.
+### Basic Position
+
+```python
+lat, lon = cp.get_lat_long()
+if lat is not None:
+    cp.log(f'Position: {lat}, {lon}')
+```
+
+### Full GPS Status
+
+```python
+gps = cp.get_gps_status()
+# Returns: gps_lock, satellites, latitude, longitude, altitude, speed, heading, accuracy
+```
+
+### NMEA Parsing
+
+Use `pynmeagps` for NMEA sentence parsing:
+
+```bash
+.venv/bin/pip install -t apps/my_app/ pynmeagps
+```
+
+```python
+from pynmeagps import NMEAReader
+import cp
+
+sentences = cp.get('status/gps/nmea')
+if sentences:
+    for sentence in sentences:
+        try:
+            msg = NMEAReader.parse(sentence)
+            if msg.msgID == 'GGA':
+                cp.log(f'lat={msg.lat} lon={msg.lon} alt={msg.alt}m sats={msg.numSV}')
+            elif msg.msgID == 'RMC' and msg.status == 'A':
+                speed_kmh = msg.spd * 1.852
+                cp.log(f'speed={speed_kmh:.1f} km/h course={msg.cog}°')
+        except Exception as e:
+            pass  # PCPTMINR (proprietary) raises "Unknown msgID" — expected
+```
+
+---
+
+## 13. Speed Testing
+
+### Using cp.speed_test() (Netperf — Built-in)
+
+```python
+result = cp.speed_test(interface='rmnet501', duration=10, direction='both')
+if result:
+    down_mbps = result['download_bps'] / 1e6
+    up_mbps = result['upload_bps'] / 1e6
+    cp.log(f'Download: {down_mbps:.1f} Mbps, Upload: {up_mbps:.1f} Mbps')
+```
+
+### Engine Priority
+
+1. **Ookla** (BYOB — Bring Your Own Binary) — fastest, requires separate license
+2. **Netperf** (built-in) — no binary needed, no server config needed
+3. **iPerf3** (user-provided server) — requires a server address
 
 ### Key Constraints
 
-- Use `restart: unless-stopped` (not `restart: always`).
-- Named volumes require explicit `driver: local`.
-- Memory limit directives (`mem_limit`, `deploy.resources.limits.memory`) are not supported. Set `shm_size' at the service level to set shared memory size.
-- Prefer alpine-based images to minimize storage and RAM usage.
-- Router architecture is ARM64 (aarch64) with musl libc — use `arm64` image variants.
+- **Netperf cannot run concurrent tests** — single shared router resource, test sequentially
+- **Ookla and iPerf3 can run concurrently** — each is an independent subprocess
+- Use `interface` parameter to route through specific modems
 
-### Deploying a Container via SDK
+### Engine Detection Pattern
+
+```python
+import os
+
+OOKLA_BINARIES = ('ookla', 'speedtest', 'speedtest-cli')
+
+def has_ookla():
+    for name in OOKLA_BINARIES:
+        if os.path.exists(name):
+            if not os.access(name, os.X_OK):
+                os.chmod(name, 0o755)
+            return True
+    return False
+```
+
+---
+
+## 14. GPIO
+
+### Reading GPIO
+
+```python
+import cp
+
+# Get all GPIOs for current router
+gpios = cp.get_gpio()
+cp.log(f'GPIOs: {gpios}')
+
+# Get specific GPIO
+power_in = cp.get_gpio('power_input')
+cp.log(f'Power input: {power_in}')
+
+# List available GPIOs
+available = cp.get_available_gpios()
+cp.log(f'Available: {available}')
+```
+
+### Writing GPIO (via config store)
+
+```python
+# Set GPIO output high
+cp.put('config/gpio/CONNECTOR_OUTPUT', 1)
+
+# Set GPIO output low
+cp.put('config/gpio/CONNECTOR_OUTPUT', 0)
+```
+
+---
+
+## 15. CLI Access (csterm) and Web Terminal (ttyd)
+
+NCOS routers have a built-in CLI accessible via SSH. SDK apps can execute CLI commands programmatically using the **csterm** control tree, or provide a full web-based terminal using the **ttyd** binary.
+
+### 15.1 CSTerm — Programmatic CLI Access
+
+The `csterm.py` module (from the `cli_sample` app) lets your app execute NCOS CLI commands and capture their output. It works by writing commands to `control/csterm/{session_id}` and reading responses back.
+
+#### Setup
+
+Copy `csterm.py` from `apps/cli_sample/` into your app directory.
+
+#### Basic Usage
+
+```python
+import cp
+from csterm import CSTerm
+
+cp.log('Starting...')
+
+# Create a terminal session
+ct = CSTerm(cp)
+
+# Execute a single command
+output = ct.exec('arpdump')
+cp.log(f'ARP table:\n{output}')
+
+# Execute multiple commands in sequence
+output = ct.exec(['clients', 'arpdump'])
+cp.log(output)
+```
+
+#### How It Works
+
+1. CSTerm creates a unique session ID (`term-{random}`)
+2. Commands are written to `control/csterm/{session_id}` with `cp.put()`
+3. Responses are read from the same path with `cp.get()`
+4. Output is polled at 0.3s intervals until a prompt is detected or timeout
+5. ANSI escape sequences are stripped from the output (when `clean=True`)
+
+#### CSTerm API
+
+```python
+CSTerm(csclient, timeout=10, soft_timeout=5, user=None)
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `csclient` | required | The `cp` module (or any object with `get`/`put` methods) |
+| `timeout` | 10 | Max seconds to wait for output |
+| `soft_timeout` | 5 | Seconds before sending Ctrl+C to abort |
+| `user` | None | CLI user to execute as (e.g., `"admin"`) |
+
+```python
+ct.exec(cmds, clean=True) -> str
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `cmds` | str or list | Single command string or list of commands |
+| `clean` | bool | Strip ANSI escape sequences and prompt lines |
+| **Returns** | str | Command output text |
+
+#### Examples
+
+**Run a single command:**
+```python
+ct = CSTerm(cp)
+output = ct.exec('arpdump')
+```
+
+**Run multiple commands (same session):**
+```python
+output = ct.exec(['clients', 'arpdump', 'wan'])
+```
+
+**Multiple exec calls (persistent session state):**
+```python
+ct.exec('clients')
+ct.exec('wan')
+ct.exec('arpdump')
+```
+
+**SSH into a remote host through the router CLI:**
+```python
+ct = CSTerm(cp, timeout=30, soft_timeout=15)
+output = ct.exec([
+    'ssh user@192.168.1.100',
+    'yes',           # Accept host key
+    'password123',   # Enter password
+    'ls -la',        # Run command on remote host
+    'exit'           # Exit SSH
+])
+```
+
+**Run as a specific user:**
+```python
+ct = CSTerm(cp, user="admin")
+output = ct.exec('status')
+```
+
+**Longer-running commands (increase timeout):**
+```python
+ct = CSTerm(cp, timeout=30, soft_timeout=20)
+output = ct.exec('ping 8.8.8.8 -c 10')
+```
+
+#### Common CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `arpdump` | Show ARP table (connected devices) |
+| `clients` | Show connected LAN clients |
+| `wan` | Show WAN status |
+| `status` | Show system status |
+| `ping <host>` | Ping a host |
+| `traceroute <host>` | Trace route to host |
+| `log show` | Show system logs |
+| `log show -s <app>` | Show logs for specific app |
+| `sms <number> '<msg>' <port>` | Send SMS |
+| `container list` | List running containers |
+
+#### Using cp.execute_cli() Instead
+
+The `cp` module also has a built-in `execute_cli()` function that provides similar functionality without needing the `csterm.py` file:
+
+```python
+import cp
+
+# Single command
+output = cp.execute_cli('arpdump')
+cp.log(output)
+
+# Multiple commands
+output = cp.execute_cli(['clients', 'wan'])
+cp.log(output)
+```
+
+The difference: `CSTerm` maintains a persistent session (stateful — like an interactive terminal), while `cp.execute_cli()` is stateless (each call is independent). Use `CSTerm` when you need multi-step interactions (SSH sessions, interactive commands) and `cp.execute_cli()` for simple one-off commands.
+
+### 15.2 ttyd — Web-Based Terminal
+
+The `ttyd` app provides a full Linux bash terminal accessible from any web browser on the LAN. It bundles the [ttyd](https://github.com/tsl0922/ttyd) binary — a terminal emulator served over HTTP/WebSockets.
+
+#### What It Does
+
+- Serves a full bash shell at `http://<router_ip>:8022`
+- No SSH client needed — works in any modern browser
+- WebSocket-based for real-time terminal interaction
+- Access to the full NCOS Linux userland
+
+#### App Structure
+
+```
+ttyd/
+├── package.ini
+├── start.sh          # Launches the binary directly (no cppython)
+├── cp.py
+├── csterm.py         # Optional — for programmatic access alongside
+├── ttyd              # Statically linked ARM64 binary
+└── readme.md
+```
+
+#### start.sh (Binary-Only App)
+
+```bash
+#!/bin/bash
+./ttyd -p 8022 -W bash
+```
+
+Note: This app does NOT use `cppython`. The `start.sh` launches the `ttyd` binary directly. This is the **binary-only app pattern** — no Python code needed.
+
+#### ttyd Flags
+
+| Flag | Description |
+|------|-------------|
+| `-p 8022` | Listen on port 8022 |
+| `-W` | Writable (allow keyboard input) |
+| `bash` | Shell to spawn (bash is default on NCOS) |
+
+#### How to Use
+
+1. Deploy the app to the router
+2. Open a browser: `http://<router_ip>:8022`
+3. A terminal session opens — full bash access
+
+#### Building Your Own ttyd App
+
+If you want to bundle ttyd in your own app (e.g., alongside Python code):
+
+1. Download the `ttyd` binary (ARM64/aarch64 static build) from [ttyd releases](https://github.com/tsl0922/ttyd/releases)
+2. Place it in your app directory
+3. Remember: tar extraction on the router does NOT preserve the execute bit. Set permissions before first use:
+
+```python
+import os
+import subprocess
+import cp
+
+# Ensure binary is executable
+ttyd_path = os.path.join(os.path.dirname(__file__), 'ttyd')
+if os.path.exists(ttyd_path) and not os.access(ttyd_path, os.X_OK):
+    os.chmod(ttyd_path, 0o755)
+
+# Launch ttyd in background
+subprocess.Popen(['./ttyd', '-p', '8022', '-W', 'bash'])
+cp.log('Web terminal started on port 8022')
+```
+
+#### Security Considerations
+
+- ttyd provides unauthenticated shell access to anyone on the LAN
+- Consider using ttyd's `-c username:password` flag for basic auth:
+  ```bash
+  ./ttyd -p 8022 -W -c admin:secretpass bash
+  ```
+- Restrict access via router firewall zone rules if needed
+- For production, consider limiting to specific interfaces or adding authentication
+
+---
+
+## 16. Containers on NCOS
+
+Deploy Docker containers via the REST API:
 
 ```python
 import cp
@@ -774,104 +1270,324 @@ project = {
 }
 
 cp.post('config/container/projects', json.dumps(project))
-cp.log('Container project deployed')
 ```
+
+### Container Rules
+
+| Rule | Detail |
+|------|--------|
+| Compose version | `"2.4"` (not v3) |
+| Restart policy | `unless-stopped` (not `always`) |
+| Named volumes | Must have `driver: local` |
+| Memory limits | NOT supported (omit entirely) |
+| Network mode | No `host` mode — use `ports:` instead |
+| Images | Prefer `-alpine` variants (ARM64) |
+| Shared memory | Set `shm_size: '1gb'` at service level if needed |
 
 ---
 
-## 12. Debugging and Troubleshooting
+## 17. Local Development
+
+Applications can run on your development machine. The `cp.py` module auto-detects the environment:
+
+```bash
+# Run locally — talks to router over REST
+.venv/bin/python apps/my_app/my_app.py
+```
+
+### What Works Locally
+
+| Feature | Behavior |
+|---------|----------|
+| `cp.get()` / `cp.put()` / `cp.post()` / `cp.delete()` | Routes through REST to dev router |
+| `cp.log()` | Prints to stdout |
+| All convenience functions using `cp.get()` | Work normally |
+| Reading/writing appdata | Works via REST |
+
+### What Does NOT Work Locally
+
+| Feature | Behavior |
+|---------|----------|
+| `cp.alert()` | Logs to console, does not send to NCM |
+| `cp.register()` / `cp.unregister()` | Requires router socket |
+| `cp.decrypt()` | Returns None |
+| Web servers (`http.server`) | Binds to YOUR machine, not router |
+| Serial/GPIO | Accesses your computer, not router |
+
+### Development Workflow
+
+1. Edit code locally
+2. Test logic with `python apps/my_app/my_app.py` (reads real data from router)
+3. Deploy to router for final testing: `.venv/bin/python make.py deploy my_app`
+
+---
+
+## 18. Production Deployment via NCM
+
+Once tested locally and on a dev router:
+
+1. Build the package: `.venv/bin/python make.py build my_app`
+2. Upload the `.tar.gz` to NetCloud Manager
+3. Assign the application to a device group
+4. NCM distributes and installs to all devices in the group
+
+Apps can be configured per-group using appdata fields pushed from NCM.
+
+---
+
+## 19. Debugging and Troubleshooting
 
 ### Viewing Logs
 
-Application logs are accessible through:
-- `make.py status` — shows status of all installed apps
-- NetCloud Manager — device logs section
-- SSH to the router — use the `log` CLI command
-
-#### Router Log CLI
-
-The router uses a `log` command (not `/var/log/messages`). Common usage:
-
 ```bash
-# Show all logs
-log show
+# Check status and recent logs
+.venv/bin/python make.py status my_app
 
-# Filter by app name or search string
-log show -s my_app
-
-# Follow logs in real time (like tail -f)
-log show -f
-
-# Follow with history (last 50 lines + new)
-log show -f 50
-
-# Case-insensitive search
-log show -i -s "error"
-
-# Highlight matches without filtering
-log show -h -s my_app
-
-# Filter by log level
-log show WARNING ERROR
-
-# Clear all logs
-log clear
+# Or view via deploy output
+.venv/bin/python make.py deploy my_app
 ```
 
-#### Log Levels
+### Router Log CLI (via SSH)
 
 ```bash
-# View current log level
-log level
-
-# Set log level
-log level DEBUG
-
-# View all service log levels
-log service
-
-# Change a specific service log level
-log service level DEBUG
-```
-
-#### Writing to the Log from CLI
-
-```bash
-# Write a message (defaults to INFO level)
-log msg "Test message from CLI"
-
-# Write at a specific level
-log msg -l WARNING "Something needs attention"
+log show                    # Show all logs
+log show -s my_app          # Filter by app name
+log show -f                 # Follow (like tail -f)
+log show -f 50              # Follow with last 50 lines
+log show WARNING ERROR      # Filter by level
+log clear                   # Clear all logs
 ```
 
 ### Common Issues
 
 | Symptom | Cause | Solution |
 |---------|-------|----------|
-| App deleted after install | Modified a packaged file at runtime | Write only to new files (e.g., `tmp/`) |
-| `Address already in use` | Port still bound from previous deploy | Set `SO_REUSEADDR`, or reboot the router |
-| `ModuleNotFoundError` | Missing dependency | `pip3 install --target=my_app/ module_name` |
-| `.so` or `.pyc` errors | Non-pure-Python files in app | Remove all `.so` and `.pyc` files |
-| App won't start | `start.sh` uses `python3` instead of `cppython` | Edit `start.sh` to use `cppython` |
-| Stale log entries | Reading old log buffer | Check timestamps — only trust entries after your deploy |
+| App deleted after install | Modified a packaged file | Write only to NEW files |
+| `Address already in use` | Port still bound | Set `SO_REUSEADDR`, or reboot router |
+| `ModuleNotFoundError` | Missing dependency | `pip install -t my_app/ module` |
+| `.so` or `.pyc` errors | Non-pure-Python files | Remove all `.so` and `.pyc` |
+| App won't start | Wrong interpreter in start.sh | Use `cppython`, not `python3` |
+| Stale logs | Old log buffer entries | Check timestamps — only trust entries after deploy |
+| Deploy fails | Wrong credentials | Check `sdk_settings.ini` |
+| SCP "lost connection" | Normal behavior | Router drops SSH after receiving file — expected |
 
-### Development Workflow
+### Error Handling Pattern
 
-1. Edit your application code locally.
-2. Build and deploy: `python3 make.py build my_app && python3 make.py install my_app`
-3. Check status: `python3 make.py status`
+Always wrap API calls:
+
+```python
+try:
+    data = cp.get('status/system')
+    if data:
+        cp.log(f"Uptime: {data.get('uptime')}")
+except Exception as e:
+    cp.log(f'Error: {e}')
+```
 
 ---
 
-## 13. Additional Resources
+## 20. Complete Examples
 
-| Resource | URL |
-|----------|-----|
-| SDK GitHub Repository | [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) |
-| Official SDK Developer Guide | [docs.cradlepoint.com](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide/) |
-| cp Module API Reference | [cp_methods_reference.md](https://github.com/cradlepoint/sdk-samples/blob/master/cp_methods_reference.md) |
-| Developer Community Portal | [dev.cradlepoint.com](http://dev.cradlepoint.com/) |
-| Customer Community Forums | [customer.cradlepoint.com](http://customer.cradlepoint.com/s/) |
-| NetCloud Manager SDK Tools | [NCM Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
-| SDK Support Statement | [SDK Support](https://docs.cradlepoint.com/r/NCOS-SDK) |
-| Pre-built Sample Apps | [Releases](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps) |
+### Hello World
+
+```python
+# hello_world.py
+import cp
+cp.log('Hello World!')
+```
+
+### Signal Monitor with Alerts
+
+```python
+import cp
+import time
+
+RSRP_THRESHOLD = -110
+
+cp.log('Starting signal monitor...')
+cp.wait_for_wan_connection()
+
+alerted = {}
+
+while True:
+    try:
+        wans = cp.get_connected_wans()
+        for uid in wans:
+            signal = cp.get_signal_strength(uid)
+            if signal:
+                rsrp = signal.get('rsrp')
+                if rsrp is not None and int(rsrp) < RSRP_THRESHOLD:
+                    if not alerted.get(uid):
+                        cp.alert(f'Low signal on {uid}: RSRP={rsrp} dBm')
+                        alerted[uid] = True
+                else:
+                    alerted[uid] = False
+    except Exception as e:
+        cp.log(f'Error: {e}')
+    time.sleep(300)
+```
+
+### MQTT Publisher
+
+```python
+import cp
+import json
+import time
+from threading import Thread
+
+try:
+    import paho.mqtt.client as mqtt
+except ImportError:
+    cp.log('ERROR: paho-mqtt not installed')
+    raise
+
+BROKER = 'test.mosquitto.org'
+PORT = 1883
+TOPIC = 'router/status'
+INTERVAL = 60
+
+def on_connect(client, userdata, flags, rc):
+    cp.log(f'MQTT connected: {mqtt.connack_string(rc)}')
+
+def publish_loop(client):
+    while True:
+        try:
+            data = {
+                'uptime': cp.get_uptime(),
+                'wan_state': cp.get_wan_connection_state(),
+                'temperature': cp.get_temperature('celsius')
+            }
+            client.publish(TOPIC, json.dumps(data), qos=1)
+            cp.log(f'Published to {TOPIC}')
+        except Exception as e:
+            cp.log(f'Publish error: {e}')
+        time.sleep(INTERVAL)
+
+cp.log('Starting MQTT app...')
+cp.wait_for_wan_connection()
+
+client = mqtt.Client(client_id=cp.get_name())
+client.on_connect = on_connect
+client.connect(BROKER, PORT)
+
+Thread(target=client.loop_forever, daemon=True).start()
+publish_loop(client)
+```
+
+### Web Dashboard with Auto-Refresh
+
+```python
+import cp
+import json
+import socket
+import time
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
+
+PORT = 8000
+
+class DashboardHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/api/data':
+            data = {
+                'system': cp.get_system_status(),
+                'wan': cp.get_wan_status(),
+                'gps': cp.get_gps_status(),
+                'clients': cp.get_lan_clients()
+            }
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+        elif self.path == '/' or self.path == '/index.html':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.end_headers()
+            with open('index.html', 'rb') as f:
+                self.wfile.write(f.read())
+        else:
+            super().do_GET()
+
+    def log_message(self, format, *args):
+        pass  # Suppress request logging
+
+cp.log('Starting dashboard...')
+server = HTTPServer(('', PORT), DashboardHandler)
+server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+Thread(target=server.serve_forever, daemon=True).start()
+cp.log(f'Dashboard running on port {PORT}')
+
+while True:
+    time.sleep(60)
+```
+
+### GPS Logger with Distance Threshold
+
+```python
+import cp
+import json
+import math
+import time
+
+MOVE_DISTANCE_M = 50
+STATIONARY_INTERVAL = 300
+POLL_INTERVAL = 5
+GPS_LOG = 'gps_log.json'
+
+def haversine(lat1, lon1, lat2, lon2):
+    r = 6371000
+    p = math.pi / 180
+    dlat = (lat2 - lat1) * p
+    dlon = (lon2 - lon1) * p
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(lat1 * p) * math.cos(lat2 * p) * math.sin(dlon / 2) ** 2)
+    return 2 * r * math.asin(math.sqrt(a))
+
+cp.log('Starting GPS logger...')
+cp.wait_for_wan_connection()
+
+last_lat, last_lon = None, None
+last_log_time = 0
+
+while True:
+    try:
+        lat, lon = cp.get_lat_long()
+        if lat is not None:
+            now = time.time()
+            should_log = False
+
+            if last_lat is None:
+                should_log = True
+            else:
+                dist = haversine(last_lat, last_lon, lat, lon)
+                if dist >= MOVE_DISTANCE_M:
+                    should_log = True
+                elif (now - last_log_time) >= STATIONARY_INTERVAL:
+                    should_log = True
+
+            if should_log:
+                entry = {'lat': lat, 'lon': lon, 'time': now}
+                with open(GPS_LOG, 'a') as f:
+                    f.write(json.dumps(entry) + '\n')
+                cp.log(f'GPS: {lat}, {lon}')
+                last_lat, last_lon, last_log_time = lat, lon, now
+    except Exception as e:
+        cp.log(f'GPS error: {e}')
+    time.sleep(POLL_INTERVAL)
+```
+
+---
+
+## Additional Resources
+
+| Resource | Link |
+|----------|------|
+| App Store | [Browse & download apps](https://cradlepoint.github.io/sdk-samples/) |
+| Official SDK Guide | [docs.cradlepoint.com](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide/) |
+| GitHub Repository | [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) |
+| NCM SDK Tools | [NCM Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
+| Pre-built Apps | [Releases](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps) |
+
+---
+
+*Copyright © 2026 Ericsson Enterprise Wireless Solutions. All rights reserved.*
