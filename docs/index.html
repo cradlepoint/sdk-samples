@@ -433,8 +433,24 @@ a:hover { color: var(--accent-hover); }
     </div>
     <div class="app-grid" id="appGrid"></div>
     <div class="license-footer">
-      <a href="https://github.com/cradlepoint/sdk-samples" target="_blank" style="display:inline-block;margin-bottom:1rem;"><img src="https://img.shields.io/badge/GitHub-Source_Code-181717?logo=github" alt="GitHub Repo"></a>
-      <a href="https://github.com/cradlepoint/sdk-samples/blob/master/docs/NCOS_SDK_Developer_Manual.md" target="_blank" style="display:inline-block;margin-bottom:1rem;margin-left:0.5rem;"><img src="https://img.shields.io/badge/Documentation-Dev_Guide-blue?logo=readthedocs" alt="Dev Guide"></a>
+      <a href="https://github.com/cradlepoint/sdk-samples" target="_blank" style="display:inline-block;margin-bottom:1rem;" id="github-badge"><img src="https://img.shields.io/badge/GitHub-Source_Code-181717?logo=github" alt="GitHub Repo"></a>
+      <a href="https://github.com/cradlepoint/sdk-samples/blob/master/docs/NCOS_SDK_Developer_Manual.md" target="_blank" style="display:inline-block;margin-bottom:1rem;margin-left:0.5rem;" id="devguide-badge"><img src="https://img.shields.io/badge/Documentation-Dev_Guide-blue?logo=readthedocs" alt="Dev Guide"></a>
+      <script>
+        // Derive GitHub repo from current Pages URL (e.g., phate999.github.io/sdk-samples -> phate999/sdk-samples)
+        (function() {
+          var host = window.location.hostname;
+          var path = window.location.pathname.split('/')[1] || '';
+          if (host.endsWith('.github.io')) {
+            var owner = host.replace('.github.io', '');
+            var repo = path || 'sdk-samples';
+            var base = 'https://github.com/' + owner + '/' + repo;
+            var gb = document.getElementById('github-badge');
+            var db = document.getElementById('devguide-badge');
+            if (gb) gb.href = base;
+            if (db) db.href = base + '/blob/master/docs/NCOS_SDK_Developer_Manual.md';
+          }
+        })();
+      </script>
       <h4>License</h4>
       <p>This software, including any sample applications, and associated documentation (the "Software"), are subject to the Cradlepoint Terms of Service and License Agreement available at <a href="https://cradlepoint.com/terms-of-service">https://cradlepoint.com/terms-of-service</a> ("TSLA").</p>
       <p style="margin-top:0.5rem">NOTWITHSTANDING ANY PROVISION CONTAINED IN THE TSLA, CRADLEPOINT DOES NOT WARRANT THAT THE SOFTWARE OR ANY FUNCTION CONTAINED THEREIN WILL MEET CUSTOMER'S REQUIREMENTS, BE UNINTERRUPTED OR ERROR-FREE, THAT DEFECTS WILL BE CORRECTED, OR THAT THE SOFTWARE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. THE SOFTWARE IS PROVIDED "AS-IS," WITHOUT ANY WARRANTIES OF ANY KIND. ANY USE OF THE SOFTWARE IS DONE AT CUSTOMER'S SOLE RISK AND CUSTOMER WILL BE SOLELY RESPONSIBLE FOR ANY DAMAGE, LOSS OR EXPENSE INCURRED AS A RESULT OF OR ARISING OUT OF CUSTOMER'S USE OF THE SOFTWARE. CRADLEPOINT MAKES NO OTHER WARRANTY, EITHER EXPRESSED OR IMPLIED, WITH RESPECT TO THE SOFTWARE. CRADLEPOINT SPECIFICALLY DISCLAIMS THE IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.</p>
