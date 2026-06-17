@@ -54,6 +54,7 @@ jobs:
           path: '_site'
 
   deploy:
+    if: vars.PAGES_ENABLED == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
