@@ -30,7 +30,6 @@ Browse, search, and download ready-to-use sample applications:
 |----------|------|
 | **App Store** | [Browse & download apps](https://cradlepoint.github.io/sdk-samples/) |
 | **SDK Developer Guide** | [docs/NCOS_SDK_Developer_Guide.md](docs/NCOS_SDK_Developer_Guide.md) |
-| **NCOS SDK Developers Guide** | [Documentation](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide) |
 | **NetCloud Manager — SDK apps** | [Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
 
 ---

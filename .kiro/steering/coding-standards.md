@@ -71,16 +71,18 @@ Applications run on Cradlepoint routers using Python 3.8.
 ### When to Use SDK Apps vs Containers
 
 - **Prefer SDK apps** — they are smaller, use fewer resources, and are included with ALL device licenses (no extra cost)
+- **Any pure-Python library can be pip-installed into an app folder** — needing a third-party Python module is NOT a reason to use a container. Only use a container when you need compiled (non-Python) software, root access, or LAN-client networking
+- **NEVER deploy or build a container without explicit user confirmation** — containers require an Advanced license (extra cost) and have technical constraints. Always ask the user before choosing a container approach, even if the task seems to require one. The user may not have the license, may prefer an alternative, or may have technical reasons to avoid containers
 - **Use containers when you need**:
-  - Linux packages or applications not available in cppython
+  - Compiled Linux packages or applications that are NOT pure Python (e.g., ntopng, InfluxDB, nginx, PostgreSQL, Node.js)
   - Root access
   - The app to behave like a client device on a LAN IP address (going through the firewall)
 - **Containers require an Advanced license** — this costs more than the standard license that includes SDK apps
-- **Rule of thumb**: build it as an SDK app unless you have a specific reason to use a container
+- **Rule of thumb**: build it as an SDK app unless you need compiled binaries, root, or LAN-client networking — and even then, confirm with the user first
 
 ### Deployment
 
-- **Deploy containers via REST API** - POST to `/api/config/container/projects/` with JSON body. Do NOT use SSH/SCP (router SSH is a restricted CLI, not bash)
+- **Deploy containers via REST API** - POST to `/api/config/container/projects/` with **form-encoded data** (NOT JSON body). Use `-d 'data={"name":"...","config":"...","enabled":true,"update_interval":0}'`. Using `Content-Type: application/json` fails with `{"exception": "key", "key": "data"}`
 - **Container project schema** (`config/container/projects`):
   - `name` (string) — project name
   - `config` (string) — docker-compose YAML as a single escaped string
@@ -89,8 +91,26 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Named volumes MUST have `driver: local`** - Cradlepoint's container runtime requires explicit `driver: local` on all named volumes in docker-compose files. Without it, volume creation fails
 - **Use alpine-based images** - prefer `-alpine` image variants to reduce size and RAM usage on the router's limited resources
 - **Expect ~200-300MB RAM for InfluxDB** - monitor system metrics when running databases in containers alongside SDK apps
-- **SSH `container` CLI** - can list, start, stop, pull, exec, and view logs. `container exec` does NOT return stdout to the SSH session
-- **Container status API** - `status/container/{name}` shows state, info, and stats per container
+- **Container status API** - `status/container/{name}` shows state, info, and stats per container. Returns `null` when pulling, failed, or non-existent — check system logs for pull errors
+- **Many Docker Hub images are amd64-only** — always verify ARM64 support before deploying. Use `docker buildx build --platform linux/arm64` to cross-build your own if needed. See `docs/ncos-api/control/container.md` for the full workflow
+- **Full container docs**: See `docs/ncos-api/control/container.md` for REST API, SSH CLI, building custom images, and troubleshooting
+
+### SSH Container CLI
+
+Access via: `sshpass -p 'pass' ssh admin@ROUTER_IP "container COMMAND"`
+
+| Command | Description |
+|---------|-------------|
+| `container list` | List running containers |
+| `container logs CONTAINER_NAME` | View logs (needs `logging: {driver: json-file}`) |
+| `container start PROJECT_NAME` | Start a project |
+| `container stop PROJECT_NAME` | Stop a project |
+| `container kill PROJECT_NAME` | Force-kill a project |
+| `container pull PROJECT_NAME` | Pull latest images |
+| `container exec CONTAINER_NAME [CMD]` | Shell into container (default: /bin/bash) |
+
+- Container names follow `{project}_{service}_{instance}` pattern (e.g., `ntopng_ntopng_1`)
+- `container exec` does NOT return stdout for non-interactive commands — use for interactive shell only
 - **Resource limits ARE supported** — use `mem_limit` and `cpus` at the service level (Compose v2.4 syntax). Do NOT use `deploy.resources.limits` (that's v3 Swarm syntax)
 - **`mem_limit`** — e.g. `mem_limit: 512m` (megabytes) or `mem_limit: 1g` (gigabytes)
 - **`cpus`** — e.g. `cpus: 2` (number of CPU cores allocated)
@@ -237,8 +257,7 @@ networks:
 Example deploy via curl:
 ```bash
 curl -s -k -u admin:pass -X POST "https://ROUTER_IP/api/config/container/projects/" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"myproject","config":"version: \"2.4\"\nservices:\n  ...","enabled":true,"update_interval":0}'
+  -d 'data={"name":"myproject","config":"version: \"2.4\"\nservices:\n  myapp:\n    image: redis:alpine\n    restart: unless-stopped\n    ports:\n      - \"6379:6379\"\n    logging:\n      driver: json-file","enabled":true,"update_interval":0}'
 ```
 
 Example with resource limits:
