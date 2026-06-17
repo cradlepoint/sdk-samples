@@ -6,14 +6,6 @@ The NCOS SDK enables developers to build and deploy Python applications that run
 
 ---
 
-## App Store
-
-Browse, search, and download ready-to-use sample applications:
-
-**[Open the App Store](https://cradlepoint.github.io/sdk-samples/)**
-
----
-
 ## Why Custom Applications on Ericsson Routers?
 
 - **Extend without hardware changes** — Add new capabilities through software while your existing Ericsson/Cradlepoint fleet stays in place.
@@ -28,7 +20,6 @@ Browse, search, and download ready-to-use sample applications:
 
 | Resource | Link |
 |----------|------|
-| **App Store** | [Browse & download apps](https://cradlepoint.github.io/sdk-samples/) |
 | **SDK Developer Guide** | [docs/NCOS_SDK_Developer_Guide.md](docs/NCOS_SDK_Developer_Guide.md) |
 | **NetCloud Manager — SDK apps** | [Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |
 
