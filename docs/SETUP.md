@@ -10,7 +10,7 @@
 - **⚠️ IMPORTANT: Check the box "Add python.exe to PATH"** on the first screen before clicking Install Now. Without this, `python` and `pip` commands will not work from the terminal.
 - Click **Install Now**
 - Verify by opening a new terminal in Kiro and running: `python --version`
-- Having trouble? See the [detailed Windows Python setup guide](../WINDOWS_PYTHON_SETUP.md)
+- Having trouble? Reinstall Python and ensure "Add python.exe to PATH" is checked
 
 **macOS:**
 - Open Terminal and install Homebrew (if not already installed):
@@ -23,26 +23,7 @@
   ```
 - Verify: `python3 --version`
 
-### 2. Install System-Level Dependencies (one-time)
-
-These are needed for app signing and deploying to routers. Python libraries are handled automatically by Kiro in step 4.
-
-**Windows:**
-- Install OpenSSL (Light version) from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html). Choose Win64 or Win32 based on your machine.
-  - **⚠️ On the final screen, the installer asks for a donation — uncheck the box and click Finish without donating.**
-
-**macOS:**
-```bash
-brew install openssl
-brew install hudochenkov/sshpass/sshpass
-```
-
-**Linux (Debian/Ubuntu):**
-```bash
-sudo apt-get install libffi-dev libssl-dev sshpass
-```
-
-### 3. Install Kiro
+### 2. Install Kiro
 
 - Download Kiro from [kiro.dev](https://kiro.dev/)
 - Run the installer and follow the setup prompts
@@ -52,7 +33,7 @@ sudo apt-get install libffi-dev libssl-dev sshpass
 - *You can use your Google account to try it for free (500 credits to use in 30 days)*
 - If you signed in using a free Google account and later want to switch to a different account that has a license, click the account panel icon at the bottom of the left sidebar to sign out and sign in with a different account.
 
-### 4. Clone the Repository
+### 3. Clone the Repository
 
 - **⚠️ When Kiro starts and you see the Getting Started page, DO NOT click "Open a Project".**
 - Click the **Source Control icon** (git) — the 3rd icon from the top in the left sidebar.
@@ -63,18 +44,18 @@ sudo apt-get install libffi-dev libssl-dev sshpass
 - Click **Open** when prompted.
 - Click **"Yes, I trust the authors"** when prompted.
 
-### 5. Python Environment
+### 4. Python Environment
 
 - Click the **Kiro ghost icon** in the left sidebar
 - Find and run the **Setup Dev Environment** hook
 
 It will:
 - Create a `.venv` virtual environment
-- Install all Python dependencies from `requirements.txt` (requests, pyopenssl, cryptography, pyserial)
+- Install all Python dependencies from `requirements.txt` (requests, cryptography, paramiko, pyserial)
 
 No manual `pip install` needed.
 
-### 6. Configure **Developer Mode** Router Connection
+### 5. Configure **Developer Mode** Router Connection
 
 - **Developer Mode must be enabled in NetCloud Manager** (not in the router UI). Go to the device in NCM and enable SDK Developer Mode under the device settings.
 - Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
@@ -87,7 +68,7 @@ No manual `pip install` needed.
   ```
 - Save with `Cmd+S` / `Ctrl+S`
 
-### 7. Create with Kiro
+### 6. Create with Kiro
 
 - Open the Kiro chat panel from the sidebar
 - In the **chat panel**, make your request. For example:

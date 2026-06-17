@@ -13,14 +13,16 @@ run_cmd() {
 	fi
 }
 
-run_cmd "python3 make.py build"
+# Build all apps (searches recursively under apps/)
 run_cmd "python3 make.py build all"
 
 # Copy tar.gz files handling spaces in filenames
 echo "Copying tar.gz files to built_apps/"
 find . -maxdepth 1 -name '*.tar.gz' -exec cp {} built_apps/ \;
 
-run_cmd "python3 make.py clean"
+# Clean all build artifacts
 run_cmd "python3 make.py clean all"
 
-# Release body (built_apps/README.md) is created by workflow after update_readme_links runs
+# Generate app store catalog
+echo "Generating app store catalog..."
+python3 docs/generate_catalog.py

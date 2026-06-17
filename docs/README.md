@@ -2,6 +2,7 @@
 
 ## Quick Start
 - **[SETUP.md](SETUP.md)** - Setup Kiro
+- **[NCOS_SDK_Developer_Manual.md](NCOS_SDK_Developer_Manual.md)** - Complete SDK developer manual
 
 ## NCOS API Reference
 - **[ncos-api/](ncos-api/README.md)** - Complete NCOS API documentation
@@ -10,7 +11,7 @@
   - Control API (actions): reboot, ping, GPIO, speedtest
 
 ## Quick Links
-- Project guidelines: `../.amazonq/rules/project-guidelines.md`
-- App template: `../app_template/`
+- Steering rules: `../.kiro/steering/`
+- App template: `../apps/templates/app_template/`
 - Build tool: `../make.py`
 - Deploy command: `python3 ../make.py deploy <app_name>`

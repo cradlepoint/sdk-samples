@@ -39,21 +39,19 @@ jobs:
             """Find all cp.py files in the repository"""
             cp_files = []
             for root, dirs, files in os.walk('.'):
-                # Skip .git directory
-                if '.git' in root:
-                    continue
+                # Skip .git, .venv, docs directories
+                dirs[:] = [d for d in dirs if d not in ['.git', '.venv', 'docs', '.kiro', 'METADATA']]
                 if 'cp.py' in files:
                     cp_files.append(os.path.join(root, 'cp.py'))
             return cp_files
         
         def get_reference_cp_py():
             """Get the reference cp.py from app_template"""
-            reference_path = './cp.py'
+            reference_path = './apps/templates/app_template/cp.py'
             if os.path.exists(reference_path):
                 return reference_path
-            else:
-                print(f"Error: Reference file {reference_path} not found")
-                return None
+            print(f"Error: Reference cp.py not found at {reference_path}")
+            return None
         
         def update_cp_py_files():
             """Update all cp.py files with the reference version"""
@@ -152,9 +150,6 @@ jobs:
           chmod +x ./.github/workflows/builds.sh
           ./.github/workflows/builds.sh
         shell: bash
-      - name: Update README with release download links
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        run: python3 .github/workflows/update_readme_links.py
       - name: Generate release body
         if: github.event_name == 'push'
         run: python3 .github/workflows/generate_release_body.py
@@ -164,11 +159,15 @@ jobs:
         with:
            github-token: ${{ github.token }}
            script: |
-             await github.rest.git.deleteRef({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               ref: "tags/built_apps"
-             })
+             try {
+               await github.rest.git.deleteRef({
+                 owner: context.repo.owner,
+                 repo: context.repo.repo,
+                 ref: "tags/built_apps"
+               })
+             } catch (e) {
+               // Tag doesn't exist yet — that's fine
+             }
              await github.rest.git.createRef({
                owner: context.repo.owner,
                repo: context.repo.repo,
@@ -184,18 +183,3 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ./built_apps/README.md
           name: "Built Apps"
-      - name: Commit and push README updates
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-        run: |
-          if git diff --quiet README.md; then
-            echo "No README changes"
-          else
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add README.md
-            git commit -m "Add release download links to app descriptions in README"
-            git stash --include-untracked
-            git pull --rebase origin ${{ github.ref_name }}
-            git stash pop || true
-            git push origin HEAD:${{ github.ref_name }}
-          fi

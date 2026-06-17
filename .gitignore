@@ -1,0 +1,10 @@
+.DS_Store
+*.pyc
+__pycache__/
+.venv/
+*.tar.gz
+*.tar
+built_apps/
+METADATA/
+.vscode/
+docs/ratings.json

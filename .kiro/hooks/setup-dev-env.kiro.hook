@@ -1,13 +1,13 @@
 {
   "enabled": true,
   "name": "Setup Dev Environment",
-  "description": "Creates a Python virtual environment and installs SDK dependencies. Run manually via the play button in the Agent Hooks panel.",
+  "description": "Creates a .venv virtual environment, installs all Python dependencies, and activates the venv. macOS/Linux: python3 make.py setup && source .venv/bin/activate. Windows: python make.py setup && .venv\\Scripts\\activate",
   "version": "1",
   "when": {
     "type": "userTriggered"
   },
   "then": {
     "type": "runCommand",
-    "command": "python3 make.py setup || python make.py setup"
+    "command": "python3 make.py setup && source .venv/bin/activate || python make.py setup && .venv\\Scripts\\activate"
   }
 }

@@ -1,0 +1,65 @@
+name: Deploy App Store to GitHub Pages
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Fetch community ratings
+        env:
+          GOATCOUNTER_TOKEN: ${{ secrets.GOATCOUNTER_TOKEN }}
+        run: python3 docs/fetch_ratings.py
+
+      - name: Generate catalog
+        run: python3 docs/generate_catalog.py
+
+      - name: Build all apps
+        run: |
+          mkdir -p built_apps
+          python3 make.py build all
+          find . -maxdepth 1 -name '*.tar.gz' -exec mv {} built_apps/ \;
+          python3 make.py clean all
+
+      - name: Prepare pages content
+        run: |
+          mkdir -p _site/apps
+          cp docs/index.html _site/
+          cp docs/catalog.json _site/
+          cp built_apps/*.tar.gz _site/apps/ 2>/dev/null || true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

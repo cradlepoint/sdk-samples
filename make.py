@@ -25,11 +25,9 @@ try:
     import urllib3
     urllib3.disable_warnings()
     from requests.auth import HTTPDigestAuth
-    from OpenSSL import crypto
 except ImportError:
     requests = None
     HTTPDigestAuth = None
-    crypto = None
     
 # Upgrade functionality for checking and updating files from GitHub
 def get_github_commit_timestamp(file_path):
@@ -378,14 +376,43 @@ def get_app_list():
     app_dirs = []
     cwd = os.getcwd()
     print("Scanning {} for app directories.".format(cwd))
-    dirs_in_cwd = os.listdir(cwd)
 
-    # Assume dir is an app_dir if it contains 'package.ini'
+    # Search under apps/ directory for package.ini files (flat structure)
+    apps_dir = os.path.join(cwd, 'apps')
+    if os.path.isdir(apps_dir):
+        for item in os.listdir(apps_dir):
+            if item in ('templates', 'archive', '__pycache__', 'METADATA', '.git', '.venv'):
+                continue
+            item_path = os.path.join(apps_dir, item)
+            if os.path.isdir(item_path) and os.path.isfile(os.path.join(item_path, 'package.ini')):
+                app_dirs.append(item_path)
+    else:
+        # Fallback: look in cwd for flat structure (backward compat)
+        dirs_in_cwd = os.listdir(cwd)
+        for item in dirs_in_cwd:
+            if os.path.isdir(item):
+                contents = os.listdir(item)
+                if 'package.ini' in contents:
+                    app_dirs.append(item)
+
+    # Also check repo root for apps in active development (created but not yet moved)
+    dirs_in_cwd = os.listdir(cwd)
     for item in dirs_in_cwd:
-        if os.path.isdir(item):
-            contents = os.listdir(item)
-            if 'package.ini' in contents:
-                app_dirs.append(item)
+        item_path = os.path.join(cwd, item)
+        if os.path.isdir(item_path) and item not in ['apps', 'archive', 'docs', '.git', '.github', '.kiro', '.venv', '__pycache__']:
+            if os.path.isfile(os.path.join(item_path, 'package.ini')):
+                if item_path not in app_dirs:
+                    app_dirs.append(item_path)
+
+    # Warn about duplicate app names
+    names_seen = {}
+    for app_dir in app_dirs:
+        name = os.path.basename(app_dir)
+        if name in names_seen:
+            print("WARNING: Duplicate app name '{}' found at:\n  {}\n  {}".format(
+                name, names_seen[name], app_dir))
+        else:
+            names_seen[name] = app_dir
 
     return app_dirs
 
@@ -398,8 +425,6 @@ def put(value):
                                 auth=get_auth(),
                                 data={"data": '"{} {}"'.format(value, get_app_uuid())},
                                 verify=False)
-
-        print('status_code: {}'.format(response.status_code))
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
@@ -531,7 +556,16 @@ def create_signature(meta_data_folder, pkey):
     with open(os.path.join(meta_data_folder, SIGNATURE_FILE), 'wb') as sf:
         checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
         if pkey:
-            sf.write(crypto.sign(pkey, checksum, 'sha256'))
+            try:
+                from cryptography.hazmat.primitives import hashes, serialization
+                from cryptography.hazmat.primitives.asymmetric import padding
+                with open(pkey, 'rb') as kf:
+                    private_key = serialization.load_pem_private_key(kf.read(), password=None)
+                signature = private_key.sign(checksum, padding.PKCS1v15(), hashes.SHA256())
+                sf.write(signature)
+            except ImportError:
+                print("WARNING: 'cryptography' library not installed. Writing unsigned checksum.")
+                sf.write(checksum)
         else:
             sf.write(checksum)
 
@@ -624,12 +658,20 @@ def package_application(app_root, pkey):
 # Package the app files into a tar.gz archive.
 def package(app=None):
     app_name = app or g_app_name
-    app_path = os.path.join(app_name)
+    app_path = app_name
 
-    # Verify the app directory exists
+    # If app_name is not a directory, try to find it under apps/
     if not os.path.isdir(app_path):
-        print("ERROR: App directory '{}' does not exist. Skipping.".format(app_path))
-        return False
+        # Check apps/{app_name} directly (flat structure)
+        candidate = os.path.join('apps', app_name)
+        if os.path.isdir(candidate):
+            app_path = candidate
+        else:
+            print("ERROR: App directory '{}' does not exist. Skipping.".format(app_name))
+            return False
+
+    # The app_name for packaging must match the folder basename
+    actual_app_name = os.path.basename(app_path)
 
     # Verify the app has a valid package.ini with the correct section
     app_config_file = os.path.join(app_path, CONFIG_FILE)
@@ -639,11 +681,11 @@ def package(app=None):
 
     config = configparser.ConfigParser()
     config.read(app_config_file)
-    if app_name not in config:
-        print("ERROR: The '{}' section does not exist in {}. Skipping.".format(app_name, app_config_file))
+    if actual_app_name not in config:
+        print("ERROR: The '{}' section does not exist in {}. Skipping.".format(actual_app_name, app_config_file))
         return False
 
-    print("Packaging {}".format(app_name))
+    print("Packaging {}".format(actual_app_name))
     scan_for_cr(app_path)
     setup_script(app_path)
 
@@ -651,7 +693,7 @@ def package(app=None):
         package_application(app_path, None)
         return True
     except Exception as err:
-        print('Error packaging {}: {}'.format(app_name, err))
+        print('Error packaging {}: {}'.format(actual_app_name, err))
         return False
 
 
@@ -696,25 +738,45 @@ def create(app_name=None):
     if not app_name:
         print('ERROR: No app name provided. Please provide a name. If you are using Cursor AI, it will generate a name for you based on your requested functionality.')
         return
-    if os.path.exists(app_name):
+
+    # Create at repo root for easy dev iteration — move to apps/ when done
+    target_dir = app_name
+
+    if os.path.exists(target_dir):
         print('App already exists.  Please choose a different name.')
         return
 
+    # Check if an app with this name already exists under apps/
+    candidate = os.path.join('apps', app_name)
+    if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, 'package.ini')):
+        print(f'App already exists at {candidate}. Please choose a different name.')
+        return
+
+    # Find app_template
+    template_path = os.path.join('apps', 'templates', 'app_template')
+    if not os.path.isdir(template_path):
+        # Fallback to old location
+        template_path = 'app_template'
+    if not os.path.isdir(template_path):
+        print('ERROR: app_template not found.')
+        return
+
     try:
-        # Copy app_template folder and rename to new app name
-        shutil.copytree('app_template', app_name)
-        os.rename(f'{app_name}/app_template.py', f'{app_name}/{app_name}.py')
+        shutil.copytree(template_path, target_dir)
+        os.rename(f'{target_dir}/app_template.py', f'{target_dir}/{app_name}.py')
 
         # Replace app_template with new app name in all files
         files = [f'{app_name}.py', 'package.ini', 'readme.md', 'start.sh']
         for file in files:
-            path = f'{app_name}/{file}'
-            with open(path, 'r') as in_file:
-                filedata = in_file.read()
-            filedata = filedata.replace('app_template', app_name)
-            with open(path, 'w') as out_file:
-                out_file.write(filedata)
-        print(f'App {app_name} created successfully.')
+            path = f'{target_dir}/{file}'
+            if os.path.isfile(path):
+                with open(path, 'r') as in_file:
+                    filedata = in_file.read()
+                filedata = filedata.replace('app_template', app_name)
+                with open(path, 'w') as out_file:
+                    out_file.write(filedata)
+        print(f'App {app_name} created at ./{app_name}/')
+        print(f'When ready, move to apps/: mv {app_name} apps/')
     except Exception as e:
         print(f'Error creating app: {e}')
 
@@ -722,44 +784,101 @@ def create(app_name=None):
 def install():
     if is_NCOS_device_in_DEV_mode():
         # Try to read version from package.ini in the app folder
+        app_archive = None
         try:
-            package_ini_path = os.path.join(g_app_name, 'package.ini')
-            config = configparser.ConfigParser()
-            config.read(package_ini_path)
-            
-            version_major = config[g_app_name].get('version_major', '0')
-            version_minor = config[g_app_name].get('version_minor', '0') 
-            version_patch = config[g_app_name].get('version_patch', '0')
-            
-            app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
-            if not os.path.exists(app_archive):
-                app_archive = f"{g_app_name}.tar.gz"
-        except Exception as e:
-            app_archive = f"{g_app_name}.tar.gz"
+            # Check multiple possible locations for package.ini
+            candidates = [
+                os.path.join(g_app_name, 'package.ini'),
+                os.path.join('apps', g_app_name, 'package.ini'),
+            ]
+            package_ini_path = None
+            for candidate in candidates:
+                if os.path.isfile(candidate):
+                    package_ini_path = candidate
+                    break
 
-        # Use sshpass for Linux or OS X
-        cmd = 'sshpass -p {0} scp -O -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "{1}" {2}@{3}:/app_upload'.format(
-               g_dev_client_password, app_archive,
-               g_dev_client_username, g_dev_client_ip)
+            if package_ini_path:
+                config = configparser.ConfigParser()
+                config.read(package_ini_path)
+                version_major = config[g_app_name].get('version_major', '0')
+                version_minor = config[g_app_name].get('version_minor', '0')
+                version_patch = config[g_app_name].get('version_patch', '0')
+                app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
+        except Exception:
+            pass
 
-        # For Windows, use pscp.exe in the tools directory
-        if sys.platform == 'win32':
-            cmd = './tools/bin/pscp.exe -pw {0} -v "{1}" {2}@{3}:/app_upload'.format(
-                   g_dev_client_password, app_archive,
-                   g_dev_client_username, g_dev_client_ip)
-
-        print('Installing {} in NCOS device {}.'.format(app_archive, g_dev_client_ip))
-        try:
-            if sys.platform == 'win32':
-                subprocess.check_output(cmd)
+        # Fallback: find any matching tar.gz
+        if not app_archive or not os.path.exists(app_archive):
+            import glob
+            matches = glob.glob(f"{g_app_name}*.tar.gz") + glob.glob(f"{g_app_name} v*.tar.gz")
+            if matches:
+                app_archive = matches[0]
             else:
-                subprocess.check_output(cmd, shell=True)
-        except subprocess.CalledProcessError as err:
-            # There is always an error because the NCOS device will drop the connection.
-            # print('Error installing: {}'.format(err))
-            return 0
+                app_archive = f"{g_app_name}.tar.gz"
+
+        if not os.path.exists(app_archive):
+            print('ERROR: Package file not found: {}'.format(app_archive))
+            return 1
+
+        print('Installing {} to {}...'.format(app_archive, g_dev_client_ip))
+
+        import paramiko
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            ssh.connect(g_dev_client_ip, username=g_dev_client_username,
+                        password=g_dev_client_password,
+                        look_for_keys=False, allow_agent=False, timeout=10)
+            transport = ssh.get_transport()
+
+            # Legacy SCP protocol — remote path MUST be /app_upload (no trailing slash)
+            channel = transport.open_session()
+            channel.exec_command('scp -t /app_upload')
+
+            # Wait for ready signal
+            response = channel.recv(1)
+            if response != b'\x00':
+                err = channel.recv(1024).decode(errors='replace') if channel.recv_ready() else ''
+                print('ERROR: SCP not ready: {}'.format(err))
+                return 1
+
+            # Send file header
+            file_size = os.path.getsize(app_archive)
+            filename = os.path.basename(app_archive)
+            header = 'C0644 {} {}\n'.format(file_size, filename)
+            channel.sendall(header.encode())
+
+            # Wait for header ack
+            response = channel.recv(1)
+            if response != b'\x00':
+                err = channel.recv(1024).decode(errors='replace') if channel.recv_ready() else ''
+                print('ERROR: SCP rejected file: {}'.format(err))
+                return 1
+
+            # Send file content
+            with open(app_archive, 'rb') as f:
+                while True:
+                    data = f.read(32768)
+                    if not data:
+                        break
+                    channel.sendall(data)
+
+            # Send completion signal
+            channel.sendall(b'\x00')
+            channel.close()
+        except (EOFError, OSError, paramiko.ssh_exception.SSHException):
+            # Router drops connection after receiving file — expected
+            pass
+        except Exception as e:
+            print('ERROR: Upload failed: {}'.format(e))
+            return 1
+        finally:
+            ssh.close()
+
+        return 0
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to install the app into {}.'.format(g_dev_client_ip))
+        return 1
 
 
 # Start the app in the NCOS device
@@ -798,29 +917,42 @@ def uninstall():
 # Purge the app from the NCOS device
 def purge():
     if is_NCOS_device_in_DEV_mode():
-        print('Purging applications for NCOS device at {}'.format(g_dev_client_ip))
-        response = put('purge')
-        print(response)
+        put('purge')
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to purge the app from {}.'.format(g_dev_client_ip))
 
 def deploy():
-    """Full deploy: purge, build, install, and show logs."""
-    print('Deploying {} to {}...'.format(g_app_name, g_dev_client_ip))
+    """Full deploy: purge, build, install, and show recent logs."""
+    print('Purging apps from {}...'.format(g_dev_client_ip))
     purge()
-    time.sleep(2)
-    package()
-    install()
+    time.sleep(3)
+
+    if not package():
+        print('ERROR: Packaging failed.')
+        return
+
+    result = install()
+    if result != 0:
+        print('ERROR: Install failed.')
+        return
+
+    # Wait for the app to start, then show all recent logs
     time.sleep(5)
-    print('Checking logs...')
     try:
         log_url = 'https://{}/api/status/log/'.format(g_dev_client_ip)
         response = requests.get(log_url, auth=get_auth(), verify=False)
         logs = json.loads(response.text).get('data', [])
-        for entry in logs[-20:]:
-            if g_app_name in str(entry):
+        cutoff = time.time() - 7
+        recent = [e for e in logs if e[0] >= cutoff]
+        if recent:
+            print('Logs:')
+            for entry in recent:
                 ts = datetime.datetime.fromtimestamp(entry[0]).strftime('%H:%M:%S')
-                print('{} {}'.format(ts, entry[3]))
+                facility = entry[2] if len(entry) > 2 else ''
+                msg = entry[3] if len(entry) > 3 and entry[3] else ''
+                print('  {} [{}] {}'.format(ts, facility, msg))
+        else:
+            print('  No log entries in the last 7 seconds.')
     except Exception as e:
         print('Warning: Could not fetch logs: {}'.format(e))
 
@@ -853,11 +985,7 @@ def setup():
     else:
         print('No requirements.txt found, skipping dependency install.')
 
-    print('\nSetup complete! Activate the venv with:')
-    if sys.platform == 'win32':
-        print('  .venv\\Scripts\\activate.bat')
-    else:
-        print('  source .venv/bin/activate')
+    print('\nSetup complete!')
 
 
 
@@ -954,13 +1082,24 @@ def init(app=None):
         os.environ["COPYFILE_DISABLE"] = "1"
 
     settings_file = os.path.join(os.getcwd(), 'sdk_settings.ini')
+    # Also check parent directories (in case running from a subdirectory)
+    if not os.path.isfile(settings_file):
+        # Walk up to find sdk_settings.ini
+        check_dir = os.path.dirname(os.getcwd())
+        for _ in range(3):
+            candidate = os.path.join(check_dir, 'sdk_settings.ini')
+            if os.path.isfile(candidate):
+                settings_file = candidate
+                break
+            check_dir = os.path.dirname(check_dir)
+
     config = configparser.ConfigParser()
     config.read(settings_file)
 
     # Initialize the globals based on the sdk_settings.ini contents.
     if sdk_key in config:
         if app is not None:
-            g_app_name = app
+            g_app_name = os.path.basename(app.rstrip('/'))
         elif app_key in config[sdk_key]:
             g_app_name = config[sdk_key][app_key]
         else:

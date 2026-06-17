@@ -6,11 +6,15 @@ description: "Deploy SDK app to Cradlepoint router via make.py deploy (cross-pla
 
 Deploy the SDK app to the router:
 
-1. Read `sdk_settings.ini` to get the `app_name`
-2. Run the deploy command:
+```bash
+# Mac/Linux:
+.venv/bin/python3 make.py deploy {app_name}
 
-- Windows: `.venv\Scripts\python make.py deploy {app_name}`
-- Mac/Linux: `.venv/bin/python make.py deploy {app_name}`
+# Windows:
+.venv\Scripts\python make.py deploy {app_name}
+```
+
+If no `{app_name}` is specified, make.py uses the `app_name` from `sdk_settings.ini`.
 
 This will:
 1. Purge all apps from router
