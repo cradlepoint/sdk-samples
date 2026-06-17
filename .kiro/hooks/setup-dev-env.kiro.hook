@@ -8,6 +8,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "python3 make.py setup && source .venv/bin/activate || python make.py setup && .venv\\Scripts\\activate"
+    "command": "python3 make.py setup || python make.py setup"
   }
 }
