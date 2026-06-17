@@ -166,12 +166,15 @@ curl -s -u admin:pass http://router/api/dtd/config/path | python3 -m json.tool
 
 ## Docker / Containers
 
+- **Prefer SDK apps over containers** — SDK apps are smaller, use fewer resources, and are included with all device licenses at no extra cost
+- **Use containers only when needed**: Linux packages/apps, root access, or client-device-like behavior on a LAN IP through the firewall
+- **Containers require an Advanced license** — costs more than the standard license
 - Deploy via REST: POST to `/api/config/container/projects/`
 - Use Compose version `"2.4"` (not v3)
 - Named volumes MUST have `driver: local`
 - Use `restart: unless-stopped` (not `always`)
 - NO `network_mode: host` — use `ports:` instead
-- NO memory limits (not supported)
+- Resource limits supported: `mem_limit: 512m`, `cpus: 2`, `shm_size: "1gb"` (Compose v2.4 service-level syntax)
 - Use alpine-based images
 
 ---
