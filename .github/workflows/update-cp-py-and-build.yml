@@ -134,6 +134,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: master
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check each app has a readme.txt
         run: |
@@ -153,6 +154,10 @@ jobs:
       - name: Generate release body
         if: github.event_name == 'push'
         run: python3 .github/workflows/generate_release_body.py
+      - name: Get current HEAD SHA
+        if: github.event_name == 'push'
+        id: get-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Delete old release and tag
         if: github.event_name == 'push'
         uses: actions/github-script@v8
@@ -185,7 +190,8 @@ jobs:
              } catch (e) {
                console.log("No existing release to delete (or error): " + e.message);
              }
-             // Delete and recreate tag
+             // Delete and recreate tag at checked-out HEAD
+             const sha = '${{ steps.get-sha.outputs.sha }}';
              try {
                await github.rest.git.deleteRef({
                  owner: context.repo.owner,
@@ -200,9 +206,9 @@ jobs:
                owner: context.repo.owner,
                repo: context.repo.repo,
                ref: "refs/tags/built_apps",
-               sha: context.sha
+               sha: sha
              })
-             console.log("Created new tag at " + context.sha);
+             console.log("Created new tag at " + sha);
       - name: Publish
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
