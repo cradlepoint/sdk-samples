@@ -1,5 +1,24 @@
 # 5GSpeed
-Runs netperf speedtests and puts results into a configurable field. Designed to enable NCM API support for speedtests.
+Runs speedtests and puts results into a configurable field. Designed to enable NCM API support for speedtests.
+
+## Speedtest Engines (priority order)
+
+1. **Ookla** - if licensed `ookla` binary is present in app directory (BYOB)
+2. **iPerf3** - if appdata `speedtest` is set to `iperf3` and `iperf3_server` is configured
+3. **Netperf** - built-in router netperf service (default)
+
+## SDK Appdata Fields
+
+| Field | Required | Values | Description |
+|-------|----------|--------|-------------|
+| `5GSpeed` | No | Config path (default: `config/system/asset_id`) | Path where results are written |
+| `speedtest` | No | `netperf` (default), `iperf3` | Engine selection when Ookla binary is not present |
+| `iperf3_server` | Only if engine=iperf3 | `ip:port` or `ip:portx-porty` | iPerf3 server address. Single port or port range. App starts at the first port and increments if busy/failed |
+
+### iperf3_server format examples
+
+- `192.168.1.1:8000` — uses port 8000
+- `10.0.0.1:5201-5210` — tries port 5201 first, increments through 5210 if a port is busy
 
 ## Steps to Use
 
@@ -15,10 +34,21 @@ Clear the results by performing any of the following:
    put {results_path} ""
    ```
 
-**Sample result:**
+## Sample Results
 
+**Ookla:**
 ```
-DL:23.47Mbps UL:9.02Mbps Ping:47.02ms Server:XMission ISP:Verizon Wireless Time:2026-03-07T19:54:30.875162Z
+DL:52.54Mbps UL:16.55Mbps Ping:9.7ms Server:Telstra ISP:Vocus Time:2023-04-11T01:06:43Z
+```
+
+**Netperf:**
+```
+DL:96.82Mbps UL:46.74Mbps Engine:netperf Time:2023-04-11T01:06:43Z
+```
+
+**iPerf3:**
+```
+DL:85.23Mbps UL:42.11Mbps Engine:iperf3 Server:10.0.0.1:5201 Time:2023-04-11T01:06:43Z
 ```
 
 ## Retrieve Results via NCM API
