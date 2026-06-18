@@ -776,7 +776,6 @@ def create(app_name=None):
                 with open(path, 'w') as out_file:
                     out_file.write(filedata)
         print(f'App {app_name} created at ./{app_name}/')
-        print(f'When ready, move to apps/: mv {app_name} apps/')
     except Exception as e:
         print(f'Error creating app: {e}')
 
