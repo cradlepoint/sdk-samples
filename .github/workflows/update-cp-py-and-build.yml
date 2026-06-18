@@ -153,19 +153,29 @@ jobs:
       - name: Generate release body
         if: github.event_name == 'push'
         run: python3 .github/workflows/generate_release_body.py
-      - name: Tag
+      - name: Delete old release and tag
         if: github.event_name == 'push'
         uses: actions/github-script@v8
         with:
            github-token: ${{ github.token }}
            script: |
-             // Delete existing release and its assets
+             // Delete existing release and ALL its assets
              try {
                const release = await github.rest.repos.getReleaseByTag({
                  owner: context.repo.owner,
                  repo: context.repo.repo,
                  tag: "built_apps"
                });
+               // Delete all assets first
+               for (const asset of release.data.assets) {
+                 await github.rest.repos.deleteReleaseAsset({
+                   owner: context.repo.owner,
+                   repo: context.repo.repo,
+                   asset_id: asset.id
+                 });
+                 console.log(`Deleted asset: ${asset.name}`);
+               }
+               // Delete the release
                await github.rest.repos.deleteRelease({
                  owner: context.repo.owner,
                  repo: context.repo.repo,
@@ -173,7 +183,7 @@ jobs:
                });
                console.log("Deleted existing release");
              } catch (e) {
-               console.log("No existing release to delete");
+               console.log("No existing release to delete (or error): " + e.message);
              }
              // Delete and recreate tag
              try {
@@ -182,8 +192,9 @@ jobs:
                  repo: context.repo.repo,
                  ref: "tags/built_apps"
                })
+               console.log("Deleted existing tag");
              } catch (e) {
-               // Tag doesn't exist yet — that's fine
+               console.log("No existing tag to delete");
              }
              await github.rest.git.createRef({
                owner: context.repo.owner,
@@ -191,6 +202,7 @@ jobs:
                ref: "refs/tags/built_apps",
                sha: context.sha
              })
+             console.log("Created new tag at " + context.sha);
       - name: Publish
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
@@ -200,3 +212,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ./built_apps/README.md
           name: "Built Apps"
+          make_latest: true
