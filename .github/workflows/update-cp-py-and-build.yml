@@ -159,6 +159,23 @@ jobs:
         with:
            github-token: ${{ github.token }}
            script: |
+             // Delete existing release and its assets
+             try {
+               const release = await github.rest.repos.getReleaseByTag({
+                 owner: context.repo.owner,
+                 repo: context.repo.repo,
+                 tag: "built_apps"
+               });
+               await github.rest.repos.deleteRelease({
+                 owner: context.repo.owner,
+                 repo: context.repo.repo,
+                 release_id: release.data.id
+               });
+               console.log("Deleted existing release");
+             } catch (e) {
+               console.log("No existing release to delete");
+             }
+             // Delete and recreate tag
              try {
                await github.rest.git.deleteRef({
                  owner: context.repo.owner,
