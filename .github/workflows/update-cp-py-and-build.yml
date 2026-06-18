@@ -158,64 +158,17 @@ jobs:
         if: github.event_name == 'push'
         id: get-sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Delete old release and tag
+      - name: Delete old release and publish new
         if: github.event_name == 'push'
-        uses: actions/github-script@v8
-        with:
-           github-token: ${{ github.token }}
-           script: |
-             // Delete existing release and ALL its assets
-             try {
-               const release = await github.rest.repos.getReleaseByTag({
-                 owner: context.repo.owner,
-                 repo: context.repo.repo,
-                 tag: "built_apps"
-               });
-               // Delete all assets first
-               for (const asset of release.data.assets) {
-                 await github.rest.repos.deleteReleaseAsset({
-                   owner: context.repo.owner,
-                   repo: context.repo.repo,
-                   asset_id: asset.id
-                 });
-                 console.log(`Deleted asset: ${asset.name}`);
-               }
-               // Delete the release
-               await github.rest.repos.deleteRelease({
-                 owner: context.repo.owner,
-                 repo: context.repo.repo,
-                 release_id: release.data.id
-               });
-               console.log("Deleted existing release");
-             } catch (e) {
-               console.log("No existing release to delete (or error): " + e.message);
-             }
-             // Delete and recreate tag at checked-out HEAD
-             const sha = '${{ steps.get-sha.outputs.sha }}';
-             try {
-               await github.rest.git.deleteRef({
-                 owner: context.repo.owner,
-                 repo: context.repo.repo,
-                 ref: "tags/built_apps"
-               })
-               console.log("Deleted existing tag");
-             } catch (e) {
-               console.log("No existing tag to delete");
-             }
-             await github.rest.git.createRef({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               ref: "refs/tags/built_apps",
-               sha: sha
-             })
-             console.log("Created new tag at " + sha);
-      - name: Publish
-        if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: 'built_apps/*.tar.gz'
-          tag_name: "built_apps"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          body_path: ./built_apps/README.md
-          name: "Built Apps"
-          make_latest: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete existing release (this also deletes all its assets)
+          gh release delete built_apps --yes --cleanup-tag 2>/dev/null || true
+          # Upload all tar.gz files as a new release
+          find built_apps -name '*.tar.gz' -print0 | \
+            xargs -0 gh release create built_apps \
+              --title "Built Apps" \
+              --notes-file built_apps/README.md \
+              --target "${{ steps.get-sha.outputs.sha }}" \
+              --latest
