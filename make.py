@@ -931,7 +931,18 @@ def uninstall():
 # Purge the app from the NCOS device
 def purge():
     if is_NCOS_device_in_DEV_mode():
-        put('purge')
+        result = put('purge')
+        if result:
+            try:
+                data = json.loads(result)
+                if data.get('success'):
+                    print('Purge successful on {}.'.format(g_dev_client_ip))
+                    return
+            except (json.JSONDecodeError, TypeError):
+                pass
+            print('Purge failed on {}.'.format(g_dev_client_ip))
+        else:
+            print('Purge failed on {}.'.format(g_dev_client_ip))
     else:
         print('ERROR: NCOS device is not in DEV Mode! Unable to purge the app from {}.'.format(g_dev_client_ip))
 
