@@ -46,13 +46,12 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 
 ## Development Environment Setup
 
-### 1. Install Python
+**Prerequisites**
 
-Install Python 3.8 or later from [python.org](https://www.python.org/downloads/).
+- Python 3.9 or higher — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md)
+- Git (optional, for cloning the repository)
 
-For Windows-specific guidance, see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md).
-
-### 2. Clone and set up
+### 1. Clone and set up
 
 #### Kiro IDE
 
@@ -85,7 +84,7 @@ python setup_env.py && .venv\Scripts\activate
 
 This creates a `.venv` virtual environment, installs all Python dependencies, and activates the venv.
 
-### 3. Configure router connection
+### 2. Configure router connection
 
 Edit `sdk_settings.ini` with your dev router's IP and credentials:
 
