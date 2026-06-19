@@ -602,7 +602,9 @@ def package_application(app_root, pkey):
 
     for section in config.sections():
         app_name = section
-        assert os.path.basename(app_root) == app_name
+        # Case-insensitive match between folder name and section name
+        if os.path.basename(app_root).lower() != app_name.lower():
+            continue
 
         clean_manifest_folder(app_metadata_folder)
 
@@ -614,7 +616,7 @@ def package_application(app_root, pkey):
         pmf['version_patch'] = int(0)
 
         app = {}
-        app['name'] = str(section)
+        app['name'] = os.path.basename(app_root)
         try:
             app['uuid'] = config[section]['uuid']
         except KeyError:
@@ -649,7 +651,7 @@ def package_application(app_root, pkey):
 
         create_signature(app_metadata_folder, pkey)
 
-        app_name_version = f"{section} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
+        app_name_version = f"{os.path.basename(app_root)} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
         pack_package(app_root, app_name_version, ignored_files=ignored_files, ignored_dirs=ignored_dirs)
 
         print(f'Package {app_name_version}.tar.gz created')
@@ -681,7 +683,13 @@ def package(app=None):
 
     config = configparser.ConfigParser()
     config.read(app_config_file)
-    if actual_app_name not in config:
+    # Case-insensitive section lookup: find section matching folder name
+    matched_section = None
+    for section in config.sections():
+        if section.lower() == actual_app_name.lower():
+            matched_section = section
+            break
+    if matched_section is None:
         print("ERROR: The '{}' section does not exist in {}. Skipping.".format(actual_app_name, app_config_file))
         return False
 
@@ -799,10 +807,17 @@ def install():
             if package_ini_path:
                 config = configparser.ConfigParser()
                 config.read(package_ini_path)
-                version_major = config[g_app_name].get('version_major', '0')
-                version_minor = config[g_app_name].get('version_minor', '0')
-                version_patch = config[g_app_name].get('version_patch', '0')
-                app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
+                # Case-insensitive section lookup
+                section_name = None
+                for s in config.sections():
+                    if s.lower() == g_app_name.lower():
+                        section_name = s
+                        break
+                if section_name:
+                    version_major = config[section_name].get('version_major', '0')
+                    version_minor = config[section_name].get('version_minor', '0')
+                    version_patch = config[section_name].get('version_patch', '0')
+                    app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
         except Exception:
             pass
 
@@ -1010,14 +1025,20 @@ def get_app_uuid():
 
         config = configparser.ConfigParser()
         config.read(app_config_file)
-        if g_app_name in config:
-            if uuid_key in config[g_app_name]:
-                g_app_uuid = config[g_app_name][uuid_key]
+        # Case-insensitive section lookup
+        section_name = None
+        for s in config.sections():
+            if s.lower() == g_app_name.lower():
+                section_name = s
+                break
+        if section_name:
+            if uuid_key in config[section_name]:
+                g_app_uuid = config[section_name][uuid_key]
 
                 if g_app_uuid == '':
                     # Create a UUID if it does not exist
                     _uuid = str(uuid.uuid4())
-                    config.set(g_app_name, uuid_key, _uuid)
+                    config.set(section_name, uuid_key, _uuid)
                     with open(app_config_file, 'w') as configfile:
                         config.write(configfile)
                     print('INFO: Created and saved uuid {} in {}'.format(_uuid, app_config_file))
