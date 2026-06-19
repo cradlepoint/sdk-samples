@@ -50,23 +50,37 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 
 Install Python 3.8 or later from [python.org](https://www.python.org/downloads/).
 
+For Windows-specific guidance, see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md).
+
 ### 2. Clone and set up
+
+#### Kiro IDE
+
+In Kiro, open the Command Palette and select **Git: Clone**, then paste:
+
+```
+https://github.com/cradlepoint/sdk-samples.git
+```
+
+Once the repo opens, click the **Setup Dev Environment** hook in the Kiro sidebar. It handles everything automatically.
+
+#### Manual setup
 
 ```bash
 git clone https://github.com/cradlepoint/sdk-samples.git
 cd sdk-samples
 ```
 
-#### macOS / Linux
+**macOS / Linux:**
 
 ```bash
-python3 make.py setup && source .venv/bin/activate
+python3 setup_env.py && source .venv/bin/activate
 ```
 
-#### Windows
+**Windows:**
 
 ```cmd
-python make.py setup && .venv\Scripts\activate
+python setup_env.py && .venv\Scripts\activate
 ```
 
 This creates a `.venv` virtual environment, installs all Python dependencies, and activates the venv.

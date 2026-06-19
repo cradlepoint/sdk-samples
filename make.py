@@ -957,34 +957,8 @@ def deploy():
 
 def setup():
     """Create .venv and install requirements.txt."""
-    venv_dir = os.path.join(os.getcwd(), '.venv')
-    py = sys.executable
-
-    if not os.path.isdir(venv_dir):
-        print('Creating virtual environment in .venv...')
-        subprocess.run([py, '-m', 'venv', venv_dir], check=True)
-    else:
-        print('Virtual environment already exists in .venv')
-
-    # Determine pip and python paths inside venv
-    if sys.platform == 'win32':
-        pip = os.path.join(venv_dir, 'Scripts', 'pip')
-        venv_py = os.path.join(venv_dir, 'Scripts', 'python')
-    else:
-        pip = os.path.join(venv_dir, 'bin', 'pip')
-        venv_py = os.path.join(venv_dir, 'bin', 'python')
-
-    print('Upgrading pip...')
-    subprocess.run([venv_py, '-m', 'pip', 'install', '-U', 'pip'], check=True)
-
-    req = os.path.join(os.getcwd(), 'requirements.txt')
-    if os.path.isfile(req):
-        print('Installing dependencies...')
-        subprocess.run([pip, 'install', '-r', req], check=True)
-    else:
-        print('No requirements.txt found, skipping dependency install.')
-
-    print('\nSetup complete!')
+    setup_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'setup_env.py')
+    subprocess.run([sys.executable, setup_script], check=True)
 
 
 

@@ -1,13 +1,13 @@
 {
   "enabled": true,
   "name": "Setup Dev Environment",
-  "description": "Creates a .venv virtual environment, installs all Python dependencies, and activates the venv. macOS/Linux: python3 make.py setup && source .venv/bin/activate. Windows: python make.py setup && .venv\\Scripts\\activate",
+  "description": "Creates a .venv virtual environment and installs all Python dependencies. macOS/Linux: python3 setup_env.py. Windows: python setup_env.py",
   "version": "1",
   "when": {
     "type": "userTriggered"
   },
   "then": {
     "type": "runCommand",
-    "command": "python3 make.py setup || python make.py setup"
+    "command": "python3 setup_env.py || python setup_env.py"
   }
 }
