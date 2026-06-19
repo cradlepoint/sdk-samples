@@ -95,9 +95,9 @@ def main():
         if app_dir:
             notes = parse_notes(app_dir)
 
-        # Encode filename for URL (spaces -> %20)
-        encoded_name = f.name.replace(" ", "%20")
-        download_link = f"[{app_name} {version}]({download_base}/{encoded_name})"
+        # GitHub Releases converts spaces in asset filenames to periods
+        asset_name = f.name.replace(" ", ".")
+        download_link = f"[{app_name} {version}]({download_base}/{asset_name})"
 
         display_name = f"{app_name} {version}".strip()
         rows.append(f"| {display_name} | {notes} | {download_link} |")
