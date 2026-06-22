@@ -99,7 +99,11 @@ def main():
         asset_name = f.name.replace(" ", ".")
         download_link = f"[{app_name} {version}]({download_base}/{asset_name})"
 
-        display_name = f"{app_name} {version}".strip()
+        # Link app name to its source page in the repo
+        app_page_name = app_dir.name if app_dir else app_name
+        app_link = f"[{app_name}]({repo_url}/tree/master/apps/{app_page_name})"
+
+        display_name = f"{app_link} {version}".strip()
         rows.append(f"| {display_name} | {notes} | {download_link} |")
 
     output = RELEASE_HEADER + "\n".join(rows)
