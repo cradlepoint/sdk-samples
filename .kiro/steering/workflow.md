@@ -67,7 +67,7 @@ Default/placeholder values that indicate unconfigured settings:
 └── mylib/              # Subdirectories with Python modules work fine
 ```
 
-Apps live at the repo root (where `make.py create` puts them). Do NOT move them to `apps/`.
+Apps live at the repo root (where `make.py create` puts them). **NEVER move apps** — not to `apps/`, not anywhere else. Leave them where they are. Only the user decides when and where to move an app.
 
 Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio, vehicle, security, web, tools, examples, speedtest, mqtt, etc.
 
@@ -83,7 +83,7 @@ Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio,
 .venv/bin/python3 make.py create {app_name}
 ```
 
-This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. **Leave the app at the root** — do NOT move it to `apps/`. The `make.py` commands (`build`, `deploy`, etc.) find apps at both the repo root and `apps/`, and keeping it at the root makes it easy for the user to find.
+This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. **NEVER move apps after creation** — not to `apps/`, not to any other directory. The app stays at the repo root unless the user explicitly moves it themselves. The `make.py` commands (`build`, `deploy`, etc.) find apps at both the repo root and `apps/`, so location doesn't affect functionality.
 
 **CRITICAL: Before writing ANY app code:**
 1. **RTFM FIRST** - Use `#rtfm.md` steering file to verify API paths, fields, and structures
