@@ -35,7 +35,7 @@ The NCOS SDK enables developers to build and deploy Python applications that run
 │   ├── ...                 # 75+ apps total
 │   ├── templates/          # app_template, web_app_template
 │   └── archive/            # Retired/inactive apps
-├── docs/                  # API documentation and app store site
+├── docs/                  # API documentation
 ├── make.py                # Build/deploy tool
 └── sdk_settings.ini       # Router connection settings
 ```

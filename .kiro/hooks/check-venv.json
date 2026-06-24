@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check Dev Environment",
+      "trigger": "SessionStart",
+      "description": "Runs setup_env.py if .venv is missing at the start of every session.",
+      "action": {
+        "type": "command",
+        "command": "test -d .venv || python3 setup_env.py"
+      }
+    }
+  ]
+}

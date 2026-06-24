@@ -639,7 +639,7 @@ The `app_name` field is the default when no app name is passed to make.py comman
 
 ### package.ini Tags
 
-Tags categorize apps for the App Store and discovery:
+Tags categorize apps for discovery:
 
 `connectivity`, `monitoring`, `networking`, `integrations`, `gpio`, `vehicle`, `security`, `web`, `tools`, `examples`, `speedtest`, `mqtt`
 
@@ -1582,7 +1582,6 @@ while True:
 
 | Resource | Link |
 |----------|------|
-| App Store | [Browse & download apps](https://cradlepoint.github.io/sdk-samples/) |
 | Official SDK Guide | [docs.cradlepoint.com](https://docs.cradlepoint.com/r/NCOS-SDK-Developers_Guide/) |
 | GitHub Repository | [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) |
 | NCM SDK Tools | [NCM Tools Tab](https://docs.cradlepoint.com/r/NetCloud-Manager-Tools-Tab) |

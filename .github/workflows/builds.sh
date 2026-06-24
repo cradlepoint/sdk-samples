@@ -23,6 +23,3 @@ find . -maxdepth 1 -name '*.tar.gz' -exec cp {} built_apps/ \;
 # Clean all build artifacts
 run_cmd "python3 make.py clean all"
 
-# Generate app store catalog
-echo "Generating app store catalog..."
-python3 docs/generate_catalog.py
