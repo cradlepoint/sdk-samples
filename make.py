@@ -185,27 +185,25 @@ def check_and_update_file(file_path, local_path=None):
 def update():
     """
     Check and update core files from the GitHub repository.
-    Updates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py
+    Updates: make.py and apps/templates/app_template/cp.py
     """
     print("Checking for updates to core SDK files...")
     print("=" * 50)
     
     # Files to check and update
     files_to_check = [
-        "cp.py",
-        "cp_methods_reference.md", 
-        "make.py",
-        "app_template/cp.py"
+        ("make.py", "make.py"),
+        ("apps/templates/app_template/cp.py", "apps/templates/app_template/cp.py"),
     ]
     
     results = {}
     updated_count = 0
     error_count = 0
     
-    for file_path in files_to_check:
-        print(f"\n--- {file_path} ---")
-        result = check_and_update_file(file_path)
-        results[file_path] = result
+    for repo_path, local_path in files_to_check:
+        print(f"\n--- {local_path} ---")
+        result = check_and_update_file(repo_path, local_path)
+        results[local_path] = result
         
         if result['status'] == 'updated':
             updated_count += 1
@@ -218,7 +216,7 @@ def update():
     
     # Summary
     print("\n" + "=" * 50)
-    print("UPGRADE SUMMARY")
+    print("UPDATE SUMMARY")
     print("=" * 50)
     
     for file_path, result in results.items():
@@ -1014,7 +1012,7 @@ def output_help():
     print('setup: Create .venv and install requirements.txt.\n')
     print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
     print('update: Check and update core SDK files from GitHub repository.\n')
-    print('\tUpdates: cp.py, cp_methods_reference.md, make.py, and app_template/cp.py\n')
+    print('\tUpdates: make.py and apps/templates/app_template/cp.py\n')
     print('unit: Run any unit tests associated with selected app.\n')
     print('system: Run any system tests associated with selected app.\n')
     print('help: Print this help information.\n')

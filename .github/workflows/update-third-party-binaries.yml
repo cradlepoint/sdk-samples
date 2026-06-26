@@ -1,0 +1,149 @@
+name: Update third-party binaries
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 06:00 UTC
+  workflow_dispatch:       # Allow manual triggering
+
+jobs:
+  update-binaries:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update iperf3 binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::Fetching latest iperf3-arm64v8 from userdocs/iperf3-static"
+          TAG=$(gh release view --repo userdocs/iperf3-static --json tagName --jq '.tagName')
+          echo "Latest iperf3 release: $TAG"
+
+          gh release download --repo userdocs/iperf3-static \
+            --pattern "iperf3-arm64v8" --dir /tmp/iperf3 --clobber
+
+          chmod +x /tmp/iperf3/iperf3-arm64v8
+
+          # Auto-discover all app directories that bundle iperf3
+          find apps -name "iperf3-arm64v8" -type f | while read -r dest; do
+            echo "  Updating $dest"
+            cp /tmp/iperf3/iperf3-arm64v8 "$dest"
+          done
+
+          echo "IPERF3_VERSION=$TAG" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+
+      - name: Update ttyd binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::Fetching latest ttyd.aarch64 from tsl0922/ttyd"
+          TAG=$(gh release view --repo tsl0922/ttyd --json tagName --jq '.tagName')
+          echo "Latest ttyd release: $TAG"
+
+          gh release download --repo tsl0922/ttyd \
+            --pattern "ttyd.aarch64" --dir /tmp/ttyd --clobber
+
+          chmod +x /tmp/ttyd/ttyd.aarch64
+
+          # Auto-discover all app directories that bundle ttyd
+          find apps -name "ttyd" -type f | while read -r dest; do
+            echo "  Updating $dest"
+            cp /tmp/ttyd/ttyd.aarch64 "$dest"
+          done
+
+          echo "TTYD_VERSION=$TAG" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+
+      - name: Update rproxy binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::Fetching latest rproxy from cayspekko/buildproxy"
+          TAG=$(gh release view --repo cayspekko/buildproxy --json tagName --jq '.tagName')
+          echo "Latest buildproxy release: $TAG"
+
+          gh release download --repo cayspekko/buildproxy \
+            --pattern "rproxy-aarch64-unknown-linux-musl.tar.gz" \
+            --pattern "rproxy-x86_64-unknown-linux-musl.tar.gz" \
+            --pattern "rproxy-arm-unknown-linux-musleabihf.tar.gz" \
+            --dir /tmp/rproxy --clobber
+
+          # Extract each architecture to a named file
+          tar -xzf /tmp/rproxy/rproxy-aarch64-unknown-linux-musl.tar.gz -C /tmp/rproxy
+          mv /tmp/rproxy/rproxy /tmp/rproxy/rproxy_arm64
+
+          tar -xzf /tmp/rproxy/rproxy-x86_64-unknown-linux-musl.tar.gz -C /tmp/rproxy
+          mv /tmp/rproxy/rproxy /tmp/rproxy/rproxy_amd64
+
+          tar -xzf /tmp/rproxy/rproxy-arm-unknown-linux-musleabihf.tar.gz -C /tmp/rproxy
+          mv /tmp/rproxy/rproxy /tmp/rproxy/rproxy_arm
+
+          chmod +x /tmp/rproxy/rproxy_arm64 /tmp/rproxy/rproxy_amd64 /tmp/rproxy/rproxy_arm
+
+          # Auto-discover all app directories that bundle rproxy
+          for arch in arm64 amd64 arm; do
+            find apps -name "rproxy_${arch}" -type f | while read -r dest; do
+              echo "  Updating $dest"
+              cp "/tmp/rproxy/rproxy_${arch}" "$dest"
+            done
+          done
+
+          echo "RPROXY_VERSION=$TAG" >> "$GITHUB_ENV"
+          echo "::endgroup::"
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No binary updates found."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Binary updates detected:"
+            git diff --stat
+          fi
+
+      - name: Create pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="auto/update-third-party-binaries"
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git checkout -B "$BRANCH"
+          git add -A
+          git commit -m "chore: update third-party binaries
+
+          - iperf3: ${{ env.IPERF3_VERSION }}
+          - ttyd: ${{ env.TTYD_VERSION }}
+          - rproxy: ${{ env.RPROXY_VERSION }}"
+          git push --force origin "$BRANCH"
+
+          # Create or update the pull request
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Existing PR #$EXISTING_PR updated with force push."
+          else
+            gh pr create \
+              --title "chore: update third-party binaries" \
+              --body "Automated update of bundled third-party binaries to latest releases.
+
+          | Binary | Version |
+          |--------|---------|
+          | iperf3 | ${{ env.IPERF3_VERSION }} |
+          | ttyd | ${{ env.TTYD_VERSION }} |
+          | rproxy | ${{ env.RPROXY_VERSION }} |
+
+          See [THIRD-PARTY-LICENSES.md](../blob/master/THIRD-PARTY-LICENSES.md) for license details." \
+              --head "$BRANCH" \
+              --base master
+          fi

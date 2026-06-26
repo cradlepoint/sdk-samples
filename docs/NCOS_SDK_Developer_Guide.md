@@ -577,7 +577,7 @@ All commands use the virtual environment Python:
 | `clean all` | Clean all apps |
 | `setup` | Create .venv and install dependencies |
 | `uuid` | Generate UUID for app |
-| `update` | Check for SDK updates from GitHub |
+| `update` | Update make.py and app_template/cp.py from GitHub |
 
 ### Creating a New App
 
