@@ -98,6 +98,10 @@ def cron_matches(cron_expr, dt):
         # Convert Python weekday (0=Monday) to cron weekday (0=Sunday)
         cron_dow = (dt.weekday() + 1) % 7
 
+        # Normalize: treat 7 as 0 (both mean Sunday in cron)
+        if 7 in weekdays:
+            weekdays.add(0)
+
         if dt.minute not in minutes:
             return False
         if dt.hour not in hours:
@@ -106,7 +110,7 @@ def cron_matches(cron_expr, dt):
             return False
         if dt.month not in months:
             return False
-        if cron_dow not in weekdays and (cron_dow == 0 and 7 not in weekdays):
+        if cron_dow not in weekdays:
             return False
         return True
     except Exception as e:
