@@ -7,14 +7,14 @@ Speedtest engines (in priority order):
 2. Netperf - built-in router netperf service (default fallback)
 
 Results format: ISO timestamp followed by speedtest results and modem diagnostics.
-Example: "DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, Carrier: Verizon, DBM: -74, SINR: 5.6, RSRP: -95, RSRQ: -11, 2024-03-15T14:30:00Z"
+Example: "DL: 26.8Mbps, UL: 12.5Mbps, Latency: 56ms, Carrier: Verizon, DBM: -74, SINR: 5.6, RSRP: -95, RSRQ: -11, 2024-03-15T14:30:00-05:00"
 
 Modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) are included only if the primary WAN device
 is a modem.
 
 Appdata fields:
 - cron_schedule: Cron expression (minute hour day month weekday).
-  Default: "0 2 * * 1" (Monday at 2:00 AM UTC)
+  Default: "0 2 * * 1" (Monday at 2:00 AM local time)
 """
 
 import cp
@@ -22,10 +22,24 @@ import os
 import time
 from datetime import datetime
 
-DEFAULT_CRON = '0 2 * * 1'  # Monday at 2:00 AM UTC
+DEFAULT_CRON = '0 2 * * 1'  # Monday at 2:00 AM local time
 
 
 OOKLA_BINARIES = ('ookla', 'speedtest', 'speedtest-cli')
+
+
+def _local_timestamp():
+    """Return ISO 8601 timestamp with the router's local UTC offset."""
+    now = time.time()
+    local = time.localtime(now)
+    utc = time.gmtime(now)
+    # Compute offset in seconds
+    offset_s = (time.mktime(local) - time.mktime(utc))
+    offset_h = int(offset_s // 3600)
+    offset_m = int(abs(offset_s) % 3600 // 60)
+    sign = '+' if offset_s >= 0 else '-'
+    dt = datetime(*local[:6])
+    return f'{dt.isoformat()}{sign}{abs(offset_h):02d}:{offset_m:02d}'
 
 
 def has_ookla():
@@ -198,7 +212,7 @@ def run_speedtest():
             return
 
         dl_mbps, ul_mbps, latency = result
-        timestamp = f'{datetime.utcnow().isoformat()}Z'
+        timestamp = _local_timestamp()
 
         # Build result string
         text = f'DL: {dl_mbps:.1f}Mbps, UL: {ul_mbps:.1f}Mbps'
@@ -249,7 +263,7 @@ try:
             time.sleep(15)
             continue
 
-        now = datetime.utcnow()
+        now = datetime.now()
         current_minute = (now.year, now.month, now.day, now.hour, now.minute)
 
         # Only run once per matching minute
