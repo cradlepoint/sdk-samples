@@ -35,7 +35,26 @@ description: "Cradlepoint NCOS API reference and cp module usage guidelines"
 - **Control API via SDK**: Use `cp.put('control/path', value)` - SDK handles encoding automatically
 - **Appdata via REST**: Read: `GET /api/config/system/sdk/appdata/`, Create: `POST ... -d 'data={"name":"field","value":"val"}'`, Delete: `DELETE .../appdata/{_id_}`
 
-**See `#rtfm.md` for the full API verification workflow before writing any API code.**
+## API Verification Workflow (MANDATORY)
+
+**BEFORE writing ANY code that uses a cp.get/cp.put path or REST API endpoint, you MUST complete these steps IN ORDER. Do not skip any step. Do not write code first.**
+
+1. **SEARCH docs**: `grep -r "keyword" docs/ncos-api/ --include="*.md"` — find the relevant documentation
+2. **READ the doc** — understand the response structure, fields, and usage patterns
+3. **CHECK DTD** (for config paths): `curl -s -u admin:pass http://router/api/dtd/config/path | .venv/bin/python -m json.tool`
+4. **TEST the endpoint**: `curl -s -u admin:pass http://router/api/status/path | .venv/bin/python -m json.tool`
+5. **VERIFY fields** — only use fields you have seen in an actual response or documented example
+6. **THEN write code** — based on verified structure, not assumptions
+
+**If a router is not available for steps 3-4, you MUST still complete steps 1-2 and note which fields are unverified.**
+
+**NEVER:**
+- Assume a field exists because it "makes sense"
+- Make up API structures based on what "should" be there
+- Write code first and verify later
+- Use SSH for API validation — always use REST with basic auth
+
+**ALWAYS use REST API with basic auth (`curl -u admin:pass`), NEVER SSH for API validation.**
 
 ## Netperf Speed Test API (control/netperf)
 

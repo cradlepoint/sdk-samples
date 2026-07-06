@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "RTFM API Verification Check",
+      "trigger": "PreToolUse",
+      "description": "Checks if a file write contains Cradlepoint API calls and prompts verification that the API paths were documented/tested before coding",
+      "matcher": "fs_write|str_replace|fs_append",
+      "action": {
+        "type": "agent",
+        "prompt": "STOP. Before completing this file write, check: does the content being written contain cp.get(), cp.put(), or direct REST API calls to a Cradlepoint router path?\n\nIf YES, answer these questions before proceeding:\n1. Did you grep docs/ncos-api/ to find documentation for this API path?\n2. Did you read the relevant doc to understand the response structure?\n3. Are you using ONLY fields that are documented or that you verified with curl/DTD?\n\nIf you cannot answer YES to at least questions 1 and 2, you MUST stop and complete the API Verification Workflow (search docs → read docs → check DTD → test endpoint → verify fields → then code) BEFORE writing this file.\n\nIf the file being written is NOT a Python file using cp.get/cp.put/REST APIs (e.g., it's a config file, HTML, CSS, docs, steering, or non-API Python), proceed normally."
+      }
+    }
+  ]
+}

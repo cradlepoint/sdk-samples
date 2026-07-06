@@ -9,7 +9,7 @@ description: "Cradlepoint SDK development workflow and prompt shortcuts"
 When building a new SDK app (not a quick script), use a Kiro Spec to plan before coding:
 1. Define requirements — what APIs, what UI, what data
 2. Design — break into tasks, identify API paths needed
-3. RTFM — verify all API paths exist before implementation tasks
+3. Follow the API Verification Workflow (in `api-reference.md`) — verify all API paths exist before implementation
 4. Implement — work through tasks step by step
 
 This prevents the "code first, debug later" cycle. Start a spec with: "Create a spec for [app description]".
@@ -86,16 +86,9 @@ Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio,
 This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. **NEVER move apps after creation** — not to `apps/`, not to any other directory. The app stays at the repo root unless the user explicitly moves it themselves. The `make.py` commands (`build`, `deploy`, etc.) find apps at both the repo root and `apps/`, so location doesn't affect functionality.
 
 **CRITICAL: Before writing ANY app code:**
-1. **RTFM FIRST** - Use `#rtfm.md` steering file to verify API paths, fields, and structures
-2. **ASK USER for unknowns** - Never assume requirements, data formats, or behavior
-3. **VERIFY with curl/DTD** - Test API endpoints before coding
-4. **THEN code** - Only write code after verification
-
-**NEVER:**
-- Assume API fields exist without testing
-- Make up data structures or formats
-- Guess at user requirements
-- Write code before verifying APIs
+1. **Follow the API Verification Workflow** in `api-reference.md` — search docs, read, check DTD, test endpoint, verify fields, THEN code
+2. **ASK USER for unknowns** — never assume requirements, data formats, or behavior
+3. **If no router available** — still search and read docs before coding
 
 **After creation, only modify the main {app_name}.py file and readme.md** - all other files are generated correctly.
 
