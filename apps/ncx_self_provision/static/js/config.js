@@ -852,7 +852,9 @@ function displaySpecialColumnsInfo() {
         'lan_resource_tags': { required: false, desc: 'Per-device LAN resource tags - merged with global tags (optional, semicolon-separated)', color: 'blue' },
         'cp_host_tags': { required: false, desc: 'Per-device CP host tags - merged with global tags (optional, semicolon-separated)', color: 'blue' },
         'wildcard_resource_tags': { required: false, desc: 'Per-device wildcard tags - merged with global tags (optional, semicolon-separated)', color: 'blue' },
-        'disable_force_dns': { required: false, desc: 'Disable Force DNS - overrides global setting per device (optional, true/false)', color: 'blue' }
+        'disable_force_dns': { required: false, desc: 'Disable Force DNS - overrides global setting per device (optional, true/false)', color: 'blue' },
+        'extra_ip_resources': { required: false, desc: 'Additional IP subnet resources (optional). Format: name=<name>;ip=<cidr>[;tags=<t1:t2>][;protocols=<proto>][;port_ranges=<p1:p2>] — use pipe (|) between entries, colon (:) for lists', color: 'blue' },
+        'extra_fqdn_resources': { required: false, desc: 'Additional FQDN resources (optional). Format: name=<name>;domain=<fqdn>[;tags=<t1:t2>][;protocols=<proto>][;port_ranges=<p1:p2>] — use pipe (|) between entries, colon (:) for lists', color: 'blue' }
     };
     
     // Get all CSV columns

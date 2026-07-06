@@ -19,7 +19,7 @@ Key Features:
     - Persistent state tracking enables recovery after failures/reboots
     - Automatic retry with exponential backoff for transient API failures
     - Template-based bulk configuration with {{placeholder}} syntax
-    - Special CSV columns: id, name, primary_lan_ip, desc, custom1/2, tags, disable_force_dns
+    - Special CSV columns: id, name, primary_lan_ip, desc, custom1/2, tags, disable_force_dns, extra_ip_resources, extra_fqdn_resources
     - Template placeholders: any non-special CSV column as {{column_name}}
     - Global and per-device tagging with automatic merge and deduplication
     - DNS options: LAN as DNS with local domain, or custom DNS servers (primary/secondary)
@@ -77,6 +77,8 @@ Bulk Configuration:
     - cp_host_tags: Per-device CP host resource tags (optional)
     - wildcard_resource_tags: Per-device wildcard resource tags (optional)
     - disable_force_dns: Override global Force DNS (optional, 'true' to disable)
+    - extra_ip_resources: Additional IP subnet resources (optional, pipe-separated entries)
+    - extra_fqdn_resources: Additional FQDN resources (optional, pipe-separated entries)
     
     Template placeholder columns:
     - Any non-special column can be used as {{column_name}} in config_template.json
@@ -323,6 +325,55 @@ def merge_tags(global_tags: str, csv_tags: str) -> str:
     # Remove empty strings, strip whitespace, and return comma-separated string
     unique_tags = sorted([tag.strip() for tag in tags if tag.strip()])
     return ','.join(unique_tags) if unique_tags else ''
+
+
+def parse_multi_resource_field(field_value: str) -> List[Dict[str, str]]:
+    """Parse a CSV cell containing one or more resource definitions.
+
+    Each resource is separated by a pipe character (|). Parameters within
+    each resource are separated by semicolons in key=value format.
+
+    Format for IP subnet resources:
+        name=<name>;ip=<cidr>[;tags=<tag1:tag2>][;protocols=<TCP:UDP>][;port_ranges=<80:8000-8080>]
+
+    Format for FQDN resources:
+        name=<name>;domain=<fqdn>[;tags=<tag1:tag2>][;protocols=<TCP:UDP>][;port_ranges=<80:8000-8080>]
+
+    Multiple resources in one cell:
+        name=res1;ip=10.0.1.0/24;tags=lan|name=res2;ip=10.0.2.0/24;tags=branch
+
+    Args:
+        field_value: Raw cell value from CSV.
+
+    Returns:
+        List[Dict[str, str]]: List of parsed resource parameter dictionaries.
+            Returns empty list if field_value is empty or None.
+
+    """
+    if not field_value or not field_value.strip():
+        return []
+
+    resources = []
+    entries = field_value.split('|')
+
+    for entry in entries:
+        entry = entry.strip()
+        if not entry:
+            continue
+
+        params = {}
+        parts = entry.split(';')
+        for part in parts:
+            part = part.strip()
+            if '=' not in part:
+                continue
+            key, value = part.split('=', 1)
+            params[key.strip()] = value.strip()
+
+        if params:
+            resources.append(params)
+
+    return resources
 
 
 def log_progress(step: int, total: int, message: str) -> None:
@@ -1040,10 +1091,174 @@ def create_exchange_site_resources(n3_client: ncm.NcmClientv3,
             if isinstance(result, str) and result.startswith('ERROR'):
                 cp.log(f"ERROR creating wildcard resource: {result}")
 
+        # Create additional IP subnet resources from CSV (optional)
+        if csv_row and csv_row.get('extra_ip_resources'):
+            create_additional_ip_subnet_resources(n3_client, site_id, csv_row)
+
+        # Create additional FQDN resources from CSV (optional)
+        if csv_row and csv_row.get('extra_fqdn_resources'):
+            create_additional_fqdn_resources(n3_client, site_id, csv_row)
+
         set_state(STATE_RESOURCES, 'complete')
     except Exception as e:
         cp.log(f"ERROR creating exchange site resources: {e}")
         raise
+
+
+def create_additional_ip_subnet_resources(
+    n3_client: ncm.NcmClientv3,
+    site_id: str,
+    csv_row: Dict[str, str]
+) -> None:
+    """Create additional exchange IP subnet resources from CSV field.
+
+    Parses the 'extra_ip_resources' CSV column and creates one
+    exchange_ipsubnet_resources entry per defined resource.
+
+    CSV cell format (pipe-separated entries, semicolon key=value params):
+        name=<name>;ip=<cidr>[;tags=<t1:t2>][;protocols=<TCP:UDP>][;port_ranges=<80:8000-8080>]
+
+    Example cell value:
+        name=servers;ip=10.0.1.0/24;tags=dc:internal|name=iot;ip=10.0.2.0/24
+
+    Args:
+        n3_client: NCM v3 API client.
+        site_id: Exchange site ID to attach resources to.
+        csv_row: Matched CSV row containing the extra_ip_resources field.
+
+    """
+    field_value = csv_row.get('extra_ip_resources', '')
+    resources = parse_multi_resource_field(field_value)
+
+    if not resources:
+        return
+
+    cp.log(f"Creating {len(resources)} additional IP subnet resource(s)")
+
+    for idx, params in enumerate(resources, start=1):
+        resource_name = params.get('name', '')
+        ip_cidr = params.get('ip', '')
+
+        if not resource_name or not ip_cidr:
+            cp.log(
+                f"WARNING: Skipping extra IP subnet entry {idx} - "
+                f"'name' and 'ip' are required "
+                f"(format: name=<name>;ip=<cidr>)"
+            )
+            continue
+
+        kwargs = {}
+
+        # Parse optional tags (colon-separated within the value)
+        tags_str = params.get('tags', '')
+        if tags_str:
+            kwargs['tags'] = [t.strip() for t in tags_str.split(':') if t.strip()]
+
+        # Parse optional protocols
+        protocols_str = params.get('protocols', '')
+        if protocols_str:
+            kwargs['protocols'] = [p.strip() for p in protocols_str.split(':') if p.strip()]
+
+        # Parse optional port_ranges
+        port_ranges_str = params.get('port_ranges', '')
+        if port_ranges_str:
+            kwargs['port_ranges'] = [p.strip() for p in port_ranges_str.split(':') if p.strip()]
+
+        try:
+            cp.log(f"  Creating IP subnet resource: {resource_name} ({ip_cidr})")
+            result = retry_on_failure(
+                n3_client.create_exchange_resource,
+                resource_name=resource_name,
+                resource_type='exchange_ipsubnet_resources',
+                site_id=site_id,
+                ip=ip_cidr,
+                **kwargs
+            )
+            if isinstance(result, str) and result.startswith('ERROR'):
+                cp.log(f"  ERROR creating IP subnet resource '{resource_name}': {result}")
+            else:
+                cp.log(f"  Successfully created IP subnet resource: {resource_name}")
+            time.sleep(2)
+        except Exception as e:
+            cp.log(f"  ERROR creating IP subnet resource '{resource_name}': {e}")
+
+
+def create_additional_fqdn_resources(
+    n3_client: ncm.NcmClientv3,
+    site_id: str,
+    csv_row: Dict[str, str]
+) -> None:
+    """Create additional exchange FQDN resources from CSV field.
+
+    Parses the 'extra_fqdn_resources' CSV column and creates one
+    exchange_fqdn_resources entry per defined resource.
+
+    CSV cell format (pipe-separated entries, semicolon key=value params):
+        name=<name>;domain=<fqdn>[;tags=<t1:t2>][;protocols=<TCP:UDP>][;port_ranges=<80:443>]
+
+    Example cell value:
+        name=app1;domain=app1.site.local;tags=web|name=api;domain=api.site.local;protocols=TCP;port_ranges=443:8443
+
+    Args:
+        n3_client: NCM v3 API client.
+        site_id: Exchange site ID to attach resources to.
+        csv_row: Matched CSV row containing the extra_fqdn_resources field.
+
+    """
+    field_value = csv_row.get('extra_fqdn_resources', '')
+    resources = parse_multi_resource_field(field_value)
+
+    if not resources:
+        return
+
+    cp.log(f"Creating {len(resources)} additional FQDN resource(s)")
+
+    for idx, params in enumerate(resources, start=1):
+        resource_name = params.get('name', '')
+        domain = params.get('domain', '')
+
+        if not resource_name or not domain:
+            cp.log(
+                f"WARNING: Skipping extra FQDN entry {idx} - "
+                f"'name' and 'domain' are required "
+                f"(format: name=<name>;domain=<fqdn>)"
+            )
+            continue
+
+        kwargs = {}
+
+        # Parse optional tags (colon-separated within the value)
+        tags_str = params.get('tags', '')
+        if tags_str:
+            kwargs['tags'] = [t.strip() for t in tags_str.split(':') if t.strip()]
+
+        # Parse optional protocols
+        protocols_str = params.get('protocols', '')
+        if protocols_str:
+            kwargs['protocols'] = [p.strip() for p in protocols_str.split(':') if p.strip()]
+
+        # Parse optional port_ranges
+        port_ranges_str = params.get('port_ranges', '')
+        if port_ranges_str:
+            kwargs['port_ranges'] = [p.strip() for p in port_ranges_str.split(':') if p.strip()]
+
+        try:
+            cp.log(f"  Creating FQDN resource: {resource_name} ({domain})")
+            result = retry_on_failure(
+                n3_client.create_exchange_resource,
+                resource_name=resource_name,
+                resource_type='exchange_fqdn_resources',
+                site_id=site_id,
+                domain=domain,
+                **kwargs
+            )
+            if isinstance(result, str) and result.startswith('ERROR'):
+                cp.log(f"  ERROR creating FQDN resource '{resource_name}': {result}")
+            else:
+                cp.log(f"  Successfully created FQDN resource: {resource_name}")
+            time.sleep(2)
+        except Exception as e:
+            cp.log(f"  ERROR creating FQDN resource '{resource_name}': {e}")
 
 
 def check_vpn_tunnel_status() -> bool:

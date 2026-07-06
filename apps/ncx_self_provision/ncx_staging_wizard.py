@@ -40,7 +40,7 @@ Wizard Steps:
        - Upload or edit config_template.json (configuration template)
        - Built-in file editor with CSV grid view and JSON syntax highlighting
        - Real-time validation: CSV columns vs JSON placeholders
-       - Special column detection: id, name, primary_lan_ip, desc, custom1/2, tags, disable_force_dns
+       - Special column detection: id, name, primary_lan_ip, desc, custom1/2, tags, disable_force_dns, extra_ip_resources, extra_fqdn_resources
        - Template placeholder detection: any non-special column as {{column_name}}
        - Missing 'id' column warning (required for router matching)
        - Hostname validation: 'name' column values must be max 50 chars, alphanumeric + hyphens only
@@ -114,6 +114,8 @@ CSV Column Types:
     - cp_host_tags: Per-device CP host resource tags (optional)
     - wildcard_resource_tags: Per-device wildcard resource tags (optional)
     - disable_force_dns: Override global Force DNS (optional, 'true' to disable)
+    - extra_ip_resources: Additional IP subnet resources (optional, pipe-separated entries)
+    - extra_fqdn_resources: Additional FQDN resources (optional, pipe-separated entries)
     
     Template placeholder columns:
     - Any non-special column can be used as {{column_name}} in config_template.json
@@ -315,6 +317,174 @@ def validate_fqdn(domain: str) -> tuple:
         if not tld.isalpha():
             return False, f"Domain has invalid TLD '{tld}'"
     return True, "Valid"
+
+
+VALID_RESOURCE_PROTOCOLS = [['TCP'], ['UDP'], ['TCP', 'UDP'], ['ICMP']]
+
+
+def validate_extra_resource_field(field_value: str, field_name: str, router_id: str) -> list:
+    """Validate extra resource field format and parameter values.
+
+    Validates pipe-separated resource entries with semicolon key=value params.
+
+    Args:
+        field_value: Raw CSV cell value.
+        field_name: Column name ('extra_ip_resources' or 'extra_fqdn_resources').
+        router_id: Router ID for error context.
+
+    Returns:
+        List of error message strings. Empty list if valid.
+    """
+    errors = []
+    if not field_value or not field_value.strip():
+        return errors
+
+    entries = field_value.split('|')
+    is_ip_type = (field_name == 'extra_ip_resources')
+
+    for idx, entry in enumerate(entries, start=1):
+        entry = entry.strip()
+        if not entry:
+            continue
+
+        params = {}
+        parts = entry.split(';')
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            if '=' not in part:
+                errors.append(
+                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                    f"invalid parameter '{part}' (must be key=value format)"
+                )
+                continue
+            key, value = part.split('=', 1)
+            key = key.strip()
+            value = value.strip()
+
+            if is_ip_type:
+                valid_keys = ['name', 'ip', 'tags', 'protocols', 'port_ranges']
+            else:
+                valid_keys = ['name', 'domain', 'tags', 'protocols', 'port_ranges']
+
+            if key not in valid_keys:
+                errors.append(
+                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                    f"unknown parameter '{key}' "
+                    f"(valid: {', '.join(valid_keys)})"
+                )
+            params[key] = value
+
+        if not params:
+            continue
+
+        # Validate required parameters
+        if 'name' not in params:
+            errors.append(
+                f"Router ID {router_id}: {field_name} entry {idx} - "
+                f"missing required parameter 'name'"
+            )
+
+        if is_ip_type:
+            if 'ip' not in params:
+                errors.append(
+                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                    f"missing required parameter 'ip'"
+                )
+            else:
+                # Validate CIDR notation
+                ip_value = params['ip']
+                try:
+                    import ipaddress
+                    ipaddress.ip_network(ip_value, strict=False)
+                except ValueError:
+                    errors.append(
+                        f"Router ID {router_id}: {field_name} entry {idx} - "
+                        f"invalid CIDR notation '{ip_value}' "
+                        f"(expected format: x.x.x.x/prefix, e.g. 10.0.1.0/24)"
+                    )
+        else:
+            if 'domain' not in params:
+                errors.append(
+                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                    f"missing required parameter 'domain'"
+                )
+            else:
+                # Validate domain format
+                domain_value = params['domain']
+                valid, msg = validate_fqdn(domain_value)
+                if not valid:
+                    errors.append(
+                        f"Router ID {router_id}: {field_name} entry {idx} - "
+                        f"invalid domain '{domain_value}': {msg}"
+                    )
+
+        # Validate protocols if present
+        if 'protocols' in params:
+            proto_list = [p.strip().upper() for p in params['protocols'].split(':') if p.strip()]
+            if proto_list not in VALID_RESOURCE_PROTOCOLS:
+                errors.append(
+                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                    f"invalid protocols '{params['protocols']}' "
+                    f"(valid: TCP | UDP | TCP:UDP | ICMP)"
+                )
+
+            # Validate port_ranges not used with ICMP
+            if proto_list == ['ICMP'] and 'port_ranges' in params:
+                errors.append(
+                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                    f"port_ranges cannot be used with ICMP protocol"
+                )
+
+        # Validate port_ranges format if present
+        if 'port_ranges' in params:
+            port_parts = [p.strip() for p in params['port_ranges'].split(':') if p.strip()]
+            for port_part in port_parts:
+                if '-' in port_part:
+                    range_parts = port_part.split('-')
+                    if len(range_parts) != 2:
+                        errors.append(
+                            f"Router ID {router_id}: {field_name} entry {idx} - "
+                            f"invalid port range '{port_part}' "
+                            f"(expected format: lower-upper, e.g. 8000-8080)"
+                        )
+                    else:
+                        try:
+                            lower = int(range_parts[0])
+                            upper = int(range_parts[1])
+                            if lower > upper:
+                                errors.append(
+                                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                                    f"invalid port range '{port_part}': "
+                                    f"lower ({lower}) > upper ({upper})"
+                                )
+                            if lower < 1 or upper > 65535:
+                                errors.append(
+                                    f"Router ID {router_id}: {field_name} entry {idx} - "
+                                    f"port range '{port_part}' out of bounds "
+                                    f"(valid: 1-65535)"
+                                )
+                        except ValueError:
+                            errors.append(
+                                f"Router ID {router_id}: {field_name} entry {idx} - "
+                                f"port range '{port_part}' must be numeric"
+                            )
+                else:
+                    try:
+                        port = int(port_part)
+                        if port < 1 or port > 65535:
+                            errors.append(
+                                f"Router ID {router_id}: {field_name} entry {idx} - "
+                                f"port '{port_part}' out of bounds (valid: 1-65535)"
+                            )
+                    except ValueError:
+                        errors.append(
+                            f"Router ID {router_id}: {field_name} entry {idx} - "
+                            f"port '{port_part}' must be numeric"
+                        )
+
+    return errors
 
 
 def validate_license(license_value: str, license_type: str) -> tuple:
@@ -600,6 +770,24 @@ class ConfigurationHandler(http.server.SimpleHTTPRequestHandler):
                                             valid, msg = validate_hostname(name_value)
                                             if not valid:
                                                 errors.append(f"Router ID {router_id}: name '{name_value}' - {msg}")
+
+                                # Validate extra resource fields
+                                if 'extra_ip_resources' in csv_columns or 'extra_fqdn_resources' in csv_columns:
+                                    csv_reader = csv.DictReader(lines)
+                                    for row in csv_reader:
+                                        router_id = row.get('id', 'unknown')
+                                        if 'extra_ip_resources' in csv_columns:
+                                            ip_errors = validate_extra_resource_field(
+                                                row.get('extra_ip_resources', ''),
+                                                'extra_ip_resources', router_id
+                                            )
+                                            errors.extend(ip_errors)
+                                        if 'extra_fqdn_resources' in csv_columns:
+                                            fqdn_errors = validate_extra_resource_field(
+                                                row.get('extra_fqdn_resources', ''),
+                                                'extra_fqdn_resources', router_id
+                                            )
+                                            errors.extend(fqdn_errors)
                             else:
                                 errors.append('CSV file is empty')
                     except Exception as e:
@@ -673,7 +861,9 @@ class ConfigurationHandler(http.server.SimpleHTTPRequestHandler):
                             'lan_resource_tags': 'lan_resource_tags' in csv_columns,
                             'cp_host_tags': 'cp_host_tags' in csv_columns,
                             'wildcard_resource_tags': 'wildcard_resource_tags' in csv_columns,
-                            'disable_force_dns': 'disable_force_dns' in csv_columns
+                            'disable_force_dns': 'disable_force_dns' in csv_columns,
+                            'extra_ip_resources': 'extra_ip_resources' in csv_columns,
+                            'extra_fqdn_resources': 'extra_fqdn_resources' in csv_columns
                         },
                         'has_disable_force_dns_true': has_disable_force_dns_true
                     }).encode())
@@ -929,6 +1119,24 @@ class ConfigurationHandler(http.server.SimpleHTTPRequestHandler):
                                             valid, msg = validate_hostname(name_value)
                                             if not valid:
                                                 errors.append(f"Router ID {router_id}: name '{name_value}' - {msg}")
+
+                                # Validate extra resource fields
+                                if 'extra_ip_resources' in csv_columns or 'extra_fqdn_resources' in csv_columns:
+                                    csv_reader = csv.DictReader(lines)
+                                    for row in csv_reader:
+                                        router_id = row.get('id', 'unknown')
+                                        if 'extra_ip_resources' in csv_columns:
+                                            ip_errors = validate_extra_resource_field(
+                                                row.get('extra_ip_resources', ''),
+                                                'extra_ip_resources', router_id
+                                            )
+                                            errors.extend(ip_errors)
+                                        if 'extra_fqdn_resources' in csv_columns:
+                                            fqdn_errors = validate_extra_resource_field(
+                                                row.get('extra_fqdn_resources', ''),
+                                                'extra_fqdn_resources', router_id
+                                            )
+                                            errors.extend(fqdn_errors)
                             else:
                                 errors.append('CSV file is empty')
                         except Exception as e:
@@ -992,7 +1200,9 @@ class ConfigurationHandler(http.server.SimpleHTTPRequestHandler):
                             'lan_resource_tags': 'lan_resource_tags' in csv_columns,
                             'cp_host_tags': 'cp_host_tags' in csv_columns,
                             'wildcard_resource_tags': 'wildcard_resource_tags' in csv_columns,
-                            'disable_force_dns': 'disable_force_dns' in csv_columns
+                            'disable_force_dns': 'disable_force_dns' in csv_columns,
+                            'extra_ip_resources': 'extra_ip_resources' in csv_columns,
+                            'extra_fqdn_resources': 'extra_fqdn_resources' in csv_columns
                         }
                     }).encode())
             
