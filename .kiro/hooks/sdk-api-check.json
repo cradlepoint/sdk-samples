@@ -2,7 +2,7 @@
   "version": "v1",
   "hooks": [
     {
-      "name": "RTFM API Verification Check",
+      "name": "SDK API Check",
       "trigger": "PreToolUse",
       "description": "Checks if a file write contains Cradlepoint API calls and prompts verification that the API paths were documented/tested before coding",
       "matcher": "fs_write|str_replace|fs_append",

@@ -21,8 +21,8 @@ description: "Web development standards for Cradlepoint SDK apps"
 - **Auto-refresh dashboards must preserve user input** - Save `document.activeElement.id` and `.value`, restore after innerHTML update
 - Vanilla JavaScript, semantic HTML5, CSS Grid/Flexbox
 - CSS variables for theming, mobile-first responsive
-- **ALWAYS copy `static/` folder from @web_app_template into new web apps** - this includes `css/style.css`, `js/script.js`, `libs/font-awesome.min.css`, `libs/jquery-3.5.1.min.js`, and `libs/webfonts/`. These are required for the design system to work
-- **ALWAYS use `your_web_app.html` from @web_app_template as the starting HTML** - copy it as `index.html` into your app, then modify the title, sidebar nav, and content sections. NEVER write HTML from scratch
+- **ALWAYS copy `static/` folder from `apps/templates/web_app_template` into new web apps** - this includes `css/style.css`, `js/script.js`, `libs/font-awesome.min.css`, `libs/jquery-3.5.1.min.js`, and `libs/webfonts/`. These are required for the design system to work
+- **ALWAYS use `your_web_app.html` from `apps/templates/web_app_template` as the starting HTML** - copy it as `index.html` into your app, then modify the title, sidebar nav, and content sections. NEVER write HTML from scratch
 - **NEVER write custom CSS or include external stylesheets** - the template's `style.css` provides the complete design system (layout, colors, dark mode, components). Add app-specific styles in a `<style>` block or a separate file that supplements (not replaces) the template CSS
 - Proper error handling with try/catch
 - Serve assets locally (no external dependencies)
