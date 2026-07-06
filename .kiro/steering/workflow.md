@@ -1,8 +1,11 @@
 ---
-inclusion: auto
 description: "Cradlepoint SDK development workflow and prompt shortcuts"
 ---
 # Cradlepoint SDK Development Workflow
+
+## Web Apps
+
+When building a web app, load and follow `web-standards.md` for the template and design system.
 
 ## Use Specs for New Apps
 
@@ -84,18 +87,6 @@ Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio,
 ```
 
 This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. **NEVER move apps after creation** — not to `apps/`, not to any other directory. The app stays at the repo root unless the user explicitly moves it themselves. The `make.py` commands (`build`, `deploy`, etc.) find apps at both the repo root and `apps/`, so location doesn't affect functionality.
-
-## Web Apps
-
-**All apps are still created with `make.py create`.** For web apps, use `apps/templates/web_app_template` as a reference:
-
-1. Create the app normally with `make.py create {app_name}`
-2. Copy `apps/templates/web_app_template/static/` into the new app — it contains the required design system (`css/style.css`, `js/script.js`, `libs/font-awesome.min.css`, `libs/jquery-3.5.1.min.js`, and `libs/webfonts/`)
-3. Use `apps/templates/web_app_template/your_web_app.html` as the starting HTML — copy it as `index.html`, then modify title, sidebar nav, and content. NEVER write HTML from scratch
-4. Reference `apps/templates/web_app_template/web_app_template.py` for the Python web server pattern
-5. NEVER write custom CSS that replaces the template's `style.css` — only supplement it
-
-This template provides a consistent look, dark/light mode, sidebar navigation, and all required static assets. See `web-standards.md` for full web development guidelines.
 
 **CRITICAL: Before writing ANY app code:**
 1. **Follow the API Verification Workflow** in `api-reference.md` — search docs, read, check DTD, test endpoint, verify fields, THEN code

@@ -1,6 +1,5 @@
 ---
-inclusion: fileMatch
-fileMatchPattern: "**/*.html,**/*.css,**/*.js,**/web_app_template/**"
+inclusion: auto
 description: "Web development standards for Cradlepoint SDK apps"
 ---
 # Web Development Standards
