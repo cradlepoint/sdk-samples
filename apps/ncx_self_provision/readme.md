@@ -23,7 +23,7 @@
 - [Best Practices](#best-practices)
 - [FAQ](#faq)
 
-## Overview (v2.7)
+## Overview (v2.8)
 
 The NCX Self-Provisioning SDK Application enables Ericsson routers to automatically provision themselves to an NCX or SASE network when moved into a staging group. The application executes a 9-step zero-touch provisioning workflow with state management and automatic recovery:
 
@@ -358,8 +358,8 @@ If using bulk configuration, you can prepare files before running the wizard or 
 1. **Create router_grid.csv** with your device data:
 
 ```csv
-id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags,cp_host_tags,wildcard_resource_tags
-5088306,site-3,NYC,12345,value 1,value 2,192.168.103.1,branch;retail,lan;network,,
+id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags,cp_host_tags,wildcard_resource_tags,extra_ip_resources,extra_fqdn_resources
+5088306,site-3,NYC,12345,value 1,value 2,192.168.103.1,branch;retail,lan;network,,,name=servers;ip=10.0.1.0/24;tags=dc:internal|name=iot;ip=10.0.2.0/24,
 ```
 
 2. **Customize config_template.json** with `{{column_name}}` placeholders
@@ -485,7 +485,7 @@ The template uses `{{column_name}}` placeholders that are automatically replaced
 - `{{primary_lan_ip}}` - Replaced with value from 'primary_lan_ip' column (e.g., '192.168.103.1')
 - Any non-special CSV column can be referenced using this syntax
 
-**Important**: Special columns (`id`, `name`, `primary_lan_ip`, `desc`, `custom1`, `custom2`, tag columns, `disable_force_dns`) are handled by application logic and should NOT be used as `{{placeholders}}` in the template. See [CSV Column Mapping](#csv-column-mapping) for the complete list of special columns.
+**Important**: Special columns (`id`, `name`, `primary_lan_ip`, `desc`, `custom1`, `custom2`, tag columns, `disable_force_dns`, `extra_ip_resources`, `extra_fqdn_resources`) are handled by application logic and should NOT be used as `{{placeholders}}` in the template. See [CSV Column Mapping](#csv-column-mapping) for the complete list of special columns.
 
 #### Template Structure Example
 
@@ -557,10 +557,12 @@ id,name,asset_id,primary_lan_ip,custom1,custom2
 | `custom1` | No | NCM custom field | Custom field 1 - set via NCM API during bulk config (Step 4), not in template. Visible in NCM device list. |
 | `custom2` | No | NCM custom field | Custom field 2 - set via NCM API during bulk config (Step 4), not in template. Visible in NCM device list. |
 | `site_tags` | No | Site tagging | Semicolon-separated tags for exchange site (e.g., `branch;west;retail`). Merged with global site tags from wizard, duplicates removed. Applied during site creation (Step 6). |
-| `lan_resource_tags` | No | Resource tagging | Semicolon-separated tags for LAN subnet resource. Merged with global LAN resource tags from wizard. Applied during resource creation (Step 7). |
-| `cp_host_tags` | No | Resource tagging | Semicolon-separated tags for CP host FQDN resource. Merged with global CP host tags from wizard. Applied during resource creation (Step 7). |
-| `wildcard_resource_tags` | No | Resource tagging | Semicolon-separated tags for wildcard FQDN resource. Merged with global wildcard tags from wizard. Applied during resource creation (Step 7). |
+| `lan_resource_tags` | No | Resource tagging | Semicolon-separated tags for the standard LAN subnet resource only. Merged with global LAN resource tags from wizard. Not applied to extra resources. Applied during resource creation (Step 7). |
+| `cp_host_tags` | No | Resource tagging | Semicolon-separated tags for the standard CP host FQDN resource only. Merged with global CP host tags from wizard. Not applied to extra resources. Applied during resource creation (Step 7). |
+| `wildcard_resource_tags` | No | Resource tagging | Semicolon-separated tags for the standard wildcard FQDN resource only. Merged with global wildcard tags from wizard. Not applied to extra resources. Applied during resource creation (Step 7). |
 | `disable_force_dns` | No | DNS configuration | Set to 'true' (case-insensitive) to disable DNS force redirect for this specific device. Overrides global Force DNS setting from wizard. Applied during DNS configuration (Step 8). |
+| `extra_ip_resources` | No | Resource creation | Additional IP subnet resources to create. Supports multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters. Applied during resource creation (Step 7). See [Additional Resource Format](#additional-resource-format). |
+| `extra_fqdn_resources` | No | Resource creation | Additional FQDN resources to create. Supports multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters. Applied during resource creation (Step 7). See [Additional Resource Format](#additional-resource-format). |
 
 **Template Placeholder Columns** (any other column):
 
@@ -576,6 +578,88 @@ id,name,asset_id,primary_lan_ip,custom1,custom2
 - All other columns can be referenced as `{{column_name}}` placeholders in your template
 - Tag columns use semicolon delimiters to avoid conflicts with CSV comma separators
 - Tags are automatically merged with global tags from wizard and deduplicated
+
+#### Additional Resource Format
+
+The `extra_ip_resources` and `extra_fqdn_resources` columns use a compact format that allows defining multiple resources in a single CSV cell.
+
+**Delimiter Hierarchy:**
+
+| Level | Delimiter | Purpose | Example |
+|-------|-----------|---------|---------|
+| 1 | Comma (`,`) | CSV field separator | `field1,field2,field3` |
+| 2 | Pipe (`\|`) | Separates multiple resources within a cell | `resource1\|resource2` |
+| 3 | Semicolon (`;`) | Separates key=value parameters within a resource | `name=res;ip=10.0.0.0/24` |
+| 4 | Colon (`:`) | Separates list items within a parameter value | `tags=tag1:tag2:tag3` |
+
+This hierarchy ensures no delimiter conflicts — no CSV cell quoting is required.
+
+**Format Rules:**
+- Multiple resources are separated by a pipe character (`|`)
+- Parameters within each resource are semicolon-separated key=value pairs
+- Colons (`:`) are used as list separators within parameter values (e.g., tags, protocols, port_ranges)
+- This avoids any conflict with CSV comma delimiters — no cell quoting required
+
+**Tag Scoping:**
+
+The per-device tag columns (`lan_resource_tags`, `cp_host_tags`, `wildcard_resource_tags`) and global tag settings from the wizard apply **only** to the standard resources created via the optional parameters (`create_lan_resource`, `create_cp_host_resource`, `create_wildcard_resource`). They are **not** applied to resources created via `extra_ip_resources` or `extra_fqdn_resources`.
+
+To tag extra resources, use the inline `tags` parameter within each resource entry (e.g., `name=myres;ip=10.0.1.0/24;tags=mytag1:mytag2`). This gives you independent, per-resource tag control.
+
+**IP Subnet Resource Format:**
+```
+name=<resource_name>;ip=<cidr_notation>[;tags=<tag1:tag2>][;protocols=<TCP:UDP>][;port_ranges=<80:8000-8080>]
+```
+
+| Parameter | Required | Type | Acceptable Values |
+|-----------|----------|------|-------------------|
+| `name` | **YES** | String | Any descriptive name for the resource (e.g., `servers-lan`, `iot-subnet`) |
+| `ip` | **YES** | CIDR String | Valid IPv4 subnet in CIDR notation (e.g., `10.0.1.0/24`, `192.168.50.0/28`). Prefix must be 0-32. |
+| `tags` | No | Colon-separated strings | One or more tag labels (e.g., `datacenter:internal`). No special characters. |
+| `protocols` | No | Colon-separated list | Exactly one of: `TCP` \| `UDP` \| `TCP:UDP` \| `ICMP`. Case-sensitive. |
+| `port_ranges` | No | Colon-separated integers or ranges | Individual ports (e.g., `80:443`) or ranges (e.g., `8000-8080`). Valid range: 1-65535. Lower must be <= upper in ranges. Not allowed when protocols=ICMP. |
+
+**FQDN Resource Format:**
+```
+name=<resource_name>;domain=<fully_qualified_domain>[;tags=<tag1:tag2>][;protocols=<TCP:UDP>][;port_ranges=<80:443>]
+```
+
+| Parameter | Required | Type | Acceptable Values |
+|-----------|----------|------|-------------------|
+| `name` | **YES** | String | Any descriptive name for the resource (e.g., `app-server`, `web-portal`) |
+| `domain` | **YES** | FQDN String | Valid fully qualified domain name using alphanumeric characters, hyphens, and dots (e.g., `app.site.local`, `api.branch.company.net`) |
+| `tags` | No | Colon-separated strings | One or more tag labels (e.g., `web:production`). No special characters. |
+| `protocols` | No | Colon-separated list | Exactly one of: `TCP` \| `UDP` \| `TCP:UDP` \| `ICMP`. Case-sensitive. |
+| `port_ranges` | No | Colon-separated integers or ranges | Individual ports (e.g., `443:8443`) or ranges (e.g., `8000-8080`). Valid range: 1-65535. Lower must be <= upper in ranges. Not allowed when protocols=ICMP. |
+
+**Examples:**
+
+Single IP subnet resource:
+```
+name=servers;ip=10.0.1.0/24;tags=dc:internal
+```
+
+Multiple IP subnet resources in one cell:
+```
+name=servers;ip=10.0.1.0/24;tags=dc|name=iot;ip=10.0.2.0/24;tags=iot:restricted
+```
+
+Single FQDN resource:
+```
+name=app1;domain=app1.branch.local;tags=web
+```
+
+Multiple FQDN resources with protocols and ports:
+```
+name=web;domain=web.site.local;protocols=TCP;port_ranges=80:443|name=api;domain=api.site.local;protocols=TCP;port_ranges=8080
+```
+
+**Example CSV row (no quoting needed):**
+
+```csv
+id,name,primary_lan_ip,extra_ip_resources,extra_fqdn_resources
+5088306,site-3,192.168.103.1,name=servers;ip=10.0.1.0/24;tags=dc:internal|name=iot;ip=10.0.2.0/24,name=app1;domain=app1.site.local;protocols=TCP;port_ranges=80:443
+```
 
 #### Common Template Patterns
 
@@ -605,12 +689,12 @@ id,name,asset_id,primary_lan_ip,custom1,custom2
 #### Example CSV
 
 ```csv
-id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags,cp_host_tags,wildcard_resource_tags
-5088306,site-3,NYC,12345,value 1,value 2,192.168.103.1,branch;retail,lan;network,,
+id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags,cp_host_tags,wildcard_resource_tags,extra_ip_resources,extra_fqdn_resources
+5088306,site-3,NYC,12345,value 1,value 2,192.168.103.1,branch;retail,lan;network,,,name=servers;ip=10.0.1.0/24;tags=dc:internal|name=iot;ip=10.0.2.0/24,
 ```
 
 **Column Breakdown:**
-- **Special columns** (processed by app logic): `id`, `name`, `desc`, `asset_id`, `custom1`, `custom2`, `primary_lan_ip`, `site_tags`, `lan_resource_tags`, `cp_host_tags`, `wildcard_resource_tags`
+- **Special columns** (processed by app logic): `id`, `name`, `desc`, `asset_id`, `custom1`, `custom2`, `primary_lan_ip`, `site_tags`, `lan_resource_tags`, `cp_host_tags`, `wildcard_resource_tags`, `extra_ip_resources`, `extra_fqdn_resources`
 - **Template placeholder columns** (used in config_template.json): None in this example (all columns are special)
 - **Note**: The `disable_force_dns` column is not shown but can be added as needed
 
@@ -1188,7 +1272,7 @@ n3.create_exchange_resource(...) -> None
 **A:** Any value in the template can use `{{column_name}}` syntax. The application will automatically replace these with values from the corresponding CSV column. For example, `{{primary_lan_ip}}` will be replaced with the value from the 'primary_lan_ip' column in your CSV file.
 
 ### Q: Can I use any CSV column name as a placeholder?
-**A:** No, special columns are handled by application logic and should NOT be used as `{{placeholders}}` in your template. Special columns include: `id`, `name`, `primary_lan_ip`, `desc`, `custom1`, `custom2`, all tag columns (`site_tags`, `lan_resource_tags`, `cp_host_tags`, `wildcard_resource_tags`), and `disable_force_dns`. All other columns can be referenced as `{{column_name}}` in your template. See the [CSV Column Mapping](#csv-column-mapping) section for details.
+**A:** No, special columns are handled by application logic and should NOT be used as `{{placeholders}}` in your template. Special columns include: `id`, `name`, `primary_lan_ip`, `desc`, `custom1`, `custom2`, all tag columns (`site_tags`, `lan_resource_tags`, `cp_host_tags`, `wildcard_resource_tags`), `disable_force_dns`, `extra_ip_resources`, and `extra_fqdn_resources`. All other columns can be referenced as `{{column_name}}` in your template. See the [CSV Column Mapping](#csv-column-mapping) section for details.
 
 ### Q: What are special columns and how are they used?
 **A:** Special columns are CSV columns that are processed by the application's logic rather than being used as template placeholders:
@@ -1252,6 +1336,16 @@ For issues or questions:
 4. Contact your NCM administrator
 
 ## Version History
+
+### Version 2.8
+- Added `extra_ip_resources` CSV column for creating additional exchange IP subnet resources per device
+- Added `extra_fqdn_resources` CSV column for creating additional exchange FQDN resources per device
+- Both columns support multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters
+- Added comprehensive validation of extra resource fields during bulk configuration validation (format, CIDR, FQDN, protocols, port ranges)
+- Added extra resource columns to wizard CSV column analysis (displayed as recognized special columns)
+- Tag columns (`lan_resource_tags`, `cp_host_tags`, `wildcard_resource_tags`) apply only to standard resources, not extra resources
+- Extra resources use independent inline `tags` parameter for per-resource tag control
+- Updated documentation with format specification, acceptable values/types, and examples
 
 ### Version 2.7
 - Added comprehensive screenshot placeholders for wizard and device logs
