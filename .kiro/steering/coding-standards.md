@@ -42,6 +42,8 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **Web servers bind to YOUR machine locally** - if your app runs an HTTP server, it binds to your computer's port, not the router's. LAN clients on the router cannot reach it
 - **Serial/GPIO not available locally** - these access your computer's hardware, not the router's
 - **Use local execution for fast iteration** - test API reads, data processing, and business logic locally, then deploy to router for final testing of alerts, events, web UIs, serial, and GPIO
+- **IMPORTANT: ALWAYS deploy after creating or modifying an app.** Run `.venv\Scripts\python make.py deploy {app_name}` (Windows) or `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) immediately after code changes. Do not ask — just deploy. See `workflow.md` for full details.
+
 
 ## Python Libraries and Dependencies
 
