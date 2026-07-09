@@ -4,6 +4,9 @@
 - **[SETUP.md](SETUP.md)** - Setup Kiro
 - **[NCOS_SDK_Developer_Manual.md](NCOS_SDK_Developer_Manual.md)** - Complete SDK developer manual
 
+## cp.py Module Reference
+- **[cp_methods_reference.md](cp_methods_reference.md)** - Complete reference for all `cp` module methods (get, put, register, helpers, etc.)
+
 ## NCOS API Reference
 - **[ncos-api/](ncos-api/README.md)** - Complete NCOS API documentation
   - Status API (read-only): WAN, GPS, modem, system health
