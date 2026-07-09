@@ -100,6 +100,14 @@ This generates all required files from `apps/templates/app_template/` into `./{a
 
 **ALWAYS deploy after creating or modifying an app** - use `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows) immediately after code changes.
 
+## Developer Mode
+
+**Developer Mode is enabled in NetCloud Manager, NOT on the router's local admin UI.**
+
+To enable: Log in to NCM → Tools page → Developer Mode Devices tab → add the device.
+
+**NEVER tell users to enable Developer Mode on the router itself** — there is no such setting in the router's local UI.
+
 ## Deploy to Router
 
 **ALWAYS use make.py deploy** - `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows)

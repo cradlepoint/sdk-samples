@@ -335,7 +335,7 @@ def is_NCOS_device_in_DEV_mode():
         return True
     elif mode == 'standard':
         print('\nERROR: NCOS device at {} is not in Developer Mode.'.format(g_dev_client_ip))
-        print('       Enable Dev Mode: System > Administration > Developer Mode.')
+        print('       Enable Dev Mode in NetCloud Manager: Tools > Developer Mode Devices.')
         return False
     else:
         print('\nERROR: Unexpected SDK mode ({}) on device at {}.'.format(mode, g_dev_client_ip))
