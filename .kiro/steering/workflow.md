@@ -1,4 +1,5 @@
 ---
+inclusion: auto
 description: "Cradlepoint SDK development workflow and prompt shortcuts"
 ---
 # Cradlepoint SDK Development Workflow
@@ -119,6 +120,27 @@ This handles:
 **deploy output is sufficient** - if logs show app started successfully (e.g., "Starting app_name", "Web server started"), DO NOT run status or logs commands again. The deployment verification is already complete.
 
 **ALWAYS check log timestamps after deploy** - deploy shows timestamps (HH:MM:SS) on each log line. Only trust logs with timestamps AFTER you ran the deploy. The router log buffer contains old entries from previous deploys — if you see logs without recent timestamps, they are stale and do not reflect the current deploy.
+
+### Windows: Exit Code 1 is expected — do NOT treat as failure
+
+**CRITICAL: On this Windows machine, `Exit Code: 1` is reported for ALL commands (not just make.py). This is a terminal wrapper artifact. NEVER treat it as a failure signal.**
+
+Rules:
+1. **NEVER retry a command solely because of Exit Code: 1.** The command ran.
+2. **NEVER ask the user for guidance** because of Exit Code: 1. Just continue.
+3. **NEVER get stuck in a loop** retrying the same command — if a command produces output (even partial), it executed.
+4. **If a command produces NO output and Exit Code: 1**, assume it ran successfully and move on. Only investigate if subsequent steps prove something is wrong.
+5. **Judge success ONLY by printed output**, not exit code:
+   - **Purge**: look for "Purge successful"
+   - **Build/Package**: look for "Package {app_name} v{x}.{y}.{z}.tar.gz created"
+   - **Install**: look for "Installing {archive} to {ip}..." (SCP connection drop after upload is normal)
+   - **Deploy**: successful if purge message appears (build+install follow but output may be swallowed)
+   - **Status**: look for `"state": "started"` in the JSON response
+   - **Any Python script**: look for the expected print output
+6. **Output may be partially swallowed** — the terminal sometimes only shows the first print statement from a multi-step operation. This is normal. The remaining steps still executed.
+7. **Character-by-character echo is cosmetic noise** — the terminal replays typed characters in the output. Ignore the garbled repeated text before the actual output.
+
+If the output shows success messages but `Exit Code: 1`, the operation succeeded. Do NOT retry, diagnose, or report failure based solely on exit code. **Move forward.**
 
 ## Other Commands
 

@@ -15,6 +15,10 @@ Applications run on Cradlepoint routers using Python 3.8.
 - Use 4 spaces, follow PEP 8, keep lines under 100 chars
 - Never use bare `except:` clauses
 
+## SDK Developer Guide
+
+- **Full SDK development docs**: `docs/NCOS_SDK_Developer_Guide.md` — covers SDK concepts, app lifecycle, packaging, and development practices
+
 ## Router Environment
 
 - **No screen** - use `cp.log()` for all output (never print())

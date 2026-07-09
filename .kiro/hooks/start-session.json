@@ -1,0 +1,23 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Check Environment",
+      "trigger": "SessionStart",
+      "description": "Runs setup_env.py to ensure .venv exists, then activates it. Works on macOS/Linux and Windows (cmd).",
+      "action": {
+        "type": "command",
+        "command": "python3 setup_env.py && source .venv/bin/activate || python setup_env.py && .venv\\Scripts\\activate"
+      }
+    },
+    {
+      "name": "Load Steering Files",
+      "trigger": "SessionStart",
+      "description": "Loads all steering files with inclusion: auto at session start.",
+      "action": {
+        "type": "agent",
+        "prompt": "Activate the following steering files using the disclose_context tool: api-reference, coding-standards, meta, web-standards, workflow"
+      }
+    }
+  ]
+}
