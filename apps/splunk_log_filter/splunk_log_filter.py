@@ -15,6 +15,9 @@ def get_router_info():
             info['hostname'] = system.get('system_id', '')
             info['serial_number'] = system.get('serial_number', '')
             info['mac'] = system.get('mac', '')
+        fw = cp.get('status/fw_info')
+        if fw:
+            info['firmware_version'] = fw.get('major_version', '')
     except Exception as e:
         cp.log(f"Error getting router info: {e}")
     return info
@@ -31,7 +34,8 @@ def send_data_to_splunk(data, router_info):
         "host": router_info.get('hostname', ''),
         "fields": {
             "serial_number": router_info.get('serial_number', ''),
-            "mac": router_info.get('mac', '')
+            "mac": router_info.get('mac', ''),
+            "firmware_version": router_info.get('firmware_version', '')
         }
     }
 
