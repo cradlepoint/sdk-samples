@@ -5,7 +5,29 @@ import cp
 import time
 import requests
 
-def send_data_to_splunk(data):
+def get_router_id():
+    """Build a router identity string: name/mac/serial/firmware."""
+    try:
+        system_id = cp.get('config/system/system_id') or 'unknown'
+        product_info = cp.get('status/product_info') or {}
+        mac = product_info.get('mac0', 'unknown')
+        serial = 'unknown'
+        mfg = product_info.get('manufacturing')
+        if mfg:
+            serial = mfg.get('serial_num', 'unknown')
+        fw_info = cp.get('status/fw_info') or {}
+        fw_version = '{}.{}.{}'.format(
+            fw_info.get('major_version', 0),
+            fw_info.get('minor_version', 0),
+            fw_info.get('patch_version', 0)
+        )
+        return '{} {} {} {}'.format(system_id, mac, serial, fw_version)
+    except Exception as e:
+        cp.log('Failed to get router ID: {}'.format(e))
+        return 'unknown'
+
+
+def send_data_to_splunk(data, router_id):
     headers = {
         "Authorization": f"Splunk {SPLUNK_TOKEN}",
         "Content-Type": "application/json"
@@ -22,7 +44,7 @@ def send_data_to_splunk(data):
         orig_dst_port = data.get('orig_dst_port', 'unknown')
         status = data.get('status', 'unknown')
         
-        event_message = f"Connection {conn_id}: {orig_src}:{orig_src_port} -> {orig_dst}:{orig_dst_port} (proto={proto}, status={status})"
+        event_message = f"{router_id} Connection {conn_id}: {orig_src}:{orig_src_port} -> {orig_dst}:{orig_dst_port} (proto={proto}, status={status})"
     except Exception as e:
         cp.log(f'Failed to create event message: {e}')
         event_message = str(data)
@@ -56,6 +78,9 @@ while True:
 
         # Get conntrack data
         conntrack = cp.get('status/firewall/conntrack')
+
+        # Get router identity string
+        router_id = get_router_id()
         
         # Get current connection IDs
         current_conn_ids = {conn.get('id') for conn in conntrack if conn.get('id')}
@@ -73,7 +98,7 @@ while True:
             # If this is a new connection, send it to Splunk
             if conn_id and conn_id not in seen_connections:
                 seen_connections.add(conn_id)
-                send_data_to_splunk(conn)
+                send_data_to_splunk(conn, router_id)
         
     except Exception as e:
         cp.logger.exception(e)
