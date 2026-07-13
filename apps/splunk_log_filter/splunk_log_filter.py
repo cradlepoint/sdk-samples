@@ -22,14 +22,20 @@ def send_data_to_splunk(data):
     return response.status_code == 200
 
 def process_logs(splunk_filters):
-    """Tails /var/log/messages and sends filtered lines to Splunk."""
-    cp.log(f"Starting log processing, filtering for: {splunk_filters}")
+    """Tails /var/log/messages and sends filtered lines to Splunk.
+    
+    If splunk_filters is empty, all log lines are sent.
+    """
+    if splunk_filters:
+        cp.log(f"Starting log processing, filtering for: {splunk_filters}")
+    else:
+        cp.log("Starting log processing, no filters configured - sending all logs")
     cmd = ['/usr/bin/tail', '/var/log/messages', '-n1', '-F']
     process = Popen(cmd, stdout=PIPE, stderr=PIPE)
 
     for line in iter(process.stdout.readline, b''):
         line_str = line.decode('utf-8', errors='ignore').strip()
-        if any(f.lower() in line_str.lower() for f in splunk_filters):
+        if not splunk_filters or any(f.lower() in line_str.lower() for f in splunk_filters):
             send_data_to_splunk(line_str)
 
     # Log any errors from the tail process
@@ -54,8 +60,8 @@ while True:
                 if item.get('name', '').startswith('splunk_filter') and item.get('value')
             ]
 
-        if not all([SPLUNK_URL, SPLUNK_TOKEN, splunk_filters]):
-            cp.log('Splunk URL, Token, or filter not configured. Sleeping for 60 seconds.')
+        if not all([SPLUNK_URL, SPLUNK_TOKEN]):
+            cp.log('Splunk URL or Token not configured. Sleeping for 60 seconds.')
             time.sleep(60)
             continue
 
