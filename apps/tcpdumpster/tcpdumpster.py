@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import time
+import re
 import struct
 import socket
 import threading
@@ -595,10 +596,11 @@ class TCPDumpsterHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({
                     'valid': False,
                     'error': 'Unable to execute tcpdump -d'})
-            elif 'syntax error' in output.lower() or 'error' in output.lower():
-                self.send_json({'valid': False, 'error': output})
-            else:
+            elif re.search(r'\(\d{3}\)', output):
                 self.send_json({'valid': True})
+            else:
+                self.send_json({'valid': False,
+                                'error': output.strip()})
         except Exception as e:
             self.send_json({'valid': False, 'error': str(e)})
 
