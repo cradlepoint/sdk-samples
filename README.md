@@ -12,7 +12,7 @@ Pre-built application packages (`.tar.gz`) ready to install on your router are a
 
 **[Download Built Apps](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)**
 
-These are compiled from the sample apps in this repository and can be installed directly via NetCloud Manager or the router's local UI without any development setup.
+These are compiled from the sample apps in this repository and can be installed via NetCloud Manager's Tools page without any development setup.
 
 ---
 
