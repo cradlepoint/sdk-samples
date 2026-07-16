@@ -1,19 +1,61 @@
 # throttle_cellular_datacap
-Works in conjunction with Connection Manager Data Usage thresholds configured on Modem profiles (does not pertain to Ethernet or WWAN profiles).
+Enforces bandwidth throttling on all cellular modem interfaces when any modem reaches 100% of its monthly data capacity limit. Automatically removes throttling when the billing cycle resets.
 
-## Behavior
+## How It Works
 
-Upon *any* Modem interface reaching 100% of the monthly data capacity limit, manual QoS will be enabled globally and bandwidth throttling will be enforced on ALL Modem profiles to the configured limit (`minbwup` and `minbwdown` variables). The default throttling rate is 512Kbps (up/down).
+1. On startup, identifies all modem interfaces and their WAN profiles
+2. Clears any existing bandwidth throttling (handles router reboot during a throttled state)
+3. Polls `status/wan/datacap/completed_alerts/` every 10 seconds
+4. When any modem's monthly data cap alert fires:
+   - Sets bandwidth ingress/egress limits on ALL modem profiles
+   - Enables manual QoS globally
+   - Sends an NCM alert
+5. When the monthly billing cycle resets and alerts clear:
+   - Removes bandwidth limits from all modem profiles
+   - Disables manual QoS
+   - Sends an NCM alert
 
-Upon the start of the next monthly cycle, NCOS will automatically clear the monthly usage alert. Once this happens, rate shaping limits will be cleared and manual QoS will be disabled.
+## Configuration
+
+### Router Prerequisites
+
+1. **Enable Global Data Usage** in Connection Manager
+2. **Enable "Alert on Cap"** on desired cellular modem profile(s)
+
+If "Alert on Cap" is not configured, the app will not detect data overages.
+
+### Throttle Rates
+
+Edit the variables at the top of `throttle_cellular_datacap.py`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `minbwup` | 512 Kbps | Upload bandwidth limit when throttled |
+| `minbwdown` | 512 Kbps | Download bandwidth limit when throttled |
+| `maxbwup` | 25000 Kbps | Default max upload (not actively used) |
+| `maxbwdown` | 25000 Kbps | Default max download (not actively used) |
+
+## Behavior Details
+
+- Throttling applies to ALL modem profiles, not just the one that exceeded its cap
+- Only monitors 100% monthly usage alerts — ignores partial alerts or non-monthly alerts
+- Ignores data usage alerts on non-modem interfaces (Ethernet, WWAN)
+- Sends NCM alerts on both throttle activation and deactivation
+- Includes router name, product, and NCM router ID in alert messages
+
+## NCM Alert Examples
+
+```
+Exceeded monthly data usage threshold - reducing LTE data rate for MyRouter - IBR1700 - Router ID: 12345
+```
+
+```
+Monthly data usage reset - disabling reduced LTE data rate for MyRouter - IBR1700 - Router ID: 12345
+```
 
 ## Requirements
 
-- Data Usage must be globally enabled
-- Data cap alerts must be configured (i.e. "Alert on Cap") on the desired Modem profile
-
-If "Alert on Cap" is not configured on the desired Modem profile, the SDK will not enforce rate shaping.
-
-## Notes
-
-This SDK only monitors 100% monthly usage alerts of Modem profiles. It is agnostic to other data cap alerts that may also be configured (e.g. setting weekly/daily alerts, monthly alerts at various percentages below 100%, or data usage alerts on non-Modem interfaces).
+- Router firmware 7.26 or later
+- Data Usage enabled globally in Connection Manager
+- "Alert on Cap" configured on at least one modem profile
+- NCM connectivity for alert delivery
