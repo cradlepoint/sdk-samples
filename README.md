@@ -6,13 +6,13 @@ The NCOS SDK enables developers to build and deploy Python applications that run
 
 ---
 
-## Why Custom Applications on Ericsson Routers?
+## Ready-to-Use Built Apps
 
-- **Extend without hardware changes** — Add new capabilities through software while your existing Ericsson/Cradlepoint fleet stays in place.
-- **Access router internals** — Query modem signal strength, WAN status, GPS, connected clients, and system metrics via a Python API.
-- **Integrate with your stack** — Push data to cloud platforms (Azure IoT, Splunk, MQTT), trigger alerts, or automate workflows based on router state.
-- **Deploy at scale** — Build once, distribute via NetCloud Manager to thousands of devices with group-based assignment.
-- **Standard Python** — Use familiar libraries and patterns; the SDK provides a simple `cp` module for router interaction.
+Pre-built application packages (`.tar.gz`) ready to install on your router are available at:
+
+**[Download Built Apps](https://github.com/cradlepoint/sdk-samples/releases/tag/built_apps)**
+
+These are compiled from the sample apps in this repository and can be installed directly via NetCloud Manager or the router's local UI without any development setup.
 
 ---
 
