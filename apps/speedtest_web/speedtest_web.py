@@ -411,6 +411,7 @@ def run_iperf3(server, duration=10, interface='', port=5201):
 
     # Resolve interface name to IP for iperf3 -B flag
     bind_ip = ''
+    bind_dev = ''
     if interface:
         try:
             devices = cp.get('status/wan/devices')
@@ -420,10 +421,13 @@ def run_iperf3(server, duration=10, interface='', port=5201):
                         if dev.get('info', {}).get('iface') == interface:
                             bind_ip = dev.get('status', {}).get(
                                 'ipinfo', {}).get('ip_address', '')
+                            bind_dev = interface
                             break
             if not bind_ip:
                 cp.log(f'Could not resolve IP for interface {interface}, '
                        f'running without bind')
+            else:
+                cp.log(f'Binding to {bind_ip} on device {bind_dev}')
         except Exception as e:
             cp.log(f'Error resolving interface IP: {e}')
 
@@ -436,7 +440,7 @@ def run_iperf3(server, duration=10, interface='', port=5201):
                     'error': 'Test cancelled'}
 
         results = _run_iperf3_on_port(
-            iperf3_bin, server, attempt_port, duration, bind_ip)
+            iperf3_bin, server, attempt_port, duration, bind_ip, bind_dev)
 
         if results and (results['download_bps'] > 0 or results['upload_bps'] > 0):
             return results
@@ -452,7 +456,7 @@ def run_iperf3(server, duration=10, interface='', port=5201):
                        'error': f'iPerf3 failed on all ports ({ports[0]}-{ports[-1]})'}
 
 
-def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
+def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''):
     """Run iperf3 download+upload on a specific port. Returns results dict."""
     global current_test
     results = {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration}
@@ -465,6 +469,8 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
                '-t', str(duration), '-R', '-J']
         if bind_ip:
             cmd.extend(['-B', bind_ip])
+        if bind_dev:
+            cmd.extend(['--bind-dev', bind_dev])
         cp.log(f'iPerf3 download cmd: {" ".join(cmd)}')
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -503,6 +509,8 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
                '-t', str(duration), '-J']
         if bind_ip:
             cmd.extend(['-B', bind_ip])
+        if bind_dev:
+            cmd.extend(['--bind-dev', bind_dev])
         cp.log(f'iPerf3 upload cmd: {" ".join(cmd)}')
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
