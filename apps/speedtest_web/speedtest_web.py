@@ -368,137 +368,6 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
 
 
 # =============================================================================
-# SOURCE ROUTING FOR IPERF3
-# =============================================================================
-
-def _normalize_to_list(obj):
-    """Normalize API response to a list (handles dict or list)."""
-    if isinstance(obj, list):
-        return obj
-    if isinstance(obj, dict):
-        return list(obj.values()) if obj else []
-    return []
-
-
-def setup_source_route(wan_uid, source_ip):
-    """Create NCOS routing table + policy to force traffic from source_ip
-    through the specified WAN device. Returns (table_id, policy_id) for cleanup."""
-    try:
-        table_name = f'STWEB-{wan_uid}'
-
-        # Create route table with default route via the WAN device
-        route_table = {
-            "name": table_name,
-            "routes": [
-                {
-                    "netallow": False,
-                    "ip_network": "0.0.0.0/0",
-                    "dev": wan_uid,
-                    "auto_gateway": True
-                }
-            ]
-        }
-
-        # Check if table already exists
-        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
-        route_table_id = None
-        for table in route_tables:
-            if isinstance(table, dict) and table.get("name") == table_name:
-                route_table_id = table.get("_id_")
-                break
-
-        if not route_table_id:
-            req = cp.post('config/routing/tables/', route_table)
-            if not req:
-                cp.log(f'Failed to create route table for {wan_uid}')
-                return None, None
-            route_table_index = req.get("data") if isinstance(req, dict) else None
-            if route_table_index is None:
-                cp.log(f'Route table post returned no data: {req}')
-                return None, None
-            table_response = cp.get(f'config/routing/tables/{route_table_index}')
-            if not table_response or not isinstance(table_response, dict):
-                cp.log(f'Failed to retrieve created route table')
-                return None, None
-            route_table_id = table_response.get("_id_")
-            time.sleep(1)
-
-        # Create routing policy: traffic from source_ip uses our table
-        route_policy = {
-            "ip_version": "ip4",
-            "priority": 1,
-            "table": route_table_id,
-            "src_ip_network": source_ip
-        }
-
-        # Check if policy already exists for this table
-        route_policies = _normalize_to_list(cp.get('config/routing/policies'))
-        policy_id = None
-        for policy in route_policies:
-            if isinstance(policy, dict) and policy.get("table") == route_table_id:
-                policy_id = policy.get("_id_")
-                break
-
-        if policy_id:
-            cp.put(f'config/routing/policies/{policy_id}', route_policy)
-        else:
-            req = cp.post('config/routing/policies/', route_policy)
-            if req and isinstance(req, dict):
-                policy_index = req.get("data")
-                if policy_index is not None:
-                    policy_response = cp.get(f'config/routing/policies/{policy_index}')
-                    if policy_response and isinstance(policy_response, dict):
-                        policy_id = policy_response.get("_id_")
-            time.sleep(1)
-
-        cp.log(f'Source route configured: {source_ip} -> {wan_uid} '
-               f'(table={route_table_id}, policy={policy_id})')
-        return route_table_id, policy_id
-    except Exception as e:
-        cp.log(f'Error setting up source route: {e}')
-        return None, None
-
-
-def teardown_source_route(wan_uid):
-    """Remove NCOS routing table + policy created by setup_source_route."""
-    try:
-        table_name = f'STWEB-{wan_uid}'
-
-        # Find and delete policy first, then table
-        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
-        route_table_id = None
-        for table in route_tables:
-            if isinstance(table, dict) and table.get("name") == table_name:
-                route_table_id = table.get("_id_")
-                break
-
-        if route_table_id:
-            # Delete policies referencing this table
-            route_policies = _normalize_to_list(cp.get('config/routing/policies'))
-            for policy in route_policies:
-                if isinstance(policy, dict) and policy.get("table") == route_table_id:
-                    policy_id = policy.get("_id_")
-                    if policy_id:
-                        cp.delete(f'config/routing/policies/{policy_id}')
-                        time.sleep(0.1)
-
-            # Delete the table
-            table_id_for_delete = None
-            route_tables = _normalize_to_list(cp.get('config/routing/tables'))
-            for table in route_tables:
-                if isinstance(table, dict) and table.get("_id_") == route_table_id:
-                    # Need the index/id to delete
-                    table_id_for_delete = route_table_id
-                    break
-            if table_id_for_delete:
-                cp.delete(f'config/routing/tables/{table_id_for_delete}')
-
-            cp.log(f'Source route cleaned up for {wan_uid}')
-    except Exception as e:
-        cp.log(f'Error tearing down source route: {e}')
-
-
-# =============================================================================
 # IPERF3 ENGINE
 # =============================================================================
 
@@ -540,9 +409,9 @@ def run_iperf3(server, duration=10, interface='', port=5201):
             cp.log(f'Error downloading iperf3: {e}')
             return None
 
-    # Resolve interface name to IP and WAN UID for source routing
+    # Resolve interface name to IP for iperf3 -B flag
     bind_ip = ''
-    wan_uid = ''
+    bind_dev = ''
     if interface:
         try:
             devices = cp.get('status/wan/devices')
@@ -552,54 +421,42 @@ def run_iperf3(server, duration=10, interface='', port=5201):
                         if dev.get('info', {}).get('iface') == interface:
                             bind_ip = dev.get('status', {}).get(
                                 'ipinfo', {}).get('ip_address', '')
-                            wan_uid = uid
+                            bind_dev = interface
                             break
             if not bind_ip:
                 cp.log(f'Could not resolve IP for interface {interface}, '
                        f'running without bind')
+            else:
+                cp.log(f'Binding to {bind_ip} on device {bind_dev}')
         except Exception as e:
             cp.log(f'Error resolving interface IP: {e}')
 
-    # Set up source-based routing so traffic from bind_ip egresses the correct device
-    route_table_id = None
-    if bind_ip and wan_uid:
-        route_table_id, _ = setup_source_route(wan_uid, bind_ip)
-        if route_table_id:
-            cp.log(f'Source routing active: {bind_ip} -> {wan_uid}')
-        else:
-            cp.log(f'Warning: source route setup failed, test may use wrong interface')
-
     iperf3_bin = get_iperf3_binary()
 
-    try:
-        # Try ports in order until one works
-        for attempt_port in ports:
-            if not current_test['running']:
-                return {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration,
-                        'error': 'Test cancelled'}
+    # Try ports in order until one works
+    for attempt_port in ports:
+        if not current_test['running']:
+            return {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration,
+                    'error': 'Test cancelled'}
 
-            results = _run_iperf3_on_port(
-                iperf3_bin, server, attempt_port, duration, bind_ip)
+        results = _run_iperf3_on_port(
+            iperf3_bin, server, attempt_port, duration, bind_ip, bind_dev)
 
-            if results and (results['download_bps'] > 0 or results['upload_bps'] > 0):
-                return results
+        if results and (results['download_bps'] > 0 or results['upload_bps'] > 0):
+            return results
 
-            # Failed on this port — retry on next if available
-            if attempt_port != ports[-1]:
-                cp.log(f'iPerf3 failed on port {attempt_port}, retrying on next port...')
-                time.sleep(1)
+        # Failed on this port — retry on next if available
+        if attempt_port != ports[-1]:
+            cp.log(f'iPerf3 failed on port {attempt_port}, retrying on next port...')
+            time.sleep(1)
 
-        # All ports exhausted
-        cp.log(f'iPerf3 failed on all ports: {ports[0]}-{ports[-1]}')
-        return results or {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration,
-                           'error': f'iPerf3 failed on all ports ({ports[0]}-{ports[-1]})'}
-    finally:
-        # Clean up source routing
-        if wan_uid and route_table_id:
-            teardown_source_route(wan_uid)
+    # All ports exhausted
+    cp.log(f'iPerf3 failed on all ports: {ports[0]}-{ports[-1]}')
+    return results or {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration,
+                       'error': f'iPerf3 failed on all ports ({ports[0]}-{ports[-1]})'}
 
 
-def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
+def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''):
     """Run iperf3 download+upload on a specific port. Returns results dict."""
     global current_test
     results = {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration}
@@ -609,9 +466,11 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
         with test_lock:
             current_test['progress'] = {'stage': 'download', 'percent': 0}
         cmd = [iperf3_bin, '-c', server, '-p', str(port),
-               '-t', str(duration), '-R', '-J']
+               '-t', str(duration), '-R', '-J', '-4']
         if bind_ip:
             cmd.extend(['-B', bind_ip])
+        if bind_dev:
+            cmd.extend(['--bind-dev', bind_dev])
         cp.log(f'iPerf3 download cmd: {" ".join(cmd)}')
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -625,9 +484,36 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
                 cp.log(f'iPerf3 download: {bps/1e6:.2f} Mbps (port {port})')
             else:
                 err_msg = _parse_iperf3_error(stdout, stderr)
-                cp.log(f'iPerf3 download failed on port {port}: {err_msg}')
-                results['error'] = err_msg
-                return results  # Fail fast — try next port
+                # Retry without --bind-dev if not permitted on this platform
+                if bind_dev and 'Operation not permitted' in err_msg:
+                    cp.log(f'--bind-dev unsupported on this platform, retrying without it')
+                    cmd_retry = [a for a in cmd if a not in ('--bind-dev', bind_dev)]
+                    cp.log(f'iPerf3 download retry cmd: {" ".join(cmd_retry)}')
+                    proc2 = subprocess.Popen(cmd_retry, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    try:
+                        stdout, stderr = proc2.communicate(timeout=duration + 30)
+                    except subprocess.TimeoutExpired:
+                        proc2.kill()
+                        proc2.communicate()
+                        cp.log(f'iPerf3 download retry timed out on port {port}')
+                        results['error'] = 'Download retry timed out'
+                        return results
+                    cp.log(f'iPerf3 download retry returncode: {proc2.returncode}')
+                    if proc2.returncode == 0:
+                        data = json.loads(stdout.decode('utf-8'))
+                        bps = data.get('end', {}).get('sum_received', {}).get(
+                            'bits_per_second', 0)
+                        results['download_bps'] = bps
+                        cp.log(f'iPerf3 download: {bps/1e6:.2f} Mbps (port {port})')
+                    else:
+                        err_msg = _parse_iperf3_error(stdout, stderr)
+                        cp.log(f'iPerf3 download failed on port {port}: {err_msg}')
+                        results['error'] = err_msg
+                        return results
+                else:
+                    cp.log(f'iPerf3 download failed on port {port}: {err_msg}')
+                    results['error'] = err_msg
+                    return results  # Fail fast — try next port
         except subprocess.TimeoutExpired:
             proc.kill()
             cp.log(f'iPerf3 download timed out on port {port}')
@@ -647,9 +533,11 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
         with test_lock:
             current_test['progress'] = {'stage': 'upload', 'percent': 0}
         cmd = [iperf3_bin, '-c', server, '-p', str(port),
-               '-t', str(duration), '-J']
+               '-t', str(duration), '-J', '-4']
         if bind_ip:
             cmd.extend(['-B', bind_ip])
+        if bind_dev:
+            cmd.extend(['--bind-dev', bind_dev])
         cp.log(f'iPerf3 upload cmd: {" ".join(cmd)}')
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -663,9 +551,35 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip):
                 cp.log(f'iPerf3 upload: {bps/1e6:.2f} Mbps (port {port})')
             else:
                 err_msg = _parse_iperf3_error(stdout, stderr)
-                cp.log(f'iPerf3 upload failed on port {port}: {err_msg}')
-                # Download succeeded but upload failed — still return partial
-                results['error'] = 'Upload failed: ' + err_msg
+                # Retry without --bind-dev if not permitted on this platform
+                if bind_dev and 'Operation not permitted' in err_msg:
+                    cp.log(f'--bind-dev unsupported on this platform, retrying without it')
+                    cmd_retry = [a for a in cmd if a not in ('--bind-dev', bind_dev)]
+                    cp.log(f'iPerf3 upload retry cmd: {" ".join(cmd_retry)}')
+                    proc2 = subprocess.Popen(cmd_retry, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    try:
+                        stdout, stderr = proc2.communicate(timeout=duration + 30)
+                    except subprocess.TimeoutExpired:
+                        proc2.kill()
+                        proc2.communicate()
+                        cp.log(f'iPerf3 upload retry timed out on port {port}')
+                        results['error'] = 'Upload retry timed out'
+                    else:
+                        cp.log(f'iPerf3 upload retry returncode: {proc2.returncode}')
+                        if proc2.returncode == 0:
+                            data = json.loads(stdout.decode('utf-8'))
+                            bps = data.get('end', {}).get('sum_sent', {}).get(
+                                'bits_per_second', 0)
+                            results['upload_bps'] = bps
+                            cp.log(f'iPerf3 upload: {bps/1e6:.2f} Mbps (port {port})')
+                        else:
+                            err_msg = _parse_iperf3_error(stdout, stderr)
+                            cp.log(f'iPerf3 upload failed on port {port}: {err_msg}')
+                            results['error'] = 'Upload failed: ' + err_msg
+                else:
+                    cp.log(f'iPerf3 upload failed on port {port}: {err_msg}')
+                    # Download succeeded but upload failed — still return partial
+                    results['error'] = 'Upload failed: ' + err_msg
         except subprocess.TimeoutExpired:
             proc.kill()
             cp.log(f'iPerf3 upload timed out on port {port}')
