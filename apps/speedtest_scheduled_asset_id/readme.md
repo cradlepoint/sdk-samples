@@ -28,11 +28,11 @@ PUT https://www.cradlepointecm.com/api/v2/routers/{router_id}/
 
 | Expression | Description |
 |-----------|-------------|
-| `0 2 * * 1` | Weekly on Monday at 2:00 AM UTC (default) |
+| `0 2 * * 1` | Weekly on Monday at 2:00 AM local time (default) |
 | `0 */4 * * *` | Every 4 hours |
 | `*/30 * * * *` | Every 30 minutes |
-| `0 8 * * *` | Daily at 8:00 AM UTC |
-| `0 0 * * 1` | Weekly on Monday at midnight UTC |
+| `0 8 * * *` | Daily at 8:00 AM local time |
+| `0 0 * * 1` | Weekly on Monday at midnight local time |
 | `0 */1 * * *` | Every hour |
 
 ## How It Works

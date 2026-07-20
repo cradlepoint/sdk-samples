@@ -34,12 +34,13 @@ def _local_timestamp():
     local = time.localtime(now)
     utc = time.gmtime(now)
     # Compute offset in seconds
-    offset_s = (time.mktime(local) - time.mktime(utc))
-    offset_h = int(offset_s // 3600)
-    offset_m = int(abs(offset_s) % 3600 // 60)
+    offset_s = int(time.mktime(local) - time.mktime(utc))
     sign = '+' if offset_s >= 0 else '-'
+    abs_offset = abs(offset_s)
+    offset_h = abs_offset // 3600
+    offset_m = (abs_offset % 3600) // 60
     dt = datetime(*local[:6])
-    return f'{dt.isoformat()}{sign}{abs(offset_h):02d}:{offset_m:02d}'
+    return f'{dt.isoformat()}{sign}{offset_h:02d}:{offset_m:02d}'
 
 
 def has_ookla():
@@ -95,8 +96,8 @@ def parse_cron_field(field, min_val, max_val):
     return values
 
 
-def cron_matches(cron_expr, dt):
-    """Check if a datetime matches a cron expression."""
+def cron_matches(cron_expr, local_time):
+    """Check if a time.struct_time (local) matches a cron expression."""
     try:
         fields = cron_expr.strip().split()
         if len(fields) != 5:
@@ -109,20 +110,21 @@ def cron_matches(cron_expr, dt):
         months = parse_cron_field(fields[3], 1, 12)
         weekdays = parse_cron_field(fields[4], 0, 7)
 
-        # Convert Python weekday (0=Monday) to cron weekday (0=Sunday)
-        cron_dow = (dt.weekday() + 1) % 7
+        # time.struct_time tm_wday: 0=Monday ... 6=Sunday
+        # cron weekday: 0=Sunday, 1=Monday ... 6=Saturday
+        cron_dow = (local_time.tm_wday + 1) % 7
 
         # Normalize: treat 7 as 0 (both mean Sunday in cron)
         if 7 in weekdays:
             weekdays.add(0)
 
-        if dt.minute not in minutes:
+        if local_time.tm_min not in minutes:
             return False
-        if dt.hour not in hours:
+        if local_time.tm_hour not in hours:
             return False
-        if dt.day not in days:
+        if local_time.tm_mday not in days:
             return False
-        if dt.month not in months:
+        if local_time.tm_mon not in months:
             return False
         if cron_dow not in weekdays:
             return False
@@ -263,11 +265,12 @@ try:
             time.sleep(15)
             continue
 
-        now = datetime.now()
-        current_minute = (now.year, now.month, now.day, now.hour, now.minute)
+        local_now = time.localtime()
+        current_minute = (local_now.tm_year, local_now.tm_mon, local_now.tm_mday,
+                          local_now.tm_hour, local_now.tm_min)
 
         # Only run once per matching minute
-        if current_minute != last_run_minute and cron_matches(cron_schedule, now):
+        if current_minute != last_run_minute and cron_matches(cron_schedule, local_now):
             last_run_minute = current_minute
             run_speedtest()
 
