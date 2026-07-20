@@ -6,14 +6,13 @@
 
 **Windows 11:**
 - Download Python 3 from [python.org/downloads](https://www.python.org/downloads/)
-- Run the installer
-- **⚠️ IMPORTANT: Check the box "Add python.exe to PATH"** on the first screen before clicking Install Now. Without this, `python` and `pip` commands will not work from the terminal.
+- Run the installer — **check "Add python.exe to PATH"** on the first screen
 - Click **Install Now**
-- Verify by opening a new terminal in Kiro and running: `python --version`
-- Having trouble? Reinstall Python and ensure "Add python.exe to PATH" is checked
+- Verify in a new terminal: `python --version`
+- For detailed steps, troubleshooting, and PATH issues see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md)
 
-**macOS:**
-- Open Terminal and install Homebrew (if not already installed):
+**macOS (recommended — Homebrew):**
+- Install Homebrew if you don't have it:
   ```
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   ```
@@ -22,6 +21,7 @@
   brew install python3
   ```
 - Verify: `python3 --version`
+- Alternatively, download from [python.org/downloads](https://www.python.org/downloads/) if you prefer not to use Homebrew.
 
 ### 2. Install Kiro
 
@@ -44,18 +44,7 @@
 - Click **Open** when prompted.
 - Click **"Yes, I trust the authors"** when prompted.
 
-### 4. Python Environment
-
-- Click the **Kiro ghost icon** in the left sidebar
-- Find and run the **Setup Dev Environment** hook
-
-It will:
-- Create a `.venv` virtual environment
-- Install all Python dependencies from `requirements.txt` (requests, cryptography, paramiko, pyserial)
-
-No manual `pip install` needed.
-
-### 5. Configure **Developer Mode** Router Connection
+### 4. Configure **Developer Mode** Router Connection
 
 - **Developer Mode must be enabled in NetCloud Manager** (not in the router UI). Go to the device in NCM and enable SDK Developer Mode under the device settings.
 - Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
@@ -68,36 +57,42 @@ No manual `pip install` needed.
   ```
 - Save with `Cmd+S` / `Ctrl+S`
 
-### 6. Create with Kiro
+### 5. Create with Kiro
 
 - Open the Kiro chat panel from the sidebar
-- In the **chat panel**, make your request. For example:
-  ```
-  Make a router dashboard
-  ```
-- Kiro will create and deploy the app, and automatically check logs for errors to fix.
-- Kiro will tell you how to use the app, such as:
-Access web interface at http://router_ip:8000
+- Describe what you want to build. Kiro will create the app, deploy it to your router, and check logs for errors automatically.
+- Kiro will tell you how to access the app (e.g., `http://192.168.0.1:8000`)
+- Keep chatting to add features, fix issues, or change behavior — Kiro redeploys after each change.
 
-- Tell Kiro if there are any bugs, changes, or additions you would like. For example:
-  ```
-  The memory utilization is blank. Add a graph showing CPU usage over time
-  ```
-- Kiro will fix bugs, make changes, and deploy the app again.
-
-
-## Prompt Examples
-
+**Build something new:**
 ```
-Make a vpn dashboard
+Build a web app that shows WAN connection status and signal strength for all modems
 
-Make a speedtest web app
+Create a dashboard showing active VPN tunnels, their uptime, and bytes transferred
 
-Add dashboard to @my_app
+Make a web UI that lets me toggle WiFi radios on and off
 
-Save state of @my_app to persist reboots
+Create an app that runs a speedtest every hour and logs the results to a CSV file
 
-Show me how @5GSpeed handles speedtest data
+Build a site survey app that logs GPS coordinates and signal metrics to a CSV
+```
+
+**Iterate on an app:**
+```
+Add auto-refresh every 30 seconds and show a banner when a WAN link goes down
+
+Add a dark mode toggle to #my_app
+
+Make #my_app persist its data across reboots using appdata
+
+Add alerts to #my_app when a WAN link goes down
+```
+
+**Learn from existing code:**
+```
+Explain how #5GSpeed runs periodic speedtests
+
+What API endpoints does #Mobile_Site_Survey use?
 ```
 
 ## Workflow Commands
