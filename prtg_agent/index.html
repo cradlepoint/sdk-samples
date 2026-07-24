@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRTG Agent</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        .path-list { list-style: none; padding: 0; margin: 0; }
+        .path-list li {
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border-color);
+            font-family: monospace; font-size: 0.85rem;
+        }
+        .path-list li:hover { background: var(--hover-bg); }
+        .path-list li .path-text { flex: 1; word-break: break-all; }
+        .path-list li .btn-icon { flex-shrink: 0; }
+        .btn-icon {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-muted); padding: 0.25rem; border-radius: 4px;
+        }
+        .btn-icon:hover { color: var(--danger-color); background: var(--hover-bg); }
+        .add-path-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .add-path-row input { flex: 1; }
+        .status-card {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem; margin-bottom: 1.5rem;
+        }
+        .stat-box {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 1rem; text-align: center;
+        }
+        .stat-box .stat-value { font-size: 1.5rem; font-weight: 600; color: var(--primary-color); }
+        .stat-box .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .preview-xml {
+            background: var(--code-bg, #1e1e1e); color: var(--code-text, #d4d4d4);
+            padding: 1rem; border-radius: 6px; overflow-x: auto;
+            font-family: monospace; font-size: 0.8rem; max-height: 400px;
+            overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+        }
+        .toast {
+            position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem;
+            border-radius: 6px; color: #fff; font-size: 0.9rem; z-index: 9999;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: var(--success-color, #28a745); }
+        .toast.error { background: var(--danger-color, #dc3545); }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-weight: 500; margin-bottom: 0.35rem; font-size: 0.9rem; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color);
+            border-radius: 6px; font-size: 0.9rem; background: var(--input-bg, var(--card-bg));
+            color: var(--text-color);
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .channel-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .channel-table th, .channel-table td {
+            padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border-color); text-align: left;
+        }
+        .channel-table th { font-weight: 600; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title"><i class="fas fa-satellite-dish"></i> PRTG Agent</h1>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-satellite-dish"></i> PRTG Agent</a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li>
+                            <a href="#" class="nav-item" data-element="status-section">
+                                <i class="fas fa-tachometer-alt"></i> Status
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="server-section">
+                                <i class="fas fa-server"></i> PRTG Server
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="paths-section">
+                                <i class="fas fa-route"></i> Data Paths
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="preview-section">
+                                <i class="fas fa-eye"></i> Preview
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+
+                    <!-- Homepage (default view) -->
+                    <section class="element-section active" id="homepage">
+                        <h2 class="section-title">PRTG Agent</h2>
+                        <p style="margin-bottom: 1rem;">Collects system and modem monitoring data and pushes it to a PRTG HTTP Push Data Advanced sensor.</p>
+                        <div class="status-card">
+                            <div class="stat-box">
+                                <div class="stat-value" id="home-stat-running">--</div>
+                                <div class="stat-label">Status</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="home-stat-pushes">--</div>
+                                <div class="stat-label">Total Pushes</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="home-stat-last">--</div>
+                                <div class="stat-label">Last Push</div>
+                            </div>
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Use the sidebar to configure the PRTG server, manage data paths, or preview the payload.</p>
+                    </section>
+
+                    <!-- Status Section -->
+                    <section class="element-section" id="status-section">
+                        <h2 class="section-title">Agent Status</h2>
+                        <div class="status-card">
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-running">--</div>
+                                <div class="stat-label">Status</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-pushes">--</div>
+                                <div class="stat-label">Total Pushes</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-last-push">--</div>
+                                <div class="stat-label">Last Push</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value" id="stat-last-result">--</div>
+                                <div class="stat-label">Last Result</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-push-now">
+                            <i class="fas fa-paper-plane"></i> Push Now
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btn-refresh-status">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </section>
+
+                    <!-- Server Config Section -->
+                    <section class="element-section" id="server-section">
+                        <h2 class="section-title">PRTG Server Settings</h2>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-protocol">Protocol</label>
+                                <select id="cfg-protocol">
+                                    <option value="http">HTTP</option>
+                                    <option value="https">HTTPS</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-server">Server Address</label>
+                                <input type="text" id="cfg-server" placeholder="e.g. 10.0.0.50 or prtg.company.com">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg-port">Port</label>
+                                <input type="number" id="cfg-port" placeholder="5050" min="1" max="65535">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg-token">Identification Token</label>
+                                <input type="text" id="cfg-token" placeholder="Sensor token from PRTG">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfg-interval">Push Interval (seconds)</label>
+                            <input type="number" id="cfg-interval" placeholder="60" min="10" max="3600">
+                        </div>
+                        <button type="button" class="btn btn-primary" id="btn-save-config">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </section>
+
+                    <!-- Paths Section -->
+                    <section class="element-section" id="paths-section">
+                        <h2 class="section-title">Data Collection Paths</h2>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                            Configure which NCOS API paths to collect. Use <code>*</code> as a wildcard for one path segment
+                            (e.g. <code>status/wan/devices/*/diagnostics/RSRP_5G</code>).
+                        </p>
+                        <ul class="path-list" id="path-list"></ul>
+                        <div class="add-path-row">
+                            <input type="text" id="new-path-input" placeholder="status/wan/devices/*/diagnostics/SINR">
+                            <button type="button" class="btn btn-primary" id="btn-add-path">
+                                <i class="fas fa-plus"></i> Add
+                            </button>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <button type="button" class="btn btn-primary" id="btn-save-paths">
+                                <i class="fas fa-save"></i> Save Paths
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btn-reset-paths">
+                                <i class="fas fa-undo"></i> Reset to Defaults
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Preview Section -->
+                    <section class="element-section" id="preview-section">
+                        <h2 class="section-title">Data Preview</h2>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                            Preview the data that will be collected and the XML payload sent to PRTG.
+                        </p>
+                        <button type="button" class="btn btn-primary" id="btn-load-preview" style="margin-bottom: 1rem;">
+                            <i class="fas fa-sync-alt"></i> Load Preview
+                        </button>
+                        <div id="preview-channels" style="margin-bottom: 1.5rem;"></div>
+                        <h3 style="margin-bottom: 0.5rem;">XML Payload</h3>
+                        <div class="preview-xml" id="preview-xml">Click "Load Preview" to see the XML payload.</div>
+                    </section>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="static/js/script.js"></script>
+    <script>
+    (function() {
+        var paths = [];
+
+        // --- Toast ---
+        function showToast(msg, type) {
+            var $t = $('#toast');
+            $t.text(msg).removeClass('success error').addClass(type + ' show');
+            setTimeout(function() { $t.removeClass('show'); }, 3000);
+        }
+
+        // --- Status ---
+        function loadStatus() {
+            $.getJSON('/api/status', function(data) {
+                var running = data.running ? 'Running' : 'Stopped';
+                var pushes = data.push_count || 0;
+                var lastPush = 'Never';
+                if (data.last_push_time > 0) {
+                    var ago = Math.round((Date.now() / 1000) - data.last_push_time);
+                    lastPush = ago + 's ago';
+                }
+                var lastResult = data.last_push_success ? 'OK' : (data.push_count > 0 ? 'Failed' : '--');
+
+                $('#stat-running').text(running);
+                $('#stat-pushes').text(pushes);
+                $('#stat-last-push').text(lastPush);
+                $('#stat-last-result').text(lastResult);
+                // Homepage stats
+                $('#home-stat-running').text(running);
+                $('#home-stat-pushes').text(pushes);
+                $('#home-stat-last').text(lastPush);
+            }).fail(function() {
+                $('#stat-running').text('Error');
+                $('#home-stat-running').text('Error');
+            });
+        }
+
+        $('#btn-refresh-status').on('click', loadStatus);
+        $('#btn-push-now').on('click', function() {
+            var $btn = $(this);
+            $btn.prop('disabled', true).find('i').removeClass('fa-paper-plane').addClass('fa-spinner fa-spin');
+            $.post('/api/push_now', function(data) {
+                if (data.success) {
+                    showToast('Push successful (' + data.channels + ' channels)', 'success');
+                } else {
+                    showToast('Push failed: ' + data.message, 'error');
+                }
+                loadStatus();
+            }).fail(function() {
+                showToast('Request failed', 'error');
+            }).always(function() {
+                $btn.prop('disabled', false).find('i').removeClass('fa-spinner fa-spin').addClass('fa-paper-plane');
+            });
+        });
+
+        // --- Config ---
+        function loadConfig() {
+            $.getJSON('/api/config', function(data) {
+                $('#cfg-server').val(data.server || '');
+                $('#cfg-port').val(data.port || '5050');
+                $('#cfg-token').val(data.token || '');
+                $('#cfg-interval').val(data.interval || '60');
+                $('#cfg-protocol').val(data.protocol || 'http');
+                paths = data.paths || [];
+                renderPaths();
+            });
+        }
+
+        $('#btn-save-config').on('click', function() {
+            var config = {
+                server: $('#cfg-server').val().trim(),
+                port: parseInt($('#cfg-port').val()) || 5050,
+                token: $('#cfg-token').val().trim(),
+                interval: parseInt($('#cfg-interval').val()) || 60,
+                protocol: $('#cfg-protocol').val(),
+                paths: paths
+            };
+            $.ajax({
+                url: '/api/config',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(config),
+                success: function(data) {
+                    if (data.success) {
+                        showToast('Settings saved', 'success');
+                    } else {
+                        showToast('Save failed: ' + data.message, 'error');
+                    }
+                },
+                error: function() { showToast('Request failed', 'error'); }
+            });
+        });
+
+        // --- Paths ---
+        function renderPaths() {
+            var $list = $('#path-list');
+            $list.empty();
+            paths.forEach(function(p, i) {
+                $list.append(
+                    '<li>' +
+                    '<span class="path-text">' + escapeHtml(p) + '</span>' +
+                    '<button type="button" class="btn-icon" data-index="' + i + '" title="Remove">' +
+                    '<i class="fas fa-trash-alt"></i></button>' +
+                    '</li>'
+                );
+            });
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        $(document).on('click', '#path-list .btn-icon', function() {
+            var idx = $(this).data('index');
+            paths.splice(idx, 1);
+            renderPaths();
+        });
+
+        $('#btn-add-path').on('click', function() {
+            var val = $('#new-path-input').val().trim();
+            if (val && paths.indexOf(val) === -1) {
+                paths.push(val);
+                renderPaths();
+                $('#new-path-input').val('');
+            }
+        });
+
+        $('#new-path-input').on('keypress', function(e) {
+            if (e.which === 13) { $('#btn-add-path').click(); }
+        });
+
+        $('#btn-save-paths').on('click', function() {
+            var config = {
+                server: $('#cfg-server').val().trim(),
+                port: parseInt($('#cfg-port').val()) || 5050,
+                token: $('#cfg-token').val().trim(),
+                interval: parseInt($('#cfg-interval').val()) || 60,
+                protocol: $('#cfg-protocol').val(),
+                paths: paths
+            };
+            $.ajax({
+                url: '/api/config',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(config),
+                success: function(data) {
+                    if (data.success) {
+                        showToast('Paths saved', 'success');
+                    } else {
+                        showToast('Save failed: ' + data.message, 'error');
+                    }
+                },
+                error: function() { showToast('Request failed', 'error'); }
+            });
+        });
+
+        $('#btn-reset-paths').on('click', function() {
+            if (!confirm('Reset paths to defaults? This will overwrite your current paths.')) return;
+            paths = [
+                'status/system/cpu',
+                'status/system/load_avg',
+                'status/system/memory/memtotal',
+                'status/system/memory/memfree',
+                'status/system/memory/memavailable',
+                'status/system/uptime',
+                'status/system/temperature',
+                'status/wan/devices/*/diagnostics/CARRID',
+                'status/wan/devices/*/diagnostics/DBM',
+                'status/wan/devices/*/diagnostics/RSRP',
+                'status/wan/devices/*/diagnostics/RSRQ',
+                'status/wan/devices/*/diagnostics/SINR',
+                'status/wan/devices/*/diagnostics/RSRP_5G',
+                'status/wan/devices/*/diagnostics/RSRQ_5G',
+                'status/wan/devices/*/diagnostics/SINR_5G',
+                'status/wan/devices/*/diagnostics/SS',
+                'status/wan/devices/*/diagnostics/RFBAND',
+                'status/wan/devices/*/diagnostics/SRVC_TYPE',
+                'status/wan/devices/*/diagnostics/MODEMTEMP',
+                'status/wan/devices/*/status/connection_state',
+                'status/wan/devices/*/status/signal_strength'
+            ];
+            renderPaths();
+            showToast('Paths reset to defaults (save to apply)', 'success');
+        });
+
+        // --- Preview ---
+        $('#btn-load-preview').on('click', function() {
+            var $btn = $(this);
+            $btn.prop('disabled', true).find('i').removeClass('fa-sync-alt').addClass('fa-spinner fa-spin');
+            $.getJSON('/api/preview', function(data) {
+                // Render channel table
+                var html = '<table class="channel-table"><thead><tr><th>Channel</th><th>Value</th><th>Type</th></tr></thead><tbody>';
+                (data.channels || []).forEach(function(ch) {
+                    html += '<tr><td>' + escapeHtml(ch.name) + '</td><td>' + ch.value + '</td><td>' + (ch.float ? 'float' : 'int') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+                html += '<p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.8rem;">' + data.channel_count + ' channels</p>';
+                $('#preview-channels').html(html);
+                $('#preview-xml').text(data.xml || 'No data');
+            }).fail(function() {
+                showToast('Failed to load preview', 'error');
+            }).always(function() {
+                $btn.prop('disabled', false).find('i').removeClass('fa-spinner fa-spin').addClass('fa-sync-alt');
+            });
+        });
+
+        // --- Init ---
+        loadConfig();
+        loadStatus();
+        setInterval(loadStatus, 15000);
+    })();
+    </script>
+</body>
+</html>

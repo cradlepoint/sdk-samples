@@ -1,62 +1,71 @@
-# iperf3
-Runs iPerf3 bandwidth tests to a user-defined server and writes the results to the router's `asset_id` field. The iPerf3 binary is bundled with the app — no download required.
+# iPerf3 Web UI
+
+A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint router. Supports both client and server modes with full option control, live results display, persistent test history, and CSV/HTML export.
 
 ## How It Works
 
-1. On startup, the app looks for a bundled `iperf3-arm64v8` binary in the app directory
-2. Reads the target server from SDK appdata (`iperf3_server`)
-3. Runs an upload test and a download test (using `-R` flag)
-4. Writes results to `config/system/asset_id`, logs them, and sends an NCM alert
-5. Registers a callback — when `asset_id` is cleared, it triggers a new test
+1. On startup, the app launches a web server on port 8000
+2. Browse to `http://<router_ip>:8000` to access the UI
+3. Select Client or Server mode and configure options
+4. Click "Run Test" (client) or "Start Server" (server) to begin
+5. Results display in real-time with summary cards (client mode)
+6. All completed client tests are saved to history on disk
 
-## SDK Appdata Configuration
+## Web Interface
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `iperf3_server` | Yes | Hostname or IP of the iPerf3 server to test against |
+### Run Test Tab
 
-Set this in System > SDK Data. If not configured, the app will create the field and log a reminder.
+**Mode Selection** — Client or Server
 
-## Triggering a Test
+**Client Mode Options:**
+- Host and port of the remote iPerf3 server
+- Protocol: TCP, UDP, or SCTP
+- Direction: Upload, Download (-R), or Bidirectional (--bidir)
+- Duration, parallel streams, report interval
+- Target bandwidth, window size, buffer length
+- MSS, ToS/DSCP, TCP no-delay, zero-copy, omit first second
 
-The app runs a test automatically on startup. To trigger additional tests:
+**Server Mode:**
+- Listen port and bind address
+- Runs continuously until manually stopped (accepts multiple client connections)
 
-- **From NCM**: Clear the Asset ID field in the Devices grid
-- **From NCM API**: PUT an empty string to the router's `asset_id`:
-  ```json
-  {"asset_id": ""}
-  ```
-- **From router CLI**: `put config/system/asset_id ""`
+**Results Panel:**
+- Summary cards showing download, upload, jitter, and packet loss
+- Raw output console with auto-scroll
 
-When the `asset_id` is cleared, the callback fires and runs a new test.
+### History Tab
+- Table of all completed tests with timestamp, mode, server, protocol, direction, transfer, bandwidth, and duration
+- **Export CSV** — download all history as a CSV file
+- **Export HTML Report** — download a styled HTML report with bandwidth statistics (average, min, max)
+- **Clear History** — remove all saved history
 
-## Results Format
+## API Endpoints
 
-Results are written to `asset_id` in the format:
-
-```
-85.23Mbps Download 42.11Mbps Upload
-```
-
-Results are also:
-- Logged to the router syslog
-- Sent as an NCM alert
-
-## Retrieving Results
-
-- **NCM Devices grid**: Check the Asset ID column
-- **NCM API v2**: GET `/routers/{router_id}/` and read the `asset_id` field
-- **Router CLI**: `get config/system/asset_id`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Serve the web UI |
+| `/api/start` | POST | Start an iPerf3 test (JSON body with options) |
+| `/api/stop` | POST | Stop a running test or server |
+| `/api/status` | GET | Get current test status and output |
+| `/api/history` | GET | Get all test history |
+| `/api/history/clear` | POST | Clear all history |
+| `/api/export/csv` | GET | Download history as CSV |
+| `/api/export/html` | GET | Download history as HTML report |
 
 ## Requirements
 
 - Router firmware 7.26 or later
-- An iPerf3 server reachable from the router's WAN
-- Network connectivity to the iPerf3 server on port 5201 (default)
+- An iPerf3 server reachable from the router (for client mode)
+- Network connectivity on port 5201 (default) to the iPerf3 server
+- LAN zone forwarding to Router zone for port 8000 (for LAN client access to the web UI)
 
 ## Notes
 
 - The bundled binary (`iperf3-arm64v8`) is for ARM64 routers — compatible with all current Cradlepoint models
-- Each test has a 60-second timeout
-- The app runs both upload and download tests sequentially
-- Customize result handling by editing the `process_results()` function
+- History is stored in `tmp/iperf3_history.json` (up to 500 entries)
+- Only one test/server instance can run at a time
+- Web server binds to all interfaces on port 8000
+- Client tests use JSON output mode (`-J`) internally for result parsing
+- Server mode streams raw text output (no JSON) for readability
+- Server output buffer is capped at 50KB to prevent memory issues on long-running servers
+- Dark mode toggle persists via localStorage
