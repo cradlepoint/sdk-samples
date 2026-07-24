@@ -583,7 +583,7 @@ def start_web_server():
     app_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(app_dir)
 
-    server = http.server.HTTPServer(('', WEB_PORT), PRTGAgentHandler)
+    server = http.server.HTTPServer(('0.0.0.0', WEB_PORT), PRTGAgentHandler)
     server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     cp.log('Web server started on port {}'.format(WEB_PORT))
     server.serve_forever()
