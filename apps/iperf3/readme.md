@@ -2,6 +2,11 @@
 
 A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint router. Supports both client and server modes with full option control, live results display, persistent test history, and CSV/HTML export.
 
+<img width="1559" height="844" alt="image" src="https://github.com/user-attachments/assets/3271184f-deac-43ae-ad7e-834d697b354f" />
+<img width="1559" height="844" alt="image" src="https://github.com/user-attachments/assets/94de844d-af7c-4bd6-b8a3-c36deebf24b1" />
+<img width="1559" height="844" alt="image" src="https://github.com/user-attachments/assets/b368c072-3da6-4b3c-90ca-cf3bdab90022" />
+
+
 ## How It Works
 
 1. On startup, the app launches a web server on port 8000
