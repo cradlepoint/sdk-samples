@@ -578,13 +578,24 @@ def data_collection_loop():
     cp.log('Data collection loop stopped')
 
 
+class NoFQDNHTTPServer(http.server.HTTPServer):
+    """HTTPServer that skips FQDN lookup to avoid IDNA encoding errors with long hostnames."""
+
+    def server_bind(self):
+        """Override to bind without calling getfqdn()."""
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(self.server_address)
+        host, port = self.socket.getsockname()[:2]
+        self.server_name = '0.0.0.0'
+        self.server_port = port
+
+
 def start_web_server():
     """Start the web server in a daemon thread."""
     app_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(app_dir)
 
-    server = http.server.HTTPServer(('', WEB_PORT), PRTGAgentHandler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server = NoFQDNHTTPServer(('0.0.0.0', WEB_PORT), PRTGAgentHandler)
     cp.log('Web server started on port {}'.format(WEB_PORT))
     server.serve_forever()
 
