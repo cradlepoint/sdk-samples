@@ -16,7 +16,8 @@ import http.server
 APP_NAME = 'prtg_agent'
 WEB_PORT = 8000
 DEFAULT_INTERVAL = 60
-DEFAULT_PRTG_PORT = 5050
+DEFAULT_PRTG_PORT_HTTP = 5050
+DEFAULT_PRTG_PORT_HTTPS = 5051
 DEFAULT_PROTOCOL = 'http'
 
 # Default paths to collect data from (supports wildcards)
@@ -49,7 +50,7 @@ def get_config():
     """Load configuration from appdata. Returns dict with defaults for missing fields."""
     config = {
         'server': '',
-        'port': str(DEFAULT_PRTG_PORT),
+        'port': '',
         'token': '',
         'interval': str(DEFAULT_INTERVAL),
         'protocol': DEFAULT_PROTOCOL,
@@ -253,7 +254,7 @@ def escape_xml(text):
 def push_to_prtg(xml_data, config):
     """Send XML data to PRTG HTTP Push Data Advanced sensor via POST."""
     server = config.get('server', '')
-    port = config.get('port', str(DEFAULT_PRTG_PORT))
+    port = config.get('port', '')
     token = config.get('token', '')
     protocol = config.get('protocol', DEFAULT_PROTOCOL)
 
@@ -261,10 +262,14 @@ def push_to_prtg(xml_data, config):
         cp.log('PRTG push skipped: server or token not configured')
         return False
 
+    # Use protocol-appropriate default port if not specified
+    if not port:
+        port = str(DEFAULT_PRTG_PORT_HTTPS if protocol == 'https' else DEFAULT_PRTG_PORT_HTTP)
+
     try:
         port_int = int(port)
     except (ValueError, TypeError):
-        port_int = DEFAULT_PRTG_PORT
+        port_int = DEFAULT_PRTG_PORT_HTTPS if protocol == 'https' else DEFAULT_PRTG_PORT_HTTP
 
     url = '{}://{}:{}/{}'.format(protocol, server, port_int, token)
     cp.log('Pushing data to PRTG: {}'.format(url))
@@ -426,7 +431,7 @@ class PRTGAgentHandler(http.server.BaseHTTPRequestHandler):
             # Validate required fields
             config = {
                 'server': data.get('server', ''),
-                'port': str(data.get('port', DEFAULT_PRTG_PORT)),
+                'port': str(data.get('port', '')),
                 'token': data.get('token', ''),
                 'interval': str(data.get('interval', DEFAULT_INTERVAL)),
                 'protocol': data.get('protocol', DEFAULT_PROTOCOL),

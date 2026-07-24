@@ -182,7 +182,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="cfg-port">Port</label>
-                                <input type="number" id="cfg-port" placeholder="5050" min="1" max="65535">
+                                <input type="number" id="cfg-port" placeholder="5050 (HTTP) / 5051 (HTTPS)" min="1" max="65535">
                             </div>
                             <div class="form-group">
                                 <label for="cfg-token">Identification Token</label>
@@ -303,10 +303,12 @@
         function loadConfig() {
             $.getJSON('/api/config', function(data) {
                 $('#cfg-server').val(data.server || '');
-                $('#cfg-port').val(data.port || '5050');
+                var proto = data.protocol || 'http';
+                var defaultPort = proto === 'https' ? '5051' : '5050';
+                $('#cfg-port').val(data.port || defaultPort);
                 $('#cfg-token').val(data.token || '');
                 $('#cfg-interval').val(data.interval || '60');
-                $('#cfg-protocol').val(data.protocol || 'http');
+                $('#cfg-protocol').val(proto);
                 paths = data.paths || [];
                 renderPaths();
             });
@@ -315,7 +317,7 @@
         $('#btn-save-config').on('click', function() {
             var config = {
                 server: $('#cfg-server').val().trim(),
-                port: parseInt($('#cfg-port').val()) || 5050,
+                port: parseInt($('#cfg-port').val()) || '',
                 token: $('#cfg-token').val().trim(),
                 interval: parseInt($('#cfg-interval').val()) || 60,
                 protocol: $('#cfg-protocol').val(),
@@ -335,6 +337,16 @@
                 },
                 error: function() { showToast('Request failed', 'error'); }
             });
+        });
+
+        // Auto-switch port when protocol changes
+        $('#cfg-protocol').on('change', function() {
+            var currentPort = $('#cfg-port').val();
+            var proto = $(this).val();
+            // Only auto-switch if port is empty or at a default value
+            if (!currentPort || currentPort === '5050' || currentPort === '5051') {
+                $('#cfg-port').val(proto === 'https' ? '5051' : '5050');
+            }
         });
 
         // --- Paths ---
@@ -378,7 +390,7 @@
         $('#btn-save-paths').on('click', function() {
             var config = {
                 server: $('#cfg-server').val().trim(),
-                port: parseInt($('#cfg-port').val()) || 5050,
+                port: parseInt($('#cfg-port').val()) || '',
                 token: $('#cfg-token').val().trim(),
                 interval: parseInt($('#cfg-interval').val()) || 60,
                 protocol: $('#cfg-protocol').val(),
