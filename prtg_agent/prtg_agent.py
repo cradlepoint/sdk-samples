@@ -119,12 +119,15 @@ def collect_data(paths):
     Returns list of (channel_name, value, is_float) tuples.
     """
     channels = []
+    # Cache device friendly names to avoid repeated lookups
+    device_names = _get_device_names()
+
     for path in paths:
         try:
             resolved = resolve_wildcard_path(path)
             for resolved_path, value in resolved:
                 # Build a readable channel name from the path
-                channel_name = make_channel_name(resolved_path)
+                channel_name = make_channel_name(resolved_path, device_names)
                 # Skip non-numeric values for PRTG channels (store as text message)
                 numeric_value, is_float = parse_numeric(value)
                 if numeric_value is not None:
@@ -134,21 +137,53 @@ def collect_data(paths):
     return channels
 
 
-def make_channel_name(path):
+def _get_device_names():
+    """
+    Build a map of device_id -> friendly name using info/product or info fields.
+    e.g. 'ethernet-wan' -> 'Multi Gigabit Ethernet Switch'
+         'mdm-abcd1234' -> 'int1 sim1' or product name
+    """
+    names = {}
+    try:
+        devices = cp.get('status/wan/devices') or {}
+        for dev_id in devices:
+            info = cp.get('status/wan/devices/{}/info'.format(dev_id))
+            if not info:
+                continue
+            # Try product field first (user-confirmed it exists)
+            product = info.get('product', '')
+            if product:
+                names[dev_id] = product
+            elif info.get('type') == 'mdm':
+                # For modems, use port + sim
+                port = info.get('port', '')
+                sim = info.get('sim', '')
+                parts = [p for p in [port, sim] if p]
+                names[dev_id] = ' '.join(parts) if parts else dev_id
+            else:
+                # Ethernet: use port
+                port = info.get('port', '')
+                names[dev_id] = port if port else dev_id
+    except Exception as e:
+        cp.log('Error getting device names: {}'.format(e))
+    return names
+
+
+def make_channel_name(path, device_names=None):
     """
     Convert a full API path to a concise PRTG channel name.
-    e.g. status/wan/devices/mdm-12345/diagnostics/RSRP_5G -> mdm-12345 RSRP_5G
+    e.g. status/wan/devices/mdm-12345/diagnostics/RSRP_5G -> 'int1 sim1 RSRP_5G'
     """
+    if device_names is None:
+        device_names = {}
+
     parts = path.split('/')
-    # For WAN device paths, include device ID and the leaf field
+    # For WAN device paths, include friendly device name and the leaf field
     if 'wan/devices' in path and len(parts) >= 5:
-        device_id = parts[3]  # e.g. mdm-12345
+        device_id = parts[3]  # e.g. mdm-12345, ethernet-wan
         leaf = parts[-1]
-        # Shorten device ID for display
-        short_id = device_id
-        if device_id.startswith('mdm-'):
-            short_id = 'mdm' + device_id[4:8] if len(device_id) > 8 else device_id
-        return '{} {}'.format(short_id, leaf)
+        friendly = device_names.get(device_id, device_id)
+        return '{} {}'.format(friendly, leaf)
     # For system paths
     if path.startswith('status/system/'):
         remainder = path[len('status/system/'):]
@@ -214,7 +249,12 @@ def build_prtg_xml(channels, message=''):
     """
     Build PRTG-compatible XML from collected channel data.
     channels: list of (channel_name, value, is_float) tuples
+    Always includes router hostname and serial number in the text message.
     """
+    # Get router identity for the text field
+    hostname = cp.get_name() or 'unknown'
+    serial = cp.get_serial_number() or 'unknown'
+
     xml_parts = ['<?xml version="1.0" encoding="UTF-8" ?>']
     xml_parts.append('<prtg>')
 
@@ -233,8 +273,11 @@ def build_prtg_xml(channels, message=''):
                     escape_xml(custom_unit)))
         xml_parts.append('  </result>')
 
+    # Always include hostname and serial in the text message
+    text_parts = ['hostname={}'.format(hostname), 'serial={}'.format(serial)]
     if message:
-        xml_parts.append('  <text>{}</text>'.format(escape_xml(message)))
+        text_parts.append(message)
+    xml_parts.append('  <text>{}</text>'.format(escape_xml(' | '.join(text_parts))))
 
     xml_parts.append('</prtg>')
     return '\n'.join(xml_parts)
@@ -510,9 +553,7 @@ def data_collection_loop():
 
                 channels = collect_data(paths)
                 if channels:
-                    hostname = cp.get_name() or 'unknown'
-                    xml = build_prtg_xml(channels, '{} - {} channels'.format(
-                        hostname, len(channels)))
+                    xml = build_prtg_xml(channels, '{} channels'.format(len(channels)))
                     success = push_to_prtg(xml, config)
                     last_push_time = time.time()
                     last_push_success = success
