@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPerf3 Web UI</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        .element-grid {
+            grid-template-columns: 1fr !important;
+        }
+        .form-row {
+            display: grid;
+            gap: 1rem;
+        }
+        .form-row-2 { grid-template-columns: 1fr 1fr; }
+        .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .checkbox-row {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.75rem;
+        }
+        .radio-row {
+            display: flex;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+        }
+        .radio-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .radio-label input[type="radio"] {
+            display: inline-block !important;
+            appearance: auto !important;
+            -webkit-appearance: auto !important;
+            position: static !important;
+            opacity: 1 !important;
+            margin: 0;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-primary);
+        }
+        @media (max-width: 768px) {
+            .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">iPerf3 Web UI</h1>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-tachometer-alt"></i> iPerf3
+                    </a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li>
+                            <a href="#" class="nav-item active" data-element="run-test">
+                                <i class="fas fa-play-circle"></i> Run Test
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="history">
+                                <i class="fas fa-history"></i> History
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+
+                    <!-- Run Test Section -->
+                    <section class="element-section active" id="run-test">
+                        <h2 class="section-title">Run iPerf3 Test</h2>
+
+                        <!-- Status Banner -->
+                        <div id="status-banner" style="display:none; margin-bottom: 1rem;">
+                            <div id="status-message" style="padding: 0.75rem; border-radius: 6px; font-weight: 500;"></div>
+                        </div>
+
+                        <!-- Mode Selection -->
+                        <div class="element-grid">
+                            <div class="element-example">
+                                <h3>Mode</h3>
+                                <div class="radio-row">
+                                    <label class="radio-label">
+                                        <input type="radio" name="mode" value="client" checked>
+                                        <i class="fas fa-upload"></i> Client
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="mode" value="server">
+                                        <i class="fas fa-download"></i> Server
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Client Options -->
+                        <div id="client-options">
+                            <div class="element-grid">
+                                <div class="element-example">
+                                    <h3>Connection</h3>
+                                    <div class="form-row form-row-2">
+                                        <div>
+                                            <label for="server-host">Server Host <span style="color:var(--color-danger);">*</span></label>
+                                            <input type="text" id="server-host" class="search-input" placeholder="e.g. 192.168.1.100" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="server-port">Port</label>
+                                            <input type="number" id="server-port" class="search-input" value="5201" min="1" max="65535" style="width:100%;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="element-grid">
+                                <div class="element-example">
+                                    <h3>Protocol &amp; Direction</h3>
+                                    <div class="form-row form-row-2">
+                                        <div>
+                                            <label>Protocol</label>
+                                            <div class="radio-row" style="margin-top: 0.5rem;">
+                                                <label class="radio-label">
+                                                    <input type="radio" name="protocol" value="tcp" checked> TCP
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="protocol" value="udp"> UDP
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="protocol" value="sctp"> SCTP
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label>Direction</label>
+                                            <div class="radio-row" style="margin-top: 0.5rem;">
+                                                <label class="radio-label">
+                                                    <input type="radio" name="direction" value="upload" checked> Upload
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="direction" value="download"> Download (-R)
+                                                </label>
+                                                <label class="radio-label">
+                                                    <input type="radio" name="direction" value="bidirectional"> Bidir
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="element-grid">
+                                <div class="element-example">
+                                    <h3>Test Parameters</h3>
+                                    <div class="form-row form-row-3">
+                                        <div>
+                                            <label for="duration">Duration (sec)</label>
+                                            <input type="number" id="duration" class="search-input" value="10" min="1" max="3600" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="parallel">Parallel Streams</label>
+                                            <input type="number" id="parallel" class="search-input" value="1" min="1" max="128" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="interval">Report Interval (sec)</label>
+                                            <input type="number" id="interval" class="search-input" value="1" min="1" max="60" style="width:100%;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="element-grid">
+                                <div class="element-example">
+                                    <h3>Bandwidth &amp; Buffer</h3>
+                                    <div class="form-row form-row-3">
+                                        <div>
+                                            <label for="bandwidth">Target Bandwidth</label>
+                                            <input type="text" id="bandwidth" class="search-input" placeholder="e.g. 100M, 1G" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="window-size">Window Size</label>
+                                            <input type="text" id="window-size" class="search-input" placeholder="e.g. 256K" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="buffer-length">Buffer Length</label>
+                                            <input type="text" id="buffer-length" class="search-input" placeholder="e.g. 128K" style="width:100%;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="element-grid">
+                                <div class="element-example">
+                                    <h3>Advanced Options</h3>
+                                    <div class="form-row form-row-2">
+                                        <div>
+                                            <label for="mss">MSS (Max Segment Size)</label>
+                                            <input type="number" id="mss" class="search-input" placeholder="Default" min="1" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="tos">ToS / DSCP</label>
+                                            <input type="text" id="tos" class="search-input" placeholder="e.g. 0x20" style="width:100%;">
+                                        </div>
+                                    </div>
+                                    <div class="checkbox-row">
+                                        <label class="checkbox-label" style="cursor:pointer;">
+                                            <input type="checkbox" id="no-delay">
+                                            <span class="checkmark"></span> No Delay
+                                        </label>
+                                        <label class="checkbox-label" style="cursor:pointer;">
+                                            <input type="checkbox" id="zerocopy">
+                                            <span class="checkmark"></span> Zero Copy
+                                        </label>
+                                        <label class="checkbox-label" style="cursor:pointer;">
+                                            <input type="checkbox" id="omit-first">
+                                            <span class="checkmark"></span> Omit 1st Sec
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Server Options -->
+                        <div id="server-options" style="display:none;">
+                            <div class="element-grid">
+                                <div class="element-example">
+                                    <h3>Server Settings</h3>
+                                    <p style="margin-bottom: 0.75rem; color: var(--text-secondary); font-size: 0.85rem;">
+                                        Server runs continuously until stopped. Clients can connect repeatedly.
+                                    </p>
+                                    <div class="form-row form-row-2">
+                                        <div>
+                                            <label for="listen-port">Listen Port</label>
+                                            <input type="number" id="listen-port" class="search-input" value="5201" min="1" max="65535" style="width:100%;">
+                                        </div>
+                                        <div>
+                                            <label for="bind-address">Bind Address</label>
+                                            <input type="text" id="bind-address" class="search-input" placeholder="0.0.0.0 (all interfaces)" style="width:100%;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Run / Stop Buttons -->
+                        <div class="element-grid">
+                            <div class="element-example" style="display: flex; gap: 1rem; align-items: center;">
+                                <button type="button" class="btn btn-primary" id="btn-run" onclick="startTest()">
+                                    <i class="fas fa-play"></i> <span id="btn-run-text">Run Test</span>
+                                </button>
+                                <button type="button" class="btn btn-danger" id="btn-stop" onclick="stopTest()" style="display:none;">
+                                    <i class="fas fa-stop"></i> Stop
+                                </button>
+                                <span id="running-indicator" style="display:none; color: var(--color-warning);">
+                                    <i class="fas fa-spinner fa-spin"></i> <span id="running-text">Running...</span>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Results Display -->
+                        <div class="element-grid">
+                            <div class="element-example" id="results-panel">
+                                <h3>Results</h3>
+                                <div id="results-summary" style="display:none; margin-bottom: 1rem;">
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+                                        <div class="status-indicator" id="result-download">
+                                            <span class="status-indicator-icon" style="color: var(--color-success);"><i class="fas fa-arrow-down"></i></span>
+                                            <div class="status-indicator-text">
+                                                <strong id="result-download-val">--</strong>
+                                                <span>Download</span>
+                                            </div>
+                                        </div>
+                                        <div class="status-indicator" id="result-upload">
+                                            <span class="status-indicator-icon" style="color: var(--color-primary);"><i class="fas fa-arrow-up"></i></span>
+                                            <div class="status-indicator-text">
+                                                <strong id="result-upload-val">--</strong>
+                                                <span>Upload</span>
+                                            </div>
+                                        </div>
+                                        <div class="status-indicator" id="result-jitter">
+                                            <span class="status-indicator-icon" style="color: var(--color-warning);"><i class="fas fa-wave-square"></i></span>
+                                            <div class="status-indicator-text">
+                                                <strong id="result-jitter-val">--</strong>
+                                                <span>Jitter</span>
+                                            </div>
+                                        </div>
+                                        <div class="status-indicator" id="result-loss">
+                                            <span class="status-indicator-icon" style="color: var(--color-danger);"><i class="fas fa-exclamation-triangle"></i></span>
+                                            <div class="status-indicator-text">
+                                                <strong id="result-loss-val">--</strong>
+                                                <span>Loss</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="results-output" style="background: var(--bg-tertiary); border-radius: 6px; padding: 1rem; font-family: monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap; color: var(--text-primary);">Waiting for test...</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- History Section -->
+                    <section class="element-section" id="history">
+                        <h2 class="section-title">Test History</h2>
+                        <div class="element-grid">
+                            <div class="element-example" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary" onclick="exportCSV()">
+                                    <i class="fas fa-file-csv"></i> Export CSV
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="exportHTML()">
+                                    <i class="fas fa-file-code"></i> Export HTML
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="clearHistory()">
+                                    <i class="fas fa-trash"></i> Clear
+                                </button>
+                            </div>
+                            <div class="element-example" style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 600px;">
+                                    <thead>
+                                        <tr style="border-bottom: 2px solid var(--border-primary); text-align: left;">
+                                            <th style="padding: 0.5rem;">Time</th>
+                                            <th style="padding: 0.5rem;">Mode</th>
+                                            <th style="padding: 0.5rem;">Server</th>
+                                            <th style="padding: 0.5rem;">Protocol</th>
+                                            <th style="padding: 0.5rem;">Direction</th>
+                                            <th style="padding: 0.5rem;">Transfer</th>
+                                            <th style="padding: 0.5rem;">Bandwidth</th>
+                                            <th style="padding: 0.5rem;">Duration</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-tbody">
+                                        <tr><td colspan="8" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No test history yet.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast-container"></div>
+    <script src="static/js/script.js"></script>
+    <script>
+    // Force show run-test section on load (override template script.js homepage behavior)
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.element-section').forEach(function(s) { s.classList.remove('active'); });
+        document.getElementById('run-test').classList.add('active');
+    });
+
+    // Mode switching
+    document.querySelectorAll('input[name="mode"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.getElementById('client-options').style.display = this.value === 'client' ? '' : 'none';
+            document.getElementById('server-options').style.display = this.value === 'server' ? '' : 'none';
+            // Update button text
+            document.getElementById('btn-run-text').textContent = this.value === 'server' ? 'Start Server' : 'Run Test';
+        });
+    });
+
+    // Nav switching
+    document.querySelectorAll('.nav-item').forEach(function(item) {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+            item.classList.add('active');
+            var target = item.getAttribute('data-element');
+            document.querySelectorAll('.element-section').forEach(function(s) { s.classList.remove('active'); });
+            document.getElementById(target).classList.add('active');
+            // Re-check status when navigating back to Run Test
+            if (target === 'run-test') { checkRunningState(); }
+            if (target === 'history') { loadHistory(); }
+        });
+    });
+
+    var pollTimer = null;
+
+    function buildOptions() {
+        var mode = document.querySelector('input[name="mode"]:checked').value;
+        var opts = { mode: mode };
+        if (mode === 'client') {
+            opts.host = document.getElementById('server-host').value.trim();
+            opts.port = parseInt(document.getElementById('server-port').value) || 5201;
+            opts.protocol = document.querySelector('input[name="protocol"]:checked').value;
+            opts.direction = document.querySelector('input[name="direction"]:checked').value;
+            opts.duration = parseInt(document.getElementById('duration').value) || 10;
+            opts.parallel = parseInt(document.getElementById('parallel').value) || 1;
+            opts.interval = parseInt(document.getElementById('interval').value) || 1;
+            opts.bandwidth = document.getElementById('bandwidth').value.trim();
+            opts.window_size = document.getElementById('window-size').value.trim();
+            opts.buffer_length = document.getElementById('buffer-length').value.trim();
+            opts.mss = document.getElementById('mss').value.trim();
+            opts.tos = document.getElementById('tos').value.trim();
+            opts.no_delay = document.getElementById('no-delay').checked;
+            opts.zerocopy = document.getElementById('zerocopy').checked;
+            opts.omit = document.getElementById('omit-first').checked ? 1 : 0;
+        } else {
+            opts.port = parseInt(document.getElementById('listen-port').value) || 5201;
+            opts.bind = document.getElementById('bind-address').value.trim();
+        }
+        return opts;
+    }
+
+    function startTest() {
+        var opts = buildOptions();
+        if (opts.mode === 'client' && !opts.host) {
+            showStatus('Please enter a server host.', 'danger');
+            return;
+        }
+        document.getElementById('btn-run').style.display = 'none';
+        document.getElementById('btn-stop').style.display = '';
+        document.getElementById('running-indicator').style.display = '';
+        document.getElementById('running-text').textContent = opts.mode === 'server' ? 'Listening...' : 'Running...';
+        document.getElementById('results-summary').style.display = 'none';
+        document.getElementById('results-output').textContent = opts.mode === 'server' ? 'Server starting...\n' : 'Starting test...\n';
+
+        fetch('/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(opts)
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (data.error) { showStatus(data.error, 'danger'); resetButtons(); }
+            else { pollStatus(); }
+        }).catch(function(err) { showStatus('Failed: ' + err, 'danger'); resetButtons(); });
+    }
+
+    function stopTest() {
+        fetch('/api/stop', { method: 'POST' }).then(function() { showStatus('Stopped.', 'warning'); }).catch(function() {});
+        resetButtons();
+    }
+
+    function pollStatus() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(function() {
+            fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+                document.getElementById('results-output').textContent = data.output || '';
+                var el = document.getElementById('results-output');
+                el.scrollTop = el.scrollHeight;
+                if (!data.running) {
+                    clearInterval(pollTimer); pollTimer = null; resetButtons();
+                    if (data.summary) showSummary(data.summary);
+                    if (data.error) showStatus(data.error, 'danger');
+                    else showStatus('Test complete.', 'success');
+                    loadHistory();
+                }
+            }).catch(function() { clearInterval(pollTimer); pollTimer = null; resetButtons(); });
+        }, 1000);
+    }
+
+    function showSummary(s) {
+        document.getElementById('results-summary').style.display = '';
+        document.getElementById('result-download-val').textContent = s.download || '--';
+        document.getElementById('result-upload-val').textContent = s.upload || '--';
+        document.getElementById('result-jitter-val').textContent = s.jitter || '--';
+        document.getElementById('result-loss-val').textContent = s.loss || '--';
+    }
+
+    function resetButtons() {
+        document.getElementById('btn-run').style.display = '';
+        document.getElementById('btn-stop').style.display = 'none';
+        document.getElementById('running-indicator').style.display = 'none';
+    }
+
+    function showStatus(msg, type) {
+        var banner = document.getElementById('status-banner');
+        var msgEl = document.getElementById('status-message');
+        banner.style.display = '';
+        var colors = { success: 'var(--color-success)', danger: 'var(--color-danger)', warning: 'var(--color-warning)', info: 'var(--color-info)' };
+        msgEl.style.background = 'color-mix(in srgb, ' + (colors[type] || colors.info) + ' 15%, transparent)';
+        msgEl.style.color = colors[type] || colors.info;
+        msgEl.textContent = msg;
+        setTimeout(function() { banner.style.display = 'none'; }, 8000);
+    }
+
+    function loadHistory() {
+        fetch('/api/history').then(function(r) { return r.json(); }).then(function(data) {
+            var tbody = document.getElementById('history-tbody');
+            if (!data.history || data.history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No test history yet.</td></tr>';
+                return;
+            }
+            var rows = '';
+            data.history.slice().reverse().forEach(function(h) {
+                rows += '<tr style="border-bottom: 1px solid var(--border-primary);">';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.timestamp || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.mode || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.server || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.protocol || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.direction || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.transfer || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.bandwidth || '') + '</td>';
+                rows += '<td style="padding: 0.5rem;">' + esc(h.duration || '') + '</td>';
+                rows += '</tr>';
+            });
+            tbody.innerHTML = rows;
+        }).catch(function() {});
+    }
+
+    function clearHistory() {
+        if (!confirm('Clear all test history?')) return;
+        fetch('/api/history/clear', { method: 'POST' }).then(function() { loadHistory(); showStatus('History cleared.', 'info'); }).catch(function() {});
+    }
+
+    function exportCSV() { window.location.href = '/api/export/csv'; }
+    function exportHTML() { window.location.href = '/api/export/html'; }
+
+    function esc(text) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(text));
+        return d.innerHTML;
+    }
+
+    function checkRunningState() {
+        fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+            if (data.running) {
+                document.getElementById('btn-run').style.display = 'none';
+                document.getElementById('btn-stop').style.display = '';
+                document.getElementById('running-indicator').style.display = '';
+                document.getElementById('results-output').textContent = data.output || 'Test in progress...';
+                if (!pollTimer) { pollStatus(); }
+            } else {
+                resetButtons();
+                if (data.summary) { showSummary(data.summary); }
+                if (data.output) { document.getElementById('results-output').textContent = data.output; }
+            }
+        }).catch(function() {});
+    }
+
+    loadHistory();
+    checkRunningState();
+    </script>
+</body>
+</html>
