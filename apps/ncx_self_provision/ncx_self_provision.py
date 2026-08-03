@@ -1,7 +1,7 @@
 """NCX Self-Provisioning SDK Application.
 
 Runs on Ericsson routers to automate zero-touch provisioning to NCX/SASE
-networks when devices are moved to a staging group. Executes a 9-step
+networks when devices are moved to a staging group. Executes a 10-step
 provisioning workflow with state management and automatic recovery.
 
 Provisioning Steps:
@@ -11,9 +11,11 @@ Provisioning Steps:
     4. Bulk Configuration - Apply device-specific config from CSV (optional)
     5. License Application - Apply Secure Connect, SD-WAN, HMF, AI licenses
     6. Exchange Site Creation - Create NCX/SASE site with DNS and tags
-    7. Exchange Resource Provisioning - Create LAN subnet, FQDN, wildcard resources
-    8. DNS Force Redirect - Disable force DNS if configured (optional)
-    9. Production Group Assignment - Move device to production group and cleanup
+    7. Auto-Created Resource Deletion - Delete resources auto-created by
+       NCX/NCS for the new site (optional)
+    8. Exchange Resource Provisioning - Create LAN subnet, FQDN, wildcard resources
+    9. DNS Force Redirect - Disable force DNS if configured (optional)
+    10. Production Group Assignment - Move device to production group and cleanup
 
 Key Features:
     - Persistent state tracking enables recovery after failures/reboots
@@ -24,6 +26,8 @@ Key Features:
     - Global and per-device tagging with automatic merge and deduplication
     - DNS options: LAN as DNS with local domain, or custom DNS servers (primary/secondary)
     - CP host and wildcard FQDN resources require DNS to be configured (LAN as DNS or custom DNS)
+    - Optional deletion of resources auto-created by NCX/NCS with a new site,
+      performed before any configured resources are created
     - local_domain for FQDN resources: uses appdata value if set, otherwise falls back to cp.get('config/system/local_domain')
     - Global Force DNS setting with per-device CSV override
     - System name and LAN IP caching for accurate site/resource creation
@@ -38,6 +42,7 @@ State Management:
     - prov_state_bulk_config: Bulk configuration applied
     - prov_state_license: Licenses applied
     - prov_state_site: Exchange site created
+    - prov_state_del_auto_res: Auto-created resources deleted or skipped
     - prov_state_resources: Exchange resources provisioned
     - prov_state_vpn_tunnel: VPN tunnel up
     - prov_state_dns_force: DNS force redirect configured
@@ -88,7 +93,7 @@ Deployment Workflow:
     2. Build SDK package: python make.py build ncx_self_provision
     3. Upload package to NCM and assign to staging group
     4. Move devices to staging group (max 50 at a time recommended)
-    5. Monitor device logs for "[Step X/9]" progress indicators
+    5. Monitor device logs for "[Step X/10]" progress indicators
     6. Devices automatically move to production group when complete
 
 Recovery:
@@ -127,7 +132,7 @@ import ipaddress
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import cp
 import ncm
@@ -217,9 +222,14 @@ STATE_READINESS = 'prov_state_readiness'
 STATE_BULK_CONFIG = 'prov_state_bulk_config'
 STATE_LICENSE = 'prov_state_license'
 STATE_SITE = 'prov_state_site'
+STATE_DELETE_AUTO_RES = 'prov_state_del_auto_res'
 STATE_RESOURCES = 'prov_state_resources'
 STATE_VPN_TUNNEL = 'prov_state_vpn_tunnel'
 STATE_DNS_FORCE = 'prov_state_dns_force'
+
+# Auto-created resource deletion settings
+AUTO_RESOURCE_WAIT_INTERVAL = 5  # Seconds between resource lookup attempts
+AUTO_RESOURCE_WAIT_TIMEOUT = 30  # Max wait for auto-created resources to appear
 
 # VPN tunnel check settings
 VPN_TUNNEL_CHECK_INTERVAL = 10  # Check every 10 seconds
@@ -983,6 +993,194 @@ def create_exchange_site(n3_client: ncm.NcmClientv3,
         raise
 
 
+def get_resource_label(resource: Dict[str, Any]) -> str:
+    """Build a human-readable label for an exchange resource.
+
+    Handles both flat and JSON:API style payloads.
+
+    Args:
+        resource: Exchange resource dictionary from the NCM v3 API.
+
+    Returns:
+        str: Resource name and target (ip or domain) when available,
+            falling back to the resource ID.
+
+    """
+    attributes = resource.get('attributes') or {}
+    name = resource.get('name') or attributes.get('name') or ''
+    target = (
+        resource.get('ip') or attributes.get('ip')
+        or resource.get('domain') or attributes.get('domain') or ''
+    )
+    resource_type = resource.get('type') or ''
+    resource_id = resource.get('id') or 'unknown'
+
+    label = name or resource_id
+    if target:
+        label = f"{label} ({target})"
+    if resource_type:
+        label = f"{label} [{resource_type}]"
+    return label
+
+
+def get_site_resources(n3_client: ncm.NcmClientv3,
+                       site_id: str) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """Retrieve resources attached to an exchange site.
+
+    Auto-created resources may not be queryable immediately after site
+    creation, so the lookup is retried until resources are returned or the
+    timeout is reached.
+
+    Args:
+        n3_client: NCM v3 API client.
+        site_id: Exchange site ID.
+
+    Returns:
+        Tuple[List[Dict[str, Any]], Optional[str]]: Resources attached to the
+            site and the last lookup error. The error is None when the final
+            lookup succeeded, in which case an empty list means the site has
+            no resources.
+
+    """
+    attempts = max(1, AUTO_RESOURCE_WAIT_TIMEOUT // AUTO_RESOURCE_WAIT_INTERVAL)
+    last_error = None
+
+    for attempt in range(1, attempts + 1):
+        last_error = None
+        try:
+            resources = n3_client.get_exchange_resources(site_id=str(site_id))
+        except Exception as e:
+            resources = None
+            last_error = str(e)
+
+        if isinstance(resources, str):
+            last_error = resources
+            resources = None
+
+        if last_error:
+            cp.log(f"WARNING: Error retrieving resources for site "
+                   f"{site_id}: {last_error}")
+        elif resources:
+            return resources, None
+
+        if attempt < attempts:
+            if not last_error:
+                cp.log(f"No resources found for site {site_id} yet "
+                       f"(attempt {attempt}/{attempts}), waiting "
+                       f"{AUTO_RESOURCE_WAIT_INTERVAL}s")
+            time.sleep(AUTO_RESOURCE_WAIT_INTERVAL)
+
+    return [], last_error
+
+
+def delete_auto_created_resources(n3_client: ncm.NcmClientv3,
+                                  site_info: Dict[str, Any]) -> None:
+    """Delete resources auto-created by NCX/NCS for a new exchange site.
+
+    NCX/NCS automatically creates resources when a new exchange site is
+    created. When the 'delete_auto_resources' appdata setting is enabled,
+    this step deletes every resource attached to the newly created site.
+
+    It runs immediately after site creation and before any configured
+    resources are provisioned, so only the auto-created resources are
+    removed. The step is skipped if resource provisioning already completed,
+    which prevents configured resources from being deleted on a re-run.
+
+    Failures are logged but do not stop provisioning, since this is an
+    optional cleanup step.
+
+    Args:
+        n3_client: NCM v3 API client.
+        site_info: Site information dictionary from site creation.
+
+    """
+    if get_state(STATE_DELETE_AUTO_RES) in ('complete', 'skipped'):
+        cp.log("Auto-created resource deletion already handled, skipping")
+        return
+
+    delete_auto_resources = (
+        cp.get_appdata('delete_auto_resources') == 'True'
+    )
+    if not delete_auto_resources:
+        cp.log("Delete auto-created resources disabled")
+        set_state(STATE_DELETE_AUTO_RES, 'skipped')
+        return
+
+    if get_state(STATE_RESOURCES) == 'complete':
+        cp.log("Exchange resources already provisioned - skipping "
+               "auto-created resource deletion to avoid deleting "
+               "configured resources")
+        set_state(STATE_DELETE_AUTO_RES, 'skipped')
+        return
+
+    try:
+        site_id = site_info.get('id') or cp.get_appdata('exchange_site_id')
+        if not site_id:
+            cp.log("ERROR: Site ID not available for auto-created "
+                   "resource deletion")
+            return
+
+        cp.log(f"Looking up auto-created resources for site {site_id}")
+        resources, lookup_error = get_site_resources(n3_client, site_id)
+
+        if lookup_error:
+            cp.log(f"ERROR: Unable to retrieve resources for site "
+                   f"{site_id}: {lookup_error} - continuing provisioning")
+            return
+
+        if not resources:
+            cp.log(f"No auto-created resources found for site {site_id}")
+            set_state(STATE_DELETE_AUTO_RES, 'complete')
+            return
+
+        cp.log(f"Found {len(resources)} auto-created resource(s) to delete")
+        failures = 0
+
+        for resource in resources:
+            resource_id = resource.get('id')
+            label = get_resource_label(resource)
+
+            if not resource_id:
+                cp.log(f"WARNING: Skipping resource without ID: {label}")
+                failures += 1
+                continue
+
+            try:
+                cp.log(f"  Deleting auto-created resource: {label}")
+                result = retry_on_failure(
+                    n3_client.delete_exchange_resource,
+                    resource_id=str(resource_id)
+                )
+
+                deleted = False
+                if isinstance(result, list) and result:
+                    deleted = all(
+                        entry.get('status') == 'deleted' for entry in result
+                    )
+
+                if deleted:
+                    cp.log(f"  Successfully deleted resource: {label}")
+                else:
+                    failures += 1
+                    cp.log(f"  ERROR deleting resource '{label}': {result}")
+            except Exception as e:
+                failures += 1
+                cp.log(f"  ERROR deleting resource '{label}': {e}")
+
+            time.sleep(2)
+
+        if failures:
+            cp.log(f"ERROR: Failed to delete {failures} of "
+                   f"{len(resources)} auto-created resource(s) - "
+                   f"continuing provisioning")
+        else:
+            cp.log(f"Deleted {len(resources)} auto-created resource(s) "
+                   f"from site {site_id}")
+            set_state(STATE_DELETE_AUTO_RES, 'complete')
+    except Exception as e:
+        cp.log(f"ERROR deleting auto-created resources: {e}")
+
+
 def create_exchange_site_resources(n3_client: ncm.NcmClientv3,
                                    site_info: Dict[str, Any],
                                    csv_row: Optional[Dict[str, str]] = None) -> None:
@@ -1409,6 +1607,7 @@ def cleanup_state() -> None:
         STATE_BULK_CONFIG,
         STATE_LICENSE,
         STATE_SITE,
+        STATE_DELETE_AUTO_RES,
         STATE_RESOURCES,
         STATE_VPN_TUNNEL,
         STATE_DNS_FORCE,
@@ -1427,7 +1626,7 @@ def cleanup_state() -> None:
 
 
 if __name__ == "__main__":
-    total_steps = 9
+    total_steps = 10
     current_step = 0
 
     try:
@@ -1477,11 +1676,19 @@ if __name__ == "__main__":
         time.sleep(STEP_DELAY_SECONDS)
 
         current_step += 1
+        log_progress(current_step, total_steps,
+                     "Deleting auto-created exchange resources")
+        delete_auto_created_resources(n3, site_info=site_info)
+        time.sleep(STEP_DELAY_SECONDS)
+
+        current_step += 1
         log_progress(current_step, total_steps, "Creating exchange resources")
         create_exchange_site_resources(n3, site_info=site_info, csv_row=csv_row)
         time.sleep(STEP_DELAY_SECONDS)
 
-        # Configure DNS force redirect if needed
+        current_step += 1
+        log_progress(current_step, total_steps,
+                     "Configuring DNS force redirect")
         configure_dns_force_redirect(csv_row=csv_row)
 
         current_step += 1

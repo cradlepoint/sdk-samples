@@ -23,14 +23,15 @@
 - [Best Practices](#best-practices)
 - [FAQ](#faq)
 
-## Overview (v2.8)
+## Overview (v2.9)
 
-The NCX Self-Provisioning SDK Application enables Ericsson routers to automatically provision themselves to an NCX or SASE network when moved into a staging group. The application executes a 9-step zero-touch provisioning workflow with state management and automatic recovery:
+The NCX Self-Provisioning SDK Application enables Ericsson routers to automatically provision themselves to an NCX or SASE network when moved into a staging group. The application executes a 10-step zero-touch provisioning workflow with state management and automatic recovery:
 
 - System readiness validation and firmware sync
 - Bulk device configuration from CSV with template-based config
 - License application (Secure Connect, SD-WAN, HMF, AI)
 - Exchange site creation with DNS configuration and tagging
+- Deletion of resources auto-created by NCX/NCS for the new site (optional)
 - Resource provisioning (LAN subnets, FQDN, wildcard domains)
 - DNS force redirect configuration (optional)
 - Automatic group re-assignment with state cleanup
@@ -76,7 +77,7 @@ For experienced users, here's the condensed setup process:
 
 4. **Provision devices**:
    - Move devices to staging group (limit to batches of 50 devices at a time)
-   - Monitor logs for "[Step X/9]" progress
+   - Monitor logs for "[Step X/10]" progress
    - Devices auto-move to production when complete
 
 For detailed instructions, see [Installation](#installation) section below.
@@ -96,6 +97,7 @@ For detailed instructions, see [Installation](#installation) section below.
 - **Template-Based Config**: JSON-based configuration templates with special and placeholder columns
 - **Web-Based Wizard**: Interactive 6-step configuration tool with real-time validation
 - **File Editor**: Built-in CSV grid view and JSON editor with syntax highlighting
+- **Auto-Created Resource Cleanup**: Optional deletion of the resources NCX/NCS creates automatically with a new site, before configured resources are provisioned
 - **VPN Tunnel Monitoring**: Automatic VPN tunnel status checking before DNS configuration
 - **Timeout Protection**: Configurable timeouts prevent infinite loops
 - **Idempotency**: Safe to re-run; skips completed steps
@@ -115,9 +117,10 @@ For detailed instructions, see [Installation](#installation) section below.
 │  4. Bulk Configuration (Optional)                           │
 │  5. License Application                                     │
 │  6. Exchange Site Creation                                  │
-│  7. Exchange Resource Provisioning                          │
-│  8. DNS Force Redirect Configuration (Optional)             │
-│  9. Production Group Assignment                             │
+│  7. Auto-Created Resource Deletion (Optional)               │
+│  8. Exchange Resource Provisioning                          │
+│  9. DNS Force Redirect Configuration (Optional)             │
+│ 10. Production Group Assignment                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -128,6 +131,7 @@ The application uses persistent state markers to enable recovery:
 - `prov_state_bulk_config`: Bulk configuration applied
 - `prov_state_license`: Licenses applied
 - `prov_state_site`: Exchange site created
+- `prov_state_del_auto_res`: Auto-created resources deleted (or skipped when disabled)
 - `prov_state_resources`: Exchange resources provisioned
 - `prov_state_vpn_tunnel`: VPN tunnel up
 - `prov_state_dns_force`: DNS force redirect configured
@@ -277,6 +281,7 @@ http://localhost:8000
      - Create CP Host FQDN Resource *(requires LAN as DNS or Custom DNS Servers to be enabled)*
      - Create Wildcard FQDN Resource *(requires LAN as DNS or Custom DNS Servers to be enabled)*
    - Note: CP host and wildcard FQDN checkboxes are disabled in the wizard unless a DNS option is configured in Step 2
+   - Optionally enable "Delete Auto-Created Resources" to remove the resources NCX/NCS creates automatically with a new site. This runs immediately after site creation and before any resources selected above are created, so only the auto-created resources are deleted. Independent of the resource creation checkboxes
    - Configure global Force DNS setting (can be overridden per-device in CSV)
 
    **Step 4: Global Tags**
@@ -335,7 +340,7 @@ Next Steps:
 - Validates bulk configuration files (CSV/JSON matching)
 - Validates license types with automatic NCX/SASE prefix matching
 - Sets API keys as certificates in the staging group
-- Configures 22 application data parameters needed by the self-provisioning app
+- Configures 23 application data parameters needed by the self-provisioning app
 - Provides interactive file editing with CSV grid view and JSON syntax highlighting
 - Color-coded CSV column analysis (green=config, blue=NCM/NCX, red=missing)
 - Displays comprehensive configuration summary before applying
@@ -408,7 +413,7 @@ This creates a package containing:
 
 2. **Monitor provisioning**:
 - Check device logs in NCM for progress
-- Look for "[Step X/9]" progress indicators
+- Look for "[Step X/10]" progress indicators
 - Successful completion shows: "NCX Self Provisioning Complete - All steps successful"
 
 3. **Verify results**:
@@ -446,6 +451,7 @@ The staging group must have the following application data configured:
 | `create_lan_resource` | Create LAN subnet resource | `'True'` |
 | `create_cp_host_resource` | Create FQDN resource | `'True'` |
 | `create_wildcard_resource` | Create wildcard resource | `'True'` |
+| `delete_auto_resources` | Delete resources auto-created by NCX/NCS for the new site (runs after site creation, before configured resources are created) | `'False'` |
 | `self_bulk_config` | Enable bulk configuration | `'False'` |
 | `bulk_config_file` | CSV filename | `'router_grid.csv'` |
 | `config_template_file` | Template filename | `'config_template.json'` |
@@ -470,6 +476,8 @@ COMPLETION_WAIT_SECONDS = 600      # Wait after completion
 LICENSE_APPLY_DELAY = 1            # Delay between license applications
 MAX_RETRIES = 3                    # API call retry attempts
 RETRY_DELAY = 5                    # Initial retry delay (exponential backoff)
+AUTO_RESOURCE_WAIT_INTERVAL = 5    # Auto-created resource lookup interval
+AUTO_RESOURCE_WAIT_TIMEOUT = 30    # Max wait for auto-created resources to appear
 ```
 
 ### Bulk Configuration Template
@@ -552,17 +560,17 @@ id,name,asset_id,primary_lan_ip,custom1,custom2
 |------------|----------|-------|-------------|
 | `id` | **YES** | Router matching | Router ID - MUST match device's NCM router ID to find the correct row. Without this column, bulk configuration will fail. |
 | `name` | No | Site creation | System name - cached during bulk config (Step 4) and used for exchange site creation (Step 6). If missing or router not in CSV, falls back to device's current system_id from running config. Must be hostname compliant: max 50 chars, alphanumeric + hyphens only. |
-| `primary_lan_ip` | No | Site/resource creation | Primary LAN IP - cached during bulk config (Step 4) and used for site DNS configuration (Step 6) and LAN resource creation (Step 7). If missing or router not in CSV, falls back to device's current LAN IP from running config. |
+| `primary_lan_ip` | No | Site/resource creation | Primary LAN IP - cached during bulk config (Step 4) and used for site DNS configuration (Step 6) and LAN resource creation (Step 8). If missing or router not in CSV, falls back to device's current LAN IP from running config. |
 | `desc` | No | Device configuration | Description - injected into device configuration via NCM API during bulk config (Step 4). Not used in template. |
 | `custom1` | No | NCM custom field | Custom field 1 - set via NCM API during bulk config (Step 4), not in template. Visible in NCM device list. |
 | `custom2` | No | NCM custom field | Custom field 2 - set via NCM API during bulk config (Step 4), not in template. Visible in NCM device list. |
 | `site_tags` | No | Site tagging | Semicolon-separated tags for exchange site (e.g., `branch;west;retail`). Merged with global site tags from wizard, duplicates removed. Applied during site creation (Step 6). |
-| `lan_resource_tags` | No | Resource tagging | Semicolon-separated tags for the standard LAN subnet resource only. Merged with global LAN resource tags from wizard. Not applied to extra resources. Applied during resource creation (Step 7). |
-| `cp_host_tags` | No | Resource tagging | Semicolon-separated tags for the standard CP host FQDN resource only. Merged with global CP host tags from wizard. Not applied to extra resources. Applied during resource creation (Step 7). |
-| `wildcard_resource_tags` | No | Resource tagging | Semicolon-separated tags for the standard wildcard FQDN resource only. Merged with global wildcard tags from wizard. Not applied to extra resources. Applied during resource creation (Step 7). |
-| `disable_force_dns` | No | DNS configuration | Set to 'true' (case-insensitive) to disable DNS force redirect for this specific device. Overrides global Force DNS setting from wizard. Applied during DNS configuration (Step 8). |
-| `extra_ip_resources` | No | Resource creation | Additional IP subnet resources to create. Supports multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters. Applied during resource creation (Step 7). See [Additional Resource Format](#additional-resource-format). |
-| `extra_fqdn_resources` | No | Resource creation | Additional FQDN resources to create. Supports multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters. Applied during resource creation (Step 7). See [Additional Resource Format](#additional-resource-format). |
+| `lan_resource_tags` | No | Resource tagging | Semicolon-separated tags for the standard LAN subnet resource only. Merged with global LAN resource tags from wizard. Not applied to extra resources. Applied during resource creation (Step 8). |
+| `cp_host_tags` | No | Resource tagging | Semicolon-separated tags for the standard CP host FQDN resource only. Merged with global CP host tags from wizard. Not applied to extra resources. Applied during resource creation (Step 8). |
+| `wildcard_resource_tags` | No | Resource tagging | Semicolon-separated tags for the standard wildcard FQDN resource only. Merged with global wildcard tags from wizard. Not applied to extra resources. Applied during resource creation (Step 8). |
+| `disable_force_dns` | No | DNS configuration | Set to 'true' (case-insensitive) to disable DNS force redirect for this specific device. Overrides global Force DNS setting from wizard. Applied during DNS configuration (Step 9). |
+| `extra_ip_resources` | No | Resource creation | Additional IP subnet resources to create. Supports multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters. Applied during resource creation (Step 8). See [Additional Resource Format](#additional-resource-format). |
+| `extra_fqdn_resources` | No | Resource creation | Additional FQDN resources to create. Supports multiple resources in a single cell using pipe-separated entries with semicolon key=value parameters. Applied during resource creation (Step 8). See [Additional Resource Format](#additional-resource-format). |
 
 **Template Placeholder Columns** (any other column):
 
@@ -573,7 +581,7 @@ id,name,asset_id,primary_lan_ip,custom1,custom2
 **Important Notes:**
 - **`id` is the ONLY required column** - without it, the application cannot match routers to CSV rows
 - Special columns are processed by application logic and should NOT be used as `{{placeholders}}` in templates
-- The `name` and `primary_lan_ip` columns are cached during bulk config (Step 4) and reused for site creation (Step 6) and resource creation (Step 7)
+- The `name` and `primary_lan_ip` columns are cached during bulk config (Step 4) and reused for site creation (Step 6) and resource creation (Step 8)
 - If `name` or `primary_lan_ip` are missing, or if the router is not found in CSV, the application falls back to reading values from the device's running configuration
 - All other columns can be referenced as `{{column_name}}` placeholders in your template
 - Tag columns use semicolon delimiters to avoid conflicts with CSV comma separators
@@ -829,14 +837,24 @@ id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags
 - Configure primary and secondary DNS (if custom DNS enabled)
 - Cache site_id for resource creation
 
-#### Step 7: Exchange Resource Provisioning
+#### Step 7: Auto-Created Resource Deletion (Optional)
+- Skipped unless `delete_auto_resources` is enabled in the wizard
+- NCX/NCS automatically creates resources (currently 2) with every new site
+- Lists the resources attached to the newly created site using the cached site_id
+- Retries the lookup for up to 30 seconds, since auto-created resources may not be queryable immediately after site creation
+- Deletes every resource found, with a 2-second delay between deletions
+- Runs before configured resources are created, so only auto-created resources are deleted
+- Skipped if resource provisioning already completed (`prov_state_resources`), which prevents configured resources from being deleted on a re-run
+- Failures are logged and provisioning continues (optional cleanup step)
+
+#### Step 8: Exchange Resource Provisioning
 - Create LAN subnet resource (if enabled)
 - Create FQDN resource for router (if enabled)
 - Create wildcard FQDN resource (if enabled)
 - Apply resource tags as list to all resources (if configured)
 - Uses cached site_id and system_id
 
-#### Step 8: DNS Force Redirect Configuration (Optional)
+#### Step 9: DNS Force Redirect Configuration (Optional)
 - Check global `disable_force_dns` setting from wizard
 - Check per-device `disable_force_dns` from CSV (takes precedence)
 - Wait for VPN tunnel to come up before applying configuration
@@ -845,7 +863,7 @@ id,name,desc,asset_id,custom1,custom2,primary_lan_ip,site_tags,lan_resource_tags
 - Skip if neither setting is true
 - Clean up CSV appdata entry after processing
 
-#### Step 9: Production Group Assignment
+#### Step 10: Production Group Assignment
 - Clean up all provisioning state and cached data
 - Move router to production group
 - Provisioning complete
@@ -873,6 +891,13 @@ Factors affecting duration:
 - Tags are automatically merged and deduplicated
 - Tags must be at least 2 characters long and contain only lowercase letters and numbers
 - Empty tag strings are handled gracefully (no tags applied)
+
+**Auto-Created Resources:**
+- NCX/NCS automatically creates resources (currently 2) whenever a new exchange site is created
+- Enable "Delete Auto-Created Resources" in the wizard (Optional Parameters step) to remove them
+- Deletion runs immediately after site creation and before any configured resources are created, so only the auto-created resources are affected
+- Independent of the resource creation checkboxes: configured LAN, CP host, wildcard, and extra resources are still created afterwards
+- Deletion failures are logged and provisioning continues; re-running provisioning for an existing site does not delete configured resources
 
 **DNS Force Redirect:**
 - Global setting configured in wizard (Optional Parameters step)
@@ -973,6 +998,7 @@ cp.delete_appdata('prov_state_readiness')
 cp.delete_appdata('prov_state_bulk_config')
 cp.delete_appdata('prov_state_license')
 cp.delete_appdata('prov_state_site')
+cp.delete_appdata('prov_state_del_auto_res')
 cp.delete_appdata('prov_state_resources')
 cp.delete_appdata('prov_state_group_move')
 ```
@@ -1078,29 +1104,35 @@ View current provisioning state in NCM:
 *Device logs showing successful provisioning completion (part 2)*
 
 ```
-[Step 1/9] Waiting for system readiness
-[Step 2/9] Building API keys
+[Step 1/10] Waiting for system readiness
+[Step 2/10] Building API keys
 API keys retrieved successfully
-[Step 3/9] Validating readiness
+[Step 3/10] Validating readiness
 Staging and production groups have matching target firmware: 18366
 Router actual firmware (18366) matches target firmware (18366)
-[Step 4/9] Applying bulk configuration
+[Step 4/10] Applying bulk configuration
 Found router 12345 in router_grid.csv
 Successfully patched config to router: 12345
 Stored system_id for site creation: Router-Site-A
-[Step 5/9] Applying licenses
+[Step 5/10] Applying licenses
 Applying Secure Connect license NCX-SCIOT to XX:XX:XX:XX:XX:XX
-[Step 6/9] Creating exchange site
+[Step 6/10] Creating exchange site
 Creating exchange site Router-Site-A on exchange network...
 Site tags: ['tag1', 'tag2']
 Exchange site created successfully: 01ABCDEF123456789
-[Step 7/9] Creating exchange resources
+[Step 7/10] Deleting auto-created exchange resources
+Looking up auto-created resources for site 01ABCDEF123456789
+Found 2 auto-created resource(s) to delete
+  Deleting auto-created resource: Router-Site-A (192.168.1.0/24) [exchange_ipsubnet_resources]
+  Successfully deleted resource: Router-Site-A (192.168.1.0/24) [exchange_ipsubnet_resources]
+Deleted 2 auto-created resource(s) from site 01ABCDEF123456789
+[Step 8/10] Creating exchange resources
 Resource tags: ['tag1', 'tag2']
 Creating LAN resource for 192.168.1.0/24
-[Step 8/9] Configuring DNS force redirect
+[Step 9/10] Configuring DNS force redirect
 Disabling DNS force redirect as specified in CSV
 DNS force redirect disabled successfully
-[Step 9/9] Moving to production group
+[Step 10/10] Moving to production group
 Cleaning up provisioning state and cached data
 Moving to production group 654321
 NCX Self Provisioning Complete - All steps successful
@@ -1108,10 +1140,10 @@ NCX Self Provisioning Complete - All steps successful
 
 #### Failed Provisioning Log Pattern
 ```
-[Step 1/9] Waiting for system readiness
-[Step 2/9] Building API keys
+[Step 1/10] Waiting for system readiness
+[Step 2/10] Building API keys
 API keys retrieved successfully
-[Step 3/9] Validating readiness
+[Step 3/10] Validating readiness
 ERROR: Router group ID (999999) does not match staging group ID (123456)
 ERROR: Readiness validation failed
 FATAL ERROR in main: Readiness validation failed
@@ -1336,6 +1368,16 @@ For issues or questions:
 4. Contact your NCM administrator
 
 ## Version History
+
+### Version 2.9
+- Added optional "Delete Auto-Created Resources" checkbox to wizard Optional Parameters (new `delete_auto_resources` appdata parameter, 23 total)
+- Added provisioning step that deletes the resources NCX/NCS creates automatically with a new site
+- Deletion runs immediately after site creation and before configured resources are provisioned, so only auto-created resources are removed
+- Deletion is skipped when resource provisioning already completed, preventing configured resources from being deleted on a re-run
+- Resource lookup retries for up to 30 seconds since auto-created resources may not be queryable immediately after site creation
+- Deletion failures are logged and provisioning continues (optional cleanup step)
+- Added `prov_state_del_auto_res` state marker with cleanup on completion
+- Updated provisioning to 10 steps; DNS force redirect configuration is now logged as a numbered step (Step 9)
 
 ### Version 2.8
 - Added `extra_ip_resources` CSV column for creating additional exchange IP subnet resources per device

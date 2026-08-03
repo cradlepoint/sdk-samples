@@ -24,6 +24,9 @@ Wizard Steps:
        - Resource creation toggles (LAN subnet, CP host FQDN, wildcard FQDN)
        - CP host and wildcard FQDN checkboxes disabled unless LAN as DNS or
          Custom DNS Servers is enabled (required by NCX API for FQDN resources)
+       - Delete auto-created resources toggle (removes resources created
+         automatically by NCX/NCS for the new site before provisioning
+         the resources selected above)
        - Global Force DNS setting (can be overridden per-device in CSV)
     
     4. Global Tags - Site and resource tagging
@@ -50,15 +53,16 @@ Wizard Steps:
        - Client-side and server-side validation
        - Error display ordered by wizard steps
        - Apply configuration to staging group via NCM API
-       - Sets 22 appdata parameters for self-provisioning app
+       - Sets 23 appdata parameters for self-provisioning app
        - Stores API keys as certificates in staging group
 
 Configuration Applied to Staging Group:
-    - 22 appdata parameters:
+    - 23 appdata parameters:
       * staging_group_id, prod_group_id, exchange_network_id
       * secure_connect_lic, sdwan_lic, hmf_lic, ai_lic
       * lan_as_dns, local_domain, primary_dns, secondary_dns
       * create_lan_resource, create_cp_host_resource, create_wildcard_resource
+      * delete_auto_resources
       * site_tags, lan_resource_tags, cp_host_tags, wildcard_tags
       * self_bulk_config, bulk_config_file, config_template_file
       * disable_force_dns (global setting)
@@ -603,7 +607,7 @@ def validate_configuration(data: Dict[str, Any]) -> tuple:
 
 
 def build_appdata_config(config: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
-    """Build appdata configuration with 22 parameters."""
+    """Build appdata configuration with 23 parameters."""
     appdata_items = [
         {"name": "staging_group_id", "value": str(config['staging_group_id'])},
         {"name": "prod_group_id", "value": str(config['prod_group_id'])},
@@ -627,6 +631,8 @@ def build_appdata_config(config: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
         {"name": "cp_host_tags", "value": config.get('cp_host_tags', '')},
         {"name": "wildcard_tags", "value": config.get('wildcard_tags', '')},
         {"name": "disable_force_dns", "value": str(config.get('disable_force_dns', False))},
+        # New parameters are appended so existing appdata item IDs stay stable
+        {"name": "delete_auto_resources", "value": str(config.get('delete_auto_resources', False))},
     ]
     
     appdata_dict = {}

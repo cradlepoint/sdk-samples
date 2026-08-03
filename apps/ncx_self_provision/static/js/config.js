@@ -1775,6 +1775,7 @@ function collectFormData() {
         create_lan_resource: $('#create-lan-resource').is(':checked'),
         create_cp_host_resource: $('#create-cp-host-resource').is(':checked'),
         create_wildcard_resource: $('#create-wildcard-resource').is(':checked'),
+        delete_auto_resources: $('#delete-auto-resources').is(':checked'),
         disable_force_dns: $('#disable-force-dns').is(':checked'),
         self_bulk_config: $('#self-bulk-config').is(':checked'),
         bulk_config_file: $('#bulk-config-file-upload')[0].files[0] ? $('#bulk-config-file-upload')[0].files[0].name : 'router_grid.csv',
@@ -1823,6 +1824,7 @@ function updateSummary() {
     html += `<div><strong>Create LAN Resource:</strong> ${data.create_lan_resource ? 'Yes' : 'No'}</div>`;
     html += `<div><strong>Create CP Host Resource:</strong> ${data.create_cp_host_resource ? 'Yes' : 'No'}</div>`;
     html += `<div><strong>Create Wildcard Resource:</strong> ${data.create_wildcard_resource ? 'Yes' : 'No'}</div>`;
+    html += `<div><strong>Delete Auto-Created Resources:</strong> ${data.delete_auto_resources ? 'Yes' : 'No'}</div>`;
     html += `<div><strong>Disable Force All DNS Requests to Router:</strong> ${data.disable_force_dns ? 'Yes (can be overridden in CSV)' : 'No'}</div>`;
     html += '</div></div>';
     
