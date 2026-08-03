@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Setup Dev Environment",
+      "description": "Builds .venv, installs requirements, and configures the dev-mode router connection in sdk_settings.ini. Asks for router IP/username/password in chat (skippable).",
+      "trigger": "Manual",
+      "enabled": true,
+      "action": {
+        "type": "agent",
+        "prompt": "Set up this repo so the user can build and deploy NCOS SDK apps by chatting with you.\n\n1. Run the setup script from the repo root, non-interactively:\n   - Mac/Linux: `python3 setup_env.py -y`\n   - Windows: `python setup_env.py -y`\n   If the command is not found, try the other one. This creates `.venv`, installs `requirements.txt`, points the IDE interpreter at `.venv`, and checks the router connection.\n\n2. Report what the script found in a couple of sentences. If it could not create the venv or install dependencies, fix that before continuing.\n\n3. Check the router configuration in `sdk_settings.ini`. If `dev_client_password` is still a placeholder (`mypassword`, `your_password`, empty), or the router check reported bad credentials / no response, ask the user in chat for:\n   - dev-mode router IP address\n   - router username\n   - router password\n   Tell them they can reply \"skip\" and configure it later by editing `sdk_settings.ini` or running `python setup_env.py --configure`. Do not nag if they skip.\n\n4. If they provide the values, write them into the `[sdk]` section of `sdk_settings.ini` using str_replace. Keep the existing `key=value` format (no spaces around `=`). Never echo the password back in your response. Then verify with `.venv/bin/python3 setup_env.py -y` (Mac/Linux) or `.venv\\Scripts\\python setup_env.py -y` (Windows).\n\n5. If the router reports SDK mode `standard` instead of `devmode`, tell the user Developer Mode must be enabled in NetCloud Manager under Tools > Developer Mode Devices. It cannot be enabled from the router's local UI.\n\n6. Finish with a short summary of what is ready and three example things they can ask you to build:\n   - \"Build a web app that shows WAN status and signal strength for all modems\"\n   - \"Create an app that runs a speedtest every hour and logs results to CSV\"\n   - \"Explain how #5GSpeed works\"\n\nKeep it brief. Do not create any files other than the ones setup_env.py creates."
+      }
+    }
+  ]
+}

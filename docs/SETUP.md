@@ -44,18 +44,27 @@
 - Click **Open** when prompted.
 - Click **"Yes, I trust the authors"** when prompted.
 
-### 4. Configure **Developer Mode** Router Connection
+### 4. Run the Setup Dev Environment hook
 
-- **Developer Mode must be enabled in NetCloud Manager** (not in the router UI). Go to the device in NCM and enable SDK Developer Mode under the device settings.
-- Click **Explorer icon** (file folder) in left sidebar OR press `Cmd+Shift+E` / `Ctrl+Shift+E`
-- Navigate to `sdk_settings.ini` in the **file tree**
-- Click to open → Edit these lines:
-  ```ini
-  dev_client_ip=192.168.0.1        # Your router IP
-  dev_client_username=admin         # Router username
-  dev_client_password=your_password # Router password
-  ```
-- Save with `Cmd+S` / `Ctrl+S`
+- Open the **Agent Hooks** panel in the Kiro sidebar and run **Setup Dev Environment**
+  (or type `/setup` in the chat panel).
+- Kiro runs `setup_env.py`, which creates the `.venv` virtual environment and installs
+  all Python dependencies.
+- Kiro then asks for your **dev-mode router IP, username, and password** and saves them
+  to `sdk_settings.ini`. Reply **skip** if you want to do it later.
+- Kiro verifies the router answers and that Developer Mode is on.
+
+**Prefer a terminal?** Open a terminal in the repo folder and run `python3 setup_env.py`
+(macOS) or `python setup_env.py` (Windows). It asks the same questions.
+
+**Developer Mode is enabled in NetCloud Manager, not in the router UI.** In NCM go to
+**Tools > Developer Mode Devices** and add your device. Without it, installs are rejected.
+
+**Your credentials stay local.** `sdk_settings.ini` is git-ignored, so it is never
+committed. It is created for you from `sdk_settings.ini.example` on first run — there is
+nothing to copy. If you cloned this repo before that change, run
+`git rm --cached sdk_settings.ini` once to untrack your local copy (the file and its
+contents stay on disk).
 
 ### 5. Create with Kiro
 
@@ -107,7 +116,10 @@ What API endpoints does #Mobile_Site_Survey use?
 
 | Issue | Solution |
 |-------|----------|
-| Deploy fails | Check `sdk_settings.ini` credentials |
-| `python` not found (Windows) | Reinstall Python with "Add to PATH" checked |
+| Deploy fails | Run `python setup_env.py --configure` to re-enter router IP and credentials |
+| "Developer Mode is NOT enabled" | Add the device in NCM under **Tools > Developer Mode Devices** |
+| "No response from \<ip\>" | Confirm you are on the same network as the router and the IP is right |
+| `python` not found (Windows) | Reinstall Python with "Add to PATH" checked — see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md) |
 | `pip` not found | Run `python -m ensurepip` or reinstall Python |
-| Venv not created | Delete `.venv/`, then run the **Setup Dev Environment** hook again |
+| Venv not created or broken | Delete `.venv/`, then run the **Setup Dev Environment** hook again |
+| Wrong interpreter in the editor | `setup_env.py` sets it; otherwise pick `.venv` via **Python: Select Interpreter** |

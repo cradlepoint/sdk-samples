@@ -50,8 +50,9 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 
 **Prerequisites**
 
-- Python 3.9 or higher — Windows users, see the [Windows Python Setup Guide](WINDOWS_PYTHON_SETUP.md)
+- Python 3.9 or higher — Windows users, see the [Windows Python Setup Guide](docs/WINDOWS_PYTHON_SETUP.md)
 - Git (optional, for cloning the repository)
+- A router with **Developer Mode** enabled in NetCloud Manager (Tools > Developer Mode Devices)
 
 ### 1. Clone and set up
 
@@ -63,7 +64,9 @@ In Kiro, open the Command Palette and select **Git: Clone**, then paste:
 https://github.com/cradlepoint/sdk-samples.git
 ```
 
-Once the repo opens, click the **Setup Dev Environment** hook in the Kiro sidebar. It handles everything automatically.
+Once the repo opens, run the **Setup Dev Environment** hook from the Agent Hooks panel
+(or type `/setup` in chat). Kiro builds the environment, asks for your router details,
+and verifies the connection. Then just describe the app you want — see [docs/SETUP.md](docs/SETUP.md).
 
 #### Manual setup
 
@@ -75,20 +78,37 @@ cd sdk-samples
 **macOS / Linux:**
 
 ```bash
-python3 setup_env.py && source .venv/bin/activate
+python3 setup_env.py
 ```
 
 **Windows:**
 
 ```cmd
-python setup_env.py && .venv\Scripts\activate
+python setup_env.py
 ```
 
-This creates a `.venv` virtual environment, installs all Python dependencies, and activates the venv.
+`setup_env.py` does the whole setup:
 
-### 2. Configure router connection
+- creates the `.venv` virtual environment
+- installs everything in `requirements.txt`
+- prompts for your dev-mode router IP, username, and password and writes them to
+  `sdk_settings.ini` (press Enter or type `skip` to leave it for later)
+- confirms the router is reachable and Developer Mode is on
+- points the IDE's Python interpreter at `.venv`
 
-Edit `sdk_settings.ini` with your dev router's IP and credentials:
+Useful flags:
+
+| Flag | Effect |
+|------|--------|
+| `--configure` | Only update the router settings |
+| `--skip-router` | Only build the venv and install dependencies |
+| `-y` | Never prompt (CI, hooks) |
+| `--quiet` | Print only problems and changes |
+| `--router-ip / --router-username / --router-password` | Set settings without prompting |
+
+### 2. Router connection settings
+
+`setup_env.py` writes these for you. To edit them by hand, open `sdk_settings.ini`:
 
 ```ini
 [sdk]
@@ -96,6 +116,16 @@ app_name=hello_world
 dev_client_ip=192.168.0.1
 dev_client_username=admin
 dev_client_password=your_password
+```
+
+`sdk_settings.ini` holds credentials, so it is **git-ignored and never committed**.
+You do not need to create it: `setup_env.py` and `make.py` both generate it from
+[sdk_settings.ini.example](sdk_settings.ini.example) the first time they run.
+
+If you cloned this repo before the file was git-ignored, untrack your local copy once:
+
+```bash
+git rm --cached sdk_settings.ini
 ```
 
 ---

@@ -1,0 +1,16 @@
+; Template for sdk_settings.ini — your local router connection settings.
+;
+; sdk_settings.ini is NOT tracked by git, so your credentials stay on your
+; machine. It is created automatically the first time you run setup_env.py
+; or make.py, so you do not need to copy this file yourself.
+;
+; To fill it in:  python setup_env.py --configure
+;
+; Developer Mode must be enabled for the router in NetCloud Manager under
+; Tools > Developer Mode Devices. It cannot be enabled from the router UI.
+
+[sdk]
+app_name=app_template
+dev_client_ip=192.168.0.1
+dev_client_username=admin
+dev_client_password=mypassword

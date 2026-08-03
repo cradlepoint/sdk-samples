@@ -24,6 +24,21 @@ Use the project's virtual environment for all commands:
 - Windows: `.venv\Scripts\python make.py ...`
 - Mac/Linux: `.venv/bin/python3 make.py ...`
 
+### Environment setup — use setup_env.py
+
+If `.venv` is missing, imports fail, or `sdk_settings.ini` still has placeholder values,
+run the setup script rather than fixing things by hand:
+- Windows: `python setup_env.py`
+- Mac/Linux: `python3 setup_env.py`
+
+Flags: `-y` (no prompts), `--quiet` (only report problems), `--configure` (router settings
+only), `--skip-router` (venv only), `--no-check` (skip the router connection test),
+`--router-ip/--router-username/--router-password` (set settings without prompting).
+
+`setup_env.py -y` is also the fastest way to verify the router is reachable and in
+Developer Mode before deploying. The **Setup Dev Environment** manual hook and the
+`/setup` steering file both drive this flow.
+
 ## Saved Prompt Shortcuts
 
 - **When user says "rtfm"** - Load `.kiro/steering/rtfm.md` (Read The Fantastic Manual - API verification workflow)
@@ -45,6 +60,9 @@ Do NOT ask the user if they want to deploy — just do it.
 
 - **NEVER make up configuration formats** - always reference actual files like @sdk_settings.ini
 - **ALWAYS check sdk_settings.ini before deploying** - if it contains default password (mypassword), warn the user to update it first
+- **sdk_settings.ini is git-ignored** - it holds router credentials and must never be committed. `setup_env.py` and `make.py` create it automatically from `sdk_settings.ini.example` when missing, so never tell the user to copy the example by hand
+- **NEVER print or echo the router password** in responses or commit messages
+- **Edit sdk_settings.ini in place** - keep the `key=value` format (no spaces around `=`) and only change the `[sdk]` values
 
 ### sdk_settings.ini format:
 ```ini

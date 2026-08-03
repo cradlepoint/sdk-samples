@@ -242,6 +242,10 @@ g_dev_client_username = ''
 g_dev_client_password = ''
 g_python_cmd = 'python3'  # Default for Linux and OS X
 
+# Seconds to wait on router HTTP requests. Without this, an unreachable or
+# wrong IP in sdk_settings.ini hangs with no output.
+REQUEST_TIMEOUT = 10
+
 # Constants for packaging
 META_DATA_FOLDER = 'METADATA'
 CONFIG_FILE = 'package.ini'
@@ -302,7 +306,7 @@ def get_auth():
     device_api = 'https://{}/api/status/product_info'.format(g_dev_client_ip)
 
     try:
-        response = requests.get(device_api, auth=requests.auth.HTTPBasicAuth(g_dev_client_username, g_dev_client_password), verify=False)
+        response = requests.get(device_api, auth=requests.auth.HTTPBasicAuth(g_dev_client_username, g_dev_client_password), verify=False, timeout=REQUEST_TIMEOUT)
         if response.status_code == HTTPStatus.OK:
             use_basic = True
 
@@ -359,14 +363,20 @@ def get(config_tree):
     ncos_api = 'https://{}/api{}'.format(g_dev_client_ip, config_tree)
 
     try:
-        response = requests.get(ncos_api, auth=get_auth(), verify=False)
+        response = requests.get(ncos_api, auth=get_auth(), verify=False, timeout=REQUEST_TIMEOUT)
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
         print("Error with get for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
 
-    return json.dumps(json.loads(response.text), indent=4)
+    try:
+        return json.dumps(json.loads(response.text), indent=4)
+    except (json.JSONDecodeError, TypeError):
+        # Non-JSON reply (e.g. an auth error page) — treat as unreachable.
+        print("Error: unexpected reply from NCOS device at {} (HTTP {}).".format(
+            g_dev_client_ip, response.status_code))
+        return None
 
 
 # Get a list of all the apps in the directory
@@ -422,14 +432,19 @@ def put(value):
                                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                                 auth=get_auth(),
                                 data={"data": '"{} {}"'.format(value, get_app_uuid())},
-                                verify=False)
+                                verify=False, timeout=REQUEST_TIMEOUT)
 
     except (requests.exceptions.Timeout,
             requests.exceptions.ConnectionError) as ex:
         print("Error with put for NCOS device at {}. Exception: {}".format(g_dev_client_ip, ex))
         return None
 
-    return json.dumps(json.loads(response.text), indent=4)
+    try:
+        return json.dumps(json.loads(response.text), indent=4)
+    except (json.JSONDecodeError, TypeError):
+        print("Error: unexpected reply from NCOS device at {} (HTTP {}).".format(
+            g_dev_client_ip, response.status_code))
+        return None
 
 
 # Cleans the SDK directory for a given app by removing files created during packaging.
@@ -1059,6 +1074,53 @@ def get_app_uuid():
     return g_app_uuid
 
 
+def create_settings_file():
+    """Create sdk_settings.ini from sdk_settings.ini.example.
+
+    The file is git-ignored because it holds router credentials, so a fresh
+    clone will not have one. Returns the path, or None if it could not be
+    created.
+    """
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    settings_file = os.path.join(repo_root, 'sdk_settings.ini')
+    example_file = settings_file + '.example'
+
+    contents = ('[sdk]\n'
+                'app_name=app_template\n'
+                'dev_client_ip=192.168.0.1\n'
+                'dev_client_username=admin\n'
+                'dev_client_password=mypassword\n')
+    source = 'defaults'
+    if os.path.isfile(example_file):
+        try:
+            with open(example_file, 'r') as example:
+                contents = example.read()
+            source = 'sdk_settings.ini.example'
+        except OSError:
+            pass
+
+    try:
+        with open(settings_file, 'w') as handle:
+            handle.write(contents)
+    except OSError as ex:
+        print('ERROR: Could not create {}: {}'.format(settings_file, ex))
+        return None
+
+    print('INFO: Created sdk_settings.ini from {}'.format(source))
+    print('      Set your router IP and credentials with:')
+    print('        python setup_env.py --configure')
+    return settings_file
+
+
+def warn_if_unconfigured():
+    """Print a warning when sdk_settings.ini still has placeholder credentials."""
+    placeholders = ('', 'mypassword', 'your_password', 'password', 'changeme')
+    if g_dev_client_password in placeholders:
+        print('\nWARNING: sdk_settings.ini still has a placeholder password.')
+        print('         Set your router credentials with:')
+        print('           python setup_env.py --configure\n')
+
+
 # Setup all the globals based on the OS and the sdk_settings.ini file.
 def init(app=None):
     global g_python_cmd
@@ -1095,6 +1157,13 @@ def init(app=None):
                 settings_file = candidate
                 break
             check_dir = os.path.dirname(check_dir)
+
+    # sdk_settings.ini is not tracked by git because it holds credentials.
+    # Create it from the template so build/clean work on a fresh clone.
+    if not os.path.isfile(settings_file):
+        settings_file = create_settings_file()
+        if settings_file is None:
+            return False
 
     config = configparser.ConfigParser()
     config.read(settings_file)
@@ -1153,6 +1222,9 @@ if __name__ == "__main__":
             sys.exit(0)
         if utility_name not in ['install', 'purge']:
             get_app_uuid()
+        # Commands that talk to the router need real credentials.
+        if utility_name in ['status', 'start', 'stop', 'install', 'uninstall', 'purge', 'deploy']:
+            warn_if_unconfigured()
 
     if utility_name == 'clean':
         if option == 'all':

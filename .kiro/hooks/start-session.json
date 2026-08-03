@@ -4,11 +4,12 @@
     {
       "name": "Check Environment",
       "trigger": "SessionStart",
-      "description": "Runs setup_env.py to ensure .venv exists, then activates it. Works on macOS/Linux and Windows (cmd).",
+      "description": "Runs setup_env.py in quiet mode to make sure .venv exists and dependencies are installed. Silent when everything is already in place. Works on macOS/Linux and Windows.",
       "action": {
         "type": "command",
-        "command": "python3 setup_env.py && source .venv/bin/activate || python setup_env.py && .venv\\Scripts\\activate"
-      }
+        "command": "python setup_env.py --quiet || python3 setup_env.py --quiet"
+      },
+      "timeout": 300
     },
     {
       "name": "Load Steering Files",

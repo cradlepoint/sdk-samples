@@ -8,3 +8,7 @@ built_apps/
 METADATA/
 .vscode/
 docs/ratings.json
+
+# Local router connection settings — holds credentials, never commit.
+# Created automatically from sdk_settings.ini.example by setup_env.py / make.py.
+sdk_settings.ini
