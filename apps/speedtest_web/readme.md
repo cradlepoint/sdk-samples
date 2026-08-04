@@ -52,7 +52,8 @@ Also detects `iperf3` or `iperf3-aarch64` binary names.
 
 ## Web Interface
 
-Access at `http://<router_ip>:8000` from a device on the LAN.
+Access at `http://<router_ip>:8000` from a device on the LAN (default port 8000,
+configurable via the `speedtest_web_port` appdata field).
 
 **Note**: LAN access requires a firewall zone forwarding rule from the Primary LAN Zone
 to the Router Zone.
@@ -90,6 +91,7 @@ All optional. Configuration is done through the web interface.
 
 | Field | Description |
 |-------|-------------|
+| `speedtest_web_port` | Web server port (default: 8000 if unset/invalid) |
 | `speedtest_schedule` | JSON: `{enabled, autostart, cron, engine, params}` |
 | `speedtest_outputs` | JSON array of output paths |
 | `netperf_servers` | JSON array of `{server, label}` objects |

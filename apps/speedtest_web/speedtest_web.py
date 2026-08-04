@@ -14,9 +14,24 @@ from datetime import datetime
 from threading import Thread
 
 # Constants
-PORT = 8000
+DEFAULT_PORT = 8000
 HISTORY_FILE = 'tmp/speedtest_history.json'
 MAX_HISTORY = 100
+
+
+def get_web_port():
+    """Get the web server port from appdata 'speedtest_web_port', falling back
+    to DEFAULT_PORT if unset or invalid. Never writes a default to appdata."""
+    try:
+        val = cp.get_appdata('speedtest_web_port')
+        if val:
+            port = int(val)
+            if 1 <= port <= 65535:
+                return port
+            cp.log(f'Invalid speedtest_web_port value "{val}", using default {DEFAULT_PORT}')
+    except Exception as e:
+        cp.log(f'Error reading speedtest_web_port appdata: {e}')
+    return DEFAULT_PORT
 
 # Global state
 current_test = {
@@ -1419,11 +1434,12 @@ sched_thread.start()
 
 # Start web server
 try:
+    WEB_PORT = get_web_port()
     HTTPServer.allow_reuse_address = True
-    server = HTTPServer(('', PORT), SpeedtestHandler)
+    server = HTTPServer(('', WEB_PORT), SpeedtestHandler)
     server_thread = Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
-    cp.log(f'Web server started on port {PORT}')
+    cp.log(f'Web server started on port {WEB_PORT}')
 except Exception as e:
     cp.log(f'Failed to start web server: {e}')
     sys.exit(1)
