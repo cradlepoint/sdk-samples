@@ -453,6 +453,19 @@
                 });
                 html += '</tbody></table>';
                 html += '<p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.8rem;">' + data.channel_count + ' channels</p>';
+
+                var skipped = data.skipped || [];
+                if (skipped.length) {
+                    html += '<h3 style="margin-top:1.5rem;margin-bottom:0.5rem;">Skipped Paths (no numeric data)</h3>';
+                    html += '<p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:0.5rem;">' +
+                        'These paths resolved but returned non-numeric or empty data, so PRTG cannot chart them as channels.</p>';
+                    html += '<table class="channel-table"><thead><tr><th>Path</th><th>Raw Value</th></tr></thead><tbody>';
+                    skipped.forEach(function(s) {
+                        html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(s.value) + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+
                 $('#preview-channels').html(html);
                 $('#preview-xml').text(data.xml || 'No data');
             }).fail(function() {

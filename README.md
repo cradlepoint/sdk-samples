@@ -54,21 +54,30 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 - Git (optional, for cloning the repository)
 - A router with **Developer Mode** enabled in NetCloud Manager (Tools > Developer Mode Devices)
 
-### 1. Clone and set up
+### 1. Get the code into Kiro
 
-#### Kiro IDE
-
-In Kiro, open the Command Palette and select **Git: Clone**, then paste:
+**Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then paste:
 
 ```
 https://github.com/cradlepoint/sdk-samples.git
 ```
 
-Once the repo opens, run the **Setup Dev Environment** hook from the Agent Hooks panel
+Kiro clones the repo and opens it for you.
+
+**No Git?** Download the repo as a ZIP instead:
+
+1. Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples)
+2. Click the green **Code** button, then **Download ZIP**
+3. Extract the ZIP to a folder on your computer
+4. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and select the extracted `sdk-samples` folder
+
+Once the repo is open in Kiro, run the **Setup Dev Environment** hook from the Agent Hooks panel
 (or type `/setup` in chat). Kiro builds the environment, asks for your router details,
 and verifies the connection. Then just describe the app you want — see [docs/SETUP.md](docs/SETUP.md).
 
-#### Manual setup
+#### Manual setup (terminal)
+
+If you'd rather set things up from a terminal instead of using the Kiro hook:
 
 ```bash
 git clone https://github.com/cradlepoint/sdk-samples.git

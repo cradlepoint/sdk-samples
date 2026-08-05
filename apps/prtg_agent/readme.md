@@ -73,7 +73,19 @@ status/wan/devices/*/diagnostics/SRVC_TYPE
 status/wan/devices/*/diagnostics/MODEMTEMP
 status/wan/devices/*/status/connection_state
 status/wan/devices/*/status/signal_strength
+status/speedtest
 ```
+
+## Special Value Parsing
+
+Some paths return values that aren't plain numbers. These are parsed into numeric channels automatically:
+
+- `status/system/cpu` — `{user, nice, system}` fields are summed into a single `cpu` channel (e.g. `0.23`)
+- `status/wan/devices/*/diagnostics/RFBAND` — the band number is extracted from strings like `"Band 66"` -> `66`
+- `status/speedtest` — parsed into separate `speedtest dl`, `speedtest ul`, `speedtest latency`, and `speedtest jitter` channels (Mbps / ms) from a status string like `"DL:74.91Mbps UL:46.4Mbps Lat:81.39ms Jit:7.84ms Iface:T-Mobile Engine:netperf ..."`
+- `status/wan/devices/*/status/connection_state` — mapped to `1` if `"connected"`, `0` if `"connecting"` or `"disconnected"`. Any other state is skipped rather than guessed at
+
+Any path that resolves but still can't produce a numeric value (e.g. `CARRID`, `SRVC_TYPE`) is shown in the Preview tab under "Skipped Paths" so it's clear why it isn't sent to PRTG.
 
 ## Wildcard Paths
 

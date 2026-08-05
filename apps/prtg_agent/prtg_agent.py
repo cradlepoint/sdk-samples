@@ -43,6 +43,7 @@ DEFAULT_PATHS = [
     'status/wan/devices/*/diagnostics/MODEMTEMP',
     'status/wan/devices/*/status/connection_state',
     'status/wan/devices/*/status/signal_strength',
+    'status/speedtest',
 ]
 
 
@@ -116,25 +117,155 @@ def resolve_wildcard_path(path):
 def collect_data(paths):
     """
     Collect data from all configured paths.
-    Returns list of (channel_name, value, is_float) tuples.
+    Returns (channels, skipped):
+      channels: list of (channel_name, value, is_float) tuples
+      skipped: list of (channel_name, raw_value) tuples for paths that
+               resolved but produced no numeric channel (surfaced in the
+               Preview UI so custom paths aren't silently invisible)
     """
     channels = []
+    skipped = []
     # Cache device friendly names to avoid repeated lookups
     device_names = _get_device_names()
 
     for path in paths:
         try:
             resolved = resolve_wildcard_path(path)
+            if not resolved:
+                skipped.append((path, None))
+                continue
             for resolved_path, value in resolved:
                 # Build a readable channel name from the path
                 channel_name = make_channel_name(resolved_path, device_names)
-                # Skip non-numeric values for PRTG channels (store as text message)
-                numeric_value, is_float = parse_numeric(value)
-                if numeric_value is not None:
-                    channels.append((channel_name, numeric_value, is_float))
+                _extract_channels(channel_name, value, channels, skipped, resolved_path)
         except Exception as e:
             cp.log('Error collecting {}: {}'.format(path, e))
-    return channels
+            skipped.append((path, 'error: {}'.format(e)))
+    return channels, skipped
+
+
+
+# Dict fields that should be summed into a single channel rather than
+# flattened into one channel per sub-key (e.g. cpu {user, nice, system} -> 0.23)
+_CPU_FIELDS = {'user', 'nice', 'system'}
+
+
+def parse_rfband(value):
+    """Extract the numeric band id from an RFBAND string (e.g. 'Band 66' -> 66)."""
+    match = re.search(r'\d+', str(value))
+    if match:
+        return int(match.group())
+    return None
+
+
+def parse_speedtest(value):
+    """
+    Parse a speedtest status string into numeric dl/ul/latency/jitter values.
+    e.g. 'DL:93.61Mbps UL:56.74Mbps Lat:81.39ms Jit:7.84ms Iface:T-Mobile Engine:netperf ...'
+      -> {'dl': 93.61, 'ul': 56.74, 'latency': 81.39, 'jitter': 7.84}
+    """
+    result = {}
+    if not isinstance(value, str):
+        return result
+    field_patterns = {
+        'dl': r'DL:([\d.]+)',
+        'ul': r'UL:([\d.]+)',
+        'latency': r'Lat:([\d.]+)',
+        'jitter': r'Jit:([\d.]+)',
+    }
+    for key, pattern in field_patterns.items():
+        match = re.search(pattern, value)
+        if match:
+            try:
+                result[key] = float(match.group(1))
+            except ValueError:
+                pass
+    return result
+
+
+# Maps connection_state text to a numeric value for PRTG (1 = connected, 0 = anything else)
+_CONNECTION_STATE_MAP = {
+    'connected': 1,
+    'connecting': 0,
+    'disconnected': 0,
+}
+
+
+def _extract_channels(channel_name, value, channels, skipped, resolved_path=''):
+    """
+    Append numeric channel(s) derived from value to channels, or record it
+    in skipped if no numeric data could be extracted. CPU usage
+    (user/nice/system) is combined into a single total channel. RFBAND
+    strings ('Band 66') are reduced to the band number. The speedtest status
+    string is parsed into separate dl/ul channels. Other dict values are
+    flattened one level into per-field sub-channels.
+    """
+    leaf = resolved_path.rsplit('/', 1)[-1] if resolved_path else ''
+
+    if leaf == 'RFBAND':
+        band_num = parse_rfband(value)
+        if band_num is not None:
+            channels.append((channel_name, band_num, False))
+        else:
+            skipped.append((channel_name, value))
+        return
+
+    if leaf == 'speedtest':
+        speed = parse_speedtest(value)
+        if speed:
+            for key in ('dl', 'ul', 'latency', 'jitter'):
+                if key in speed:
+                    channels.append((key, speed[key], True))
+        else:
+            skipped.append((channel_name, value))
+        return
+
+    if leaf == 'connection_state':
+        state_value = _CONNECTION_STATE_MAP.get(str(value).strip().lower())
+        if state_value is not None:
+            channels.append((channel_name, state_value, False))
+        else:
+            skipped.append((channel_name, value))
+        return
+
+    if isinstance(value, dict):
+        if set(value.keys()) & _CPU_FIELDS:
+            total = 0.0
+            found_numeric = False
+            for sub_value in value.values():
+                numeric_value, _ = parse_numeric(sub_value)
+                if numeric_value is not None:
+                    total += numeric_value
+                    found_numeric = True
+            if found_numeric:
+                channels.append((channel_name, round(total, 4), True))
+            else:
+                skipped.append((channel_name, value))
+            return
+
+        found_numeric = False
+        for sub_key, sub_value in value.items():
+            numeric_value, is_float = parse_numeric(sub_value)
+            if numeric_value is not None:
+                channels.append(('{} {}'.format(channel_name, sub_key), numeric_value, is_float))
+                found_numeric = True
+        if not found_numeric:
+            skipped.append((channel_name, value))
+        return
+
+    numeric_value, is_float = parse_numeric(value)
+    if numeric_value is not None:
+        channels.append((channel_name, numeric_value, is_float))
+    else:
+        skipped.append((channel_name, value))
+
+
+def _stringify_skip(value):
+    """Format a skipped raw value for display, truncated to a safe length."""
+    if value is None:
+        return '(no data)'
+    text = str(value)
+    return text if len(text) <= 200 else text[:200] + '...'
 
 
 def _get_device_names():
@@ -230,6 +361,8 @@ def get_unit_for_channel(channel_name):
         return 'TimeSeconds'
     if 'signal' in name_lower or 'ss' == name_lower.split()[-1]:
         return 'Percent'
+    if name_lower.endswith(' latency') or name_lower.endswith(' jitter'):
+        return 'TimeResponse'
     return 'Custom'
 
 
@@ -242,6 +375,12 @@ def get_custom_unit(channel_name):
         return 'dB'
     if 'sinr' in name_lower:
         return 'dB'
+    if name_lower.endswith(' dl') or name_lower.endswith(' ul'):
+        return 'Mbps'
+    if name_lower.endswith(' rfband'):
+        return 'Band'
+    if name_lower.endswith(' connection_state'):
+        return 'State'
     return ''
 
 
@@ -455,10 +594,11 @@ class PRTGAgentHandler(http.server.BaseHTTPRequestHandler):
         except (json.JSONDecodeError, TypeError):
             paths = DEFAULT_PATHS
 
-        channels = collect_data(paths)
+        channels, skipped = collect_data(paths)
         xml = build_prtg_xml(channels, 'Preview data collection')
         preview = {
             'channels': [{'name': c[0], 'value': c[1], 'float': c[2]} for c in channels],
+            'skipped': [{'name': s[0], 'value': _stringify_skip(s[1])} for s in skipped],
             'xml': xml,
             'channel_count': len(channels),
         }
@@ -503,7 +643,7 @@ class PRTGAgentHandler(http.server.BaseHTTPRequestHandler):
             except (json.JSONDecodeError, TypeError):
                 paths = DEFAULT_PATHS
 
-            channels = collect_data(paths)
+            channels, _skipped = collect_data(paths)
             if not channels:
                 self._send_json({'success': False, 'message': 'No data collected'})
                 return
@@ -551,7 +691,10 @@ def data_collection_loop():
                 except (json.JSONDecodeError, TypeError):
                     paths = DEFAULT_PATHS
 
-                channels = collect_data(paths)
+                channels, skipped = collect_data(paths)
+                if skipped:
+                    cp.log('Paths with no numeric data: {}'.format(
+                        ', '.join(s[0] for s in skipped)))
                 if channels:
                     xml = build_prtg_xml(channels, '{} channels'.format(len(channels)))
                     success = push_to_prtg(xml, config)
@@ -595,12 +738,8 @@ def start_web_server():
     app_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(app_dir)
 
-<<<<<<< HEAD
-    server = NoFQDNHTTPServer(('0.0.0.0', WEB_PORT), PRTGAgentHandler)
-=======
     server = http.server.HTTPServer(('0.0.0.0', WEB_PORT), PRTGAgentHandler)
     server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
->>>>>>> ade2e1280bf207720cdc746c514d51dfc282bc81
     cp.log('Web server started on port {}'.format(WEB_PORT))
     server.serve_forever()
 
