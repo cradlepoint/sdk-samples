@@ -158,7 +158,7 @@ class ResultsHandler(tornado.web.RequestHandler):
     def get(self):
         try:
             files = os.listdir("./results")
-            url = self.request.full_url().replace('http://aoobm-haproxy', 'https://aoobm-haproxy').replace('?', '')
+            url = self.request.full_url().replace('http://aoobm-cp-connector', 'https://aoobm-cp-connector').replace('?', '')
             files_paths = sorted([f"{url}/{f}" for f in files])
             self.render("template.html", items=files_paths)
         except Exception as e:
@@ -290,8 +290,6 @@ class Dispatcher:
 
     def _run_tests_on_modems(self):
         if self.modems:
-            routing_policies = cp.get('config/routing/policies')
-            routing_tables = cp.get('config/routing/tables')
             with concurrent.futures.ThreadPoolExecutor(len(self.modems)) as executor:
                 executor.map(run_tests, self.modems)
             # Format UTC timestamp for display
@@ -299,10 +297,12 @@ class Dispatcher:
             pretty_lat = '{:.6f}'.format(float(self.lat)) if self.lat is not None else '0.000000'
             pretty_lon = '{:.6f}'.format(float(self.long)) if self.long is not None else '0.000000'
             # Title will be added with the detailed results in run_tests function
-
-            cp.put('config/routing/policies', routing_policies)
-            cp.put('config/routing/tables', routing_tables)
-            cleanup_mss_routing()
+            # NOTE: Per-modem routing (created by source_route()) is intentionally left in
+            # place across survey cycles instead of being torn down and recreated every run.
+            # It's idempotent (see source_route()), so repeated cycles don't rewrite
+            # config/routing/* unless something actually changed. Rewriting config/ on every
+            # cycle was causing constant NCM config syncs. Cleanup of stale MSS routing
+            # entries happens once at startup via initialize_routing().
 
 class Surveyor:
     """Sends HTTP Requests to remote router"""
@@ -657,7 +657,8 @@ def source_route(sim):
     Returns source IP of sim."""
     try:
         source_ip = cp.get(f'status/wan/devices/{sim}/status/ipinfo/ip_address')
-        cp.put('config/routing/policies/0/priority', 10)
+        if cp.get('config/routing/policies/0/priority') != 10:
+            cp.put('config/routing/policies/0/priority', 10)
         
         # First, prepare the desired route table definition
         route_table = {
@@ -712,10 +713,15 @@ def source_route(sim):
                 existing_policy_id = policy.get("_id_")
                 break
 
-        # If policy exists, update it; if not, create it
+        # If policy exists, update it only if something changed; if not, create it
         if existing_policy_id:
-            cp.put(f'config/routing/policies/{existing_policy_id}', route_policy)
-            time.sleep(1)
+            existing_policy = next((p for p in route_policies if p.get("_id_") == existing_policy_id), None)
+            needs_update = not existing_policy or any(
+                existing_policy.get(k) != v for k, v in route_policy.items()
+            )
+            if needs_update:
+                cp.put(f'config/routing/policies/{existing_policy_id}', route_policy)
+                time.sleep(1)
         else:
             cp.post('config/routing/policies/', route_policy)
             time.sleep(1)
