@@ -1,5 +1,20 @@
 # Cradlepoint SDK Documentation
 
+## Getting the Code
+
+**Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then paste:
+
+```
+https://github.com/cradlepoint/sdk-samples.git
+```
+
+**No Git?** Download the repo as a ZIP instead:
+
+1. Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples)
+2. Click the green **Code** button, then **Download ZIP**
+3. Extract the ZIP to a folder on your computer
+4. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and select the extracted `sdk-samples` folder
+
 ## Quick Start
 - **[SETUP.md](SETUP.md)** - Setup Kiro
 - **[NCOS_SDK_Developer_Manual.md](NCOS_SDK_Developer_Manual.md)** - Complete SDK developer manual

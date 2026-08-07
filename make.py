@@ -583,6 +583,92 @@ def create_signature(meta_data_folder, pkey):
             sf.write(checksum)
 
 
+def verify_manifest_signature(app_metadata_folder, pkey):
+    """Recompute the SHA-256 checksum of MANIFEST.json and confirm it matches
+    what is stored in SIGNATURE.DS (or that the signature verifies against
+    the key, if the manifest was signed).
+
+    Returns True if the signature is valid, False otherwise.
+    """
+    manifest_file = os.path.join(app_metadata_folder, MANIFEST_FILE)
+    signature_file = os.path.join(app_metadata_folder, SIGNATURE_FILE)
+
+    if not os.path.isfile(manifest_file) or not os.path.isfile(signature_file):
+        print('ERROR: MANIFEST.json or SIGNATURE.DS is missing from {}'.format(app_metadata_folder))
+        return False
+
+    checksum = file_checksum(hashlib.sha256, manifest_file).encode('utf-8')
+
+    with open(signature_file, 'rb') as sf:
+        signature_data = sf.read()
+
+    if pkey:
+        try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            with open(pkey, 'rb') as kf:
+                private_key = serialization.load_pem_private_key(kf.read(), password=None)
+            public_key = private_key.public_key()
+            public_key.verify(signature_data, checksum, padding.PKCS1v15(), hashes.SHA256())
+            return True
+        except ImportError:
+            # 'cryptography' wasn't available when the signature was created,
+            # so it was written as a plain checksum instead.
+            return signature_data == checksum
+        except Exception as err:
+            print('ERROR: SIGNATURE.DS does not verify against MANIFEST.json: {}'.format(err))
+            return False
+    else:
+        if signature_data != checksum:
+            print('ERROR: SIGNATURE.DS checksum does not match MANIFEST.json contents.')
+            return False
+        return True
+
+
+def verify_manifest_files(app_root, app_manifest_file, ignored_files=None, ignored_dirs=None):
+    """Recompute checksums for every packaged file and compare them against
+    the 'files' entry recorded in MANIFEST.json. Catches stale/corrupted
+    METADATA content that would otherwise be packaged as-is and rejected by
+    NCM on upload.
+
+    Returns True if every recorded hash matches the file on disk, False
+    otherwise.
+    """
+    try:
+        with open(app_manifest_file, 'r') as f:
+            manifest_data = json.load(f)
+    except (OSError, json.JSONDecodeError) as err:
+        print('ERROR: Could not read MANIFEST.json for verification: {}'.format(err))
+        return False
+
+    recorded_files = manifest_data.get('app', {}).get('files', {})
+
+    if ignored_files is None or ignored_dirs is None:
+        ignored_files, ignored_dirs = parse_ignore_file(app_root)
+
+    # MANIFEST.json is written after files are hashed, so the METADATA
+    # folder itself must be excluded to match what was originally hashed.
+    verify_ignored_dirs = set(ignored_dirs) | {META_DATA_FOLDER}
+    current_files = hash_dir(app_root, ignored_files=ignored_files, ignored_dirs=verify_ignored_dirs)
+
+    if recorded_files == current_files:
+        return True
+
+    missing = sorted(set(recorded_files) - set(current_files))
+    extra = sorted(set(current_files) - set(recorded_files))
+    changed = sorted(
+        fl for fl in (set(recorded_files) & set(current_files))
+        if recorded_files[fl] != current_files[fl]
+    )
+    if missing:
+        print('ERROR: Files listed in MANIFEST.json are missing from the app: {}'.format(missing))
+    if extra:
+        print('ERROR: Files in the app are not listed in MANIFEST.json: {}'.format(extra))
+    if changed:
+        print('ERROR: File checksums no longer match MANIFEST.json: {}'.format(changed))
+    return False
+
+
 def clean_manifest_folder(app_metadata_folder):
     path, dirs, files = next(os.walk(app_metadata_folder))
 
@@ -613,12 +699,9 @@ def package_application(app_root, pkey):
     if not os.path.exists(app_metadata_folder):
         os.makedirs(app_metadata_folder)
 
-    for section in config.sections():
-        app_name = section
-        # Case-insensitive match between folder name and section name
-        if os.path.basename(app_root).lower() != app_name.lower():
-            continue
-
+    def build_manifest_and_signature(section):
+        """Build MANIFEST.json and SIGNATURE.DS for the given package.ini
+        section. Returns the 'app' dict that was written to the manifest."""
         clean_manifest_folder(app_metadata_folder)
 
         clean_bytecode_files(app_root)
@@ -664,10 +747,43 @@ def package_application(app_root, pkey):
 
         create_signature(app_metadata_folder, pkey)
 
+        return app, ignored_files, ignored_dirs
+
+    for section in config.sections():
+        app_name = section
+        # Case-insensitive match between folder name and section name
+        if os.path.basename(app_root).lower() != app_name.lower():
+            continue
+
+        app, ignored_files, ignored_dirs = build_manifest_and_signature(section)
+
+        # Verify the signature and file hashes we just wrote actually match
+        # the manifest and the files on disk. A stale/corrupted METADATA
+        # folder produces a package NCM will reject on upload, so rebuild
+        # once from scratch before giving up.
+        verified = (verify_manifest_signature(app_metadata_folder, pkey)
+                    and verify_manifest_files(app_root, app_manifest_file, ignored_files, ignored_dirs))
+
+        if not verified:
+            print('WARNING: MANIFEST/SIGNATURE verification failed for {}. '
+                  'Rebuilding METADATA from scratch...'.format(os.path.basename(app_root)))
+            app, ignored_files, ignored_dirs = build_manifest_and_signature(section)
+            verified = (verify_manifest_signature(app_metadata_folder, pkey)
+                        and verify_manifest_files(app_root, app_manifest_file, ignored_files, ignored_dirs))
+
+        if not verified:
+            print('ERROR: Could not produce a valid MANIFEST.json/SIGNATURE.DS for {}. '
+                  'Package was NOT created.'.format(os.path.basename(app_root)))
+            return False
+
         app_name_version = f"{os.path.basename(app_root)} v{app['version_major']}.{app['version_minor']}.{app['version_patch']}"
         pack_package(app_root, app_name_version, ignored_files=ignored_files, ignored_dirs=ignored_dirs)
 
         print(f'Package {app_name_version}.tar.gz created')
+        print('MANIFEST.json and SIGNATURE.DS verified.')
+        return True
+
+    return False
 
 
 # Package the app files into a tar.gz archive.
@@ -711,8 +827,7 @@ def package(app=None):
     setup_script(app_path)
 
     try:
-        package_application(app_path, None)
-        return True
+        return package_application(app_path, None)
     except Exception as err:
         print('Error packaging {}: {}'.format(actual_app_name, err))
         return False
@@ -726,7 +841,8 @@ def package_all():
     app_dirs = get_app_list()
 
     for app in app_dirs:
-        package(app)
+        if not package(app):
+            success = False
 
     return success
 
