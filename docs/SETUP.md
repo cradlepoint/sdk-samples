@@ -44,18 +44,23 @@
 - Click **Open** when prompted.
 - Click **"Yes, I trust the authors"** when prompted.
 
-### 4. Run the Setup Dev Environment hook
+### 4. Open the chat panel — setup runs itself
 
-- Open the **Agent Hooks** panel in the Kiro sidebar and run **Setup Dev Environment**
-  (or type `/setup` in the chat panel).
-- Kiro runs `setup_env.py`, which creates the `.venv` virtual environment and installs
-  all Python dependencies.
-- Kiro then asks for your **dev-mode router IP, username, and password** and saves them
-  to `sdk_settings.ini`. Reply **skip** if you want to do it later.
-- Kiro verifies the router answers and that Developer Mode is on.
+- Open the Kiro chat panel from the sidebar. Nothing to click and nothing to run.
+- On the first session, Kiro creates the `.venv` virtual environment, installs all Python
+  dependencies, and points the editor's interpreter at `.venv`. This takes a minute the
+  first time and under a second after that.
+- Kiro then asks for your **dev-mode router IP, username, and password** and saves them to
+  `sdk_settings.ini`. Reply **skip** if you want to do it later.
+- If anything goes wrong (no Python installed, no internet, blocked by a proxy), Kiro says
+  so in chat in plain language instead of failing silently.
+
+**Want to re-run setup later?** Type `/setup` in chat, or run the **Setup Dev Environment**
+hook from the Agent Hooks panel. Both do the full pass, including the router connection and
+Developer Mode check.
 
 **Prefer a terminal?** Open a terminal in the repo folder and run `python3 setup_env.py`
-(macOS) or `python setup_env.py` (Windows). It asks the same questions.
+(macOS/Linux) or `python setup_env.py` (Windows). It asks the same questions.
 
 **Developer Mode is enabled in NetCloud Manager, not in the router UI.** In NCM go to
 **Tools > Developer Mode Devices** and add your device. Without it, installs are rejected.
@@ -121,5 +126,5 @@ What API endpoints does #Mobile_Site_Survey use?
 | "No response from \<ip\>" | Confirm you are on the same network as the router and the IP is right |
 | `python` not found (Windows) | Reinstall Python with "Add to PATH" checked — see [WINDOWS_PYTHON_SETUP.md](WINDOWS_PYTHON_SETUP.md) |
 | `pip` not found | Run `python -m ensurepip` or reinstall Python |
-| Venv not created or broken | Delete `.venv/`, then run the **Setup Dev Environment** hook again |
+| Venv not created or broken | Delete `.venv/`, then start a new chat session (or type `/setup`) — Kiro rebuilds it |
 | Wrong interpreter in the editor | `setup_env.py` sets it; otherwise pick `.venv` via **Python: Select Interpreter** |

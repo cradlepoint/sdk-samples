@@ -71,13 +71,14 @@ Kiro clones the repo and opens it for you.
 3. Extract the ZIP to a folder on your computer
 4. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and select the extracted `sdk-samples` folder
 
-Once the repo is open in Kiro, run the **Setup Dev Environment** hook from the Agent Hooks panel
-(or type `/setup` in chat). Kiro builds the environment, asks for your router details,
-and verifies the connection. Then just describe the app you want — see [docs/SETUP.md](docs/SETUP.md).
+Once the repo is open in Kiro, open the chat panel — that's it. Kiro builds the `.venv`
+environment and installs dependencies automatically the first time a session starts, then
+asks in chat for your router details. Nothing to click. Then just describe the app you want —
+see [docs/SETUP.md](docs/SETUP.md).
 
 #### Manual setup (terminal)
 
-If you'd rather set things up from a terminal instead of using the Kiro hook:
+If you'd rather set things up from a terminal instead of letting Kiro do it:
 
 ```bash
 git clone https://github.com/cradlepoint/sdk-samples.git
@@ -113,6 +114,7 @@ Useful flags:
 | `--skip-router` | Only build the venv and install dependencies |
 | `-y` | Never prompt (CI, hooks) |
 | `--quiet` | Print only problems and changes |
+| `--hook` | Session-start mode used by Kiro: fixes the environment, prints one status line, always exits 0 |
 | `--router-ip / --router-username / --router-password` | Set settings without prompting |
 
 ### 2. Router connection settings

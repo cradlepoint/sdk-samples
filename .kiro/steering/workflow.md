@@ -39,6 +39,20 @@ only), `--skip-router` (venv only), `--no-check` (skip the router connection tes
 Developer Mode before deploying. The **Setup Dev Environment** manual hook and the
 `/setup` steering file both drive this flow.
 
+### Session-start environment check
+
+The **Check Environment** session-start hook runs `setup_env.py --hook`, which creates
+`.venv` and installs `requirements.txt` when they are missing. Read its output before
+touching the environment:
+
+- `kiro-env: ready ...` — everything is in place. Do NOT run `setup_env.py` again.
+- `kiro-env: PROBLEM — ...` — setup could not finish. Follow the `KIRO —` line in the same
+  output and tell the user in plain language. Do not try to build or deploy until it is fixed.
+- No `kiro-env:` line at all — Python is missing entirely, or the hook did not run.
+- Lines like `python: command not found` or a Microsoft Store message ahead of the
+  `kiro-env:` line are the interpreter probe (`python3`, then `python`, then `py -3`).
+  Ignore them; only the `kiro-env:` lines are meaningful.
+
 ## Saved Prompt Shortcuts
 
 - **When user says "rtfm"** - Load `.kiro/steering/rtfm.md` (Read The Fantastic Manual - API verification workflow)

@@ -4,12 +4,12 @@
     {
       "name": "Check Environment",
       "trigger": "SessionStart",
-      "description": "Runs setup_env.py in quiet mode to make sure .venv exists and dependencies are installed. Silent when everything is already in place. Works on macOS/Linux and Windows.",
+      "description": "Creates .venv and installs dependencies if they are missing, then reports a one-line kiro-env: status. Tries python3, python, then py -3 so it works on macOS, Linux, and Windows 11. Always exits 0; problems are reported as kiro-env: PROBLEM lines.",
       "action": {
         "type": "command",
-        "command": "python setup_env.py --quiet || python3 setup_env.py --quiet"
+        "command": "python3 setup_env.py --hook || python setup_env.py --hook || py -3 setup_env.py --hook || echo kiro-env: PROBLEM - no Python interpreter was found on PATH. KIRO - tell the user to install Python from https://www.python.org/downloads/ - on Windows they must check Add python.exe to PATH during install - then reopen Kiro. Do not try to build or deploy apps until then."
       },
-      "timeout": 300
+      "timeout": 600
     },
     {
       "name": "Load Steering Files",

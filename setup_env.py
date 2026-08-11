@@ -25,6 +25,7 @@ Usage:
     python3 setup_env.py --skip-router  # only build the venv
     python3 setup_env.py -y             # never prompt (CI / hooks)
     python3 setup_env.py --quiet        # only report problems / changes
+    python3 setup_env.py --hook         # Kiro session-start mode (see run_hook)
     python3 setup_env.py --router-ip 192.168.0.1 --router-username admin \
         --router-password secret
 """
@@ -130,32 +131,43 @@ print('RESULT ' + json.dumps(result))
 
 
 class Out(object):
-    """Console output that can be muted for hook/quiet runs."""
+    """Console output that can be muted for hook/quiet runs.
 
-    def __init__(self, quiet):
+    Every message is also recorded in `self.log` as (level, text) so hook mode
+    can decide what to surface instead of printing as it goes.
+    """
+
+    def __init__(self, quiet, capture=False):
         self.quiet = quiet
+        self.capture = capture
+        self.log = []
+
+    def _emit(self, level, text, formatted, always=False):
+        self.log.append((level, text))
+        if self.capture:
+            return
+        if always or not self.quiet:
+            print(formatted)
 
     def step(self, message):
-        if not self.quiet:
-            print('\n== {} =='.format(message))
+        self._emit('step', message, '\n== {} =='.format(message))
 
     def say(self, message=''):
-        if not self.quiet:
-            print(message)
+        self._emit('say', message, message)
 
     def ok(self, message):
-        self.say('   [ok] {}'.format(message))
+        self._emit('ok', message, '   [ok] {}'.format(message))
 
     def change(self, message):
         # Something was actually modified — always worth reporting.
-        print('   [ok] {}'.format(message))
+        self._emit('change', message, '   [ok] {}'.format(message), always=True)
 
     def warn(self, message):
         # Warnings are always shown, even in quiet mode.
-        print('   [!] {}'.format(message))
+        self._emit('warn', message, '   [!] {}'.format(message), always=True)
 
     def fail(self, message):
-        print('   [X] {}'.format(message))
+        self._emit('fail', message, '   [X] {}'.format(message), always=True)
 
 
 def run(cmd, out, capture=False, env=None):
@@ -265,11 +277,14 @@ def required_imports():
 
 
 def ensure_dependencies(python_exe, out, force=False):
-    """Install requirements.txt into the venv if anything is missing."""
+    """Install requirements.txt into the venv if anything is missing.
+
+    Returns (ok, installed) — `installed` is True only when pip actually ran.
+    """
     out.step('Dependencies')
     if not os.path.isfile(REQUIREMENTS_FILE):
         out.warn('No requirements.txt found — skipping dependency install.')
-        return True
+        return True, False
 
     imports = required_imports()
     check = 'import ' + ', '.join(imports) if imports else 'pass'
@@ -278,7 +293,7 @@ def ensure_dependencies(python_exe, out, force=False):
         code, _ = run([python_exe, '-c', check], out, capture=True)
         if code == 0:
             out.ok('All dependencies present ({})'.format(', '.join(imports)))
-            return True
+            return True, False
 
     out.say('   Installing from requirements.txt ...')
     run([python_exe, '-m', 'pip', 'install', '--upgrade', 'pip',
@@ -290,16 +305,16 @@ def ensure_dependencies(python_exe, out, force=False):
         if text:
             out.say(text.strip()[-2000:])
         out.say('       Check your internet connection or proxy settings and re-run.')
-        return False
+        return False, False
 
     if imports:
         code, text = run([python_exe, '-c', check], out, capture=True)
         if code != 0:
             out.fail('Dependencies installed but not importable:')
             out.say(text.strip())
-            return False
+            return False, True
     out.change('Dependencies installed')
-    return True
+    return True, True
 
 
 # -------------------------------------------------------------- settings
@@ -654,6 +669,137 @@ def print_next_steps(python_exe, values, out):
         out.say('  python setup_env.py --configure')
 
 
+# ------------------------------------------------------------- hook mode
+
+HOOK_PREFIX = 'kiro-env:'
+
+# Appended to the first line so Kiro ignores interpreter-probe noise. The Kiro
+# session-start hook tries python3, then python, then py -3; on Windows the
+# first miss can print a Microsoft Store message before this script even runs.
+IGNORE_NOTE = ('Ignore any Python interpreter messages printed above this line - they '
+               'are from the interpreter probe, not a real problem.')
+
+ROUTER_ASK = (
+    'KIRO - the dev-mode router is not configured, so deploys will fail. Ask the user '
+    'in chat for their router IP address, username, and password, and tell them they '
+    'can reply "skip" and set it up later. Write the answers into the [sdk] section of '
+    'sdk_settings.ini with str_replace, keeping key=value with no spaces around "=". '
+    'Never repeat the password back. Then verify with `{launcher} setup_env.py -y`. '
+    'If they skip, do not ask again this session. If their first message is already a '
+    'request, do that first and ask before the first deploy.')
+
+
+def hook_say(message):
+    """Print one hook line, degrading gracefully on limited console encodings.
+
+    Windows consoles may use an OEM code page that cannot represent characters
+    from captured pip output. A UnicodeEncodeError here would exit non-zero and
+    make the hook's `||` chain re-run setup with the next interpreter.
+    """
+    text = '{} {}'.format(HOOK_PREFIX, message)
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, 'encoding', None) or 'ascii'
+        print(text.encode(encoding, 'replace').decode(encoding, 'replace'))
+    except Exception:
+        pass
+
+
+def hook_details(out, limit=8):
+    """Echo the captured failure detail from the last phase, indented."""
+    lines = []
+    for level, text in out.log:
+        if level in ('fail', 'say', 'warn') and text.strip():
+            lines.extend(text.strip().splitlines())
+    for line in lines[-limit:]:
+        hook_say('  {}'.format(line.strip()))
+
+
+def run_hook():
+    """Session-start mode for the Kiro "Check Environment" hook.
+
+    Makes the environment usable (creates .venv and installs requirements the
+    first time) and prints a handful of `kiro-env:` lines describing the result.
+    Silent about everything else so it does not fill the chat context.
+
+    Always returns 0. The hook command chains interpreters with `||`, so a
+    non-zero exit here would make the shell re-run setup with the next
+    interpreter instead of reporting the real problem.
+    """
+    out = Out(quiet=True, capture=True)
+
+    if not check_python(out):
+        hook_say('PROBLEM - Python {} is too old for this repo.'.format(
+            sys.version.split()[0]))
+        hook_say('KIRO - tell the user to install Python {}.{} or newer from '
+                 'https://www.python.org/downloads/ (on Windows, check "Add python.exe '
+                 'to PATH"), then reopen Kiro. Do not try to build or deploy until '
+                 'then.'.format(MIN_PYTHON[0], MIN_PYTHON[1]))
+        return 0
+
+    first_run = venv_python() is None
+    out.log = []
+    python_exe = ensure_venv(out)
+    if not python_exe:
+        hook_say('PROBLEM - could not create the .venv virtual environment. {}'.format(
+            IGNORE_NOTE))
+        hook_details(out)
+        hook_say('KIRO - explain the failure to the user in plain language and offer to '
+                 'retry. On Debian/Ubuntu it usually means "sudo apt install python3-venv" '
+                 'is needed. Building or deploying apps will not work until .venv exists.')
+        return 0
+
+    launcher = os.path.relpath(python_exe, REPO_ROOT)
+
+    out.log = []
+    deps_ok, deps_installed = ensure_dependencies(python_exe, out)
+    if not deps_ok:
+        hook_say('PROBLEM - .venv exists but installing requirements.txt failed. '
+                 '{}'.format(IGNORE_NOTE))
+        hook_details(out)
+        hook_say('KIRO - tell the user dependency installation failed (usually no '
+                 'internet access or a corporate proxy) and offer to retry with '
+                 '`{} setup_env.py -y`.'.format(launcher))
+        return 0
+
+    configure_ide(python_exe, out)
+
+    out.log = []
+    settings_ok = ensure_settings_file(out)
+    if not settings_ok:
+        hook_say('PROBLEM - could not create sdk_settings.ini. {}'.format(IGNORE_NOTE))
+        hook_details(out)
+        return 0
+
+    values = read_settings()
+    configured = is_configured(values)
+
+    if first_run:
+        state = 'first-time setup done - created .venv and installed dependencies'
+    elif deps_installed:
+        state = 'installed missing dependencies into .venv'
+    else:
+        state = 'ready - .venv and dependencies are in place'
+
+    if configured:
+        hook_say('{}; router {}@{} configured in sdk_settings.ini. No setup action '
+                 'needed - do not run setup_env.py. {}'.format(
+                     state, values['dev_client_username'], values['dev_client_ip'],
+                     IGNORE_NOTE))
+    else:
+        hook_say('{}. {}'.format(state, IGNORE_NOTE))
+        hook_say(ROUTER_ASK.format(launcher=launcher))
+
+    out.log = []
+    check_git_tracking(out)
+    for level, text in out.log:
+        if level in ('warn', 'fail'):
+            hook_say('NOTE - {}'.format(' '.join(text.split())))
+
+    return 0
+
+
 # ------------------------------------------------------------------ main
 
 
@@ -664,6 +810,9 @@ def parse_args(argv):
                         help='never prompt for input')
     parser.add_argument('--quiet', action='store_true',
                         help='only print problems and changes (implies -y)')
+    parser.add_argument('--hook', action='store_true',
+                        help='Kiro session-start mode: fix the environment, print a '
+                             'short kiro-env: status, always exit 0')
     parser.add_argument('--configure', action='store_true',
                         help='only configure the router settings')
     parser.add_argument('--skip-router', action='store_true',
@@ -681,6 +830,8 @@ def parse_args(argv):
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.hook:
+        return run_hook()
     out = Out(args.quiet)
     interactive = not (args.non_interactive or args.quiet)
     if interactive and not (sys.stdin and sys.stdin.isatty()):
@@ -699,7 +850,8 @@ def main(argv=None):
         python_exe = ensure_venv(out)
         if not python_exe:
             return 1
-        if not ensure_dependencies(python_exe, out, force=args.force_install):
+        deps_ok, _ = ensure_dependencies(python_exe, out, force=args.force_install)
+        if not deps_ok:
             return 1
         configure_ide(python_exe, out)
 

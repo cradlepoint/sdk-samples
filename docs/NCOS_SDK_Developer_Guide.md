@@ -543,6 +543,147 @@ cp.delete_appdata(name) -> None
 
 See [Section 11](#11-application-data-appdata) for full details.
 
+### 4.25 Direct API Access and the status/config/control Tree
+
+The cp.py helpers in this section wrap a smaller set of underlying API trees. When a helper doesn't exist for what you need, or you need more detail than it returns, read and write the tree directly with `cp.get()` / `cp.put()` / `cp.post()` / `cp.delete()` (or the REST equivalents).
+
+#### The Four Trees
+
+| Tree | Persisted? | Read/Write | Purpose |
+|------|-----------|------------|---------|
+| `status/` | No — runtime only | Read-only | Live device state, created at runtime by router processes (WAN connection state, modem diagnostics, LAN clients, GPS, system health, etc.) |
+| `config/` | Yes — NVRAM | Read/write (`GET`/`PUT`/`POST`/`DELETE`) | Persistent settings that define the router's desired configuration (WAN profiles, firewall rules, LAN networks, QoS, users, etc.). Schema is defined by a DTD (see [DTD Schema Verification](#dtd-schema-verification) below) |
+| `control/` | No | Write to trigger, read for structure | One-shot actions and commands (reboot, ping, GPIO, per-device resets). Most leaf values are `null` until written. `GET` returns the current structure/state, `PUT` triggers the action |
+| `state/` | Mostly read-only | Read-only | Internal/diagnostic state (app registry, license, admin counters). The router's own API spec marks it "Internal use only — should not be used by applications." Prefer `status/` for anything application-facing; fall back to `state/` only for diagnostics `status/` doesn't cover |
+
+REST access wraps the response (`{"success": true, "data": ...}`); `cp.get()` unwraps it and returns the data directly — never call `.get('data')` on a `cp.get()` result.
+
+Config writes over REST use form-encoded data, not a JSON body:
+
+```bash
+curl -k -u admin:pass -X PUT "https://ROUTER/api/config/{path}" -d 'data={"key":"val"}'
+```
+
+`cp.put()` on-router handles this encoding for you.
+
+#### How config/ Drives status/: the WAN Example
+
+WAN is the clearest example of how a `config/` tree drives what shows up in `status/`, and it's documented in [`docs/ncos-api/config/wan-rules2.md`](ncos-api/config/wan-rules2.md).
+
+`config/wan/rules2` is a list of WAN profile rules. Each rule has:
+
+- `_id_` — the rule's UUID
+- `trigger_name` — human-readable name
+- `trigger_string` — a match pattern against device properties, e.g. `type|is|mdm%sim|is|sim1%port|is|int1`
+- `priority` — connection priority (higher = preferred)
+- `disabled` — `true` disables the rule regardless of priority
+
+When a physical WAN device (a modem SIM, an ethernet WAN port) matches a rule's `trigger_string`, the router creates a corresponding entry under `status/wan/devices/{device_id}` (e.g. `mdm-41949674`, `ethernet-wan`). That status entry's `info.config_id` field points back to the `_id_` of the rule that matched it:
+
+```python
+import cp
+
+devices = cp.get('status/wan/devices') or {}
+for device_id, device_data in devices.items():
+    config_id = device_data.get('info', {}).get('config_id')
+    if config_id:
+        rule = cp.get(f'config/wan/rules2/{config_id}')
+        cp.log(f"{device_id} uses rule: {rule.get('trigger_name')}")
+```
+
+Notes confirmed in the docs:
+- Multiple devices can match the same rule (e.g. SIM1 and SIM2 both matching a generic modem rule).
+- A `disabled` rule prevents the device from activating even if the hardware is present.
+- To disable a specific device, look up its `config_id` from `status/wan/devices/{device_id}/info` and PUT `disabled: true` to that rule: `cp.put(f'config/wan/rules2/{config_id}/disabled', True)`.
+- Do not PUT the whole `rules2` list back — update individual fields by rule `_id_`/index instead.
+
+Once a device exists under `status/wan/devices/{device_id}`, you act on it through `control/wan/devices/{device_id}`, documented in [`docs/ncos-api/control/wan.md`](ncos-api/control/wan.md). Available per-device controls include `reset_stats`, `reset`, `manual_activate_connect`/`manual_activate_started`/`manual_activate_done`/`manual_activate_finalize`, `fw_upgrade`, `activity`, `factory_defaults_finalize`, `puk_unlock`, `restore_bands`, `euicc`, `ob_upgrade`, `remote_upgrade`, and `testmode`:
+
+```python
+import cp
+
+# Reset stats for a specific modem device
+cp.put('control/wan/devices/mdm-41949674/reset_stats', None)
+
+# Reload WAN steering rules (all devices)
+cp.put('control/wan/steering/reload_rules', True)
+```
+
+So the pattern is: `config/wan/rules2` (what should exist / how to connect it) → matching hardware appears as `status/wan/devices/{device_id}` (what currently exists and its live state) → `control/wan/devices/{device_id}` (act on that specific device).
+
+#### LAN: a UUID Lookup, Not a Trigger Match
+
+`config/lan` and `status/lan` are related, but not the same way WAN is. There's no `trigger_string` matching here — `status/lan` is a fixed object (not an array), and the link is a direct UUID lookup. Verified against a live dev router (`GET /api/config/lan`, `GET /api/status/lan`):
+
+`config/lan` is an **array** of LAN network configs. Each entry has an `_id_` (UUID) and a `devices[]` array of `{type, uid}` refs to the physical/wireless interfaces assigned to that network:
+
+```json
+{
+  "_id_": "00000000-0d93-319d-8220-4a1fb0372b51",
+  "name": "Primary LAN",
+  "ip_address": "192.168.1.5",
+  "devices": [
+    {"type": "ethernet", "uid": "lan"},
+    {"type": "wlan", "uid": "wireless0"}
+  ]
+}
+```
+
+`status/lan/uuid` is an object keyed by that same `_id_`, mapping it to the runtime interface name:
+
+```json
+"uuid": {
+  "00000000-0d93-319d-8220-4a1fb0372b51": {"iface": "primarylan1"},
+  "00000001-0d93-319d-8220-4a1fb0372b51": {"iface": "installerl2"}
+}
+```
+
+`status/lan/devices` is keyed by `"{type}-{uid}"` (e.g. `ethernet-lan`, `wlan-wireless0`), where `uid` matches the `uid` values inside `config/lan[].devices[]`:
+
+```python
+import cp
+
+lan_configs = cp.get('config/lan') or []
+lan_status = cp.get('status/lan') or {}
+status_uuid = lan_status.get('uuid', {})
+status_devices = lan_status.get('devices', {})
+
+for network in lan_configs:
+    config_id = network.get('_id_')
+    iface = status_uuid.get(config_id, {}).get('iface')
+    cp.log(f"{network.get('name')} ({config_id}) -> {iface}")
+    for dev in network.get('devices', []):
+        key = f"{dev['type']}-{dev['uid']}"
+        dev_status = status_devices.get(key, {})
+        link_state = dev_status.get('status', {}).get('link_state')
+        cp.log(f"  {key}: link_state={link_state}")
+```
+
+So the chain is: `config/lan[]._id_` → `status/lan/uuid/{_id_}.iface` (which network this config maps to at runtime), and `config/lan[].devices[].uid` → `status/lan/devices/{type}-{uid}` (live state of each interface in that network). `status/lan/networks/{iface_name}` also exposes per-network runtime state, keyed by iface name rather than by `_id_`.
+
+Separately, WLAN SSIDs are looked up positionally rather than by UUID: `status/lan/devices` WLAN entries (e.g. `wlan-wireless0`, `wlan-wireless0_1`) map to `config/wlan[radio_index]/bss[bss_index]/ssid` by position, not by matching a UUID or trigger string.
+
+#### Direct API Reference
+
+For full task-oriented examples, response shapes, and gotchas beyond what's summarized here, see `docs/ncos-api/`:
+
+- [`docs/ncos-api/README.md`](ncos-api/README.md) — common direct-access tasks with verified response structures
+- [`docs/ncos-api/api-structures.md`](ncos-api/api-structures.md) — detailed structures and edge cases across WAN, LAN, firewall, QoS, certs, and more
+- [`docs/ncos-api/status/`](ncos-api/status/README.md) — status API index (87 endpoints)
+- [`docs/ncos-api/config/PATHS.md`](ncos-api/config/PATHS.md) — full config path index (500+ paths, generated from the DTD)
+- [`docs/ncos-api/control/README.md`](ncos-api/control/README.md) — control API index and common patterns
+- [`docs/ncos-api/state/README.md`](ncos-api/state/README.md) — state API (internal/diagnostic use)
+
+#### DTD Schema Verification
+
+Before writing to any `config/` path, check its schema via the DTD endpoint — this shows exact field names, types, required/optional status, defaults, and min/max/allowed values:
+
+```bash
+curl -s -u admin:pass http://router/api/dtd/config/{path} | python3 -m json.tool
+```
+
+Full workflow and a worked QoS example are in [`docs/ncos-api/dtd-usage.md`](ncos-api/dtd-usage.md). The status tree has no DTD — it's runtime-only and not schema-defined.
+
 ---
 
 ## 5. Build Tool (make.py)

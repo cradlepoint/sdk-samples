@@ -6,6 +6,12 @@ inclusion: manual
 
 Get this repo ready so the user can build and deploy NCOS SDK apps by chatting.
 
+The **Check Environment** session-start hook already handles `.venv` and dependencies
+automatically (see `workflow.md`). This flow is the full pass — run it when the user asks
+for setup, when the session-start hook reported a `kiro-env: PROBLEM`, or when router
+settings need to change. Run the steps even if the environment looks fine; the router
+connection and Developer Mode check are the point.
+
 ## Steps
 
 1. Run the setup script from the repo root, non-interactively:
