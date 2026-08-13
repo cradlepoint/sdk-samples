@@ -533,14 +533,74 @@ def _normalize_to_list(obj):
     return []
 
 
+# NCOS routing identity model - these two objects are NOT addressed the same way:
+#
+#   config/routing/tables    entries expose an "_id_" UUID. Routing policies
+#                            reference a table by that UUID in their "table"
+#                            field. Tables are still stored in an array, so a
+#                            DELETE needs the current numeric index (resolve the
+#                            UUID to an index first).
+#
+#   config/routing/policies  entries have NO "_id_" field at all (confirmed
+#                            against the DTD and live routers). A policy is only
+#                            addressable by its numeric collection index. POST
+#                            returns that index in the response "data" field.
+#
+# Never do `policy.get('_id_')` - it always returns None, which previously made
+# MSS think policy creation had failed and made every cleanup pass a no-op.
+
+
+def _delete_policies_by_index(indexes, label):
+    """Delete routing policies by numeric index.
+
+    Policies live in an array, so deleting one shifts the indexes of every
+    later entry. Always delete from highest index to lowest.
+    """
+    for idx in sorted(set(indexes), reverse=True):
+        try:
+            cp.delete(f'config/routing/policies/{idx}')
+            time.sleep(0.1)
+        except Exception as e:
+            cp.log(f'Failed to delete {label} policy at index {idx}: {e}')
+
+
+def _delete_tables_by_index(indexes, label):
+    """Delete routing tables by numeric index, highest index first."""
+    for idx in sorted(set(indexes), reverse=True):
+        try:
+            cp.delete(f'config/routing/tables/{idx}')
+            time.sleep(0.1)
+        except Exception as e:
+            cp.log(f'Failed to delete {label} table at index {idx}: {e}')
+
+
+def _delete_table_by_id(table_id):
+    """Delete a routing table given its _id_ UUID.
+
+    Resolves the UUID to its current numeric collection index, because index
+    addressing is what works consistently across NCOS platforms.
+    """
+    if not table_id:
+        return
+    try:
+        tables = _normalize_to_list(cp.get('config/routing/tables'))
+        for idx, table in enumerate(tables):
+            if isinstance(table, dict) and table.get("_id_") == table_id:
+                cp.delete(f'config/routing/tables/{idx}')
+                return
+        # Compatibility fallback for platforms that accept UUID addressing
+        cp.delete(f'config/routing/tables/{table_id}')
+    except Exception as e:
+        cp.log(f'Failed to delete route table {table_id}: {e}')
+
+
 def cleanup_mss_routing():
     """Remove all MSS-related route tables and policies from previous runs.
     Must delete policies that reference MSS tables first, then delete the tables."""
     try:
         route_tables = _normalize_to_list(cp.get('config/routing/tables'))
-        route_policies = _normalize_to_list(cp.get('config/routing/policies'))
 
-        # Find MSS route table IDs by name (e.g. MSS-mdm-75613315)
+        # Find MSS route table UUIDs by name (e.g. MSS-mdm-75613315)
         mss_table_ids = set()
         for table in route_tables:
             if not isinstance(table, dict):
@@ -551,39 +611,27 @@ def cleanup_mss_routing():
                 if table_id is not None:
                     mss_table_ids.add(table_id)
 
-        # Delete policies that reference MSS tables first (required before deleting tables)
-        for policy in route_policies:
-            if not isinstance(policy, dict):
-                continue
-            if policy.get("table") not in mss_table_ids:
-                continue
-            policy_id = policy.get("_id_")
-            if policy_id is not None:
-                try:
-                    cp.delete(f'config/routing/policies/{policy_id}')
-                    time.sleep(0.1)
-                except Exception as e:
-                    cp.log(f'Failed to delete MSS policy {policy_id}: {e}')
+        if not mss_table_ids:
+            return
 
-        # Re-get tables after policy deletion
+        # Delete policies referencing MSS tables first (required before deleting
+        # the tables). Policies are addressed by numeric index only.
+        route_policies = _normalize_to_list(cp.get('config/routing/policies'))
+        stale_policy_indexes = [
+            idx for idx, policy in enumerate(route_policies)
+            if isinstance(policy, dict) and policy.get("table") in mss_table_ids
+        ]
+        _delete_policies_by_index(stale_policy_indexes, 'stale MSS')
+
+        # Re-get tables after policy deletion, then delete by numeric index
         route_tables = _normalize_to_list(cp.get('config/routing/tables'))
+        stale_table_indexes = [
+            idx for idx, table in enumerate(route_tables)
+            if isinstance(table, dict) and table.get("_id_") in mss_table_ids
+        ]
+        _delete_tables_by_index(stale_table_indexes, 'stale MSS')
 
-        # Delete MSS route tables
-        for table in route_tables:
-            if not isinstance(table, dict):
-                continue
-            name = table.get("name")
-            if name and "MSS" in name:
-                table_id = table.get("_id_")
-                if table_id is not None:
-                    try:
-                        cp.delete(f'config/routing/tables/{table_id}')
-                        time.sleep(0.1)
-                    except Exception as e:
-                        cp.log(f'Failed to delete MSS table {table_id}: {e}')
-
-        if mss_table_ids:
-            cp.log('Cleaned up MSS route tables and policies from previous run')
+        cp.log('Cleaned up MSS route tables and policies from previous run')
     except Exception as e:
         cp.log(f'Exception in cleanup_mss_routing(): {e}')
 
@@ -592,53 +640,41 @@ def cleanup_duplicate_routing():
     """Clean up duplicate routing policies and tables, keeping only one per unique identifier."""
     try:
         route_policies = _normalize_to_list(cp.get('config/routing/policies'))
-        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
 
-        # Clean up duplicate policies - keep only one per table
+        # Duplicate policies - keep the first entry per referenced table.
+        # Policies have no _id_, so track the numeric index of the duplicates.
         seen_tables = set()
         policies_to_delete = []
-
-        for policy in route_policies:
+        for idx, policy in enumerate(route_policies):
             if not isinstance(policy, dict):
                 continue
             table_id = policy.get("table")
-            policy_id = policy.get("_id_")
-            if policy_id is None:
+            if not table_id:
                 continue
-            if table_id and table_id in seen_tables:
-                policies_to_delete.append(policy_id)
-            elif table_id:
+            if table_id in seen_tables:
+                policies_to_delete.append(idx)
+            else:
                 seen_tables.add(table_id)
 
-        for policy_id in policies_to_delete:
-            try:
-                cp.delete(f'config/routing/policies/{policy_id}')
-                time.sleep(0.1)
-            except Exception as e:
-                cp.log(f'Failed to delete policy {policy_id}: {e}')
+        _delete_policies_by_index(policies_to_delete, 'duplicate')
 
-        # Clean up duplicate tables - keep only one per table name
+        # Duplicate tables - keep the first entry per table name. Re-read after
+        # the policy deletes above so indexes reflect current state.
+        route_tables = _normalize_to_list(cp.get('config/routing/tables'))
         seen_names = set()
         tables_to_delete = []
-
-        for table in route_tables:
+        for idx, table in enumerate(route_tables):
             if not isinstance(table, dict):
                 continue
             table_name = table.get("name")
-            table_id = table.get("_id_")
-            if table_id is None:
+            if not table_name:
                 continue
-            if table_name and table_name in seen_names:
-                tables_to_delete.append(table_id)
-            elif table_name:
+            if table_name in seen_names:
+                tables_to_delete.append(idx)
+            else:
                 seen_names.add(table_name)
 
-        for table_id in tables_to_delete:
-            try:
-                cp.delete(f'config/routing/tables/{table_id}')
-                time.sleep(0.1)
-            except Exception as e:
-                cp.log(f'Failed to delete table {table_id}: {e}')
+        _delete_tables_by_index(tables_to_delete, 'duplicate')
 
     except Exception as e:
         cp.log(f'Exception in cleanup_duplicate_routing(): {e}')
@@ -673,7 +709,8 @@ def source_route(sim):
             ]
         }
 
-        # Check if this route table exists by name
+        # Check if this route table exists by name. Tables DO expose an _id_ UUID
+        # and that UUID is what a routing policy references in its "table" field.
         route_tables = _normalize_to_list(cp.get('config/routing/tables'))
         route_table_id = None
         for table in route_tables:
@@ -681,7 +718,8 @@ def source_route(sim):
                 route_table_id = table.get("_id_")
                 break
 
-        # If not found, create it
+        # If not found, create it. POST returns a numeric collection index in
+        # "data"; GET that index to read the table's _id_ UUID.
         if not route_table_id:
             req = cp.post('config/routing/tables/', route_table)
             if not req:
@@ -695,6 +733,8 @@ def source_route(sim):
             route_table_id = table_response.get("_id_")
             if route_table_id is None:
                 raise Exception("Created route table does not have _id_ field")
+            cp.log(f'Created route table MSS-{sim} '
+                   f'index={route_table_index} id={route_table_id}')
             time.sleep(1)
 
         # Now prepare the desired route policy
@@ -705,26 +745,49 @@ def source_route(sim):
             "src_ip_network": source_ip
         }
 
-        # Check if a policy already exists for this table and update/create as needed
+        # Look for an existing policy for this table. Policies have NO _id_ field,
+        # so they are identified and addressed purely by numeric list index.
         route_policies = _normalize_to_list(cp.get('config/routing/policies'))
-        existing_policy_id = None
-        for policy in route_policies:
+        existing_policy_index = None
+        existing_policy = None
+        for idx, policy in enumerate(route_policies):
             if isinstance(policy, dict) and policy.get("table") == route_table_id:
-                existing_policy_id = policy.get("_id_")
+                existing_policy_index = idx
+                existing_policy = policy
                 break
 
-        # If policy exists, update it only if something changed; if not, create it
-        if existing_policy_id:
-            existing_policy = next((p for p in route_policies if p.get("_id_") == existing_policy_id), None)
-            needs_update = not existing_policy or any(
+        if existing_policy_index is not None:
+            # Update in place only if something actually changed, so repeated
+            # survey cycles don't rewrite config/ and trigger NCM config syncs.
+            needs_update = any(
                 existing_policy.get(k) != v for k, v in route_policy.items()
             )
             if needs_update:
-                cp.put(f'config/routing/policies/{existing_policy_id}', route_policy)
+                cp.put(f'config/routing/policies/{existing_policy_index}', route_policy)
                 time.sleep(1)
+            policy_index = existing_policy_index
         else:
-            cp.post('config/routing/policies/', route_policy)
+            resp = cp.post('config/routing/policies/', route_policy)
+            if not resp:
+                _delete_table_by_id(route_table_id)
+                raise Exception("Failed to create route policy - post returned None")
+            policy_index = resp.get("data")
+            if policy_index is None:
+                _delete_table_by_id(route_table_id)
+                raise Exception("Failed to create route policy - no index in response")
+            cp.log(f'Created route policy for MSS-{sim} index={policy_index}')
             time.sleep(1)
+
+        # Verify by content, not by looking for an _id_ that policies never have
+        pol_obj = cp.get(f'config/routing/policies/{policy_index}')
+        if not pol_obj or not isinstance(pol_obj, dict):
+            raise Exception(f'Cannot read route policy at index {policy_index}')
+        verified = all(pol_obj.get(k) == v for k, v in route_policy.items())
+        if not verified:
+            raise Exception(
+                f'Route policy verification failed at index {policy_index}. '
+                f'Expected {route_policy} got {pol_obj}'
+            )
         return source_ip
     except Exception as e:
         msg = f'Exception in source_route(): {e}'

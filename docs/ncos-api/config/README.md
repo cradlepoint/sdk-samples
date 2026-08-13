@@ -54,10 +54,23 @@ rule_id = 'a1b2c3d4-...'
 rule = cp.get(f'config/wan/rules2/{rule_id}')
 ```
 
+**Not every config array has `_id_`.** Check before you rely on it —
+`config/routing/policies` entries have no `_id_` at all and are addressable only
+by numeric index. See [source-routing.md](source-routing.md). Confirm with the
+DTD (`/api/dtd/config/{path}`) or by reading an actual entry.
+
+**A POST to a config array returns the new entry's numeric index in `data`, not
+its `_id_`.** If you need the UUID, GET the returned index and read `_id_` from
+the response.
+
+**When deleting multiple entries from a config array, delete highest index
+first.** Removing one entry shifts the indexes of all later entries.
+
 ## Path Index
 
 - **[PATHS.md](PATHS.md)** - Full list of config paths (generated from DTD)
 - **[wan-rules2.md](wan-rules2.md)** - WAN rules configuration (device matching, disabled field)
+- **[source-routing.md](source-routing.md)** - `config/routing/tables` and `config/routing/policies` (policies have no `_id_`, index-only addressing, descending-order deletes)
 
 ## Schema (DTD)
 
