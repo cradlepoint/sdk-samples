@@ -54,22 +54,28 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 - Git (optional, for cloning the repository)
 - A router with **Developer Mode** enabled in NetCloud Manager (Tools > Developer Mode Devices)
 
-### 1. Get the code into Kiro
+### 1. Fork and clone the repo
 
-**Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then paste:
+Work happens on your own fork so you can experiment freely and, if you'd like, contribute
+your apps back upstream later.
 
-```
-https://github.com/cradlepoint/sdk-samples.git
-```
+1. Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) and
+   click **Fork** (top right) to create your own copy under your GitHub account.
+2. **Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then
+   paste your fork's URL:
 
-Kiro clones the repo and opens it for you.
+   ```
+   https://github.com/YOUR-USERNAME/sdk-samples.git
+   ```
 
-**No Git?** Download the repo as a ZIP instead:
+   Kiro clones your fork and opens it for you.
 
-1. Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples)
-2. Click the green **Code** button, then **Download ZIP**
-3. Extract the ZIP to a folder on your computer
-4. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and select the extracted `sdk-samples` folder
+   **No Git?** Download your fork as a ZIP instead:
+
+   1. On your fork's GitHub page, click the green **Code** button, then **Download ZIP**
+   2. Extract the ZIP to a folder on your computer
+   3. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and
+      select the extracted `sdk-samples` folder
 
 Once the repo is open in Kiro, open the chat panel — that's it. Kiro builds the `.venv`
 environment and installs dependencies automatically the first time a session starts, then
@@ -78,10 +84,11 @@ see [docs/SETUP.md](docs/SETUP.md).
 
 #### Manual setup (terminal)
 
-If you'd rather set things up from a terminal instead of letting Kiro do it:
+If you'd rather set things up from a terminal instead of letting Kiro do it, clone your fork
+(replace `YOUR-USERNAME` with your GitHub username):
 
 ```bash
-git clone https://github.com/cradlepoint/sdk-samples.git
+git clone https://github.com/YOUR-USERNAME/sdk-samples.git
 cd sdk-samples
 ```
 
@@ -169,6 +176,28 @@ python3 make.py status my_app
 | **start / stop** | Control a running app |
 | **uninstall** | Remove app from router |
 | **clean** | Remove local build artifacts |
+
+---
+
+## Contributing back upstream (optional)
+
+Built something worth sharing? You can submit it back to the main repo:
+
+1. Commit your changes and push them to your fork:
+
+   ```bash
+   git add apps/your_app
+   git commit -m "Add your_app"
+   git push
+   ```
+
+2. Go to your fork on GitHub and click **Contribute > Open pull request** (or go to
+   [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) and click
+   **New pull request**).
+3. Fill in a description of what your app does and submit the PR for review.
+
+This step is optional — your fork works completely on its own for building and deploying
+apps to your router.
 
 ---
 
