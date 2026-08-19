@@ -16,5 +16,15 @@ settings = {
     "server_token": "",
     "enable_surveyors": False,
     "surveyors": [],
-    "speedtest_url": "speedtest.sea11.us.leaseweb.net:5201-5210"
+    # Speedtest engine: "netperf" (built into NCOS, always available), "iperf3"
+    # (needs iperf3_server) or "ookla" (only if an Ookla binary is bundled).
+    # On first run this is set to the best engine the build offers, and any
+    # engine whose binary is absent falls back to netperf.
+    "speedtest_engine": "netperf",
+    # iPerf3 target - hostname or IP of your iperf3 server.
+    "iperf3_server": "",
+    # iPerf3 port or port range, e.g. "5201" or "5201-5210". A range lets
+    # concurrent modem tests use separate ports and lets a busy port fall
+    # through to the next one.
+    "iperf3_ports": "5201-5210"
 }

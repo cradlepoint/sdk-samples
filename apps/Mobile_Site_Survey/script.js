@@ -47,6 +47,16 @@ class MobileSiteSurvey {
             this.saveConfig();
         });
 
+        // Speedtest engine selection reveals the iPerf3 target fields
+        document.getElementById('speedtest_engine').addEventListener('change', () => {
+            this.toggleEngineOptions();
+        });
+
+        // Picking a preset server fills in the field that actually gets saved
+        document.getElementById('iperf3_server_select').addEventListener('change', () => {
+            this.syncServerSelectToInput();
+        });
+
         // Real-time form validation
         this.setupFormValidation();
 
@@ -157,18 +167,44 @@ class MobileSiteSurvey {
         }
     }
 
+    populateEngineOptions(engines) {
+        // Ookla and iPerf3 only appear when their binary is bundled, which is
+        // fixed at build time, so the backend decides what is on offer.
+        if (!Array.isArray(engines) || engines.length === 0) return;
+
+        const select = document.getElementById('speedtest_engine');
+        if (!select) return;
+
+        const previous = select.value;
+        select.innerHTML = '';
+        engines.forEach(engine => {
+            const option = document.createElement('option');
+            option.value = engine.value;
+            option.textContent = engine.label;
+            select.appendChild(option);
+        });
+        if (engines.some(engine => engine.value === previous)) {
+            select.value = previous;
+        }
+    }
+
     populateForm(config) {
         // Update version
         if (config.version) {
             document.getElementById('version').textContent = `Mobile Site Survey v${config.version}`;
         }
 
+        // Rebuild the engine list before setting form values below, so the
+        // saved engine has a matching option to select.
+        this.populateEngineOptions(config.available_engines);
+
         // Update form fields
         const fields = [
             'enabled', 'min_distance', 'enable_timer', 'min_time', 'all_wans',
             'speedtests', 'packet_loss', 'full_diagnostics', 'write_csv', 'debug',
             'send_to_server', 'include_logs', 'server_url', 'server_token',
-            'enable_surveyors', 'surveyors'
+            'enable_surveyors', 'surveyors',
+            'speedtest_engine', 'iperf3_server', 'iperf3_ports'
         ];
 
         fields.forEach(field => {
@@ -181,6 +217,57 @@ class MobileSiteSurvey {
                 }
             }
         });
+
+        this.toggleEngineOptions();
+        this.syncInputToServerSelect();
+    }
+
+    toggleEngineOptions() {
+        // The iPerf3 server and port range only apply to the iPerf3 engine.
+        const engine = document.getElementById('speedtest_engine');
+        const options = document.getElementById('iperf3-options');
+        if (engine && options) {
+            options.style.display = engine.value === 'iperf3' ? 'block' : 'none';
+        }
+    }
+
+    // The preset list is a convenience picker. #iperf3_server is the only field
+    // that gets submitted, so it always holds the value that will be saved.
+    syncServerSelectToInput() {
+        const select = document.getElementById('iperf3_server_select');
+        const input = document.getElementById('iperf3_server');
+        const customRow = document.getElementById('iperf3-custom-row');
+        if (!select || !input || !customRow) return;
+
+        if (select.value === '__custom__') {
+            customRow.style.display = 'flex';
+            input.value = '';
+            input.focus();
+        } else {
+            customRow.style.display = 'none';
+            input.value = select.value;
+        }
+    }
+
+    syncInputToServerSelect() {
+        const select = document.getElementById('iperf3_server_select');
+        const input = document.getElementById('iperf3_server');
+        const customRow = document.getElementById('iperf3-custom-row');
+        if (!select || !input || !customRow) return;
+
+        const presets = Array.from(select.options).map(option => option.value);
+
+        if (!input.value) {
+            // Nothing configured yet, so show the "Select a server..." prompt.
+            select.value = '';
+            customRow.style.display = 'none';
+        } else if (presets.includes(input.value)) {
+            select.value = input.value;
+            customRow.style.display = 'none';
+        } else {
+            select.value = '__custom__';
+            customRow.style.display = 'flex';
+        }
     }
 
     updateResults(results) {

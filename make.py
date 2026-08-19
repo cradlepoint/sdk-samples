@@ -1091,7 +1091,7 @@ def deploy():
         return
 
     # Wait for the app to start, then show all recent logs
-    time.sleep(5)
+    time.sleep(8)
     try:
         log_url = 'https://{}/api/status/log/'.format(g_dev_client_ip)
         response = requests.get(log_url, auth=get_auth(), verify=False)

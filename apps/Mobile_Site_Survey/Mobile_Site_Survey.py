@@ -1,7 +1,8 @@
 import cp
 from threading import Thread, Lock
 import concurrent.futures
-from speedtest import Speedtest, configure as configure_speedtest, get_engine
+import speedtest
+from speedtest import Speedtest
 from geopy import distance
 from settings import settings
 import requests
@@ -84,7 +85,13 @@ class ConfigHandler(tornado.web.RequestHandler):
             else:
                 config["survey_running"] = False
                 config["total_data_used_mb"] = 0.0
-                
+
+            # Which engines this build can run, so the UI only offers those.
+            config["available_engines"] = [
+                {"value": engine, "label": speedtest.engine_label(engine)}
+                for engine in speedtest.available_engines()
+            ]
+
             self.write(json.dumps(config))
             return
         except Exception as e:
@@ -106,6 +113,28 @@ class SubmitHandler(tornado.web.RequestHandler):
             dispatcher.config["server_token"] = self.get_argument('server_token')
         except Exception as e:
             cp.log(f'Exception in config submit: {e}')
+
+        # Text and select fields are read explicitly. They are deliberately kept
+        # out of config_fields below, where a missing argument is coerced to
+        # 0/False - that would wipe the value instead of leaving it alone.
+        try:
+            engine = self.get_argument('speedtest_engine', '').strip().lower()
+            if engine:
+                dispatcher.config["speedtest_engine"] = engine
+        except Exception as e:
+            cp.log(f'Exception parsing speedtest_engine: {e}')
+
+        try:
+            dispatcher.config["iperf3_server"] = self.get_argument(
+                'iperf3_server', '').strip()
+        except Exception as e:
+            cp.log(f'Exception parsing iperf3_server: {e}')
+
+        try:
+            ports = self.get_argument('iperf3_ports', '').strip()
+            dispatcher.config["iperf3_ports"] = ports or settings["iperf3_ports"]
+        except Exception as e:
+            cp.log(f'Exception parsing iperf3_ports: {e}')
 
         try:
             surveyors = self.get_argument('surveyors')
@@ -149,6 +178,9 @@ class SubmitHandler(tornado.web.RequestHandler):
 
         save_config(dispatcher.config, 'Mobile_Site_Survey')
         cp.log(f'Saved new config: {dispatcher.config}')
+        # Apply the engine change straight away so it takes effect on the next
+        # survey without restarting the app.
+        apply_speedtest_config(dispatcher.config)
         self.redirect('/')
 
 
@@ -228,6 +260,8 @@ class Dispatcher:
                     self.pings[modem] = {"tx": 0, "rx": 0}
                 iface = cp.get(f'status/wan/devices/{modem}/info/iface')
                 pong = ping('8.8.8.8', iface)
+                if not pong:
+                    continue
                 debug_log(json.dumps(pong))
 
                 if pong.get('tx') and pong.get('rx'):
@@ -447,16 +481,51 @@ def get_config(name):
     try:
         config = json.loads([x["value"] for x in appdata if x["name"] == name][0])
     except:
-        config = settings
+        # Copy the defaults rather than aliasing the settings dict.
+        config = dict(settings)
+        config['speedtest_engine'] = speedtest.default_engine()
         cp.post('config/system/sdk/appdata', {"name": name, "value": json.dumps(config)})
         cp.log(f'No config found - Saved default config: {config}')
     else:  # Update config with any new settings
         if config.get('dead_reckoning') is None:
             config['dead_reckoning'] = settings['dead_reckoning']
-        if config.get('speedtest_url') is None:
-            config['speedtest_url'] = settings['speedtest_url']
+        # Only offer engines this build can actually run. A missing key, the old
+        # "auto" value, or an engine whose binary is not bundled all resolve to
+        # the best available engine so the UI select always has a match.
+        if config.get('speedtest_engine') not in speedtest.available_engines():
+            config['speedtest_engine'] = speedtest.default_engine()
+        if config.get('iperf3_server') is None:
+            # Migrate the legacy combined "host:start-end" speedtest_url value.
+            host, _, ports = (config.get('speedtest_url') or '').partition(':')
+            host = host.strip()
+            if host and 'speedtest.net' not in host:
+                config['iperf3_server'] = host
+                if ports.strip() and config.get('iperf3_ports') is None:
+                    config['iperf3_ports'] = ports.strip()
+            else:
+                config['iperf3_server'] = settings['iperf3_server']
+        if config.get('iperf3_ports') is None:
+            config['iperf3_ports'] = settings['iperf3_ports']
+        config.pop('speedtest_url', None)
         save_config(config, 'Mobile_Site_Survey')
     return config
+
+
+def apply_speedtest_config(config):
+    """Push the speedtest settings into the speedtest module and log the result."""
+    try:
+        speedtest.configure(
+            engine=config.get('speedtest_engine'),
+            iperf3_server=config.get('iperf3_server', ''),
+            iperf3_ports=config.get('iperf3_ports', ''))
+        problem = speedtest.engine_error()
+        if problem:
+            cp.log(f'Speedtest engine: {speedtest.describe_engine()} '
+                   f'| WARNING: {problem}')
+        else:
+            cp.log(f'Speedtest engine: {speedtest.describe_engine()}')
+    except Exception as e:
+        cp.log(f'Exception applying speedtest config: {e}')
 
 def dec(deg, min, sec):
     """Return decimal version of lat or long from deg, min, sec"""
@@ -479,6 +548,13 @@ def log_all(msg, logs):
     cp.log(msg)
     logs.append(f'{logstamp} {msg}')
     dispatcher.results = f'{msg}\n\n' + dispatcher.results[:32000]
+
+
+def log_progress(msg, logs):
+    """Log test progress to syslog and the app logs, but not the UI results panel."""
+    logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+    cp.log(msg)
+    logs.append(f'{logstamp} {msg}')
 
 
 def ping(host, iface):
@@ -797,47 +873,52 @@ def source_route(sim):
 
 def run_tests(modem):
     """Main testing function - multithreaded by Dispatcher"""
-    download, upload, latency = 0.0, 0.0, 0.0
+    download, upload = 0.0, 0.0
+    latency, jitter = None, None
     bytes_sent, bytes_received, total_mb_used, packet_loss_percent = 0, 0, 0, 0
     share = ''
-    server = None
+    server = ''
+    engine = ''
     cur_plmn = None  # Initialize cur_plmn to avoid "referenced before assignment" error
-    source_ip = None
     st = None
     logs = []
 
-    if dispatcher.config.get("speedtests"):
-        # ROUTING - Packets sourced from modem IP egress modem device:
-        try:
-            source_ip = source_route(modem)
-            if not source_ip:
-                msg = f'Failed to configure source routing for {modem}'
+    wan_info = cp.get(f'status/wan/devices/{modem}/info') or {}
+    wan_type = wan_info.get('type')
+    iface = wan_info.get('iface')
+
+    # The WAN IP labels non-modem interfaces and binds the speedtest to this
+    # device. Read it up front so it is available even when speedtests are off.
+    source_ip = cp.get(f'status/wan/devices/{modem}/status/ipinfo/ip_address')
+
+    run_speedtest = bool(dispatcher.config.get("speedtests"))
+    if run_speedtest:
+        engine_problem = speedtest.engine_error()
+        if engine_problem:
+            log_all(f'Skipping speedtest on {modem}: {engine_problem}', logs)
+            run_speedtest = False
+
+    if run_speedtest:
+        # ROUTING - iPerf3 and Ookla need packets sourced from the modem IP to
+        # egress the modem device. netperf pins the WAN itself through its
+        # ifc_wan option, so it needs no config/routing entries at all.
+        if speedtest.needs_source_routing():
+            try:
+                source_ip = source_route(modem)
+                if not source_ip:
+                    msg = f'Failed to configure source routing for {modem}'
+                    log_all(msg, logs)
+                    return
+            except Exception as e:
+                msg = f'Exception in routing: {e}'
                 log_all(msg, logs)
-                return
-        except Exception as e:
-            msg = f'Exception in routing: {e}'
-            log_all(msg, logs)
+        engine = speedtest.resolve_engine()
         try:
-            # Instantiate speedtest with source_ip from modem
-            retries = 0
-            while retries < 5:
-                try:
-                    st = Speedtest(source_address=source_ip)
-                    break
-                except Exception:
-                    retries += 1
-                    cp.log(f'Speedtest failed to start for source {source_ip} on {modem}. Trying again...')
-                    time.sleep(1)
-            else:
-                log_all(f'Speedtest server is not accepting connections. Please try again later. Device: {modem}', logs)
-                return
+            st = Speedtest(source_address=source_ip, interface=iface, device=modem)
         except Exception as e:
             msg = f'Exception in speedtest startup: {e}'
             log_all(msg, logs)
-
-    wan_info = cp.get(f'status/wan/devices/{modem}/info')
-    wan_type = wan_info.get('type')
-    iface = wan_info.get('iface')
+            run_speedtest = False
 
     # GET MODEM DIAGNOSTICS:
     if wan_type == 'mdm':
@@ -859,8 +940,6 @@ def run_tests(modem):
         iccid = modem
         product = modem
         cur_plmn = None
-
-    latency = None
 
     # Calculate packet loss
     try:
@@ -891,41 +970,33 @@ def run_tests(modem):
         cp.log(f'Exception calculating packet loss: {e}')
         tx, rx, packet_loss_percent = 0, 0, 0
 
-    if dispatcher.config.get("speedtests"):
-        # Speedtest
+    if run_speedtest and st:
+        # Speedtest - start() measures download, upload and latency together.
         try:
-            retries = 0
-            while retries < 3:
-                try:
-                    st.get_best_server()
-                    break
-                except Exception as e:
-                    retries += 1
-                    cp.log(f'Attempt {retries} of 3 to get_best_server() failed: {e}')
-
-            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
-            logs.append(f'{logstamp} Starting Download Test on {product} {carrier}.')
-            cp.log(f'Starting Download Test on {product} {carrier}.')
-            st.download()
+            log_progress(f'Starting {speedtest.describe_engine()} speedtest on '
+                         f'{product} {carrier}.', logs)
+            st.start()
             if wan_type == 'mdm':  # Capture CA Bands for modems
-                diagnostics = cp.get(f'status/wan/devices/{modem}/diagnostics')
-            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
-            logs.append(f'{logstamp} Starting Upload Test on {product} {carrier}.')
-            cp.log(f'Starting Upload Test on {product} {carrier}.')
-            st.upload(pre_allocate=False)
-            logstamp = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
-            logs.append(f'{logstamp} Speedtest Complete on {product} {carrier}.')
-            cp.log(f'Speedtest Complete on {product} {carrier}.')
+                diagnostics = cp.get(
+                    f'status/wan/devices/{modem}/diagnostics') or diagnostics
+            log_progress(f'Speedtest Complete on {product} {carrier}.', logs)
 
             # Format results
             try:
                 download = round(st.results.download / 1000 / 1000, 2)
                 upload = round(st.results.upload / 1000 / 1000, 2)
-                latency = round(st.results.ping)
+                # Latency stays a whole number of milliseconds so the value
+                # posted to the server keeps its existing shape.
+                if st.results.ping is not None:
+                    latency = round(st.results.ping)
+                if st.results.jitter is not None:
+                    jitter = round(st.results.jitter, 1)
                 bytes_sent = st.results.bytes_sent
                 bytes_received = st.results.bytes_received
+                # Blank for netperf, which picks its own server internally.
                 server = st.results.server.get("host", "")
                 share = st.results.share()
+                engine = st.results.engine or engine
             except Exception as e:
                 cp.log(f'Exception formatting speedtest results: {e}')
 
@@ -935,6 +1006,8 @@ def run_tests(modem):
         except Exception as e:
             msg = f'Exception running speedtest for {product} {carrier}: {e}'
             log_all(msg, logs)
+
+
 
     # SEND TO SERVER:
     # Use time.gmtime() to ensure UTC time regardless of system timezone
@@ -1041,7 +1114,8 @@ def run_tests(modem):
     # Log results
     try:
         row = [pretty_timestamp, dispatcher.lat, dispatcher.long, dispatcher.accuracy,
-               carrier, download, upload, latency, packet_loss_percent, bytes_sent, bytes_received, share]
+               carrier, download, upload, latency, jitter, packet_loss_percent,
+               bytes_sent, bytes_received, share, engine, server]
         if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config.get("full_diagnostics")):
             row = row + [str(x).replace(',', ' ') for x in diagnostics.values()]
         elif wan_type == 'mdm' and not dispatcher.config.get("full_diagnostics"):
@@ -1088,9 +1162,15 @@ def run_tests(modem):
         else:
             title = ''
             
+        # netperf reports no server, so show the engine and only append a server
+        # when there is one.
+        engine_display = engine or 'no speedtest'
+        if server:
+            engine_display = f'{engine_display}  {server}'
+
         pretty_results = title + f' ┣┅┅┅  ☏{carrier} {cur_plmn}  ⇄ {packet_loss_percent}% loss ({tx - rx} of {tx})\n' \
-                         f' ┣┅┅┅  ↓{download}Mbps  ↑{upload}Mbps  ⏱{latency}ms\n' \
-                         f' ┣┅┅┅  ⛁ {server}\n' \
+                         f' ┣┅┅┅  ↓{download}Mbps  ↑{upload}Mbps  ⏱{latency}ms  ∿{jitter}ms\n' \
+                         f' ┣┅┅┅  ⛁ {engine_display}\n' \
                          f' ┗┅┅┅  {post_success}'
         log_all(pretty_results, logs)
     except Exception as e:
@@ -1117,7 +1197,8 @@ def run_tests(modem):
             cp.log(f'{filename} not found.')
             with open(f'{results_dir}/{filename}', 'wt') as f:
                 header = ['Timestamp', 'Lat', 'Long', 'Accuracy', 'Carrier', 'Download', 'Upload',
-                          'Latency', 'Packet Loss Percent', 'bytes_sent', 'bytes_received', 'Results Image']
+                          'Latency', 'Jitter', 'Packet Loss Percent', 'bytes_sent',
+                          'bytes_received', 'Results Image', 'Engine', 'Server']
                 if diagnostics:
                     if wan_type == 'wwan' or (wan_type == 'mdm' and dispatcher.config.get("full_diagnostics")):
                         header = header + [*diagnostics]
@@ -1155,21 +1236,14 @@ if __name__ == "__main__":
         time.sleep(1)
     time.sleep(3)
 
+    # Detect bundled speedtest binaries once, before any config is read.
+    speedtest.detect_binaries()
+
     dispatcher = Dispatcher()
-    # Configure speedtest engine
-    engine = get_engine()
-    if engine == 'ookla':
-        cp.log('Speedtest engine: Ookla (binary detected)')
-    elif engine == 'iperf3':
-        speedtest_url = dispatcher.config.get('speedtest_url', '')
-        if speedtest_url and 'speedtest.net' not in speedtest_url:
-            configure_speedtest(speedtest_url)
-            cp.log(f'Speedtest engine: iPerf3 | Server: {speedtest_url}')
-        else:
-            cp.log('Speedtest engine: iPerf3 | WARNING: No server configured. '
-                   'Set speedtest_url in appdata (e.g. "iperf.example.com:5201-5210")')
-    else:
-        cp.log('WARNING: No speedtest binary found (need ookla or iperf3-arm64v8)')
+    # Configure the selected speedtest engine
+    cp.log(f'Speedtest engines available: '
+           f'{", ".join(speedtest.available_engines())}')
+    apply_speedtest_config(dispatcher.config)
     # Initialize routing cleanup once at startup
     initialize_routing()
     Thread(target=dispatcher.loop, daemon=True).start()

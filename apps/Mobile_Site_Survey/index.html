@@ -44,50 +44,39 @@
                         <!-- Tab Navigation -->
                         <div class="tab-navigation">
                             <button type="button" class="tab-btn active" data-tab="basic">
-                                <i class="fas fa-cog"></i> Basic Settings
+                                <i class="fas fa-tachometer-alt"></i> Speedtest Settings
                             </button>
                             <button type="button" class="tab-btn" data-tab="advanced">
                                 <i class="fas fa-sliders-h"></i> Advanced
                             </button>
                             <button type="button" class="tab-btn" data-tab="server">
-                                <i class="fas fa-cloud"></i> Server
+                                <i class="fas fa-cloud"></i> Send to 5g-ready.io
                             </button>
                         </div>
 
-                        <!-- Basic Settings Tab -->
+                        <!-- Speedtest Settings Tab -->
                         <div class="tab-content active" id="basic-tab">
                             <div class="form-section">
-                                <h3><i class="fas fa-map-marker-alt"></i> Test Configuration</h3>
-                                <div class="form-group">
+                                <h3><i class="fas fa-map-marker-alt"></i> Test Triggers</h3>
+                                <div class="trigger-row">
                                     <label class="checkbox-label">
                                         <input type="checkbox" name="enabled" id="enabled" value="1">
                                         <span class="checkmark"></span>
                                         Run Distance Based Tests
                                     </label>
-                                    <div class="form-field">
-                                        <label for="min_distance">Distance Between Tests (meters):</label>
-                                        <input type="number" name="min_distance" id="min_distance" class="form-input">
-                                    </div>
+                                    <label for="min_distance">Every</label>
+                                    <input type="number" name="min_distance" id="min_distance" class="form-input compact-input" aria-label="Distance between tests in meters">
+                                    <span class="field-unit">meters</span>
                                 </div>
-
-                                <div class="form-group">
+                                <div class="trigger-row">
                                     <label class="checkbox-label">
                                         <input type="checkbox" name="enable_timer" id="enable_timer" value="1">
                                         <span class="checkmark"></span>
                                         Run Time Based Tests
                                     </label>
-                                    <div class="form-field">
-                                        <label for="min_time">Time Between Tests (seconds):</label>
-                                        <input type="number" name="min_time" id="min_time" class="form-input">
-                                    </div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="checkbox-label">
-                                        <input type="checkbox" name="all_wans" id="all_wans" value="1">
-                                        <span class="checkmark"></span>
-                                        Test Ethernet and Wifi-as-WAN
-                                    </label>
+                                    <label for="min_time">Every</label>
+                                    <input type="number" name="min_time" id="min_time" class="form-input compact-input" aria-label="Time between tests in seconds">
+                                    <span class="field-unit">seconds</span>
                                 </div>
                             </div>
 
@@ -109,6 +98,68 @@
                                         <span class="checkmark"></span>
                                         Write to CSV
                                     </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="all_wans" id="all_wans" value="1">
+                                        <span class="checkmark"></span>
+                                        Test Ethernet and Wifi-as-WAN
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3><i class="fas fa-server"></i> Speedtest Server</h3>
+                                <div class="form-row">
+                                    <label for="speedtest_engine">Engine</label>
+                                    <!-- Options are rebuilt from /config so only
+                                         engines this build can run are offered. -->
+                                    <select name="speedtest_engine" id="speedtest_engine" class="form-input">
+                                        <option value="netperf">Netperf (built into NCOS)</option>
+                                    </select>
+                                </div>
+                                <div id="iperf3-options" style="display: none;">
+                                    <div class="form-row">
+                                        <label for="iperf3_server_select">Server</label>
+                                        <select id="iperf3_server_select" class="form-input">
+                                            <option value="">Select a server&hellip;</option>
+                                            <optgroup label="North America">
+                                                <option value="speedtest.sea11.us.leaseweb.net">LeaseWeb SEA-11 &mdash; Seattle, US</option>
+                                                <option value="speedtest.sfo12.us.leaseweb.net">LeaseWeb SFO-12 &mdash; San Francisco, US</option>
+                                                <option value="speedtest.lax12.us.leaseweb.net">LeaseWeb LAX-12 &mdash; Los Angeles, US</option>
+                                                <option value="speedtest.phx1.us.leaseweb.net">LeaseWeb PHX-01 &mdash; Phoenix, US</option>
+                                                <option value="speedtest.dal13.us.leaseweb.net">LeaseWeb DAL-13 &mdash; Dallas, US</option>
+                                                <option value="speedtest.chi11.us.leaseweb.net">LeaseWeb CHI-11 &mdash; Chicago, US</option>
+                                                <option value="speedtest.mia11.us.leaseweb.net">LeaseWeb MIA-11 &mdash; Miami, US</option>
+                                                <option value="speedtest.wdc2.us.leaseweb.net">LeaseWeb WDC-02 &mdash; Washington DC, US</option>
+                                                <option value="speedtest.nyc1.us.leaseweb.net">LeaseWeb NYC-01 &mdash; New York, US</option>
+                                                <option value="speedtest.mtl2.ca.leaseweb.net">LeaseWeb MTL-02 &mdash; Montreal, CA</option>
+                                            </optgroup>
+                                            <optgroup label="Europe">
+                                                <option value="speedtest.ams1.nl.leaseweb.net">LeaseWeb AMS-01 &mdash; Amsterdam, NL</option>
+                                                <option value="speedtest.ams2.nl.leaseweb.net">LeaseWeb AMS-02 &mdash; Amsterdam, NL</option>
+                                                <option value="speedtest.fra1.de.leaseweb.net">LeaseWeb FRA-01 &mdash; Frankfurt, DE</option>
+                                                <option value="speedtest.lon1.uk.leaseweb.net">LeaseWeb LON-01 &mdash; London, UK</option>
+                                                <option value="speedtest.lon12.uk.leaseweb.net">LeaseWeb LON-12 &mdash; London, UK</option>
+                                            </optgroup>
+                                            <optgroup label="Asia Pacific">
+                                                <option value="speedtest.sin1.sg.leaseweb.net">LeaseWeb SIN-01 &mdash; Singapore, SG</option>
+                                                <option value="speedtest.hkg12.hk.leaseweb.net">LeaseWeb HKG-12 &mdash; Hong Kong, HK</option>
+                                                <option value="speedtest.tyo11.jp.leaseweb.net">LeaseWeb TYO-11 &mdash; Tokyo, JP</option>
+                                                <option value="speedtest.syd12.au.leaseweb.net">LeaseWeb SYD-12 &mdash; Sydney, AU</option>
+                                            </optgroup>
+                                            <optgroup label="Other">
+                                                <option value="__custom__">Custom server&hellip;</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
+                                    <div class="form-row" id="iperf3-custom-row" style="display: none;">
+                                        <label for="iperf3_server">Hostname or IP</label>
+                                        <input type="text" name="iperf3_server" id="iperf3_server" class="form-input" placeholder="iperf.example.com or 203.0.113.10">
+                                    </div>
+                                    <div class="form-row">
+                                        <label for="iperf3_ports">Port Range</label>
+                                        <input type="text" name="iperf3_ports" id="iperf3_ports" class="form-input compact-input" placeholder="5201-5210">
+                                        <span class="field-unit">busy ports fall through to the next</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -140,9 +191,9 @@
                                         Enable Surveyors
                                     </label>
                                 </div>
-                                <div class="form-field">
-                                    <label for="surveyors">IP Addresses (comma separated):</label>
-                                    <input type="text" name="surveyors" id="surveyors" class="form-input" placeholder="192.168.1.100, 192.168.1.101">
+                                <div class="form-row">
+                                    <label for="surveyors">IP Addresses</label>
+                                    <input type="text" name="surveyors" id="surveyors" class="form-input" placeholder="192.168.1.100, 192.168.1.101" aria-label="Surveyor IP addresses, comma separated">
                                 </div>
                             </div>
                         </div>
@@ -150,7 +201,7 @@
                         <!-- Server Tab -->
                         <div class="tab-content" id="server-tab">
                             <div class="form-section">
-                                <h3><i class="fas fa-cloud-upload-alt"></i> Server Integration</h3>
+                                <h3><i class="fas fa-cloud-upload-alt"></i> Send Results to 5g-ready.io</h3>
                                 <p class="section-description">Powered by <a href="https://5g-ready.io" target="_blank">5g-ready.io</a></p>
                                 <div class="form-group">
                                     <label class="checkbox-label">
@@ -164,12 +215,12 @@
                                         Include Application Logs
                                     </label>
                                 </div>
-                                <div class="form-field">
-                                    <label for="server_url">Server URL:</label>
+                                <div class="form-row">
+                                    <label for="server_url">Server URL</label>
                                     <input type="text" name="server_url" id="server_url" value="https://5g-ready.io/injector" class="form-input">
                                 </div>
-                                <div class="form-field">
-                                    <label for="server_token">Server Token:</label>
+                                <div class="form-row">
+                                    <label for="server_token">Server Token</label>
                                     <input type="text" name="server_token" id="server_token" class="form-input">
                                 </div>
                             </div>

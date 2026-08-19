@@ -89,6 +89,17 @@ result = cp.speed_test(
 ### Netperf TCP RR (latency/jitter):
 Use `control/netperf` with `"rr": True` for latency measurement. See @speedtest_web for implementation.
 
+Verified field names in `status/wan/devices/{uid}/status/perf_results/tcp_rr`:
+- **`RT_LATENCY`** and **`STDDEV_LATENCY`**, both in **microseconds** (divide by 1000 for ms)
+- **There is no `MEAN_LATENCY`, `MIN_LATENCY`, `MAX_LATENCY`, `P50_LATENCY` or `P99_LATENCY`** on NCOS 7.x — speedtest_web checks `MEAN_LATENCY` first and falls through to `RT_LATENCY`, so always keep the `RT_LATENCY` fallback
+- `THROUGHPUT_UNITS` for an RR test is `Trans/s` (transactions/sec) — it is NOT a bitrate, do not convert it to bps
+
+### Netperf gotchas:
+- **`cp.speed_test()` does NOT return byte counters or latency** — `latency_ms` is initialised to 0 and never populated. Real volume is in `perf_results/tcp_down/LOCAL_BYTES_RECVD` and `perf_results/tcp_up/LOCAL_BYTES_SENT` (strings, coerce to int). Read them right after the test.
+- **`perf_results` accumulates keys across runs and is never cleared** — after a recv-only test the tree still holds the `tcp_up` and `tcp_rr` values from whenever they last ran. Reading a key that the current test did not produce silently returns stale numbers. Compare the entry's `TIME` field against its value from before the run if you need to be sure.
+- **`ifc_wan` takes the iface name** (e.g. `pmip3`, `wan`), from `status/wan/devices/{uid}/info/iface` — not the device uid.
+- **Do NOT substitute `control/ping` for netperf latency** — netperf has a real latency/jitter test (TCP_RR, above). Use it. `cp.speed_test()` for throughput plus one `control/netperf` `rr` call for latency is the correct combination.
+
 ### iPerf3 pattern:
 ```python
 cmd = ['./iperf3-arm64v8', '-c', server, '-p', str(port), '-t', '10', '-J']
