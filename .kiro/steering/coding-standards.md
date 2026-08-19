@@ -35,6 +35,19 @@ Applications run on Cradlepoint routers using Python 3.8.
 - **NEVER write default values to appdata** - Writing defaults to appdata overrides group configs pushed from NCM. Instead, read appdata and use a default in code if the field is missing/empty. For required fields with no sensible default, log a warning and skip that feature
 - **Router architecture is ARM64 (aarch64) with musl libc** - when downloading binaries, use aarch64/arm64 versions, NOT x86_64
 
+## Memory Management
+
+Routers have limited RAM. Fetching or holding large objects in a polling loop causes peak-memory spikes and fragmentation that add up over long unattended uptimes.
+
+- **NEVER fetch large API trees in a polling loop** - use the most specific sub-path possible. E.g., use `cp.get('status/vpn/tunnels')` NOT `cp.get('status/vpn')` which returns massive config/policy text blobs. Same applies to `status/wan/devices/{id}/diagnostics` vs `status/wan/devices` (all devices). This also avoids the repeated JSON-parsing cost of turning a big blob into hundreds of Python objects every poll
+- **Don't accumulate data in global collections without bounds** - if tracking state in dicts/sets/lists, clean up entries for items that no longer exist. Cap collection sizes if unbounded growth is possible
+- **Prefer simple types over nested structures** - store only what you need (a string ID, a boolean flag) rather than caching entire API response dicts
+- **Don't hold onto previous poll results longer than needed** - if a variable holding a big API response outlives the loop iteration (e.g. stored on `self` or in a global), drop the reference once you're done with it. Reassigning a local variable each iteration already frees the old value, no explicit `del` needed
+- **Match poll interval to response size** - small responses (single values, short lists): 1-2s is fine. Medium responses (device status objects): 3-5s. Large trees (full WAN/VPN status): 10-30s or use `cp.register()` instead
+- **ALWAYS use `time.sleep()` in polling loops** - never spin-wait. A bare `while True` without sleep burns CPU and accelerates object allocation with no benefit
+- **Monitor `status/system/memory` for complex apps** - for apps that warrant a memory guard (see below), log available memory at startup and periodically during operation. A steady decline over hours indicates a leak. If your app gets OOM-killed, it vanishes from `status/system/sdk` with no log entry. Simple fixed-workload apps don't need this — just follow the allocation rules above
+- **Consider a memory guard based on app complexity** - NOT every app needs this. Skip it for simple apps with fixed-size workloads (polling a few small paths on a timer, no growing collections). DO include it when: the app processes variable-size data (client lists, VPN tunnels, log buffers), accumulates state over time, or runs unattended on fleet-deployed routers. The guard checks `memavailable` every 30-60s and takes action: at suggested thresholds of ~20% available, log a warning and shed load (clear caches, back off poll frequency); at ~10% available, `cp.alert()` to NCM and `sys.exit(0)` to self-restart. Tune these thresholds per app if needed. The router restarts apps with `auto_start=true`, reclaiming all leaked memory. This is better than letting the OOM killer decide what to kill
+
 ## Local Development (Running on Your Computer)
 
 - **Apps can run locally** - `.venv/bin/python3 my_app/my_app.py` (Mac/Linux) or `.venv\Scripts\python my_app/my_app.py` (Windows) runs the app on your computer. cp.py auto-detects it's not on a router and uses HTTP REST to communicate with the dev router specified in `sdk_settings.ini`
