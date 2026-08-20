@@ -15,9 +15,15 @@ is a modem.
 Appdata fields:
 - cron_schedule: Cron expression (minute hour day month weekday).
   Default: "0 2 * * 1" (Monday at 2:00 AM local time)
+- delay_window: Seconds. Optional. Spreads fleet-wide test start times across this
+  window so thousands of routers don't hit the speedtest server at the same moment.
+  Each router computes a fixed offset (0 to delay_window-1) derived from its own
+  serial number, so the same router always delays by the same amount - deterministic,
+  not random. Default: 0 (no delay).
 """
 
 import cp
+import hashlib
 import os
 import time
 from datetime import datetime
@@ -62,6 +68,53 @@ def get_cron_schedule():
     if value:
         return value
     return DEFAULT_CRON
+
+
+def get_delay_window():
+    """Read delay_window (seconds) from appdata. 0/unset disables the delay."""
+    try:
+        value = cp.get_appdata('delay_window')
+        if value:
+            window = int(value)
+            if window > 0:
+                return window
+        return 0
+    except Exception as e:
+        cp.log(f'Invalid delay_window value, ignoring: {e}')
+        return 0
+
+
+def get_device_id():
+    """Get a stable per-router identifier for computing the fleet delay offset."""
+    try:
+        info = cp.get('status/product_info')
+        if info:
+            serial = info.get('manufacturing', {}).get('serial_num')
+            if serial:
+                return serial
+            mac = info.get('mac0')
+            if mac:
+                return mac
+    except Exception as e:
+        cp.log(f'Error getting device id for delay offset: {e}')
+    return None
+
+
+def get_delay_offset_seconds(delay_window):
+    """Compute a fixed per-router delay offset within [0, delay_window).
+
+    Deterministic and derived from the router's own serial number/MAC so the
+    same router always delays by the same amount, and thousands of routers
+    spread evenly across the window instead of all hitting the speedtest
+    server at once.
+    """
+    if delay_window <= 0:
+        return 0
+    device_id = get_device_id()
+    if not device_id:
+        return 0
+    digest = hashlib.md5(device_id.encode()).hexdigest()
+    return int(digest, 16) % delay_window
 
 
 def parse_cron_field(field, min_val, max_val):
@@ -251,16 +304,32 @@ try:
     cron_schedule = get_cron_schedule()
     cp.log(f'Cron schedule: {cron_schedule}')
 
+    delay_window = get_delay_window()
+    delay_offset = get_delay_offset_seconds(delay_window)
+    if delay_window:
+        cp.log(f'Delay window: {delay_window}s, this device\'s offset: {delay_offset}s')
+
     last_run_minute = None
+    pending_run_at = None  # unix timestamp when a delayed run should fire, or None
 
     while True:
-        # Re-read schedule every cycle to pick up appdata changes
+        # Re-read schedule/delay every cycle to pick up appdata changes
         cron_schedule = get_cron_schedule()
+        delay_window = get_delay_window()
 
-        # Manual trigger: run speedtest if asset_id is set to "start"
+        # Manual trigger: run speedtest immediately if asset_id is set to "start"
+        # (bypasses any pending delayed run - manual should be instant)
         asset_id = cp.get('config/system/asset_id')
         if asset_id and asset_id.lower() == 'start':
             cp.log('asset_id is "start" - running manual speedtest...')
+            pending_run_at = None
+            run_speedtest()
+            time.sleep(15)
+            continue
+
+        # If a delayed run is due, fire it
+        if pending_run_at is not None and time.time() >= pending_run_at:
+            pending_run_at = None
             run_speedtest()
             time.sleep(15)
             continue
@@ -269,10 +338,17 @@ try:
         current_minute = (local_now.tm_year, local_now.tm_mon, local_now.tm_mday,
                           local_now.tm_hour, local_now.tm_min)
 
-        # Only run once per matching minute
-        if current_minute != last_run_minute and cron_matches(cron_schedule, local_now):
+        # Only schedule once per matching minute
+        if (current_minute != last_run_minute and pending_run_at is None
+                and cron_matches(cron_schedule, local_now)):
             last_run_minute = current_minute
-            run_speedtest()
+            delay_offset = get_delay_offset_seconds(delay_window)
+            if delay_offset > 0:
+                pending_run_at = time.time() + delay_offset
+                cp.log(f'Cron matched - delaying speedtest by {delay_offset}s '
+                        f'(fleet load spreading)')
+            else:
+                run_speedtest()
 
         time.sleep(15)
 except Exception as e:

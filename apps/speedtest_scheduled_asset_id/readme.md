@@ -23,6 +23,7 @@ PUT https://www.cradlepointecm.com/api/v2/routers/{router_id}/
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `cron_schedule` | No | `0 2 * * 1` | Cron expression (minute hour day month weekday). Changes are picked up within 15 seconds |
+| `delay_window` | No | `0` (disabled) | Seconds. Spreads fleet-wide test start times across this window so thousands of routers don't hammer the speedtest server at once. Each router computes a fixed offset (0 to `delay_window`-1 seconds) from its own serial number/MAC - deterministic, not random, so the same router always delays by the same amount and the fleet spreads evenly. Example: `3600` spreads starts across a 1-hour window. |
 
 ## Cron Expression Examples
 
@@ -38,12 +39,15 @@ PUT https://www.cradlepointecm.com/api/v2/routers/{router_id}/
 ## How It Works
 
 1. App starts and waits for WAN connectivity
-2. Reads `cron_schedule` from appdata every 15 seconds (uses default if not set)
+2. Reads `cron_schedule` and `delay_window` from appdata every 15 seconds (uses defaults if not set)
 3. Checks if the current time matches the cron schedule
-4. Also checks if asset_id is set to "start" for manual triggering
-5. When triggered, runs a netperf speedtest
-6. Reads modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) from the primary WAN device if it's a modem
-7. Writes formatted results to `config/system/asset_id`
+4. If `delay_window` is set, the speedtest is scheduled to run after this router's fixed offset
+   into the window (instead of running immediately when the cron matches)
+5. Also checks if asset_id is set to "start" for manual triggering - this runs immediately and
+   bypasses any pending delayed run
+6. When triggered, runs a netperf speedtest
+7. Reads modem diagnostics (Carrier, DBM, SINR, RSRP, RSRQ) from the primary WAN device if it's a modem
+8. Writes formatted results to `config/system/asset_id`
 
 ## Retrieving Results via NCM
 
