@@ -1369,6 +1369,14 @@ For issues or questions:
 
 ## Version History
 
+### Version 2.10
+- Added configuration sync verification after patching device config via configuration manager v2 endpoint
+- Added `wait_for_config_sync` helper that polls `configuration_managers` for `synched=True` / `suspended=False` before proceeding
+- Sync check inserted after bulk config patch to ensure template config is fully delivered to the device
+- Sync checks inserted before and after `cleanup_state()` in group move to confirm all config changes and appdata deletions have propagated before the router moves to the production group
+- Prevents "id not found" configuration sync errors in NCM after the device is moved to the production group
+- Added `CONFIG_SYNC_CHECK_INTERVAL` (10s) and `CONFIG_SYNC_CHECK_TIMEOUT` (300s) constants
+
 ### Version 2.9
 - Added optional "Delete Auto-Created Resources" checkbox to wizard Optional Parameters (new `delete_auto_resources` appdata parameter, 23 total)
 - Added provisioning step that deletes the resources NCX/NCS creates automatically with a new site

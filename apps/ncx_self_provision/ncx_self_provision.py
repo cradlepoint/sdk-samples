@@ -216,6 +216,8 @@ DEFAULT_CONFIG_TEMPLATE = 'config_template.json'
 LICENSE_APPLY_DELAY = 1
 MAX_RETRIES = 3
 RETRY_DELAY = 5
+CONFIG_SYNC_CHECK_INTERVAL = 10  # Seconds between sync status checks
+CONFIG_SYNC_CHECK_TIMEOUT = 300  # 5 minutes total timeout for config sync
 
 # State tracking keys
 STATE_READINESS = 'prov_state_readiness'
@@ -524,6 +526,65 @@ def retry_on_failure(func, *args, max_retries: int = MAX_RETRIES,
             time.sleep(wait_time)
 
 
+def wait_for_config_sync(n2_client: 'ncm.NcmClientv2', router_id: str,
+                         timeout: int = CONFIG_SYNC_CHECK_TIMEOUT,
+                         interval: int = CONFIG_SYNC_CHECK_INTERVAL) -> None:
+    """Wait for device configuration to be fully synced in NCM.
+
+    Polls the configuration manager for the given router until the device
+    reports synched=True and suspended=False, or until the timeout expires.
+
+    Args:
+        n2_client: NCM v2 API client.
+        router_id: Router ID to check sync status for.
+        timeout: Maximum seconds to wait for sync. Defaults to
+            CONFIG_SYNC_CHECK_TIMEOUT.
+        interval: Seconds between status checks. Defaults to
+            CONFIG_SYNC_CHECK_INTERVAL.
+
+    Raises:
+        RuntimeError: If sync does not complete within timeout or sync is
+            suspended with an error.
+
+    """
+    cp.log(f"Waiting for configuration sync (timeout: {timeout}s)")
+    elapsed = 0
+
+    while elapsed < timeout:
+        try:
+            config_managers = n2_client.get_configuration_managers(
+                router=router_id,
+                fields='id,synched,suspended'
+            )
+            if config_managers:
+                cm = config_managers[0]
+                synched = cm.get('synched', False)
+                suspended = cm.get('suspended', False)
+
+                if suspended:
+                    cp.log("WARNING: Configuration sync is suspended")
+                    raise RuntimeError(
+                        "Configuration sync suspended for router "
+                        f"{router_id}. Manual intervention may be required."
+                    )
+
+                if synched:
+                    cp.log(f"Configuration sync complete ({elapsed}s elapsed)")
+                    return
+        except RuntimeError:
+            raise
+        except Exception as e:
+            cp.log(f"Warning: Error checking sync status: {e}")
+
+        time.sleep(interval)
+        elapsed += interval
+
+    raise RuntimeError(
+        f"Configuration sync did not complete within {timeout}s "
+        f"for router {router_id}"
+    )
+
+
 def validate_readiness(n2_client: ncm.NcmClientv2) -> bool:
     """Validate router firmware and group assignment.
     
@@ -768,6 +829,9 @@ def self_bulk_config(n2_client: ncm.NcmClientv2) -> Optional[Dict[str, str]]:
                             config_man_json=config
                         )
                         cp.log(f'Successfully patched config to router: {router_id}')
+
+                        # Wait for config to sync to device before continuing
+                        wait_for_config_sync(n2_client, str(router_id))
 
                         custom1_value = row.get('custom1')
                         if custom1_value and custom1_value != '':
@@ -1584,9 +1648,16 @@ def move_router_to_prod_group(n2_client: ncm.NcmClientv2) -> None:
         prod_group_id = validate_appdata('prod_group_id')
         router_id = str(cp.get('status/ecm/client_id'))
         
+        # Verify config is fully synced before moving groups
+        cp.log("Verifying configuration sync before group move")
+        wait_for_config_sync(n2_client, router_id)
+        
         # Clean up all appdata before moving
         cp.log("Cleaning up provisioning state and cached data")
         cleanup_state()
+        
+        # Wait for cleanup deletions to sync before moving
+        wait_for_config_sync(n2_client, router_id)
         
         cp.log(f"Moving to production group {prod_group_id}")
         retry_on_failure(
