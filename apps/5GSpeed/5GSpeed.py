@@ -61,6 +61,7 @@ import json
 import os
 import subprocess
 import time
+import traceback
 from datetime import datetime
 
 default_results_path = "config/system/asset_id"
@@ -275,39 +276,51 @@ def speedtest_netperf():
 
 
 def speedtest():
-    """Run speedtest with engine priority: Ookla (if present) > configured engine > netperf."""
-    text = None
+    """Run speedtest with engine priority: Ookla (if present) > configured engine > netperf.
 
-    # Ookla always takes priority if binary is present
-    if has_ookla():
-        text = speedtest_ookla()
-        if text:
-            cp.put(results_path, text)
-            return
-        cp.log('Ookla failed, trying configured engine...')
+    Always writes something to results_path, even on an unexpected error, so the
+    field never sits empty/unpopulated with no diagnostic trail.
+    """
+    try:
+        text = None
 
-    # Check configured engine from appdata
-    engine = get_appdata_value('speedtest') or 'netperf'
-    engine = engine.strip().lower()
-
-    if engine == 'iperf3':
-        if has_iperf3():
-            text = speedtest_iperf3()
+        # Ookla always takes priority if binary is present
+        if has_ookla():
+            text = speedtest_ookla()
             if text:
                 cp.put(results_path, text)
                 return
-            cp.log('iPerf3 failed, falling back to netperf...')
-        else:
-            cp.log('iperf3 engine selected but no binary found, '
-                   'falling back to netperf...')
+            cp.log('Ookla failed, trying configured engine...')
 
-    # Default: netperf
-    text = speedtest_netperf()
-    if text:
-        cp.put(results_path, text)
-    else:
-        cp.log('All speedtest engines failed.')
-        cp.put(results_path, 'Speedtest failed')
+        # Check configured engine from appdata
+        engine = get_appdata_value('speedtest') or 'netperf'
+        engine = engine.strip().lower()
+
+        if engine == 'iperf3':
+            if has_iperf3():
+                text = speedtest_iperf3()
+                if text:
+                    cp.put(results_path, text)
+                    return
+                cp.log('iPerf3 failed, falling back to netperf...')
+            else:
+                cp.log('iperf3 engine selected but no binary found, '
+                       'falling back to netperf...')
+
+        # Default: netperf
+        text = speedtest_netperf()
+        if text:
+            cp.put(results_path, text)
+        else:
+            cp.log('All speedtest engines failed.')
+            cp.put(results_path, 'Speedtest failed')
+    except Exception as e:
+        cp.log(f'Unexpected error running speedtest: {e}')
+        cp.log(traceback.format_exc())
+        try:
+            cp.put(results_path, f'Speedtest error: {e}')
+        except Exception as put_err:
+            cp.log(f'Also failed to write error result to {results_path}: {put_err}')
 
 
 def results_field_check(path, results, *args):
@@ -318,7 +331,12 @@ def results_field_check(path, results, *args):
         else:
             cp.log(f'5GSpeed ready. To start speedtest: put {results_path} ""')
     except Exception as e:
-        cp.log(f'Error: {e}')
+        cp.log(f'Error in results_field_check: {e}')
+        cp.log(traceback.format_exc())
+        try:
+            cp.put(results_path, f'Speedtest error: {e}')
+        except Exception as put_err:
+            cp.log(f'Also failed to write error result to {results_path}: {put_err}')
 
 
 try:
@@ -340,3 +358,4 @@ try:
         time.sleep(60)
 except Exception as e:
     cp.log(f'Fatal error: {e}')
+    cp.log(traceback.format_exc())
