@@ -41,7 +41,6 @@ The Serial Port page pulls the current values from the router and writes changes
 | Stop Bits | `stop_bits` (0 = 1, 1 = 1.5, 2 = 2) |
 | Hardware Flow Control | `flow_control/hardware` |
 | Software Flow Control | `flow_control/software` |
-| Router Serial Service Enabled | `enabled` |
 
 Notes:
 
@@ -50,8 +49,10 @@ Notes:
   writing.
 - All fields are written in a single PUT so the router validates the change as a whole. A
   rejected change leaves the existing config untouched rather than half-applied.
-- `enabled` controls the router's own serial redirector service. If you turn it on while
-  this app is running, both may contend for the same device.
+- `config/system/serial/enabled` (the router's own telnet-style serial redirector service)
+  is intentionally not exposed here. It is a separate service from this app's forwarding
+  and running both against the same device can cause contention; leave it configured
+  through the router's own UI/API if you need it.
 
 ## SDK Data (appdata)
 

@@ -268,9 +268,6 @@
 
                 els.serialFlowHw.checked = !!serial.flow_control.hardware;
                 els.serialFlowSw.checked = !!serial.flow_control.software;
-                els.serialEnabled.checked = !!serial.enabled;
-                els.serialStatusHint.textContent = 'Router serial service status: ' +
-                    (serial.status || 'unknown') + '.';
 
                 if (notify) {
                     showToast('Serial settings reloaded from router.', 'success');
@@ -295,7 +292,6 @@
             byte_size: parseInt(els.serialByteSize.value, 10),
             byte_parity: parseInt(els.serialParity.value, 10),
             stop_bits: parseInt(els.serialStopBits.value, 10),
-            enabled: els.serialEnabled.checked,
             flow_control: {
                 hardware: els.serialFlowHw.checked,
                 software: els.serialFlowSw.checked
@@ -381,8 +377,6 @@
         els.serialStopBits = document.getElementById('serial-stopbits');
         els.serialFlowHw = document.getElementById('serial-flow-hw');
         els.serialFlowSw = document.getElementById('serial-flow-sw');
-        els.serialEnabled = document.getElementById('serial-enabled');
-        els.serialStatusHint = document.getElementById('serial-status-hint');
         els.saveSerialBtn = document.getElementById('btn-save-serial');
         els.reloadSerialBtn = document.getElementById('btn-reload-serial');
         els.serialError = document.getElementById('serial-error');
@@ -414,5 +408,12 @@
         loadSerialSettings(false);
         loadStatus();
         setInterval(loadStatus, 5000);
+
+        // The template's own init() defaults to a "homepage" section that
+        // this app doesn't have, which leaves the page blank until a nav
+        // item is clicked. Show UDP Settings by default instead.
+        if (window.webAppTemplate && typeof window.webAppTemplate.showElement === 'function') {
+            window.webAppTemplate.showElement('udp-section');
+        }
     });
 })();
