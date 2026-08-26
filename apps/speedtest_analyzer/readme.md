@@ -111,6 +111,10 @@ http://192.168.0.1:8000
 6. Start the test.
 7. Review Downlink, Uplink, data transferred, latency/jitter when available, and cellular information when testing a cellular WAN.
 
+<img width="1414" height="489" alt="Speedtest Analyzer Test Center configured for a Public iPerf3 test" src="https://github.com/user-attachments/assets/075c505c-7003-416e-bedb-d97891c2ce37" />
+
+*Screenshots in this guide use example lab device names and private IP addressing. Device names, WAN labels, addresses, and available interfaces will vary by deployment.*
+
 The bundled **Public iPerf3 Server** catalog is available without first creating a User Server List.
 
 - **Public iPerf3 Servers** are the easiest way to begin testing.
