@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serial to UDP</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        .dest-row {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-end;
+            margin-bottom: 0.75rem;
+        }
+        .dest-row .form-field {
+            margin-bottom: 0;
+        }
+        .dest-row .dest-ip {
+            flex: 2 1 12rem;
+        }
+        .dest-row .dest-port {
+            flex: 1 1 7rem;
+        }
+        .dest-row .dest-remove {
+            flex: 0 0 auto;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+            gap: 1rem;
+        }
+        .checkbox-field {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .checkbox-field input {
+            width: auto;
+        }
+        .form-hint {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+        .form-error {
+            color: var(--danger-color);
+            margin-top: 1rem;
+        }
+        .status-line {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title"><i class="fas fa-exchange-alt"></i> Serial to UDP</h1>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-exchange-alt"></i> Serial to UDP</a></h2>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li>
+                            <a href="#" class="nav-item active" data-element="udp-section">
+                                <i class="fas fa-network-wired"></i> UDP Settings
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="serial-section">
+                                <i class="fas fa-plug"></i> Serial Port
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+
+                    <!-- UDP Settings -->
+                    <section class="element-section active" id="udp-section">
+                        <h2 class="section-title">UDP Settings</h2>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                            Serial data is forwarded to every destination listed below. Saved settings are
+                            stored in SDK Data and applied immediately.
+                        </p>
+
+                        <div class="control-panel">
+                            <div class="panel-header">
+                                <h2><i class="fas fa-arrow-right"></i> UDP Destinations</h2>
+                            </div>
+                            <div class="panel-content">
+                                <div id="dest-list"></div>
+                                <button type="button" class="btn btn-secondary" id="btn-add-dest">
+                                    <i class="fas fa-plus"></i> Add Destination
+                                </button>
+                                <p class="form-hint" id="dest-hint"></p>
+                            </div>
+                        </div>
+
+                        <div class="control-panel" style="margin-top: 1.5rem;">
+                            <div class="panel-header">
+                                <h2><i class="fas fa-arrow-left"></i> UDP Source</h2>
+                            </div>
+                            <div class="panel-content">
+                                <div class="settings-grid">
+                                    <div class="form-field">
+                                        <label for="udp-src-ip">Source IP Address</label>
+                                        <input type="text" id="udp-src-ip" class="form-input" placeholder="">
+                                        <p class="form-hint" id="src-ip-hint"></p>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="udp-src-port">Source Port</label>
+                                        <input type="number" id="udp-src-port" class="form-input"
+                                               placeholder="" min="1" max="65535">
+                                        <p class="form-hint" id="src-port-hint"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="udp-error" class="form-error" style="display: none;"></div>
+
+                        <div style="margin-top: 1.5rem;">
+                            <button type="button" class="btn btn-primary" id="btn-save-udp">
+                                <i class="fas fa-save"></i> Save UDP Settings
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Serial Port Settings -->
+                    <section class="element-section" id="serial-section">
+                        <h2 class="section-title">Serial Port</h2>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                            These values come from the router configuration at
+                            <code>config/system/serial</code>. Saving writes them back to the router
+                            config (not SDK Data) and reopens the serial port.
+                        </p>
+
+                        <div class="control-panel">
+                            <div class="panel-header">
+                                <h2><i class="fas fa-plug"></i> Port Configuration</h2>
+                            </div>
+                            <div class="panel-content">
+                                <div class="settings-grid">
+                                    <div class="form-field">
+                                        <label for="serial-port">Serial Device</label>
+                                        <select id="serial-port" class="form-input"></select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="serial-baud">Baud Rate</label>
+                                        <select id="serial-baud" class="form-input"></select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="serial-bytesize">Data Bits</label>
+                                        <select id="serial-bytesize" class="form-input"></select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="serial-parity">Parity</label>
+                                        <select id="serial-parity" class="form-input"></select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label for="serial-stopbits">Stop Bits</label>
+                                        <select id="serial-stopbits" class="form-input"></select>
+                                    </div>
+                                </div>
+
+                                <div class="settings-grid" style="margin-top: 1rem;">
+                                    <div class="form-field checkbox-field">
+                                        <input type="checkbox" id="serial-flow-hw">
+                                        <label for="serial-flow-hw">Hardware Flow Control (RTS/CTS)</label>
+                                    </div>
+                                    <div class="form-field checkbox-field">
+                                        <input type="checkbox" id="serial-flow-sw">
+                                        <label for="serial-flow-sw">Software Flow Control (XON/XOFF)</label>
+                                    </div>
+                                    <div class="form-field checkbox-field">
+                                        <input type="checkbox" id="serial-enabled">
+                                        <label for="serial-enabled">Router Serial Service Enabled</label>
+                                    </div>
+                                </div>
+                                <p class="form-hint" id="serial-status-hint"></p>
+                            </div>
+                        </div>
+
+                        <div id="serial-error" class="form-error" style="display: none;"></div>
+
+                        <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
+                            <button type="button" class="btn btn-primary" id="btn-save-serial">
+                                <i class="fas fa-save"></i> Save to Router Config
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btn-reload-serial">
+                                <i class="fas fa-sync"></i> Reload from Router
+                            </button>
+                        </div>
+
+                        <div class="control-panel" style="margin-top: 1.5rem;">
+                            <div class="panel-header">
+                                <h2><i class="fas fa-chart-line"></i> Forwarding Status</h2>
+                            </div>
+                            <div class="panel-content">
+                                <p class="status-line" id="forward-status">Loading...</p>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="static/js/script.js"></script>
+    <script src="static/js/serial_to_UDP.js"></script>
+</body>
+</html>
