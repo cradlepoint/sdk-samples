@@ -73,10 +73,12 @@ SERIAL_OPTIONS = {
     'stop_bits': [[0, '1'], [1, '1.5'], [2, '2']],
 }
 
-# Serial fields the UI may write back to the router config
+# Serial fields the UI may write back to the router config.
+# Note: config/system/serial/enabled controls the router's own serial
+# redirector (telnet-style) service, not this app's forwarding. It is
+# intentionally not exposed here.
 SERIAL_SELECT_FIELDS = ('serial_port', 'baud_rate', 'byte_size', 'byte_parity',
                         'stop_bits')
-SERIAL_BOOL_FIELDS = ('enabled',)
 SERIAL_FLOW_FIELDS = ('hardware', 'software')
 
 # Reload signalling between the web thread and the forwarding loop
@@ -312,7 +314,6 @@ def serial_config_for_ui(config):
     config = config or {}
     flow = config.get('flow_control') or {}
     return {
-        'enabled': bool(config.get('enabled', False)),
         'serial_port': config.get('serial_port', 'ttyUSB0'),
         'baud_rate': config.get('baud_rate', 9600),
         'byte_size': config.get('byte_size', 8),
@@ -322,7 +323,6 @@ def serial_config_for_ui(config):
             'hardware': bool(flow.get('hardware', False)),
             'software': bool(flow.get('software', False)),
         },
-        'status': config.get('status', ''),
     }
 
 
@@ -352,10 +352,6 @@ def build_serial_payload(data):
         if value not in [option[0] for option in allowed]:
             return None, '%s value "%s" is not supported' % (field, value)
         payload[field] = value
-
-    for field in SERIAL_BOOL_FIELDS:
-        if field in data:
-            payload[field] = bool(data[field])
 
     flow = data.get('flow_control')
     if isinstance(flow, dict):

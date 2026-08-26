@@ -10,6 +10,17 @@
 
 Cellular modem diagnostics. **Only on `mdm-*` devices**; not on ethernet WAN. Flat key-value object. Includes signal metrics (DBM, RSRP, SS) and capability/config keys (SUPPORTS_*, FW_INFO*, VER_*, etc.).
 
+Each SIM slot is a separate `mdm-*` device with its own diagnostics, but both slots of one
+physical modem share the same `DISP_IMEI` and the same `info/port` (e.g. `int1`). Use
+`info/port` to group slots by physical modem, and `SIM_SLOT_ID` / `info/sim` to tell slots apart.
+
+An empty slot's diagnostics has `NOSIM: 'TRUE'` and no `ICCID` or `CARRID` keys at all
+(the device still exists, with `status/error_text` = `'SIM error: NOSIM'`).
+
+`CARRID` is the short carrier name the modem reports (`Verizon`, `T-Mobile`, `ATT`), not the
+marketing name. There is no longer/friendlier carrier-name field — `COPS` is a numeric mode
+value, not an operator string.
+
 ### Fields (flat key-value object)
 
 | Field | Type | Description |
@@ -26,7 +37,14 @@ Cellular modem diagnostics. **Only on `mdm-*` devices**; not on ethernet WAN. Fl
 | `RFBAND` | string | LTE band (e.g. Band 66) |
 | `SRVC_TYPE` | string | Service type (LTE) |
 | `CELL_ID` | string | Cell identifier |
-| `ICCID` | string | SIM card ID |
+| `ICCID` | string | SIM card ID. **Absent when the slot is empty** |
+| `DISP_IMEI` | string | Modem IMEI (same value as `info/serial`; also in `GSN`/`CGSN`) |
+| `HOMECARRID` | string | Home carrier name — fallback when `CARRID` is absent (inactive slot) |
+| `NOSIM` | string | `'TRUE'` when the slot has no SIM. Key absent otherwise |
+| `SIM_SLOT_ID` | string | Slot number as a string (`'1'`, `'2'`) — matches `info/sim` (`sim1`/`sim2`) |
+| `SIM_NUM` | string | Same as `SIM_SLOT_ID` |
+| `MULTI_SIM_TOTAL` | string | Number of SIM slots on the modem |
+| `IMSI` | string | SIM IMSI |
 | `EMMSTATE` | string | Registration state (Registered) |
 | `MODEMOPMODE` | string | Online, Offline |
 | `MODEMTEMP` | string | Modem temperature |
