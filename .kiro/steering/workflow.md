@@ -108,7 +108,8 @@ Apps live at the repo root (where `make.py create` puts them). **NEVER move apps
 Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio, vehicle, security, web, tools, examples, speedtest, mqtt, etc.
 
 - **Multi-file apps work** - apps can have subdirectories with Python modules (e.g., `taky/taky/cot/`). Imports work normally. Include `__init__.py` in each package directory
-- **make.py finds apps by name** - `build`, `deploy`, `clean` all find apps in `apps/` or repo root
+- **make.py finds apps by name, case-insensitively** - `build`, `install`, `deploy`, `clean` search the repo root first, then `apps/`. The name you type does not have to match the folder's case; make.py normalizes to the on-disk folder name
+- **`make.py install` / `deploy` accept a .tar.gz file** - pass a package file name to install that exact file with no rebuild (e.g. `make.py install "My_App v1.0.0.tar.gz"`). Useful for app packages sent by someone else, where the archive name and the extracted folder name differ in case
 
 ## Create App
 

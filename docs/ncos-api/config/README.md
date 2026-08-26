@@ -66,11 +66,51 @@ the response.
 **When deleting multiple entries from a config array, delete highest index
 first.** Removing one entry shifts the indexes of all later entries.
 
+### String leaf PUTs over REST need JSON quoting
+
+`data=` carries a JSON value, so a string leaf must be quoted. Numbers and
+booleans are bare.
+
+```bash
+# Fails: {"exception": "server", "reason": "Expecting value: line 1 column 1 (char 0)"}
+curl -u admin:pass -X PUT http://ROUTER/api/config/system/serial/serial_port -d 'data=ttyUSB0'
+
+# Works
+curl -u admin:pass -X PUT http://ROUTER/api/config/system/serial/serial_port -d 'data="ttyUSB0"'
+```
+
+`cp.put()` JSON-serializes the value for you, so this only bites raw curl calls.
+
+### A partial struct PUT merges, it does not replace
+
+PUTting a dict with a subset of keys to a struct path leaves the unlisted keys
+alone. The response contains the full merged struct.
+
+```bash
+curl -u admin:pass -X PUT http://ROUTER/api/config/system/serial \
+  -d 'data={"baud_rate":19200}'
+# -> returns every field of config/system/serial, only baud_rate changed
+```
+
+### Prefer one struct PUT over several leaf PUTs when fields validate together
+
+Some structs have cross-field validation. Writing leaves one at a time makes the
+router validate each intermediate state, so a legal end state can be rejected —
+and the leaves written before the failure stay applied, leaving config
+half-changed. A single struct PUT is validated as a whole and is all-or-nothing.
+
+Example: `config/system/serial/flow_control` rejects hardware and software flow
+control being enabled together (`"reason": "Software and Hardware flow controls
+cannot be configured together."`). Going from software to hardware one leaf at a
+time always fails; sending `{"hardware": true, "software": false}` in one PUT
+succeeds.
+
 ## Path Index
 
 - **[PATHS.md](PATHS.md)** - Full list of config paths (generated from DTD)
 - **[wan-rules2.md](wan-rules2.md)** - WAN rules configuration (device matching, disabled field)
 - **[source-routing.md](source-routing.md)** - `config/routing/tables` and `config/routing/policies` (policies have no `_id_`, index-only addressing, descending-order deletes)
+- **[serial.md](serial.md)** - `config/system/serial` (parity/stop-bit enum values, mutually exclusive flow control, single-PUT requirement)
 
 ## Schema (DTD)
 
