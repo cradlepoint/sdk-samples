@@ -237,6 +237,9 @@ def update():
 # They are used by various functions in the file.
 g_app_name = ''
 g_app_uuid = ''
+# Set when the user passes a .tar.gz file instead of an app name. When set,
+# install/deploy use this exact file rather than looking for a built package.
+g_app_archive = ''
 g_dev_client_ip = ''
 g_dev_client_username = ''
 g_dev_client_password = ''
@@ -352,6 +355,201 @@ def get_app_pack(app_name=None):
     if app_name is not None:
         package_name = app_name + ".tar.gz"
     return package_name
+
+
+# Where make.py looks for apps and packages, in priority order:
+# '' is the repo root, then the apps/ folder.
+APP_SEARCH_DIRS = ('', 'apps')
+
+
+def _has_path_separator(name):
+    return '/' in name or '\\' in name or os.sep in name
+
+
+def _listdir(path):
+    """os.listdir that returns an empty list instead of raising."""
+    try:
+        return sorted(os.listdir(path))
+    except OSError:
+        return []
+
+
+def find_section(config, app_name):
+    """Return the package.ini section matching app_name, ignoring case.
+
+    Returns None when no section matches.
+    """
+    target = app_name.lower()
+    for section in config.sections():
+        if section.lower() == target:
+            return section
+    return None
+
+
+def find_app_dir(app_name):
+    """Locate an app directory by name, ignoring case.
+
+    Searches the repo root first, then the apps/ folder. Directories that
+    contain a package.ini are preferred over bare name matches. Returns the
+    path relative to the current working directory, or None if not found.
+    """
+    if not app_name:
+        return None
+
+    app_name = app_name.rstrip('/\\')
+
+    # An explicit path was given (e.g. apps/My_App) — honor it as-is.
+    if _has_path_separator(app_name) and os.path.isdir(app_name):
+        return app_name
+
+    cwd = os.getcwd()
+    target = os.path.basename(app_name).lower()
+    candidates = []
+
+    for base in APP_SEARCH_DIRS:
+        base_path = os.path.join(cwd, base) if base else cwd
+        if not os.path.isdir(base_path):
+            continue
+        for item in _listdir(base_path):
+            if item.lower() != target:
+                continue
+            rel = os.path.join(base, item) if base else item
+            if os.path.isdir(os.path.join(cwd, rel)):
+                candidates.append(rel)
+
+    # Prefer a match that actually looks like an app.
+    for candidate in candidates:
+        if os.path.isfile(os.path.join(candidate, CONFIG_FILE)):
+            return candidate
+
+    return candidates[0] if candidates else None
+
+
+def find_file(file_name):
+    """Locate a file by name in the repo root first, then apps/, ignoring case.
+
+    Returns the path relative to the current working directory, or None.
+    """
+    if not file_name:
+        return None
+
+    # An explicit path was given — only honor it as-is.
+    if _has_path_separator(file_name):
+        return file_name if os.path.isfile(file_name) else None
+
+    cwd = os.getcwd()
+    target = file_name.lower()
+
+    for base in APP_SEARCH_DIRS:
+        base_path = os.path.join(cwd, base) if base else cwd
+        if not os.path.isdir(base_path):
+            continue
+        for item in _listdir(base_path):
+            if item.lower() != target:
+                continue
+            rel = os.path.join(base, item) if base else item
+            if os.path.isfile(os.path.join(cwd, rel)):
+                return rel
+
+    return None
+
+
+def is_archive_name(name):
+    """True if name looks like an app package file (.tar.gz)."""
+    return bool(name) and name.lower().endswith('.tar.gz')
+
+
+def archive_to_app_name(archive):
+    """Derive an app name from a package file name.
+
+    'My_App v1.2.3.tar.gz'  -> 'My_App'
+    'My_App_v1.2.3.tar.gz'  -> 'My_App'
+    'my_app.tar.gz'         -> 'my_app'
+    """
+    name = os.path.basename(archive.rstrip('/\\'))
+    name = re.sub(r'\.tar\.gz$', '', name, flags=re.IGNORECASE)
+    # Strip a trailing version suffix, separated by a space, underscore or dash.
+    name = re.sub(r'[\s_-]+v\d+(\.\d+)*$', '', name, flags=re.IGNORECASE)
+    return name
+
+
+def read_app_version(app_path, app_name=None):
+    """Read 'major.minor.patch' from an app's package.ini.
+
+    Returns None when package.ini or its section is missing.
+    """
+    app_name = app_name or os.path.basename(app_path)
+    config_path = os.path.join(app_path, CONFIG_FILE)
+    if not os.path.isfile(config_path):
+        return None
+
+    config = configparser.ConfigParser()
+    try:
+        config.read(config_path)
+    except configparser.Error as err:
+        print('WARNING: Could not read {}: {}'.format(config_path, err))
+        return None
+
+    section = find_section(config, app_name)
+    if section is None:
+        return None
+
+    return '{}.{}.{}'.format(config[section].get('version_major', '0'),
+                             config[section].get('version_minor', '0'),
+                             config[section].get('version_patch', '0'))
+
+
+def find_app_archive(app_name):
+    """Locate the .tar.gz package to install, ignoring case.
+
+    If app_name is itself a .tar.gz file, that exact file is used. Otherwise
+    the app directory is located (repo root first, then apps/), the version is
+    read from its package.ini, and the matching package file is searched for in
+    the repo root first, then apps/.
+
+    Returns the path relative to the current working directory, or None.
+    """
+    if not app_name:
+        return None
+
+    # A package file was named directly — use that exact file.
+    if is_archive_name(app_name):
+        return find_file(app_name)
+
+    app_path = find_app_dir(app_name)
+    # Use the on-disk folder name so the package file name matches what
+    # build produced, even if the user typed a different case.
+    actual_name = os.path.basename(app_path) if app_path else app_name
+
+    wanted = []
+    if app_path:
+        version = read_app_version(app_path, actual_name)
+        if version:
+            wanted.append('{} v{}.tar.gz'.format(actual_name, version))
+    wanted.append('{}.tar.gz'.format(actual_name))
+
+    for name in wanted:
+        match = find_file(name)
+        if match:
+            return match
+
+    # Fall back to any package file starting with the app name. Reverse sort so
+    # the highest version wins when several builds are lying around.
+    cwd = os.getcwd()
+    prefix = actual_name.lower()
+    for base in APP_SEARCH_DIRS:
+        base_path = os.path.join(cwd, base) if base else cwd
+        if not os.path.isdir(base_path):
+            continue
+        for item in sorted(_listdir(base_path), reverse=True):
+            lowered = item.lower()
+            if not lowered.startswith(prefix) or not lowered.endswith('.tar.gz'):
+                continue
+            rel = os.path.join(base, item) if base else item
+            if os.path.isfile(os.path.join(cwd, rel)):
+                return rel
+
+    return None
 
 
 # Gets data from the NCOS config store
@@ -789,17 +987,13 @@ def package_application(app_root, pkey):
 # Package the app files into a tar.gz archive.
 def package(app=None):
     app_name = app or g_app_name
-    app_path = app_name
 
-    # If app_name is not a directory, try to find it under apps/
-    if not os.path.isdir(app_path):
-        # Check apps/{app_name} directly (flat structure)
-        candidate = os.path.join('apps', app_name)
-        if os.path.isdir(candidate):
-            app_path = candidate
-        else:
-            print("ERROR: App directory '{}' does not exist. Skipping.".format(app_name))
-            return False
+    # Find the app case-insensitively: repo root first, then apps/
+    app_path = find_app_dir(app_name)
+    if app_path is None:
+        print("ERROR: App directory '{}' was not found in the repo root or "
+              "apps/. Skipping.".format(app_name))
+        return False
 
     # The app_name for packaging must match the folder basename
     actual_app_name = os.path.basename(app_path)
@@ -813,11 +1007,7 @@ def package(app=None):
     config = configparser.ConfigParser()
     config.read(app_config_file)
     # Case-insensitive section lookup: find section matching folder name
-    matched_section = None
-    for section in config.sections():
-        if section.lower() == actual_app_name.lower():
-            matched_section = section
-            break
+    matched_section = find_section(config, actual_app_name)
     if matched_section is None:
         print("ERROR: The '{}' section does not exist in {}. Skipping.".format(actual_app_name, app_config_file))
         return False
@@ -919,48 +1109,20 @@ def create(app_name=None):
 # Transfer the app tar.gz package to the NCOS device
 def install():
     if is_NCOS_device_in_DEV_mode():
-        # Try to read version from package.ini in the app folder
-        app_archive = None
-        try:
-            # Check multiple possible locations for package.ini
-            candidates = [
-                os.path.join(g_app_name, 'package.ini'),
-                os.path.join('apps', g_app_name, 'package.ini'),
-            ]
-            package_ini_path = None
-            for candidate in candidates:
-                if os.path.isfile(candidate):
-                    package_ini_path = candidate
-                    break
+        # A .tar.gz passed on the command line is used exactly as given.
+        # Otherwise find the app (repo root first, then apps/) case-insensitively
+        # and locate the package file built from it.
+        requested = g_app_archive or g_app_name
+        app_archive = find_app_archive(requested)
 
-            if package_ini_path:
-                config = configparser.ConfigParser()
-                config.read(package_ini_path)
-                # Case-insensitive section lookup
-                section_name = None
-                for s in config.sections():
-                    if s.lower() == g_app_name.lower():
-                        section_name = s
-                        break
-                if section_name:
-                    version_major = config[section_name].get('version_major', '0')
-                    version_minor = config[section_name].get('version_minor', '0')
-                    version_patch = config[section_name].get('version_patch', '0')
-                    app_archive = f"{g_app_name} v{version_major}.{version_minor}.{version_patch}.tar.gz"
-        except Exception:
-            pass
-
-        # Fallback: find any matching tar.gz
-        if not app_archive or not os.path.exists(app_archive):
-            import glob
-            matches = glob.glob(f"{g_app_name}*.tar.gz") + glob.glob(f"{g_app_name} v*.tar.gz")
-            if matches:
-                app_archive = matches[0]
+        if not app_archive:
+            if is_archive_name(requested):
+                print('ERROR: Package file not found: {}'.format(requested))
             else:
-                app_archive = f"{g_app_name}.tar.gz"
-
-        if not os.path.exists(app_archive):
-            print('ERROR: Package file not found: {}'.format(app_archive))
+                print('ERROR: No package file found for \'{}\' in the repo root '
+                      'or apps/.'.format(requested))
+                print('       Build it first: {} make.py build {}'.format(
+                    g_python_cmd, requested))
             return 1
 
         print('Installing {} to {}...'.format(app_archive, g_dev_client_ip))
@@ -1081,7 +1243,10 @@ def deploy():
     purge()
     time.sleep(3)
 
-    if not package():
+    if g_app_archive:
+        # A package file was named directly — install it as-is, no build.
+        print('Using package file {}'.format(g_app_archive))
+    elif not package():
         print('ERROR: Packaging failed.')
         return
 
@@ -1130,11 +1295,17 @@ def output_help():
     print('\tTo clean all the apps, add the option "all" (i.e. clean all).\n')
     print('build or package: Create the app archive tar.gz file.')
     print('\tTo build all the apps, add the option "all" (i.e. build all).')
-    print('\tAny directory containing a package.ini file is considered an app.\n')
+    print('\tAny directory containing a package.ini file is considered an app.')
+    print('\tThe app name is case-insensitive. The repo root is searched first,')
+    print('\tthen the apps/ folder.\n')
     print('status: Fetch and print current app status from the locally connected NCOS device.\n')
     print('install: Secure copy the app archive to a locally connected NCOS device.')
     print('\tThe NCOS device must already be in SDK DEV mode via registration ')
-    print('\tand licensing using NCM.\n')
+    print('\tand licensing using NCM.')
+    print('\tThe app name is case-insensitive. The repo root is searched first,')
+    print('\tthen the apps/ folder.')
+    print('\tPass a .tar.gz file to install that exact package, for example:')
+    print(f'\t\t{g_python_cmd} make.py install "My_App v1.0.0.tar.gz"\n')
     print('start: Start the app on the locally connected NCOS device.\n')
     print('stop: Stop the app on the locally connected NCOS device.\n')
     print('uninstall: Uninstall the app from the locally connected NCOS device.\n')
@@ -1155,22 +1326,20 @@ def get_app_uuid():
 
     if g_app_uuid == '':
         uuid_key = 'uuid'
-        app_config_file = os.path.join(g_app_name, 'package.ini')
 
-        if not os.path.isdir(g_app_name):
+        # Find the app case-insensitively: repo root first, then apps/
+        app_path = find_app_dir(g_app_name)
+        if app_path is None:
             return g_app_uuid
 
+        app_config_file = os.path.join(app_path, CONFIG_FILE)
         if not os.path.isfile(app_config_file):
             return g_app_uuid
 
         config = configparser.ConfigParser()
         config.read(app_config_file)
         # Case-insensitive section lookup
-        section_name = None
-        for s in config.sections():
-            if s.lower() == g_app_name.lower():
-                section_name = s
-                break
+        section_name = find_section(config, os.path.basename(app_path))
         if section_name:
             if uuid_key in config[section_name]:
                 g_app_uuid = config[section_name][uuid_key]
@@ -1241,6 +1410,7 @@ def warn_if_unconfigured():
 def init(app=None):
     global g_python_cmd
     global g_app_name
+    global g_app_archive
     global g_dev_client_ip
     global g_dev_client_username
     global g_dev_client_password
@@ -1287,7 +1457,18 @@ def init(app=None):
     # Initialize the globals based on the sdk_settings.ini contents.
     if sdk_key in config:
         if app is not None:
-            g_app_name = os.path.basename(app.rstrip('/'))
+            app_arg = app.rstrip('/\\')
+            if is_archive_name(app_arg):
+                # A package file was named directly — install exactly that file.
+                g_app_archive = app_arg
+                g_app_name = archive_to_app_name(app_arg)
+            else:
+                g_app_name = os.path.basename(app_arg)
+            # Normalize to the on-disk folder name so package.ini lookups and
+            # package file names match, regardless of the case the user typed.
+            resolved = find_app_dir(g_app_name)
+            if resolved:
+                g_app_name = os.path.basename(resolved)
         elif app_key in config[sdk_key]:
             g_app_name = config[sdk_key][app_key]
         else:
