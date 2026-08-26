@@ -127,15 +127,21 @@ The bundled **Public iPerf3 Server** catalog is available without first creating
 
 # Test Center
 
-**Test Center** is the central configuration area for both on-demand Manual Tests and Scheduled Tests. The manual test controls are used when you want to run a test immediately.
+**Test Center** is the central area for on-demand Manual Tests, live test results, and Scheduled Tests.
 
-## WAN selection
+## Manual Tests
+
+Use **Manual Tests** when you want to run a test immediately.
+
+### WAN selection
 
 The default selection is **Active Primary WAN**.
 
 This is useful when the goal is to test the router's currently preferred connection without manually selecting an interface. The application resolves the actual primary WAN when the test starts, and History records the real interface that was used.
 
-Manual Tests and Scheduled Tests both keep the WAN selector available whenever a connected WAN exists. The selector shows **Active Primary WAN** first and also lists each connected WAN interface, even when only one physical WAN is connected. Select the concrete interface when you want the test pinned to that path instead of following whichever WAN is primary when the test starts.
+Manual Tests and Scheduled Tests both keep the WAN selector available whenever a connected WAN exists. The selector shows **Active Primary WAN** first and also lists each connected WAN interface, even when only one physical WAN is connected.
+
+Select a specific interface when you want the test pinned to that WAN instead of following whichever WAN is primary when the test starts.
 
 Friendly interface labels may include:
 
@@ -148,7 +154,7 @@ Friendly interface labels may include:
 
 The friendly name is only a display label. The application retains the underlying NCOS interface identity for actual test execution.
 
-## Typical workflow
+### Typical workflow
 
 1. Select the WAN.
 2. Select the test engine.
@@ -161,7 +167,7 @@ The friendly name is only a display label. The application retains the underlyin
 
 Unsupported engine/device combinations are disabled rather than silently attempted.
 
-## Stopping a test
+### Stopping a test
 
 The Test Center supports stopping an active manual test.
 
@@ -169,151 +175,43 @@ For iPerf3, the application terminates the active local iPerf3 process. If Downl
 
 Netperf cancellation uses the router's native NCOS speed-test control.
 
----
+## Live Results and Cellular Information
 
-# Test Engines
+During and after a test, the Test Center can display:
 
-## iPerf3
+- Downlink throughput
+- Uplink throughput
+- Data downloaded
+- Data uploaded
+- Latency
+- Jitter
+- Cellular Health
+- Service Type
+- Active Carriers
 
-iPerf3 is bundled with the application and is the recommended general-purpose throughput engine.
+<img width="1331" height="229" alt="Speedtest Analyzer live cellular results showing throughput, cellular health, service type, and Active Carriers" src="https://github.com/user-attachments/assets/2b4a476d-3b38-4249-ba73-fc64ce127b05" />
 
-User-facing capabilities include:
+**Data downloaded** and **Data uploaded** represent data reported by the active test engine. They are not general WAN-interface byte-counter changes, so unrelated production/user traffic sharing the selected WAN is not counted as speed-test data.
 
-- TCP Downlink and Uplink testing.
-- Primary and validated non-primary WAN testing.
-- Public, User, and Custom server workflows.
-- Port-range support.
-- Automatic retry for eligible listener failures.
-- Public same-Region backup behavior when the selected Public server cannot start Downlink after eligible listener failures.
-- Actual server and port information recorded in History and CSV.
-- Stop/cancellation support.
+If a direction does not produce a valid engine result, its data value remains unavailable rather than falling back to total WAN traffic.
 
-iPerf3 requires access to an iPerf3 server.
+### Active Carriers
 
-iPerf3 does not provide the same latency and jitter measurements available from Netperf.
+When a cellular WAN is selected, **Active Carriers** shows the current radio state reported by NCOS, including available items such as:
 
-## Netperf
+- Service mode
+- Active carrier count
+- Active bands
+- Observed Downlink bandwidth across reported active serving carriers
+- Peak carrier count and observed Downlink bandwidth reached during the current test
 
-Netperf uses the router's native NCOS speed-test service.
+Cellular state is refreshed approximately every two seconds while a test is running.
 
-User-facing capabilities include:
+The application reports what NCOS exposes. It does not force Carrier Aggregation or 5G activation.
 
-- TCP Downlink and Uplink testing.
-- Per-WAN testing.
-- Optional latency and jitter reporting.
-- Native Cradlepoint Netperf infrastructure.
-- Automatic safety handling when a native test does not stop normally.
+A successful speed test therefore does not guarantee that additional component carriers will activate.
 
-Some platforms have confirmed NCOS Netperf defects. The application disables Netperf only where the matching known-defect rule applies.
-
-## Ookla
-
-Ookla support is optional.
-
-A compatible licensed ARM64 Ookla/Speedtest binary must be included with the application. The distributed app does not include a licensed Ookla binary by default.
-
-Platform behavior should be considered unvalidated unless separately tested.
-
----
-
-# iPerf3 Servers
-
-Open **Servers** to choose between the two persistent server sources and to review server Reliability statistics.
-
-## Public iPerf3 Servers
-
-Public mode is the default iPerf3 server source for new Speedtest Analyzer installations.
-
-The bundled read-only catalog is organized into five United States regions:
-
-- East
-- Southeast
-- Midwest
-- Southwest
-- West
-
-The catalog is sourced from the monitored public server list at `iperf3serverlist.net`. The application uses the bundled catalog and does not continuously query the external site during normal operation.
-
-Public servers are operated by third parties. Availability, load, and individual listener ports can change at any time.
-
-### Manual Public tests
-
-Manual Public testing provides:
-
-1. Region selection.
-2. Friendly server selection within that Region.
-3. A **Custom Server** option for one-time testing.
-
-Custom Server tests are not stored in persistent iPerf3 Reliability statistics.
-
-### Scheduled Public tests
-
-Scheduled Public tests maintain their own Region and server selection.
-
-The Scheduled Region is independent from the Region selected for manual testing in Test Center.
-
-**Custom Server is not available for Scheduled Tests.**
-
-## User Server List
-
-Use **User Server List** for private, trusted, or preferred endpoints that should remain saved.
-
-Available management functions include:
-
-- Add Server
-- Edit Server
-- Delete Server
-- Delete All Servers
-- Download Server List Template
-- Export My Server List
-- Import Server List
-- Merge Lists
-- Replace List
-
-The User Server List remains stored when the application is switched to Public mode.
-
-A saved User endpoint is identified by its Hostname/IP and Port or Port Range. Friendly Name, City, and Country are descriptive metadata.
-
-Editing only descriptive metadata preserves that server's existing identity, schedule association, and Reliability history. Changing Hostname/IP or Port/Range creates a new endpoint identity and can require confirmation if a schedule references the old endpoint.
-
-## Port ranges and retries
-
-A Public or User server can define a single port or a port range.
-
-The application uses a bounded retry strategy and does not endlessly scan a configured range.
-
-Eligible listener problems such as a busy or unavailable iPerf3 listener can move the test to another unused port. Generic WAN, DNS, routing, timeout, or system failures are not treated as listener failures.
-
-For Public mode, one same-Region backup server can be attempted when the original server exhausts its eligible Downlink listener attempts before throughput begins.
-
-User Server List tests remain locked to the configured endpoint and do not automatically move to another User server.
-
-After Downlink succeeds, Uplink remains on the successful server and tries the successful Downlink port first.
-
----
-
-# iPerf3 Reliability
-
-The Servers page provides lightweight Reliability statistics for saved Public or User iPerf3 endpoints.
-
-The summary includes:
-
-- Successful Tests
-- Endpoint Failures
-- Failure Rate
-- Most Failed Port
-
-Only listener-attributable endpoint failures are counted.
-
-WAN, DNS, routing, generic timeout, and system failures are excluded so the Reliability metric is not presented as a general WAN-success score.
-
-Custom Server tests are excluded because they do not have a stable saved server identity.
-
-Resetting Reliability statistics affects only the currently active Public or User Reliability source and does not delete saved server definitions.
-
----
-
-# Scheduled Tests
+## Scheduled Tests
 
 Use **Scheduled Tests** to run recurring tests automatically.
 
@@ -337,100 +235,246 @@ Typical presets include:
 - Weekly
 - Weekdays
 
+<img width="1317" height="726" alt="Speedtest Analyzer Scheduled Tests configured for hourly Public iPerf3 testing on the Active Primary WAN" src="https://github.com/user-attachments/assets/c55e65ab-f9eb-45e1-a441-f31b91e9f3d4" />
+
 For Public iPerf3 schedules, select the Scheduled Region and server independently from the manual test configuration in Test Center.
 
 A Custom iPerf3 server cannot be scheduled.
 
 The same device and engine compatibility rules used for manual testing apply to Scheduled Tests. A hard-disabled combination cannot be saved as a scheduled job.
 
-## Auto-start on boot
+### Auto-start on boot
 
 Schedule configuration remains saved across application and router restarts.
 
 - **Auto-start enabled:** the saved schedule resumes after restart.
 - **Auto-start disabled:** the schedule remains saved, but scheduled execution starts disabled.
 
+## Test Engines
+
+### iPerf3
+
+iPerf3 is bundled with the application and is the recommended general-purpose throughput engine.
+
+User-facing capabilities include:
+
+- TCP Downlink and Uplink testing.
+- Primary and validated non-primary WAN testing.
+- Public, User, and Custom server workflows.
+- Port-range support.
+- Automatic retry for eligible listener failures.
+- Public same-Region backup behavior when the selected Public server cannot start Downlink after eligible listener failures.
+- Actual server and port information recorded in History and CSV.
+- Stop/cancellation support.
+
+iPerf3 requires access to an iPerf3 server.
+
+iPerf3 does not provide the same latency and jitter measurements available from Netperf.
+
+### Netperf
+
+Netperf uses the router's native NCOS speed-test service.
+
+User-facing capabilities include:
+
+- TCP Downlink and Uplink testing.
+- Per-WAN testing.
+- Optional latency and jitter reporting.
+- Native Cradlepoint Netperf infrastructure.
+- Automatic safety handling when a native test does not stop normally.
+
+Some platforms have confirmed NCOS Netperf defects. The application disables Netperf only where the matching known-defect rule applies.
+
+### Ookla
+
+Ookla support is optional.
+
+A compatible licensed ARM64 Ookla/Speedtest binary must be included with the application. The distributed app does not include a licensed Ookla binary by default.
+
+Platform behavior should be considered unvalidated unless separately tested.
+
 ---
 
-# Live Results and Cellular Information
+# Servers
 
-The Test Center can display:
+Open **Servers** to manage test destinations, select the active iPerf3 server source, maintain saved User endpoints, and review iPerf3 Reliability statistics.
 
-- Downlink throughput
-- Uplink throughput
-- Data downloaded
-- Data uploaded
-- Latency
-- Jitter
-- Cellular Health
-- Service Type
-- Active Carriers
+<img width="1356" height="1186" alt="Speedtest Analyzer Server Management showing Public iPerf3 servers, region selection, and endpoint reliability statistics" src="https://github.com/user-attachments/assets/fa660fd0-b018-425c-8a74-0220115c088e" />
 
-**Data downloaded** and **Data uploaded** represent data reported by the active test engine. They are not general WAN-interface byte-counter changes, so unrelated production/user traffic sharing the selected WAN is not counted as speed-test data.
+## Netperf Servers
 
-If a direction does not produce a valid engine result, its data value remains unavailable rather than falling back to total WAN traffic.
+Netperf uses the router's native NCOS speed-test service and can operate without maintaining an iPerf3 server list.
 
-## Active Carriers
+The Servers page also provides optional Netperf server management. A Netperf server can be saved with an IP address and an optional descriptive label.
 
-When a cellular WAN is selected, **Active Carriers** shows the current radio state reported by NCOS, including available items such as:
+If no custom Netperf server is saved, the application uses the default Netperf service available through NCOS.
 
-- Service mode
-- Active carrier count
-- Active bands
-- Observed Downlink bandwidth across reported active serving carriers
-- Peak carrier count and observed Downlink bandwidth reached during the current test
+Netperf server definitions can be imported or exported from the Servers page.
 
-Cellular state is refreshed approximately every two seconds while a test is running.
+Netperf server configuration is independent from the iPerf3 **Server List Mode** described below.
 
-The application reports what NCOS exposes. It does not force Carrier Aggregation or 5G activation.
+## iPerf3 Server List Modes
 
-A successful speed test therefore does not guarantee that additional component carriers will activate.
+Speedtest Analyzer provides two persistent iPerf3 server sources:
 
----
+- **Public iPerf3 Servers**
+- **User Server List**
 
-# Understanding Carrier Activity
+Use the **Server List Mode** selector on the Servers page to choose the active source.
 
-For successful cellular tests, the **CA** field in the Test Log can be expanded.
+The selected mode controls which saved iPerf3 source is presented to Manual Tests, Scheduled Tests, and the Servers page.
 
-The detailed view is organized as:
+Switching modes preserves both persistent server sources. The inactive source is not deleted.
 
-```text
-BASELINE | PROGRESS | PEAK
-```
+See **Switching between Public and User modes** below for the effect of a mode change on an existing iPerf3 Scheduled Test.
 
-- **Baseline** — the last known carrier state immediately before successful throughput begins.
-- **Progress** — carrier information observed during successful Downlink and Uplink traffic.
-- **Peak** — the strongest carrier state observed during successful traffic.
+### Public iPerf3 Servers
 
-Setup delays, failed iPerf3 listener attempts, and unsuccessful throughput attempts are not promoted into the successful traffic timeline.
+**Public iPerf3 Servers** is the default iPerf3 server source for new Speedtest Analyzer installations.
 
-## Observed Downlink Bandwidth
+The bundled read-only catalog is organized into five United States regions:
 
-**Observed Downlink Bandwidth** is the sum of positive bandwidth values reported for active RX/downlink serving carriers.
+- East
+- Southeast
+- Midwest
+- Southwest
+- West
 
-It describes modem-reported serving-carrier bandwidth. It is **not** the measured speed-test throughput and does not prove that every displayed carrier carried test traffic.
+The catalog is sourced from the monitored public server list at `iperf3serverlist.net`.
 
-An active carrier explicitly reporting `0 MHz` remains part of the active-carrier count but contributes zero to the bandwidth total.
+The application uses the bundled catalog and does not continuously query the external site during normal operation.
 
-## Uplink Carrier Aggregation
+Each Public entry can provide information such as:
 
-NCOS currently does not expose the TX-channel and uplink component-carrier information required for the app to determine active Uplink CA.
+- Friendly server name
+- Hostname or IP address
+- Port or port range
+- City
+- Country
+- Region
 
-The detailed result can therefore show an **Observed Uplink Anchor** and a **Published Maximum Uplink CA** reference, but it does not claim to show active Uplink CA.
+Public servers are operated by third parties. Availability, load, and individual listener ports can change at any time.
 
-When displayed:
+#### Manual Public tests
 
-- **Observed Uplink Anchor** is a serving-carrier observation captured during Uplink traffic.
-- **Current Uplink CA: Not reported by NCOS** means active uplink component-carrier participation cannot currently be determined.
-- **Published Maximum Uplink CA** is a modem capability reference, not a measurement of currently active uplink carriers.
+Manual Public testing provides:
 
-## Published modem capabilities
+1. Region selection.
+2. Friendly server selection within that Region.
+3. A **Custom Server** option for one-time testing.
 
-When a supported modem variant is identified, the expanded Carrier Activity view can show published LTE, 5G NSA, and 5G SA maximum Carrier Aggregation references.
+The Region selected for Manual Tests is independent from the Region used by Scheduled Tests.
 
-These are capability references only. They do not change or override the serving carriers observed during a test.
+#### Scheduled Public tests
 
-If the device model is known but the exact modem variant cannot be confirmed, the application can show available published variants so the user can identify the correct one manually.
+Scheduled Public testing maintains its own Region and server selection.
+
+Changing the Scheduled Region requires the scheduled server to be selected from the new Region.
+
+**Custom Server is not available for Scheduled Tests.**
+
+### User Server List
+
+Use **User Server List** for private, trusted, or preferred iPerf3 endpoints that should remain saved.
+
+<img width="1337" height="505" alt="Speedtest Analyzer User Server List showing saved iPerf3 endpoints and server management controls" src="https://github.com/user-attachments/assets/bb1091f7-96af-4b4b-9b5c-3affbdaf90fd" />
+
+Available management functions include:
+
+- Add Server
+- Edit Server
+- Delete Server
+- Delete All Servers
+- Download Server List Template
+- Export My Server List
+- Import Server List
+- Merge Lists
+- Replace List
+
+The User Server List remains stored when the application is switched to Public mode.
+
+A saved User endpoint is identified by its:
+
+- Hostname or IP address
+- Port or port range
+
+Friendly Name, City, and Country are descriptive metadata.
+
+Editing only Friendly Name, City, or Country preserves the endpoint identity, existing schedule association, and Reliability history.
+
+Changing Hostname/IP or Port/Range changes the endpoint identity. If an existing iPerf3 schedule references that endpoint, the application can require confirmation before resetting the affected schedule.
+
+Duplicate endpoint definitions are not treated as separate saved servers.
+
+### Switching between Public and User modes
+
+To change the active iPerf3 server source:
+
+1. Open **Servers**.
+2. Locate **Server List Mode**.
+3. Select **Public iPerf3 Servers** or **User Server List**.
+4. Review the confirmation warning if an iPerf3 Scheduled Test is currently configured.
+5. Confirm the mode change.
+6. Return to **Test Center** and select a server from the newly active source before creating a new iPerf3 schedule.
+
+Switching modes changes the active iPerf3 server source but does **not** delete either persistent server source. A saved **User Server List** remains stored while Public mode is active and becomes available again when User mode is selected.
+
+However, an existing iPerf3 Scheduled Test can be tied to a server from the currently active source. If changing Server List Mode would make that scheduled server reference incompatible, Speedtest Analyzer displays a confirmation warning before completing the change.
+
+<img width="471" height="208" alt="Speedtest Analyzer warning that changing iPerf3 server list mode removes the existing scheduled iPerf3 job" src="https://github.com/user-attachments/assets/37d7c0be-017b-4ef5-b753-fee2966c1ceb" />
+
+If the mode change is confirmed, the incompatible iPerf3 Scheduled Test is reset and must be configured again using a server from the newly active source.
+
+Changing iPerf3 Server List Mode does not affect saved server definitions or Netperf Scheduled Tests.
+
+### Custom Server
+
+**Custom Server** is intended for one-time Manual Tests against an iPerf3 endpoint that does not need to be permanently saved.
+
+A Custom Server:
+
+- Is available for Manual iPerf3 testing.
+- Is not added to the Public catalog.
+- Is not added to the User Server List.
+- Cannot be used for Scheduled Tests.
+- Is excluded from persistent iPerf3 Reliability statistics.
+
+If you want long-term Reliability statistics for a private or preferred endpoint, add it to the **User Server List** instead.
+
+## Port ranges and retries
+
+A Public or User server can define a single port or a port range.
+
+The application uses a bounded retry strategy and does not endlessly scan a configured range.
+
+Eligible listener problems, such as a busy or unavailable iPerf3 listener, can move the test to another unused port.
+
+Generic WAN, DNS, routing, timeout, or system failures are not treated as listener failures.
+
+For Public mode, one same-Region backup server can be attempted when the original server exhausts its eligible Downlink listener attempts before throughput begins.
+
+User Server List tests remain locked to the configured endpoint and do not automatically move to another User server.
+
+After Downlink succeeds, Uplink remains on the successful server and tries the successful Downlink port first.
+
+## iPerf3 Reliability
+
+The Servers page provides lightweight Reliability statistics for saved Public or User iPerf3 endpoints.
+
+Reliability information is maintained for the active persistent server source and includes:
+
+- Successful Tests
+- Endpoint Failures
+- Failure Rate
+- Most Failed Port
+
+Only listener-attributable endpoint failures are counted.
+
+WAN, DNS, routing, generic timeout, and system failures are excluded so the Reliability metric is not presented as a general WAN-success score.
+
+Custom Server tests are excluded because they do not have a stable saved server identity.
+
+Resetting Reliability statistics affects only the currently active Public or User Reliability source and does not delete saved server definitions.
 
 ---
 
@@ -470,6 +514,11 @@ The selected range updates Summary tiles, Trends, per-engine statistics, and spe
 
 Each interface filter group always retains at least one selected interface.
 
+<img width="1629" height="609" alt="Speedtest Analyzer History and Reports all-tests summary with WAN filters and aggregate statistics" src="https://github.com/user-attachments/assets/9561853a-c41d-4c99-b575-1812cb3c73c1" />
+
+<img width="1333" height="818" alt="Speedtest Analyzer trend analysis comparing iPerf3 and Netperf across Ethernet and cellular WAN interfaces" src="https://github.com/user-attachments/assets/e2d68d9d-2af8-4073-ba06-856f0aa3ce7b" />
+
+
 ## Test Log
 
 The Test Log provides independent filters for:
@@ -490,6 +539,9 @@ matching results per page, with the newest 10 shown by default.
 
 The Test Summary Date Range and Test Log filters are independent.
 
+<img width="1336" height="546" alt="Speedtest Analyzer Test Log with interface, status, date filters, cellular details, and pagination" src="https://github.com/user-attachments/assets/7da3bd05-2ee0-4fe7-83c0-1523db362af4" />
+
+
 ## Time display
 
 History timestamps are stored in UTC and displayed using the viewer's browser timezone and normal regional 12-hour or 24-hour convention.
@@ -502,6 +554,9 @@ CSV exports remain in UTC for portability and consistent downstream processing.
 
 Throughput history is displayed using connected Downlink and Uplink line graphs.
 
+<img width="1326" height="787" alt="Speedtest Analyzer iPerf3 throughput history showing Downlink and Upload trends over time" src="https://github.com/user-attachments/assets/b7f151e0-a2a9-4ecc-b54c-c4e9ff9b6665" />
+
+
 Graph points provide immediate details and identify the friendly WAN interface associated with each plotted result.
 
 The Test Log provides expandable details for items such as:
@@ -513,14 +568,62 @@ The Test Log provides expandable details for items such as:
 
 Only one detail section is open for a given test at a time, while details from different tests can remain open for comparison.
 
----
+## Carrier Activity Details
 
-# Reports and Exports
+For successful cellular tests, the **CA** field in the Test Log can be expanded.
+
+The detailed view is organized into **Baseline**, **Progress**, and **Peak**:
+
+- **Baseline** — the last known carrier state immediately before successful throughput begins.
+- **Progress** — carrier information observed during successful Downlink and Uplink traffic.
+- **Peak** — the strongest carrier state observed during successful traffic.
+
+<img width="1322" height="637" alt="Speedtest Analyzer Carrier Activity detail showing Baseline, Progress, Peak, and uplink CA limitations" src="https://github.com/user-attachments/assets/5f1e8946-008c-4d19-8b98-fff8b4c5e58c" />
+
+Setup delays, failed iPerf3 listener attempts, and unsuccessful throughput attempts are not promoted into the successful traffic timeline.
+
+### Observed Downlink Bandwidth
+
+**Observed Downlink Bandwidth** is the sum of positive bandwidth values reported for active RX/downlink serving carriers.
+
+It describes modem-reported serving-carrier bandwidth. It is **not** the measured speed-test throughput and does not prove that every displayed carrier carried test traffic.
+
+An active carrier explicitly reporting `0 MHz` remains part of the active-carrier count but contributes zero to the bandwidth total.
+
+### Uplink Carrier Aggregation
+
+NCOS currently does not expose the TX-channel and uplink component-carrier information required for the app to determine active Uplink CA.
+
+The detailed result can therefore show an **Observed Uplink Anchor** and a **Published Maximum Uplink CA** reference, but it does not claim to show active Uplink CA.
+
+When displayed:
+
+- **Observed Uplink Anchor** is a serving-carrier observation captured during Uplink traffic.
+- **Current Uplink CA: Not reported by NCOS** means active uplink component-carrier participation cannot currently be determined.
+- **Published Maximum Uplink CA** is a modem capability reference, not a measurement of currently active uplink carriers.
+
+### Published modem capabilities
+
+When a supported modem variant is identified, the expanded Carrier Activity view can show published LTE, 5G NSA, and 5G SA maximum Carrier Aggregation references.
+
+These are capability references only. They do not change or override the serving carriers observed during a test.
+
+If the device model is known but the exact modem variant cannot be confirmed, the application can show available published variants so the user can identify the correct one manually.
+
+## Reports and Exports
 
 Supported report formats include:
 
 - CSV
 - HTML
+
+### HTML reports
+
+HTML reports honor the interface selections currently applied in the **All Test Summary**.
+
+If the All Test Summary is filtered to one or more specific interfaces, the HTML report is generated using only those selected interfaces. The interface filter is carried throughout the exported report, including summary statistics, trend analysis, graphs, and reported test results.
+
+To include results from all available interfaces, select all desired interfaces in the All Test Summary before generating the HTML report.
 
 Reports can be useful for:
 
@@ -655,7 +758,14 @@ The README keeps a concise, user-facing changelog for the current Speedtest Anal
 - Moved the Light/Dark mode control out of the sidebar navigation and into the top-right device header beside Firmware.
 - Replaced the theme menu label with the existing moon/sun icon and added an immediate hover/focus tooltip that identifies the view the button will switch to.
 - Preserved the existing theme preference in browser local storage.
-- No backend API, test-engine, scheduling, WAN-resolution, routing, history, persistence, or SDK appdata behavior was changed.
+
+**Documentation updates:**
+
+- Expanded the README with strategic screenshots covering Test Center configuration, live cellular results, Scheduled Tests, Public and User server management, server-mode switching, History & Reports, throughput graphs, Test Log filtering, and Carrier Activity details.
+- Reorganized and expanded the Test Center, Test Engines, Servers, and History & Reports documentation to better match the application workflow and explain Public/User server modes, scheduled-test reset behavior, server reliability, and Carrier Activity interpretation.
+- Clarified that HTML reports honor the interfaces selected in the All Test Summary and apply those interface filters throughout the generated report.
+- Added guidance noting that device names, WAN labels, and private IP addresses shown in screenshots are example lab values and will vary by deployment.
+- These documentation updates do not change backend APIs, test-engine behavior, scheduling, WAN resolution, routing, history, persistence, or SDK appdata behavior.
 
 ## v1.0.0
 
