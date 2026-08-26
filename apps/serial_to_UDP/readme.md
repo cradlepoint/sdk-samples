@@ -3,6 +3,9 @@
 Reads data from the router's serial interface and forwards every chunk to one or more
 remote hosts over UDP.
 
+<img width="1686" height="845" alt="image" src="https://github.com/user-attachments/assets/2077fcd2-a94b-4f66-a780-6cfabf96edc0" />
+<img width="1686" height="845" alt="image" src="https://github.com/user-attachments/assets/b66ded08-0a9a-4b07-97da-baa297d5f205" />
+
 A web UI on port **8000** configures both sides:
 
 - **UDP settings** (destinations and source address) are stored in SDK Data (appdata).
