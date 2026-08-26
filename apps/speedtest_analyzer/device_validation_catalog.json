@@ -1,0 +1,534 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026-08-20",
+  "last_updated": "2026-08-20",
+  "description": "Validation status for standalone devices and exact controller plus captive-modem combinations used by Speedtest Analyzer.",
+  "maintenance": {
+    "status_values": {
+      "pending": "Show the Not yet validated informational alert.",
+      "validated": "Suppress the general validation alert."
+    },
+    "instructions": [
+      "Matching is case-insensitive and model-family based. For example, E3000 matches E3000-5GB and W1850 matches W1850-5GB or W1850-5GC.",
+      "To approve a tested entry, change status from pending to validated and set validated_date to YYYY-MM-DD.",
+      "Do not change a pending entry to validated until the exact standalone device or controller plus captive-modem combination has been tested.",
+      "Each physical captive adapter is counted once even when NCOS reports separate SIM1 and SIM2 WAN records.",
+      "Single-captive combinations are grouped first by controller and then by captive model for easy maintenance.",
+      "Multiple-captive combinations are order-independent but count-sensitive. One W1850 differs from two W1850 adapters.",
+      "An attached captive modem that is not listed, or an extra captive modem beyond a validated entry, remains not validated.",
+      "Examples are documentation only and are never loaded as validation entries.",
+      "Known defects are independent of validation status. A confirmed defect disables only the matching engine and hardware selection.",
+      "confirmed_firmware records the simple NCOS version where the defect was reproduced. fixed_in null keeps the restriction active on all firmware; when fixed_in is set, that version and newer are enabled.",
+      "Restart or rebuild the application after changing this file so the catalog is reloaded."
+    ],
+    "compatibility_source": "NetCloud Manager controller selections captured with NCOS 7.26.60 on 2026-08-18."
+  },
+  "standalone_devices": {
+    "E400": {
+      "status": "validated",
+      "validated_date": "2026-08-20",
+      "notes": "Standalone testing and scheduled-test validation completed successfully."
+    },
+    "E3000": {
+      "status": "validated",
+      "validated_date": "2026-08-20",
+      "notes": "Standalone testing and scheduled-test validation completed successfully."
+    },
+    "R1900": {
+      "status": "validated",
+      "validated_date": "2026-08-20",
+      "notes": "Standalone testing and scheduled-test validation completed successfully."
+    },
+    "R980": {
+      "status": "validated",
+      "validated_date": "2026-08-20",
+      "notes": "Standalone testing and scheduled-test validation completed successfully."
+    },
+    "W2255": {
+      "status": "validated",
+      "validated_date": "2026-08-20",
+      "notes": "Validated with the standalone Netperf known defect tracked in known_defects."
+    },
+    "W1850": {
+      "status": "validated",
+      "validated_date": "2026-08-18",
+      "notes": "Standalone iPerf3 and Netperf testing completed successfully."
+    },
+    "W1855": {
+      "status": "validated",
+      "validated_date": "2026-08-18",
+      "notes": "Standalone testing and scheduled-test validation completed successfully."
+    },
+    "R920": {
+      "status": "pending",
+      "validated_date": null,
+      "notes": "Standalone app validation is still pending."
+    },
+    "R2400": {
+      "status": "validated",
+      "validated_date": "2026-08-20",
+      "notes": "Standalone testing and scheduled-test validation completed successfully."
+    }
+  },
+  "single_captive_combinations": {
+    "E400": {
+      "W1850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W1855": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2255": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2000": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2105": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2155": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W4005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "L950": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA550": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      }
+    },
+    "E3000": {
+      "W1850": {
+        "status": "validated",
+        "validated_date": "2026-08-18",
+        "notes": "Standalone testing and scheduled-test validation completed successfully."
+      },
+      "W1855": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2255": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2000": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2105": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2155": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W4005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "L950": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA550": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      }
+    },
+    "R920": {
+      "W1850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W1855": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2255": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "RC1250": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "170900-022": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2000": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2105": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2155": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W4005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "L950": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA550": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      }
+    },
+    "R980": {
+      "W1850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W1855": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2255": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "RC1250": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "170900-022": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2000": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2105": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2155": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W4005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "L950": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA550": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      }
+    },
+    "R1900": {
+      "W1850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W1855": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2255": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "RC1250": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "170900-022": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2000": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2105": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2155": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W4005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "L950": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA550": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      }
+    },
+    "R2400": {
+      "W1850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W1855": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2255": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "RC1250": {
+        "status": "validated",
+        "validated_date": "2026-08-19",
+        "notes": "Fully validated with Speedtest Analyzer on NCOS 7.26.60. iPerf3 and supported interface behavior validated. Native NCOS Netperf has a confirmed defect when targeting the RC1250 captive modem; Speedtest Analyzer safely disables Netperf for this exact combination through known_defects."
+      },
+      "170900-022": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2000": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2105": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "R2155": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W2005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "W4005": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "L950": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA550": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      },
+      "CBA850": {
+        "status": "pending",
+        "validated_date": null,
+        "notes": "Supported pairing shown in NCM for NCOS 7.26.60; Speedtest Analyzer validation pending."
+      }
+    }
+  },
+  "multi_captive_combinations": [],
+  "known_defects": [
+    {
+      "id": "W2255-NETPERF",
+      "status": "confirmed",
+      "device": "W2255",
+      "captive_modem": null,
+      "engine": "netperf",
+      "confirmed_firmware": "7.26.60",
+      "fixed_in": null,
+      "reason": "Native NCOS Netperf can hang or run indefinitely on this standalone device.",
+      "workaround": "Use iPerf3 instead."
+    },
+    {
+      "id": "R2400-RC1250-NETPERF",
+      "status": "confirmed",
+      "device": "R2400",
+      "captive_modem": "RC1250",
+      "engine": "netperf",
+      "confirmed_firmware": "7.26.60",
+      "fixed_in": null,
+      "reason": "Native NCOS Netperf can continue beyond the requested duration and fail to produce results when the selected WAN is the RC1250 captive modem.",
+      "workaround": "Use iPerf3 instead."
+    },
+    {
+      "id": "AER2200-IPERF",
+      "status": "confirmed",
+      "device": "AER2200",
+      "captive_modem": null,
+      "engine": "iperf3",
+      "confirmed_firmware": "7.25.121",
+      "fixed_in": null,
+      "reason": "The bundled iPerf3 executable is incompatible with the AER2200 platform and cannot be launched.",
+      "workaround": "Use Netperf instead."
+    }
+  ],
+  "examples_not_loaded": [
+    {
+      "purpose": "Standalone device example",
+      "model": "FUTURE_ROUTER",
+      "status": "pending",
+      "validated_date": null,
+      "notes": "Copy this shape into standalone_devices."
+    },
+    {
+      "purpose": "Single captive modem example",
+      "controller": "FUTURE_ROUTER",
+      "captive_modems": [
+        "FUTURE_MODEM"
+      ],
+      "status": "pending",
+      "validated_date": null,
+      "notes": "Add this under single_captive_combinations using the grouped format."
+    },
+    {
+      "purpose": "Two different captive modems example",
+      "controller": "FUTURE_ROUTER",
+      "captive_modems": [
+        "MODEM_A",
+        "MODEM_B"
+      ],
+      "status": "pending",
+      "validated_date": null,
+      "notes": "Copy this object into multi_captive_combinations."
+    },
+    {
+      "purpose": "Two captive modems of the same model example",
+      "controller": "FUTURE_ROUTER",
+      "captive_modems": [
+        "MODEM_A",
+        "MODEM_A"
+      ],
+      "status": "pending",
+      "validated_date": null,
+      "notes": "Repeated model names preserve the physical-adapter count."
+    }
+  ]
+}

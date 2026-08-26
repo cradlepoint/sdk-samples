@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "regions": [
+    {
+      "name": "East",
+      "servers": [
+        {
+          "server_name": "Clouvider - Ashburn, VA",
+          "host": "ash.speedtest.clouvider.net",
+          "port_start": 5200,
+          "port_end": 5209,
+          "city": "Ashburn",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Washington, DC",
+          "host": "speedtest.wdc2.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Washington",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - New York, NY",
+          "host": "speedtest.nyc1.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "New York",
+          "country": "United States"
+        },
+        {
+          "server_name": "HOSTKEY - New York, NY",
+          "host": "spd-uswb.hostkey.com",
+          "port_start": 5201,
+          "port_end": 5209,
+          "city": "New York",
+          "country": "United States"
+        }
+      ]
+    },
+    {
+      "name": "Southeast",
+      "servers": [
+        {
+          "server_name": "Clouvider - Atlanta, GA",
+          "host": "atl.speedtest.clouvider.net",
+          "port_start": 5200,
+          "port_end": 5209,
+          "city": "Atlanta",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Miami, FL",
+          "host": "speedtest.mia11.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Miami",
+          "country": "United States"
+        }
+      ]
+    },
+    {
+      "name": "Midwest",
+      "servers": [
+        {
+          "server_name": "Clouvider - Chicago, IL",
+          "host": "chi.speedtest.clouvider.net",
+          "port_start": 5200,
+          "port_end": 5209,
+          "city": "Chicago",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Chicago, IL",
+          "host": "speedtest.chi11.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Chicago",
+          "country": "United States"
+        },
+        {
+          "server_name": "NOCIX - Kansas City, MO",
+          "host": "speedtest.nocix.net",
+          "port_start": 5201,
+          "port_end": 5205,
+          "city": "Kansas City",
+          "country": "United States"
+        }
+      ]
+    },
+    {
+      "name": "Southwest",
+      "servers": [
+        {
+          "server_name": "Clouvider - Dallas, TX",
+          "host": "dal.speedtest.clouvider.net",
+          "port_start": 5200,
+          "port_end": 5209,
+          "city": "Dallas",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Dallas, TX",
+          "host": "speedtest.dal13.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Dallas",
+          "country": "United States"
+        },
+        {
+          "server_name": "InterServer - Dallas, TX",
+          "host": "dfw.speedtest.is.cc",
+          "port_start": 5203,
+          "port_end": 5210,
+          "city": "Dallas",
+          "country": "United States"
+        },
+        {
+          "server_name": "Clouvider - Phoenix, AZ",
+          "host": "phx.speedtest.clouvider.net",
+          "port_start": 5200,
+          "port_end": 5209,
+          "city": "Phoenix",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Phoenix, AZ",
+          "host": "speedtest.phx1.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Phoenix",
+          "country": "United States"
+        }
+      ]
+    },
+    {
+      "name": "West",
+      "servers": [
+        {
+          "server_name": "Clouvider - Los Angeles, CA",
+          "host": "la.speedtest.clouvider.net",
+          "port_start": 5200,
+          "port_end": 5209,
+          "city": "Los Angeles",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Los Angeles, CA",
+          "host": "speedtest.lax12.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Los Angeles",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - San Francisco, CA",
+          "host": "speedtest.sfo12.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "San Francisco",
+          "country": "United States"
+        },
+        {
+          "server_name": "Leaseweb - Seattle, WA",
+          "host": "speedtest.sea11.us.leaseweb.net",
+          "port_start": 5201,
+          "port_end": 5210,
+          "city": "Seattle",
+          "country": "United States"
+        }
+      ]
+    }
+  ]
+}
