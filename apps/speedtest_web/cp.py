@@ -1899,104 +1899,233 @@ def get_available_gpios(router_model: Optional[str] = None) -> List[str]:
 # DIAGNOSTICS: Ping, Traceroute, CLI
 # =============================================================================
 
-def ping_host(host: str, count: int = 4, packet_size: int = 56) -> Optional[Dict[str, Any]]:
+_PING_TERMINAL_STATES = ('done', 'error', 'stopped')
+
+
+def _parse_ping_output(raw: str, count: int) -> Dict[str, Any]:
+    """Parse ping output text into stats.
+
+    The router emits a '---Ping statistics---' summary for both successful
+    and failed runs, so this is called regardless of the reported status.
+
+    Returns:
+        Dict with any of tx/rx/loss/min/avg/max that could be parsed.
+        Empty dict if the text held no usable numbers.
+    """
+    parsed: Dict[str, Any] = {}
+    if not raw:
+        return parsed
+
+    lines = raw.split('\n')
+
+    for line in lines:
+        if 'packets transmitted' in line:
+            tx_m = re.search(r'(\d+)\s+packets transmitted', line)
+            rx_m = re.search(r'(\d+)\s+(?:packets\s+)?received', line)
+            loss_m = re.search(r'([\d.]+)%\s+packet loss', line)
+            if tx_m:
+                parsed['tx'] = int(tx_m.group(1))
+            if rx_m:
+                parsed['rx'] = int(rx_m.group(1))
+            if loss_m:
+                parsed['loss'] = float(loss_m.group(1))
+        elif 'min/avg/max' in line:
+            rtt_m = re.search(r'min/avg/max\s*=\s*([\d.]+)/([\d.]+)/([\d.]+)', line)
+            if rtt_m:
+                parsed['min'] = float(rtt_m.group(1))
+                parsed['avg'] = float(rtt_m.group(2))
+                parsed['max'] = float(rtt_m.group(3))
+
+    # Fallback: no summary line, so count individual replies instead.
+    if 'tx' not in parsed:
+        responses = [l for l in lines if 'icmp_seq=' in l and 'time=' in l]
+        if responses or any('icmp_seq' in l for l in lines):
+            parsed['tx'] = count
+            parsed['rx'] = len(responses)
+            parsed['loss'] = ((count - len(responses)) / count * 100) if count > 0 else 0.0
+
+            rtts = []
+            for resp in responses:
+                try:
+                    rtts.append(float(resp.split('time=')[1].split(' ms')[0]))
+                except Exception:
+                    pass
+            if rtts:
+                parsed['min'] = min(rtts)
+                parsed['max'] = max(rtts)
+                parsed['avg'] = sum(rtts) / len(rtts)
+
+    # An all-zero RTT triple is what the router prints when nothing came
+    # back; it isn't a real measurement, so drop it.
+    if parsed.get('rx') == 0:
+        for key in ('min', 'avg', 'max'):
+            parsed.pop(key, None)
+
+    return parsed
+
+
+def _wait_for_ping_idle(timeout: float = 16.0, delay: float = 0.25) -> Tuple[bool, str]:
+    """Wait for control/ping to go idle before starting a new run.
+
+    control/ping keeps `status` and `result` from the previous run and the
+    router clears them itself roughly ten seconds later. Writing to those
+    fields does nothing lasting (a written value reads back empty at once),
+    so the only reliable option is to wait them out.
+
+    Starting from a genuinely idle tree is what makes a result provably
+    fresh: any output that appears afterwards must belong to the new run.
+    Without it, a repeat ping of the *same* host cannot be distinguished
+    from the previous run's leftover output, since both name that host.
+
+    Returns:
+        (idle, last_result) - idle is True if the tree went quiet, and
+        last_result is the leftover result text when it did not.
+    """
+    deadline = time.time() + timeout
+    last_result = ''
+    while time.time() < deadline:
+        try:
+            snapshot = get('control/ping') or {}
+            status = snapshot.get('status') or ''
+            last_result = snapshot.get('result') or ''
+            if not status and not last_result:
+                return True, ''
+        except Exception:
+            pass
+        time.sleep(delay)
+
+    return False, last_result
+
+
+def ping_host(
+    host: str,
+    count: int = 4,
+    packet_size: int = 56,
+    interval: int = 1,
+    timeout: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
     """Ping a host using the router's diagnostic tools.
 
     Args:
         host: Target hostname or IP address.
         count: Number of ping packets (default 4).
         packet_size: Packet size in bytes (default 56).
+        interval: Seconds between packets (default 1).
+        timeout: Max seconds to wait for the run to finish. Default scales
+            with count/interval, so larger runs are not cut short.
 
     Returns:
         Optional[Dict[str, Any]]: Dict with keys:
             - host (str): Target host.
-            - num (int): Packets sent.
+            - num (int): Packets requested.
             - size (int): Packet size.
-            - tx (int): Packets transmitted.
-            - rx (int): Packets received.
-            - loss (float): Packet loss percentage.
-            - min (float): Minimum RTT in ms.
-            - avg (float): Average RTT in ms.
-            - max (float): Maximum RTT in ms.
-            - error (str): Present instead of stats on failure.
+            - status (str): Router status - done, error, stopped, or '' if
+              it never reached a terminal state.
+            - tx (int): Packets transmitted, when parseable.
+            - rx (int): Packets received, when parseable.
+            - loss (float): Packet loss percentage, when parseable.
+            - min/avg/max (float): RTT in ms, only when packets came back.
+            - timed_out (bool): Present and True if the router never
+              reported a terminal status within `timeout`.
+            - stale_state (bool): Present and True if previous ping state
+              could not be cleared, so the output may not be for `host`.
+            - error (str): Present only when no stats could be parsed.
         Returns None on exception.
+
+    Note:
+        An unreachable host reports status 'error' while a reachable one
+        reports 'done', but both include a parseable statistics summary.
+        Stats are therefore parsed for both, and callers should judge
+        reachability from `rx`/`loss` rather than from `error`.
     """
+    stats: Dict[str, Any] = {"host": host, "num": count, "size": packet_size}
     try:
+        # Start from an idle tree so any output that appears afterwards is
+        # provably from this run. No PUT is used to force it - the fields
+        # are router-managed and ignore writes.
+        idle, leftover = _wait_for_ping_idle()
+        if not idle:
+            stats['stale_state'] = True
+
+        # Bound the run on the router itself. Left unset, the router uses
+        # its 11s default deadline, so an unreachable host takes ~17s to
+        # report. A bound that scales with the request returns much sooner
+        # (measured: timeout=4 -> ~10s vs ~17s) and keeps the wait
+        # predictable.
+        run_timeout = max((count * max(interval, 1)) + 3, 5)
+
         ping_params = {
             "host": host,
             "num": count,
             "size": packet_size,
-            "df": True,
-            "srcaddr": ""
+            "interval": interval,
+            "timeout": run_timeout,
+            # Documented as a string (do/want/dont), not a boolean - and
+            # "do" is the router's own default for this field.
+            "df": "do",
+            "srcaddr": "",
         }
-
-        # Clear and start
-        put('control/ping/start', {})
-        put('control/ping/status', '')
         put('control/ping/start', ping_params)
 
-        # Wait for completion
-        result = None
-        for _ in range(30):
-            result = get('control/ping')
-            if result and result.get('status') in ("error", "done"):
-                break
-            time.sleep(0.5)
+        if timeout is None:
+            # The router's own deadline, plus headroom for the lag between
+            # the run finishing and status/result being published.
+            timeout = run_timeout + 12
 
-        stats = {"host": host, "num": count, "size": packet_size}
+        # Poll for a terminal status whose output actually refers to the
+        # host we asked for. control/ping is a single shared resource - the
+        # NCOS UI or another app can run its own ping and overwrite these
+        # fields - so a terminal status alone does not prove the output is
+        # ours. Read status and result as one snapshot, since they are not
+        # updated atomically.
+        deadline = time.time() + timeout
+        status = ''
+        raw = ''
+        matched = False
+        saw_running = False
+        while time.time() < deadline:
+            snapshot = get('control/ping') or {}
+            status = snapshot.get('status') or ''
+            raw = snapshot.get('result') or ''
 
-        if not result:
-            stats['error'] = 'No results received'
-            return stats
+            if status == 'running':
+                saw_running = True
 
-        if result.get('status') == 'error':
-            stats['error'] = result.get('result', 'Unknown error')
-            return stats
+            if status in _PING_TERMINAL_STATES and host in raw:
+                # Only trust a terminal result once it is provably this
+                # run's: either the tree was idle when we started, or we
+                # watched it go 'running', or the text differs from the
+                # leftover we saw. Repeated pings of one host otherwise
+                # look identical to the previous run's output.
+                if idle or saw_running or raw != leftover:
+                    matched = True
+                    break
 
-        raw = result.get('result', '')
-        if not raw:
-            stats['error'] = 'No results received'
-            return stats
+            time.sleep(0.25)
 
-        # Parse statistics
-        lines = raw.split('\n')
+        stats['status'] = status
+        if not matched:
+            if status not in _PING_TERMINAL_STATES:
+                stats['timed_out'] = True
+            elif raw and host not in raw:
+                # Terminal, but the text never mentioned our host: most
+                # likely another consumer's run. Stats are still returned
+                # so behaviour is no worse than before, but flagged.
+                stats['host_unverified'] = True
+            else:
+                # Terminal and about our host, but we could not prove it
+                # was fresh rather than the previous run's leftover.
+                stats['stale_result'] = True
 
-        for line in lines:
-            if 'packets transmitted' in line:
-                tx_m = re.search(r'(\d+)\s+packets transmitted', line)
-                rx_m = re.search(r'(\d+)\s+received', line)
-                loss_m = re.search(r'([\d.]+)% packet loss', line)
-                if tx_m:
-                    stats['tx'] = int(tx_m.group(1))
-                if rx_m:
-                    stats['rx'] = int(rx_m.group(1))
-                if loss_m:
-                    stats['loss'] = float(loss_m.group(1))
-            elif 'min/avg/max' in line:
-                rtt_m = re.search(r'min/avg/max\s*=\s*([\d.]+)/([\d.]+)/([\d.]+)', line)
-                if rtt_m:
-                    stats['min'] = float(rtt_m.group(1))
-                    stats['avg'] = float(rtt_m.group(2))
-                    stats['max'] = float(rtt_m.group(3))
+        stats.update(_parse_ping_output(raw, count))
 
-        # Fallback: parse individual responses if no summary found
         if 'tx' not in stats:
-            responses = [l for l in lines if 'icmp_seq=' in l and 'time=' in l]
-            stats['tx'] = count
-            stats['rx'] = len(responses)
-            stats['loss'] = ((count - len(responses)) / count * 100) if count > 0 else 0
-
-            rtts = []
-            for resp in responses:
-                try:
-                    t = float(resp.split('time=')[1].split(' ms')[0])
-                    rtts.append(t)
-                except Exception:
-                    pass
-            if rtts:
-                stats['min'] = min(rtts)
-                stats['max'] = max(rtts)
-                stats['avg'] = sum(rtts) / len(rtts)
+            # Nothing numeric to report - surface the router's text, or a
+            # clear timeout message, as a single line.
+            detail = ' '.join(raw.split()) if raw else ''
+            if not detail:
+                detail = f'No results received (status: {status or "none"})'
+            stats['error'] = detail
 
         return stats
     except Exception as e:
