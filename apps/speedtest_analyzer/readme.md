@@ -2,7 +2,7 @@
 
 Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.0.0
+**Version:** 1.0.1
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -131,7 +131,7 @@ The default selection is **Active Primary WAN**.
 
 This is useful when the goal is to test the router's currently preferred connection without manually selecting an interface. The application resolves the actual primary WAN when the test starts, and History records the real interface that was used.
 
-When multiple WANs are connected, you can instead select a specific interface to test that path directly.
+Manual Tests and Scheduled Tests both keep the WAN selector available whenever a connected WAN exists. The selector shows **Active Primary WAN** first and also lists each connected WAN interface, even when only one physical WAN is connected. Select the concrete interface when you want the test pinned to that path instead of following whichever WAN is primary when the test starts.
 
 Friendly interface labels may include:
 
@@ -643,6 +643,15 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 # Changelog — 1.0.x
 
 The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.0.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.0.1
+
+- Updated the Manual Tests WAN selector to match Scheduled Tests: **Active Primary WAN** remains the default, while each connected WAN interface is also selectable even on single-WAN devices.
+- Kept the Manual Tests WAN selector enabled whenever at least one WAN interface is available; it is disabled only when no WAN exists or while a Manual Test is running.
+- Moved the Light/Dark mode control out of the sidebar navigation and into the top-right device header beside Firmware.
+- Replaced the theme menu label with the existing moon/sun icon and added an immediate hover/focus tooltip that identifies the view the button will switch to.
+- Preserved the existing theme preference in browser local storage.
+- No backend API, test-engine, scheduling, WAN-resolution, routing, history, persistence, or SDK appdata behavior was changed.
 
 ## v1.0.0
 

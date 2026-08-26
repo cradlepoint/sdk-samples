@@ -1369,6 +1369,58 @@
             padding: 0 0.1rem;
         }
 
+        /* Header Light/Dark mode control */
+        .header-theme-toggle {
+            position: relative;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--light-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .header-theme-toggle:hover,
+        .header-theme-toggle:focus-visible {
+            background: var(--border-color);
+            color: var(--primary-color);
+            outline: none;
+        }
+
+        .header-theme-toggle::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: calc(100% + 0.45rem);
+            right: 0;
+            z-index: 1000;
+            padding: 0.4rem 0.55rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--light-surface);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-md);
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .header-theme-toggle:hover::after,
+        .header-theme-toggle:focus-visible::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
         /* Theme-aware Speedtest Analyzer sidebar header */
         [data-theme="dark"] .sidebar-header {
             background: #1e293b;
@@ -1397,6 +1449,13 @@
                             <div style="font-size:0.55rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary);">Firmware</div>
                             <div id="device-firmware" style="font-size:1.1rem; font-weight:700; color:var(--text-primary);">—</div>
                         </div>
+                        <button type="button"
+                                id="dark-mode-toggle"
+                                class="header-theme-toggle"
+                                aria-label="Switch to Dark Mode"
+                                data-tooltip="Switch to Dark Mode">
+                            <i class="fas fa-moon" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1463,11 +1522,6 @@
                         <li>
                             <a href="#" class="nav-item" data-section="outputs" title="Outputs">
                                 <i class="fas fa-share-alt"></i> <span>Outputs</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" class="nav-item" id="dark-mode-toggle" title="Toggle Dark Mode">
-                                <i class="fas fa-moon"></i> <span id="dark-mode-label">Dark Mode</span>
                             </a>
                         </li>
                     </ul>
@@ -2189,27 +2243,48 @@
             }
         }
 
-        // ===== DARK MODE =====
+        // ===== LIGHT / DARK MODE =====
         var darkToggle = document.getElementById('dark-mode-toggle');
-        var darkModeLabel = document.getElementById('dark-mode-label');
+
+        function updateThemeToggleState(theme) {
+            if (!darkToggle) return;
+
+            var switchLabel = theme === 'dark'
+                ? 'Switch to Light Mode'
+                : 'Switch to Dark Mode';
+
+            var icon = darkToggle.querySelector('i');
+
+            if (icon) {
+                icon.className = theme === 'dark'
+                    ? 'fas fa-sun'
+                    : 'fas fa-moon';
+            }
+
+            darkToggle.setAttribute('aria-label', switchLabel);
+            darkToggle.setAttribute('data-tooltip', switchLabel);
+        }
+
         if (darkToggle) {
-            darkToggle.addEventListener('click', function(e) {
-                e.preventDefault();
+            darkToggle.addEventListener('click', function() {
                 var html = document.documentElement;
                 var current = html.getAttribute('data-theme');
                 var next = current === 'dark' ? 'light' : 'dark';
+
                 html.setAttribute('data-theme', next);
                 localStorage.setItem('theme', next);
-                var icon = darkToggle.querySelector('i');
-                icon.className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
-                if (darkModeLabel) darkModeLabel.textContent = next === 'dark' ? 'Light Mode' : 'Dark Mode';
+                updateThemeToggleState(next);
             });
+
             var saved = localStorage.getItem('theme');
+
             if (saved === 'dark') {
                 document.documentElement.setAttribute('data-theme', 'dark');
-                darkToggle.querySelector('i').className = 'fas fa-sun';
-                if (darkModeLabel) darkModeLabel.textContent = 'Light Mode';
             }
+
+            updateThemeToggleState(
+                saved === 'dark' ? 'dark' : 'light'
+            );
         }
 
         // ===== INIT =====
@@ -2850,22 +2925,17 @@
                     manualActiveOpt.selected = true;
                     sel.appendChild(manualActiveOpt);
 
-                    if (data.length === 1) {
-                        // Do not duplicate the only connected WAN. The Primary
-                        // WAN indicator below identifies the concrete interface.
-                        sel.disabled = true;
-                    } else {
-                        sel.disabled = false;
+                    sel.disabled = false;
 
-                        // Explicit entries remain available so a user can pin
-                        // a test to a specific primary or secondary WAN.
-                        for (var i = 0; i < data.length; i++) {
-                            var s = data[i];
-                            var opt = document.createElement('option');
-                            opt.value = s.iface;
-                            opt.textContent = s.name + (s.ip ? ' (' + s.ip + ')' : '');
-                            sel.appendChild(opt);
-                        }
+                    // Match Scheduled Tests: always expose each connected WAN
+                    // so the user can choose dynamic Active Primary WAN or pin
+                    // the Manual Test to a specific interface.
+                    for (var i = 0; i < data.length; i++) {
+                        var s = data[i];
+                        var opt = document.createElement('option');
+                        opt.value = s.iface;
+                        opt.textContent = s.name + (s.ip ? ' (' + s.ip + ')' : '');
+                        sel.appendChild(opt);
                     }
                 }
                 refreshManualCapabilities();
@@ -3783,7 +3853,7 @@
             // Disable/enable controls while running
             engineSelect.disabled = running;
             document.getElementById('interface-select').disabled =
-                running || manualInterfaceCount <= 1;
+                running || manualInterfaceCount === 0;
             durationSelect.disabled = running;
             latencyCheckbox.disabled = running;
             document.getElementById('netperf-server-select').disabled = running;

@@ -2,7 +2,7 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.0.0
+**Documentation version:** 1.0.1
 **Application release family:** 1.0.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
@@ -140,6 +140,8 @@ The frontend disables a matching engine option for the selected WAN and the back
 The user interface presents friendly WAN labels while preserving the underlying NCOS identity used for testing, source routing, filtering, history, and reporting.
 
 `Active Primary WAN` is a selector alias, not a persisted interface identity. It is resolved to one concrete NCOS interface before test execution proceeds.
+
+Manual Tests and Scheduled Tests use the same selector presentation: **Active Primary WAN** is listed first, followed by every connected concrete WAN interface. This remains true when only one physical WAN is connected so users can choose between dynamic primary-WAN resolution and an explicitly pinned interface. This is frontend selector behavior only and does not change the existing backend Active Primary WAN resolver or persisted interface identity.
 
 The implementation fails closed if NCOS cannot determine the current primary WAN. It does not silently choose another connection.
 
@@ -1351,6 +1353,18 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.0.1
+
+- Aligned Manual Tests WAN-selection presentation with Scheduled Tests.
+- Manual Tests now presents **Active Primary WAN** plus every connected concrete WAN interface even when the device has only one connected WAN.
+- Updated the Manual interface enable/disable guard so the selector remains available with one or more connected WANs and is disabled only with zero connected WANs or while a Manual Test is running.
+- Preserved the existing `__active_wan__` alias, backend Active Primary WAN resolver, concrete interface values, capability evaluation, source routing, history identity, and reporting behavior.
+- Removed the Light/Dark mode control from the sidebar navigation because it is an action rather than a navigation destination.
+- Added an icon-only theme button beside Firmware in the top-right header using the existing moon/sun icon state.
+- Added an immediate CSS hover/focus tooltip with dynamically updated **Switch to Dark Mode** / **Switch to Light Mode** text and matching accessibility label.
+- Preserved existing `localStorage` theme persistence.
+- Scope is frontend presentation/interaction, package version metadata, and documentation only. No backend Python, API route, test-engine, scheduler, routing, persistence, or SDK appdata changes were made.
 
 ## v1.0.0 — Speedtest Analyzer
 
