@@ -29,6 +29,10 @@ The Web App Template Style Guide provides a complete design system with:
 ### Features
 
 - **Dark-mode friendly** – Palettes, icons, and states designed for light and dark themes
+- **Collapsible sidebar** – Sidebar collapses to icon-only view with hover tooltips, persists preference across sessions
+- **Help button** – Opens a modal displaying the app's readme.md content, rendered as formatted HTML
+- **Device info button** – Opens a modal showing router model, serial number, MAC address, firmware version, and SDK app version
+- **App version display** – Version number from package.ini shown below the app title
 - **Copyable markup** – Structured HTML ready for rapid prototyping
 - **Consistent design language** – Shared typography, color tokens, and spacing across all components
 - **Production-ready patterns** – Snapshot of UI patterns suitable for internal portals, admin consoles, and monitoring dashboards
@@ -59,7 +63,13 @@ The Web App Template Style Guide provides a complete design system with:
 
 2. **Copy components** – Use markup from `index.html` as a reference. Copy the HTML structure you need and paste it into your app, then adjust copy or data bindings.
 
-3. **Assets** – Ensure your app references:
+3. **Built-in features** – Both `index.html` and `your_web_app.html` include:
+   - Collapsible sidebar with icon tooltips when collapsed
+   - Help button (displays readme.md in a modal)
+   - Device info button (displays router model, serial, MAC, firmware, and app version)
+   - App version shown below the title (read from package.ini)
+
+4. **Assets** – Ensure your app references:
    - `static/css/style.css` – Main stylesheet
    - `static/libs/font-awesome.min.css` – Icons
    - `static/libs/jquery-3.5.1.min.js` – jQuery (if your scripts depend on it)
@@ -70,14 +80,24 @@ The Web App Template Style Guide provides a complete design system with:
 web_app_template/
 ├── index.html              # Style guide (full component library)
 ├── your_web_app.html       # Starter template for new apps
-├── web_app_template.py     # HTTP server
+├── web_app_template.py     # HTTP server with API endpoints
+├── package.ini             # App metadata and version
 ├── start.sh                # Launch script
 ├── static/
 │   ├── css/style.css       # Design system styles
 │   ├── js/script.js        # Application logic
 │   └── libs/               # Font Awesome, jQuery
-└── README.md
+└── readme.md
 ```
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Serves `index.html` (style guide) |
+| `GET /your_web_app.html` | Serves the starter template |
+| `GET /api/help` | Returns readme.md content as plain text |
+| `GET /api/info` | Returns JSON with router model, serial number, MAC address, firmware version, and app version |
 
 ---
 
@@ -91,5 +111,5 @@ web_app_template/
 
 ## Version
 
-- **Version:** 1.0.0  
+- **Version:** 1.1.0  
 - **Status:** BETA
