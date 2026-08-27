@@ -15,6 +15,7 @@
             <div class="header-content">
                 <div class="logo-section">
                     <h1 id="app-title">Web App Template - Style Guide <span class="beta-tag">BETA</span></h1>
+                    <span class="app-version" id="app-version"></span>
                 </div>
                 <div class="header-actions">
                     <div class="search-container search-with-clear">
@@ -24,6 +25,12 @@
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
+                    <button type="button" class="header-icon-btn" id="help-btn" title="Help">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <button type="button" class="header-icon-btn" id="info-btn" title="Device Info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
                     <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
                         <i class="fas fa-moon"></i>
                     </button>
@@ -34,9 +41,12 @@
         <!-- Main Content -->
         <main class="app-main">
             <!-- Sidebar -->
-            <aside class="sidebar">
+            <aside class="sidebar" id="app-sidebar">
                 <div class="sidebar-header">
-                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home"></i> Homepage</a></h2>
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-home"></i> <span class="sidebar-label">Homepage</span></a></h2>
+                    <button type="button" class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
                 </div>
                 <nav class="sidebar-nav">
                     <ul class="nav-list" id="nav-list">
@@ -2243,6 +2253,36 @@
 
     <!-- Toast Notifications -->
     <div class="toast-container" id="toast-container"></div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="help-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fas fa-question-circle"></i> Help</h2>
+                <button type="button" class="modal-close" id="help-modal-close" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="help-modal-body">
+                <div class="modal-loading"><div class="spinner-circle"></div><p>Loading help...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> Device Info</h2>
+                <button type="button" class="modal-close" id="info-modal-close" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="info-modal-body">
+                <div class="modal-loading"><div class="spinner-circle"></div><p>Loading info...</p></div>
+            </div>
+        </div>
+    </div>
 
     <script src="static/js/script.js"></script>
 </body>
