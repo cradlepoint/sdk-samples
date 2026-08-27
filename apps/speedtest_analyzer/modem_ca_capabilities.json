@@ -1,0 +1,400 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026-08-19",
+  "reference_only": true,
+  "description": "Published modem carrier-aggregation capabilities used only for the Expanded CA Information reference display. These values do not prove which carriers participated in a speed test.",
+  "maintenance": {
+    "instructions": [
+      "Add or update modem capability values under modem_families.",
+      "Add device models and their available variants under devices.",
+      "A variant family must match a key in modem_families.",
+      "Put the most specific match_tokens first. Matching is case-insensitive and token-boundary aware.",
+      "Use generic_match_tokens when a family-only token should display the grouped variant label.",
+      "Keep published ambiguity in a configuration note instead of inferring an LTE or NR carrier split.",
+      "Restart the application after changing this file so the catalog is reloaded."
+    ]
+  },
+  "modem_families": {
+    "C7": {
+      "release": "Rel. 11",
+      "max_download_ca": 2,
+      "max_upload_ca": 2,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "2 LTE",
+          "upload": "2 LTE"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/e300-series-enterprise-router/",
+        "https://cradlepoint.com/datasheet/r920-series-ruggedized-router/"
+      ]
+    },
+    "C18B": {
+      "release": "Rel. 12",
+      "max_download_ca": 5,
+      "max_upload_ca": 2,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "5 LTE",
+          "upload": "2 LTE"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/e300-series-enterprise-router/",
+        "https://cradlepoint.com/datasheet/e3000-series-enterprise-router/"
+      ]
+    },
+    "5GB": {
+      "release": "Rel. 15",
+      "max_download_ca": 7,
+      "max_upload_ca": 2,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "7 LTE",
+          "upload": "2 LTE"
+        },
+        {
+          "mode": "5G NSA",
+          "download": "1 CA",
+          "upload": "1 CA",
+          "note": "LTE/NR split not published"
+        },
+        {
+          "mode": "5G SA",
+          "download": "Not published",
+          "upload": "Not published"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/e300-series-enterprise-router/",
+        "https://cradlepoint.com/datasheet/e3000-series-enterprise-router/",
+        "https://cradlepoint.com/datasheet/w1850-series-5g-wideband-adapter/",
+        "https://cradlepoint.com/datasheet/r1900-series-5g-ruggedized-router/"
+      ]
+    },
+    "5GC": {
+      "release": "Rel. 16",
+      "max_download_ca": 5,
+      "max_upload_ca": 4,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "5 LTE",
+          "upload": "2 LTE"
+        },
+        {
+          "mode": "5G NSA",
+          "download": "4 LTE + 1 NR",
+          "upload": "2 LTE + 2 NR"
+        },
+        {
+          "mode": "5G SA",
+          "download": "2 NR",
+          "upload": "1 NR"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/w1850-series-5g-wideband-adapter/",
+        "https://cradlepoint.com/datasheet/w1855-series-5g-wideband-adapter/"
+      ]
+    },
+    "5GD": {
+      "release": "Rel. 16",
+      "max_download_ca": 5,
+      "max_upload_ca": 4,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "5 LTE",
+          "upload": "2 LTE"
+        },
+        {
+          "mode": "5G NSA",
+          "download": "4 LTE + 1 NR",
+          "upload": "2 LTE + 2 NR"
+        },
+        {
+          "mode": "5G SA",
+          "download": "2 NR",
+          "upload": "1 NR"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/r980-series-ruggedized-router/"
+      ]
+    },
+    "5GE": {
+      "release": "Rel. 17",
+      "max_download_ca": 6,
+      "max_upload_ca": 2,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "6 LTE",
+          "upload": "2 LTE"
+        },
+        {
+          "mode": "5G NSA",
+          "download": "3 LTE + 2 NR",
+          "upload": "1 LTE + 1 NR"
+        },
+        {
+          "mode": "5G SA",
+          "download": "3 NR",
+          "upload": "2 NR"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/ericsson-cradlepoint-e400/"
+      ]
+    },
+    "5GF": {
+      "release": "Rel. 17",
+      "max_download_ca": 7,
+      "max_upload_ca": 2,
+      "configurations": [
+        {
+          "mode": "LTE",
+          "download": "6 LTE",
+          "upload": "2 LTE"
+        },
+        {
+          "mode": "5G NSA",
+          "download": "5 LTE + 2 NR",
+          "upload": "1 LTE + 1 NR"
+        },
+        {
+          "mode": "5G SA",
+          "download": "3 NR (200 MHz max)",
+          "upload": "2 NR"
+        }
+      ],
+      "source_documents": [
+        "https://cradlepoint.com/datasheet/ericsson-cradlepoint-w2255/",
+        "https://cradlepoint.com/datasheet/ericsson-cradlepoint-r2400/",
+        "https://cradlepoint.com/datasheet/ericsson-cradlepoint-rc1250/"
+      ]
+    }
+  },
+  "devices": {
+    "W1850": {
+      "match_tokens": [
+        "W1850"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/w1850-series-5g-wideband-adapter/",
+      "variants": [
+        {
+          "label": "5GB",
+          "family": "5GB",
+          "match_tokens": [
+            "5GB"
+          ]
+        },
+        {
+          "label": "5GC",
+          "family": "5GC",
+          "match_tokens": [
+            "5GC"
+          ]
+        }
+      ]
+    },
+    "W1855": {
+      "match_tokens": [
+        "W1855"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/w1855-series-5g-wideband-adapter/",
+      "variants": [
+        {
+          "label": "5GC",
+          "family": "5GC",
+          "match_tokens": [
+            "5GC"
+          ]
+        }
+      ]
+    },
+    "W2255": {
+      "match_tokens": [
+        "W2255"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/ericsson-cradlepoint-w2255/",
+      "variants": [
+        {
+          "label": "5GF-NA/GL",
+          "family": "5GF",
+          "match_tokens": [
+            "5GF-NA",
+            "5GF-GL",
+            "5GF"
+          ],
+          "generic_match_tokens": [
+            "5GF"
+          ]
+        }
+      ]
+    },
+    "RC1250": {
+      "match_tokens": [
+        "RC1250"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/ericsson-cradlepoint-rc1250/",
+      "variants": [
+        {
+          "label": "5GF-NA/GL",
+          "family": "5GF",
+          "match_tokens": [
+            "5GF-NA",
+            "5GF-GL",
+            "5GF"
+          ],
+          "generic_match_tokens": [
+            "5GF"
+          ]
+        }
+      ]
+    },
+    "E300": {
+      "match_tokens": [
+        "E300"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/e300-series-enterprise-router/",
+      "variants": [
+        {
+          "label": "C7C/C7D",
+          "family": "C7",
+          "match_tokens": [
+            "C7C",
+            "C7D"
+          ]
+        },
+        {
+          "label": "C18B",
+          "family": "C18B",
+          "match_tokens": [
+            "C18B"
+          ]
+        },
+        {
+          "label": "5GB",
+          "family": "5GB",
+          "match_tokens": [
+            "5GB"
+          ]
+        }
+      ]
+    },
+    "E400": {
+      "match_tokens": [
+        "E400"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/ericsson-cradlepoint-e400/",
+      "variants": [
+        {
+          "label": "5GE-AM/GL",
+          "family": "5GE",
+          "match_tokens": [
+            "5GE-AM",
+            "5GE-GL",
+            "5GE"
+          ],
+          "generic_match_tokens": [
+            "5GE"
+          ]
+        }
+      ]
+    },
+    "E3000": {
+      "match_tokens": [
+        "E3000"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/e3000-series-enterprise-router/",
+      "variants": [
+        {
+          "label": "C18B",
+          "family": "C18B",
+          "match_tokens": [
+            "C18B"
+          ]
+        },
+        {
+          "label": "5GB",
+          "family": "5GB",
+          "match_tokens": [
+            "5GB"
+          ]
+        }
+      ]
+    },
+    "R920": {
+      "match_tokens": [
+        "R920"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/r920-series-ruggedized-router/",
+      "variants": [
+        {
+          "label": "C7A/C7B",
+          "family": "C7",
+          "match_tokens": [
+            "C7A",
+            "C7B"
+          ]
+        }
+      ]
+    },
+    "R980": {
+      "match_tokens": [
+        "R980"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/r980-series-ruggedized-router/",
+      "variants": [
+        {
+          "label": "5GD",
+          "family": "5GD",
+          "match_tokens": [
+            "5GD"
+          ]
+        }
+      ]
+    },
+    "R1900": {
+      "match_tokens": [
+        "R1900"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/r1900-series-5g-ruggedized-router/",
+      "variants": [
+        {
+          "label": "5GB",
+          "family": "5GB",
+          "match_tokens": [
+            "5GB"
+          ]
+        }
+      ]
+    },
+    "R2400": {
+      "match_tokens": [
+        "R2400"
+      ],
+      "datasheet_url": "https://cradlepoint.com/datasheet/ericsson-cradlepoint-r2400/",
+      "variants": [
+        {
+          "label": "5GF-NA/GL",
+          "family": "5GF",
+          "match_tokens": [
+            "5GF-NA",
+            "5GF-GL",
+            "5GF"
+          ],
+          "generic_match_tokens": [
+            "5GF"
+          ]
+        }
+      ]
+    }
+  }
+}
