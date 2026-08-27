@@ -18,6 +18,9 @@ class WebAppTemplate {
         this.initUploadButton();
         this.initFormExamples();
         this.initButtonExamples();
+        this.initModals();
+        this.loadAppVersion();
+        this.initSidebar();
         
         // Show homepage by default
         this.showElement('homepage');
@@ -1442,6 +1445,259 @@ class WebAppTemplate {
 
         textToggle.addEventListener('change', render);
         render();
+    }
+
+    initSidebar() {
+        var sidebar = document.getElementById('app-sidebar');
+        var toggle = document.getElementById('sidebar-toggle');
+        if (!sidebar || !toggle) return;
+
+        // Populate title on nav items from their text content for hover tooltips
+        var navItems = sidebar.querySelectorAll('.nav-item');
+        navItems.forEach(function(item) {
+            var text = '';
+            item.childNodes.forEach(function(node) {
+                if (node.nodeType === 3) { // Text node
+                    text += node.textContent.trim();
+                }
+            });
+            if (text) {
+                item.setAttribute('data-nav-label', text);
+            }
+        });
+
+        var updateTitles = function() {
+            var isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+            navItems.forEach(function(item) {
+                var label = item.getAttribute('data-nav-label') || '';
+                item.title = isCollapsed ? label : '';
+            });
+        };
+
+        // Restore saved state (default: expanded)
+        var saved = localStorage.getItem('sidebar-collapsed');
+        if (saved === 'true') {
+            sidebar.classList.add('sidebar-collapsed');
+        }
+        updateTitles();
+
+        toggle.addEventListener('click', function() {
+            sidebar.classList.toggle('sidebar-collapsed');
+            localStorage.setItem('sidebar-collapsed',
+                sidebar.classList.contains('sidebar-collapsed') ? 'true' : 'false');
+            updateTitles();
+        });
+    }
+
+    loadAppVersion() {
+        var versionEl = document.getElementById('app-version');
+        if (!versionEl) return;
+        fetch('api/info')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.app_version) {
+                    versionEl.textContent = 'v' + data.app_version;
+                }
+            })
+            .catch(function() {
+                // Version display is optional; silently ignore errors
+            });
+    }
+
+    initModals() {
+        var self = this;
+        this._helpLoaded = false;
+
+        // Help button
+        var helpBtn = document.getElementById('help-btn');
+        var helpModal = document.getElementById('help-modal');
+        var helpClose = document.getElementById('help-modal-close');
+
+        if (helpBtn && helpModal) {
+            helpBtn.addEventListener('click', function() { self.openModal('help'); });
+        }
+        if (helpClose && helpModal) {
+            helpClose.addEventListener('click', function() { self.closeModal('help'); });
+        }
+
+        // Info button
+        var infoBtn = document.getElementById('info-btn');
+        var infoModal = document.getElementById('info-modal');
+        var infoClose = document.getElementById('info-modal-close');
+
+        if (infoBtn && infoModal) {
+            infoBtn.addEventListener('click', function() { self.openModal('info'); });
+        }
+        if (infoClose && infoModal) {
+            infoClose.addEventListener('click', function() { self.closeModal('info'); });
+        }
+
+        // Close on overlay click
+        var overlays = document.querySelectorAll('.modal-overlay');
+        overlays.forEach(function(overlay) {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    overlay.classList.remove('show');
+                }
+            });
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                overlays.forEach(function(overlay) {
+                    overlay.classList.remove('show');
+                });
+            }
+        });
+    }
+
+    openModal(type) {
+        var modal = document.getElementById(type + '-modal');
+        if (!modal) return;
+        modal.classList.add('show');
+
+        if (type === 'help') {
+            this.loadHelpContent();
+        } else if (type === 'info') {
+            this.loadInfoContent();
+        }
+    }
+
+    closeModal(type) {
+        var modal = document.getElementById(type + '-modal');
+        if (modal) modal.classList.remove('show');
+    }
+
+    loadHelpContent() {
+        if (this._helpLoaded) return;
+        var body = document.getElementById('help-modal-body');
+        if (!body) return;
+        var self = this;
+
+        fetch('api/help')
+            .then(function(r) { return r.text(); })
+            .then(function(md) {
+                body.innerHTML = self.renderMarkdown(md);
+                self._helpLoaded = true;
+            })
+            .catch(function() {
+                body.innerHTML = '<p>Unable to load help documentation.</p>';
+            });
+    }
+
+    loadInfoContent() {
+        var body = document.getElementById('info-modal-body');
+        if (!body) return;
+        body.innerHTML = '<div class="modal-loading"><div class="spinner-circle"></div><p>Loading info...</p></div>';
+
+        fetch('api/info')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var items = [
+                    { icon: 'fas fa-server', label: 'Router Model', value: data.router_model || 'N/A' },
+                    { icon: 'fas fa-barcode', label: 'Serial Number', value: data.serial_number || 'N/A' },
+                    { icon: 'fas fa-network-wired', label: 'MAC Address', value: data.mac_address || 'N/A' },
+                    { icon: 'fas fa-microchip', label: 'Firmware Version', value: data.firmware_version || 'N/A' },
+                    { icon: 'fas fa-cube', label: 'SDK App Version', value: data.app_version || 'N/A' }
+                ];
+                var html = '<div class="info-grid">';
+                items.forEach(function(item) {
+                    html += '<div class="info-item">' +
+                        '<div class="info-item-icon"><i class="' + item.icon + '"></i></div>' +
+                        '<div class="info-item-content">' +
+                        '<span class="info-item-label">' + item.label + '</span>' +
+                        '<span class="info-item-value">' + item.value + '</span>' +
+                        '</div></div>';
+                });
+                html += '</div>';
+                body.innerHTML = html;
+            })
+            .catch(function() {
+                body.innerHTML = '<p>Unable to load device information.</p>';
+            });
+    }
+
+    renderMarkdown(md) {
+        if (!md) return '';
+        // Escape HTML entities first
+        var html = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // Code blocks (``` ... ```)
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(match, lang, code) {
+            return '<pre><code>' + code.replace(/\n$/, '') + '</code></pre>';
+        });
+
+        // Tables
+        html = html.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, function(match, headerRow, sepRow, bodyRows) {
+            var headers = headerRow.split('|').filter(function(c) { return c.trim() !== ''; });
+            var rows = bodyRows.trim().split('\n');
+            var table = '<table><thead><tr>';
+            headers.forEach(function(h) { table += '<th>' + h.trim() + '</th>'; });
+            table += '</tr></thead><tbody>';
+            rows.forEach(function(row) {
+                var cols = row.split('|').filter(function(c) { return c.trim() !== ''; });
+                table += '<tr>';
+                cols.forEach(function(c) { table += '<td>' + c.trim() + '</td>'; });
+                table += '</tr>';
+            });
+            table += '</tbody></table>';
+            return table;
+        });
+
+        // Horizontal rules
+        html = html.replace(/^\n?---+\n?$/gm, '<hr>');
+
+        // Headers
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+        // Bold and italic
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Inline code
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Unordered lists
+        html = html.replace(/(^|\n)((?:- .+\n?)+)/g, function(match, prefix, block) {
+            var items = block.trim().split('\n').map(function(line) {
+                return '<li>' + line.replace(/^- /, '') + '</li>';
+            }).join('');
+            return prefix + '<ul>' + items + '</ul>';
+        });
+
+        // Ordered lists
+        html = html.replace(/(^|\n)((?:\d+\. .+\n?)+)/g, function(match, prefix, block) {
+            var items = block.trim().split('\n').map(function(line) {
+                return '<li>' + line.replace(/^\d+\. /, '') + '</li>';
+            }).join('');
+            return prefix + '<ol>' + items + '</ol>';
+        });
+
+        // Paragraphs: wrap remaining bare lines
+        html = html.replace(/\n{2,}/g, '</p><p>');
+        // Wrap in paragraph tags if not already wrapped
+        if (html.indexOf('<') !== 0) {
+            html = '<p>' + html + '</p>';
+        }
+        // Clean up empty paragraphs
+        html = html.replace(/<p>\s*<\/p>/g, '');
+        // Fix paragraphs wrapping block elements
+        html = html.replace(/<p>(<h[1-3]>)/g, '$1');
+        html = html.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
+        html = html.replace(/<p>(<hr>)<\/p>/g, '$1');
+        html = html.replace(/<p>(<pre>)/g, '$1');
+        html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+        html = html.replace(/<p>(<table>)/g, '$1');
+        html = html.replace(/(<\/table>)<\/p>/g, '$1');
+        html = html.replace(/<p>(<ul>)/g, '$1');
+        html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+        html = html.replace(/<p>(<ol>)/g, '$1');
+        html = html.replace(/(<\/ol>)<\/p>/g, '$1');
+
+        return html;
     }
 
     bindEvents() {
