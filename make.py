@@ -1239,6 +1239,7 @@ def purge():
 
 def deploy():
     """Full deploy: purge, build, install, and show recent logs."""
+    deploy_start = time.time()
     print('Purging apps from {}...'.format(g_dev_client_ip))
     purge()
     time.sleep(3)
@@ -1261,7 +1262,11 @@ def deploy():
         log_url = 'https://{}/api/status/log/'.format(g_dev_client_ip)
         response = requests.get(log_url, auth=get_auth(), verify=False)
         logs = json.loads(response.text).get('data', [])
-        cutoff = time.time() - 7
+        # Anchor the cutoff to when this deploy started (not to "now"), so
+        # slow purge/build/install steps can't push the app's own startup
+        # log lines outside the window. A few seconds of slack cover clock
+        # drift between this machine and the router.
+        cutoff = deploy_start - 3
         recent = [e for e in logs if e[0] >= cutoff]
         if recent:
             print('Logs:')
@@ -1271,7 +1276,7 @@ def deploy():
                 msg = entry[3] if len(entry) > 3 and entry[3] else ''
                 print('  {} [{}] {}'.format(ts, facility, msg))
         else:
-            print('  No log entries in the last 7 seconds.')
+            print('  No log entries since deploy started.')
     except Exception as e:
         print('Warning: Could not fetch logs: {}'.format(e))
 
