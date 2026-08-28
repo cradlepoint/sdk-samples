@@ -2,7 +2,7 @@
 
 Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.0.1
+**Version:** 1.0.2
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -750,6 +750,17 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 # Changelog — 1.0.x
 
 The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.0.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.0.2
+
+- Corrected cellular telemetry handling for **5G Standalone (SA)** so the NR serving PCell is represented as the primary carrier instead of being mislabeled as an LTE anchor.
+- Made live cellular radio details service-mode aware: LTE and 5G NSA retain the LTE / 5G NR presentation, while 5G SA displays the NR PCell and the first reported NR secondary carrier when available.
+- Updated Carrier Activity and CSV labels to use **PCell (LTE Anchor)** only for 5G NSA and **PCell (Primary)** for LTE-only and 5G SA connections.
+- Preserved native NCOS secondary-carrier numbering as **SCell0**, **SCell1**, **SCell2**, and later indexed carriers.
+- Corrected mixed LTE/NR carrier normalization, duplicate physical-carrier handling, same-band carriers on different channels, and active carriers reporting `0 MHz`.
+- Updated **Published Maximum Uplink CA** to use the modem capability configuration for the connection's current service mode.
+- On 5G SA connections, **Cell Tower ID** and **Physical Cell ID** now prefer `NR_CELL_ID` and `PHY_CELL_ID_5G` when reported by NCOS, with existing generic identifiers retained as fallbacks.
+- Throughput engines, WAN selection and routing, scheduling, server management, result persistence, and SDK appdata architecture are unchanged.
 
 ## v1.0.1
 

@@ -5756,29 +5756,248 @@
             }
             html += '</div>';
 
-            // 2. LTE ---------------------------------------------------------------
-            html += section('LTE', metrics([
-                ['Band', c.rf_band, 'rf_band'],
-                ['Bandwidth', unit(c.lte_bandwidth, ' MHz'), 'lte_bandwidth'],
-                ['RSSI', unit(c.signal_dbm, ' dBm')],
-                ['SINR', unit(c.sinr, ' dB')],
-                ['RSRP', unit(c.rsrp, ' dBm')],
-                ['RSRQ', unit(c.rsrq, ' dB')]
-            ]));
+            // 2. PRIMARY RADIO -----------------------------------------------------
 
-            // 3. 5G NR -------------------------------------------------------------
-            var nrNote = '';
-            var detail = String(c.service_details || '').toUpperCase();
-            if (detail.indexOf('NR IDLE') !== -1) {
-                nrNote = '\u26A0 NR idle \u2014 throughput came from LTE only';
+            var radioCells = c.aggregation || [];
+
+            var serviceMode = String(
+                c.service_mode || ''
+            ).toUpperCase();
+
+            var detail = String(
+                c.service_details || ''
+            ).toUpperCase();
+
+            // NSA contains the characters "SA", so Standalone detection
+            // must explicitly exclude NSA.
+            var isStandalone = (
+                serviceMode === '5G SA' ||
+                (
+                    detail.indexOf('SA') !== -1 &&
+                    detail.indexOf('NSA') === -1
+                )
+            );
+
+            var primaryCell = null;
+            var firstNrSecondary = null;
+
+            for (
+                var radioIdx = 0;
+                radioIdx < radioCells.length;
+                radioIdx++
+            ) {
+                var radioCell = radioCells[radioIdx] || {};
+
+                var radioRole = String(
+                    radioCell.role || ''
+                ).toUpperCase();
+
+                var radioGen = String(
+                    radioCell.gen || ''
+                ).toUpperCase();
+
+                if (!primaryCell && radioRole === 'P') {
+                    primaryCell = radioCell;
+                }
+
+                if (
+                    !firstNrSecondary &&
+                    radioRole === 'S' &&
+                    radioGen === '5G'
+                ) {
+                    firstNrSecondary = radioCell;
+                }
             }
-            html += section('5G NR', metrics([
-                ['Band', c.rf_band_5g, 'rf_band_5g'],
-                ['Bandwidth', unit(c.bandwidth_5g, ' MHz'), 'bandwidth_5g'],
-                ['SINR', unit(c.sinr_5g, ' dB')],
-                ['RSRP', unit(c.rsrp_5g, ' dBm')],
-                ['RSRQ', unit(c.rsrq_5g, ' dB')]
-            ], !!nrNote), nrNote);
+
+            if (isStandalone) {
+
+                var saPrimary = primaryCell || {};
+
+                // Keep the first radio block in the same location, but
+                // represent the NR PCell instead of a nonexistent LTE
+                // anchor.
+                html += section('5G NR', metrics([
+
+                    [
+                        'Band',
+                        ok(saPrimary.band)
+                            ? saPrimary.band
+                            : (c.rf_band_5g || c.rf_band),
+                        'rf_band_5g'
+                    ],
+
+                    [
+                        'Bandwidth',
+                        unit(
+                            ok(saPrimary.bandwidth)
+                                ? saPrimary.bandwidth
+                                : c.bandwidth_5g,
+                            ' MHz'
+                        ),
+                        'bandwidth_5g'
+                    ],
+
+                    [
+                        'RSSI',
+                        unit(
+                            ok(saPrimary.rssi)
+                                ? saPrimary.rssi
+                                : c.rssi_5g,
+                            ' dBm'
+                        )
+                    ],
+
+                    [
+                        'SINR',
+                        unit(
+                            ok(saPrimary.sinr)
+                                ? saPrimary.sinr
+                                : c.sinr_5g,
+                            ' dB'
+                        )
+                    ],
+
+                    [
+                        'RSRP',
+                        unit(
+                            ok(saPrimary.rsrp)
+                                ? saPrimary.rsrp
+                                : c.rsrp_5g,
+                            ' dBm'
+                        )
+                    ],
+
+                    [
+                        'RSRQ',
+                        unit(
+                            ok(saPrimary.rsrq)
+                                ? saPrimary.rsrq
+                                : c.rsrq_5g,
+                            ' dB'
+                        )
+                    ]
+
+                ]));
+
+            } else {
+
+                // LTE and NSA retain the existing primary LTE section.
+                html += section('LTE', metrics([
+
+                    ['Band', c.rf_band, 'rf_band'],
+
+                    [
+                        'Bandwidth',
+                        unit(c.lte_bandwidth, ' MHz'),
+                        'lte_bandwidth'
+                    ],
+
+                    ['RSSI', unit(c.signal_dbm, ' dBm')],
+
+                    ['SINR', unit(c.sinr, ' dB')],
+
+                    ['RSRP', unit(c.rsrp, ' dBm')],
+
+                    ['RSRQ', unit(c.rsrq, ' dB')]
+
+                ]));
+            }
+
+            // 3. SECONDARY / NR RADIO ----------------------------------------------
+
+            var nrNote = '';
+
+            if (
+                !isStandalone &&
+                detail.indexOf('NR IDLE') !== -1
+            ) {
+                nrNote =
+                    '\u26A0 NR idle \u2014 throughput came from LTE only';
+            }
+
+            if (isStandalone) {
+
+                // In SA, the second existing radio-summary area represents
+                // the first active NR secondary cell. The full carrier set
+                // remains visible in the CA table below.
+                if (firstNrSecondary) {
+
+                    var secondaryName = 'SCell';
+
+                    var secondaryMatch = String(
+                        firstNrSecondary.label || ''
+                    ).match(/^(SCell\d+)/i);
+
+                    if (secondaryMatch) {
+                        secondaryName = secondaryMatch[1];
+                    }
+
+                    html += section(
+                        '5G NR \u2014 ' + secondaryName,
+                        metrics([
+
+                            [
+                                'Band',
+                                firstNrSecondary.band
+                            ],
+
+                            [
+                                'Bandwidth',
+                                unit(
+                                    firstNrSecondary.bandwidth,
+                                    ' MHz'
+                                )
+                            ],
+
+                            [
+                                'SINR',
+                                unit(
+                                    firstNrSecondary.sinr,
+                                    ' dB'
+                                )
+                            ],
+
+                            [
+                                'RSRP',
+                                unit(
+                                    firstNrSecondary.rsrp,
+                                    ' dBm'
+                                )
+                            ],
+
+                            [
+                                'RSRQ',
+                                unit(
+                                    firstNrSecondary.rsrq,
+                                    ' dB'
+                                )
+                            ]
+
+                        ])
+                    );
+                }
+
+            } else {
+
+                // NSA retains the existing direct NR summary.
+                html += section('5G NR', metrics([
+
+                    ['Band', c.rf_band_5g, 'rf_band_5g'],
+
+                    [
+                        'Bandwidth',
+                        unit(c.bandwidth_5g, ' MHz'),
+                        'bandwidth_5g'
+                    ],
+
+                    ['SINR', unit(c.sinr_5g, ' dB')],
+
+                    ['RSRP', unit(c.rsrp_5g, ' dBm')],
+
+                    ['RSRQ', unit(c.rsrq_5g, ' dB')]
+
+                ], !!nrNote), nrNote);
+            }
 
             // 4. CARRIER AGGREGATION ----------------------------------------------
             var cells = c.aggregation || [];
@@ -5796,7 +6015,14 @@
                 var sumBw = 0, haveBw = false;
                 for (var i = 0; i < cells.length; i++) {
                     var cc = cells[i];
-                    var isPrimary = String(cc.label || '').indexOf('Primary') !== -1;
+                    var ccRole = String(cc.role || '').toUpperCase();
+                    var ccLabel = String(cc.label || '');
+
+                    var isPrimary = (
+                        ccRole === 'P' ||
+                        /^PCell\b/i.test(ccLabel) ||
+                        ccLabel.indexOf('Primary') !== -1
+                    );
                     var bwNum = parseFloat(String(cc.bandwidth || '').replace(/[^\d.]/g, ''));
                     if (!isNaN(bwNum)) { sumBw += bwNum; haveBw = true; }
                     t += '<tr' + (isPrimary ? ' class="ca-primary"' : '') + '>' +
@@ -5856,30 +6082,57 @@
                 return count + ' Carrier' + (count !== 1 ? 's' : '');
             }
 
-            function carrierRoleLabel(carrier, index) {
+            function carrierRoleLabel(
+                carrier,
+                index,
+                serviceMode
+            ) {
                 var role = String(
                     (carrier && carrier.role) || ''
                 ).trim().toLowerCase();
 
-                if (role === 'pcell') {
-                    return 'PCell (Anchor)';
+                var rat = String(
+                    (carrier && carrier.rat) || ''
+                ).trim().toUpperCase();
+
+                var mode = String(
+                    serviceMode || ''
+                ).trim().toUpperCase();
+
+                if (
+                    role === 'pcell' ||
+                    role === 'lte_primary'
+                ) {
+                    if (
+                        mode === '5G NSA' &&
+                        (
+                            rat === 'LTE' ||
+                            role === 'lte_primary'
+                        )
+                    ) {
+                        return 'PCell (LTE Anchor)';
+                    }
+
+                    return 'PCell (Primary)';
                 }
 
                 var match = role.match(/^scell(\d+)$/);
+
                 if (match) {
-                    return 'SCell ' + (parseInt(match[1], 10) + 1);
+                    return 'SCell' + parseInt(match[1], 10);
                 }
 
                 match = role.match(/^lte_scell(\d+)$/);
-                if (match) {
-                    return 'SCell ' + (parseInt(match[1], 10) + 1);
-                }
 
-                if (role === 'lte_primary') {
-                    return 'LTE Anchor';
+                if (match) {
+                    return 'SCell' + parseInt(match[1], 10);
                 }
 
                 if (role === 'nr_primary') {
+                    if (mode === '5G SA') {
+                        return 'PCell (Primary)';
+                    }
+
                     return 'NR Carrier';
                 }
 
@@ -5930,17 +6183,30 @@
                         '</div>';
                 }
 
+                var serviceMode = state && state.service_mode
+                    ? state.service_mode
+                    : '';
+
                 var out = '<div class="ca-carrier-list">';
 
                 for (var i = 0; i < carriers.length; i++) {
                     var carrier = carriers[i] || {};
-                    var zero = Number(carrier.bandwidth_mhz) === 0;
+
+                    var zero =
+                        Number(carrier.bandwidth_mhz) === 0;
 
                     out += '<div class="ca-carrier-row' +
-                        (zero ? ' ca-zero' : '') + '">';
+                        (zero ? ' ca-zero' : '') +
+                        '">';
 
                     out += '<span class="ca-carrier-role">' +
-                        esc(carrierRoleLabel(carrier, i)) +
+                        esc(
+                            carrierRoleLabel(
+                                carrier,
+                                i,
+                                serviceMode
+                            )
+                        ) +
                         '</span>';
 
                     out += '<span class="ca-carrier-spec">' +
@@ -5953,6 +6219,7 @@
                 }
 
                 out += '</div>';
+
                 return out;
             }
 
@@ -6224,7 +6491,13 @@
                                 (carrierZero ? ' ca-zero' : '') +
                                 '">';
                             html += '<span class="ca-seg-role">' +
-                                esc(carrierRoleLabel(carrier, ci)) +
+                                esc(
+                                    carrierRoleLabel(
+                                        carrier,
+                                        ci,
+                                        state.service_mode
+                                    )
+                                ) +
                                 '</span> ';
                             html += '<span class="ca-seg-spec">' +
                                 esc(carrierBandLabel(carrier)) +
@@ -6264,7 +6537,10 @@
                 return html;
             }
 
-            function publishedUplinkMaximum(capability) {
+            function publishedUplinkMaximum(
+                capability,
+                serviceMode
+            ) {
                 var variants = capability && capability.variants
                     ? capability.variants
                     : [];
@@ -6273,22 +6549,62 @@
                     return 'Not available';
                 }
 
+                var requestedMode = String(
+                    serviceMode || ''
+                ).trim().toUpperCase();
+
+                if (
+                    requestedMode !== 'LTE' &&
+                    requestedMode !== '5G NSA' &&
+                    requestedMode !== '5G SA'
+                ) {
+                    return 'Not available';
+                }
+
                 var values = [];
+                var matchedMode = false;
 
                 for (var i = 0; i < variants.length; i++) {
-                    var value = Number(
-                        (variants[i] || {}).max_upload_ca
-                    );
+                    var variant = variants[i] || {};
 
-                    if (
-                        !isFinite(value) ||
-                        value < 1 ||
-                        values.indexOf(value) !== -1
+                    var configurations =
+                        variant.configurations || [];
+
+                    for (
+                        var ci = 0;
+                        ci < configurations.length;
+                        ci++
                     ) {
-                        continue;
-                    }
+                        var config = configurations[ci] || {};
 
-                    values.push(value);
+                        var configMode = String(
+                            config.mode || ''
+                        ).trim().toUpperCase();
+
+                        if (configMode !== requestedMode) {
+                            continue;
+                        }
+
+                        matchedMode = true;
+
+                        var value =
+                            configurationCarrierCount(
+                                config.upload
+                            );
+
+                        if (
+                            value == null ||
+                            values.indexOf(value) !== -1
+                        ) {
+                            continue;
+                        }
+
+                        values.push(value);
+                    }
+                }
+
+                if (!matchedMode) {
+                    return 'Not supported';
                 }
 
                 if (!values.length) {
@@ -6302,17 +6618,24 @@
                 return 'Varies by modem variant';
             }
 
-            function firstUplinkAnchor(activity) {
+            function firstUplinkPrimary(activity) {
                 var timeline = activity && activity.timeline
                     ? activity.timeline
                     : [];
+
                 var fallback = null;
 
                 for (var i = 0; i < timeline.length; i++) {
-                    var carriers = (timeline[i] || {}).carriers || [];
+                    var carriers =
+                        (timeline[i] || {}).carriers || [];
 
-                    for (var ci = 0; ci < carriers.length; ci++) {
+                    for (
+                        var ci = 0;
+                        ci < carriers.length;
+                        ci++
+                    ) {
                         var carrier = carriers[ci] || {};
+
                         var role = String(
                             carrier.role || ''
                         ).trim().toLowerCase();
@@ -6334,14 +6657,66 @@
                 return fallback;
             }
 
-            function buildUplinkStatus(activity, capability) {
-                var anchor = firstUplinkAnchor(activity);
+            function uplinkServiceMode(
+                activity,
+                fallbackServiceMode
+            ) {
+                var timeline = activity && activity.timeline
+                    ? activity.timeline
+                    : [];
+
+                for (
+                    var i = timeline.length - 1;
+                    i >= 0;
+                    i--
+                ) {
+                    var mode = String(
+                        (timeline[i] || {}).service_mode || ''
+                    ).trim().toUpperCase();
+
+                    if (
+                        mode === 'LTE' ||
+                        mode === '5G NSA' ||
+                        mode === '5G SA'
+                    ) {
+                        return mode;
+                    }
+                }
+
+                var fallback = String(
+                    fallbackServiceMode || ''
+                ).trim().toUpperCase();
+
+                if (
+                    fallback === 'LTE' ||
+                    fallback === '5G NSA' ||
+                    fallback === '5G SA'
+                ) {
+                    return fallback;
+                }
+
+                return '';
+            }
+
+            function buildUplinkStatus(
+                activity,
+                capability,
+                fallbackServiceMode
+            ) {
+                var primary = firstUplinkPrimary(activity);
+
+                var serviceMode = uplinkServiceMode(
+                    activity,
+                    fallbackServiceMode
+                );
+
                 var html =
                     '<div class="ca-phase ca-phase-upload">';
 
                 html += '<div class="ca-phase-head">';
                 html += '<span class="ca-phase-label">';
-                html += '<span class="ca-phase-name">Uplink</span>';
+                html +=
+                    '<span class="ca-phase-name">Uplink</span>';
                 html += '</span>';
                 html += '</div>';
 
@@ -6350,53 +6725,86 @@
 
                 html += '<div class="ca-segment-count">';
                 html += '<span class="ca-max-label">' +
-                    'Observed Uplink Anchor:</span>';
+                    'Observed Serving Primary:</span>';
                 html += '</div>';
 
-                if (anchor) {
-                    html += '<div class="ca-segment-carriers">';
-                    html += '<div class="ca-segment-carrier">';
+                if (primary) {
+                    html +=
+                        '<div class="ca-segment-carriers">';
+
+                    html +=
+                        '<div class="ca-segment-carrier">';
+
                     html += '<span class="ca-seg-role">' +
-                        esc(carrierRoleLabel(anchor, 0)) +
+                        esc(
+                            carrierRoleLabel(
+                                primary,
+                                0,
+                                serviceMode
+                            )
+                        ) +
                         '</span> ';
+
                     html += '<span class="ca-seg-spec">' +
-                        esc(carrierBandLabel(anchor)) +
+                        esc(carrierBandLabel(primary)) +
                         ' &middot; ' +
-                        esc(carrierBandwidthLabel(anchor)) +
+                        esc(carrierBandwidthLabel(primary)) +
                         '</span>';
+
                     html += '</div></div>';
+
                 } else {
-                    html += '<div class="ca-segment-carrier">' +
+                    html +=
+                        '<div class="ca-segment-carrier">' +
                         '<strong>Not available</strong></div>';
                 }
 
-                html += '<div class="ca-segment-count" ' +
+                html +=
+                    '<div class="ca-segment-count" ' +
                     'style="margin-top:0.45rem;">';
+
                 html += '<span class="ca-max-label">' +
                     'Current Uplink CA:</span> ';
-                html += '<strong>Not reported by NCOS</strong>';
+
+                html +=
+                    '<strong>Not reported by NCOS</strong>';
+
                 html += '</div>';
 
                 html += '<div class="ca-segment-total">';
-                html += 'NCOS reports the serving anchor but does not ' +
-                    'report the TX channel or uplink component-carrier ' +
-                    'telemetry needed to identify active Uplink CA.';
+
+                html +=
+                    'NCOS reports the serving primary carrier but ' +
+                    'does not report the TX channel or uplink ' +
+                    'component-carrier telemetry needed to ' +
+                    'identify active Uplink CA.';
+
                 html += '</div>';
 
-                html += '<div class="ca-segment-total" ' +
+                html +=
+                    '<div class="ca-segment-total" ' +
                     'style="margin-top:0.35rem;">';
+
                 html += '<span class="ca-max-label">' +
                     'Published Maximum Uplink CA:</span> ';
+
                 html += '<strong>' +
-                    esc(publishedUplinkMaximum(capability)) +
+                    esc(
+                        publishedUplinkMaximum(
+                            capability,
+                            serviceMode
+                        )
+                    ) +
                     '</strong>';
+
                 html += '</div>';
 
                 html += '</div></div></div>';
+
                 return html;
             }
 
-            // The Uplink section uses the first serving anchor observed
+            // The Uplink section uses the first serving primary observed
             // during upload traffic. It intentionally does not render RX
             // secondary carriers, bandwidth totals, timestamps, or
             // transition snapshots as confirmed active Uplink CA.
@@ -6440,7 +6848,11 @@
                 'Downlink',
                 'ca-phase-download'
             );
-            html += buildUplinkStatus(upload, ca.capability);
+            html += buildUplinkStatus(
+                upload,
+                ca.capability,
+                baseline.service_mode || peak.service_mode
+            );
             html += '</div>';
 
             // PEAK
@@ -7633,30 +8045,61 @@
                     return count + ' Carrier' + (count !== 1 ? 's' : '');
                 }
 
-                function caCarrierRoleLabel(carrier, index) {
+                function caCarrierRoleLabel(
+                    carrier,
+                    index,
+                    serviceMode
+                ) {
                     var role = String(
                         (carrier && carrier.role) || ''
                     ).trim().toLowerCase();
 
-                    if (role === 'pcell') {
-                        return 'PCell (Anchor)';
+                    var rat = String(
+                        (carrier && carrier.rat) || ''
+                    ).trim().toUpperCase();
+
+                    var mode = String(
+                        serviceMode || ''
+                    ).trim().toUpperCase();
+
+                    if (
+                        role === 'pcell' ||
+                        role === 'lte_primary'
+                    ) {
+                        if (
+                            mode === '5G NSA' &&
+                            (
+                                rat === 'LTE' ||
+                                role === 'lte_primary'
+                            )
+                        ) {
+                            return 'PCell (LTE Anchor)';
+                        }
+
+                        return 'PCell (Primary)';
                     }
 
-                    var match = role.match(/^scell(\d+)$/);
+                    var match =
+                        role.match(/^scell(\d+)$/);
+
                     if (match) {
-                        return 'SCell ' + (parseInt(match[1], 10) + 1);
+                        return 'SCell' +
+                            parseInt(match[1], 10);
                     }
 
-                    match = role.match(/^lte_scell(\d+)$/);
+                    match =
+                        role.match(/^lte_scell(\d+)$/);
+
                     if (match) {
-                        return 'SCell ' + (parseInt(match[1], 10) + 1);
-                    }
-
-                    if (role === 'lte_primary') {
-                        return 'LTE Anchor';
+                        return 'SCell' +
+                            parseInt(match[1], 10);
                     }
 
                     if (role === 'nr_primary') {
+                        if (mode === '5G SA') {
+                            return 'PCell (Primary)';
+                        }
+
                         return 'NR Carrier';
                     }
 
@@ -7695,14 +8138,23 @@
                     return (rat ? rat + ' ' : '') + band;
                 }
 
-                function caCarrierText(carrier, index) {
+                function caCarrierText(
+                    carrier,
+                    index,
+                    serviceMode
+                ) {
                     if (!carrier) return '';
 
-                    var bandwidth = carrier.bandwidth_mhz != null
-                        ? carrier.bandwidth_mhz + ' MHz'
-                        : '--';
+                    var bandwidth =
+                        carrier.bandwidth_mhz != null
+                            ? carrier.bandwidth_mhz + ' MHz'
+                            : '--';
 
-                    return caCarrierRoleLabel(carrier, index) +
+                    return caCarrierRoleLabel(
+                        carrier,
+                        index,
+                        serviceMode
+                    ) +
                         ': ' +
                         caCarrierBandLabel(carrier) +
                         ' (' +
@@ -7716,9 +8168,17 @@
                     var carriers = state.carriers || [];
                     var parts = [];
 
-                    for (var i = 0; i < carriers.length; i++) {
+                    for (
+                        var i = 0;
+                        i < carriers.length;
+                        i++
+                    ) {
                         parts.push(
-                            caCarrierText(carriers[i], i)
+                            caCarrierText(
+                                carriers[i],
+                                i,
+                                state.service_mode
+                            )
                         );
                     }
 
@@ -7726,9 +8186,9 @@
                         return parts.join(' | ');
                     }
 
-                    // Older history may not contain the normalized carriers[]
-                    // records. Preserve its summarized bands rather than
-                    // inventing serving-cell roles.
+                    // Older history may not contain normalized
+                    // carriers[] records. Preserve its summarized
+                    // bands rather than inventing serving-cell roles.
                     if (state.bands) {
                         return String(state.bands)
                             .replace(/ \+ /g, ' | ');
