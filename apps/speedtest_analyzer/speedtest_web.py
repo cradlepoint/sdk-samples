@@ -561,7 +561,7 @@ _CA_METRIC_KEYS = {
 # index. e.g. BAND_5G_SCELL0, BANDWIDTH_5G_SCELL0, SINR_5G_SCELL0,
 # ACTIVE_5G_SCELL0. P/SCELL distinguishes primary from secondary.
 _CA_KEY_RE = re.compile(
-    r'^(?P<metric>[A-Z]+)_(?P<gen>5G|LTE|4G)_(?P<role>[SP])CELL(?P<idx>\d+)$')
+    r'^(?P<metric>[A-Z]+)_(?P<gen>5G|LTE|4G)_(?P<role>[SP])CELL(?P<idx>\d*)$')
 
 # Legacy/alternate shape kept as a fallback: CA_PCC_RFBAND, CA_SCC1_SINR.
 _CA_LEGACY_RE = re.compile(
@@ -608,6 +608,7 @@ _DIAG_FIELD_CANDIDATES = {
     'rf_channel_5g': ('CHANNEL_5G', 'RFCHANNEL_5G', 'NR_RFCHANNEL'),
     'phy_cell_id_5g': ('PHY_CELL_ID_5G', 'PCI_5G'),
     # Tower / network
+    'nr_cell_id': ('NR_CELL_ID',),
     'cell_id': ('CELL_ID',),
     'phy_cell_id': ('PHY_CELL_ID',),
     'tac': ('TAC', 'TRACKING_AREA_CODE'),
@@ -686,7 +687,14 @@ def _parse_aggregation_cells(diagnostics):
                 metric = match.group('metric')
                 role = 'P' if match.group('role') == 'P' else 'S'
                 gen = match.group('gen')
-                idx = int(match.group('idx'))
+                idx_raw = match.group('idx')
+
+                # NCOS PCell keys are unnumbered. SCells keep their native
+                # zero-based indexes: SCell0, SCell1, SCell2, ...
+                if role == 'S' and not idx_raw:
+                    continue
+
+                idx = int(idx_raw or 0)
             else:
                 match = _CA_LEGACY_RE.match(key)
                 if not match:
@@ -703,16 +711,42 @@ def _parse_aggregation_cells(diagnostics):
             cell = cells.setdefault((role, gen, idx), {'role': role, 'gen': gen})
             cell[out_key] = value
 
+        service_mode = _determine_service_mode(diagnostics)
+
         ordered = []
         # Primary first, then secondary cells in index order.
         for cell_key in sorted(cells, key=lambda k: (k[0] != 'P', k[2])):
             role, gen, idx = cell_key
             entry = dict(cells[cell_key])
-            if role == 'P':
-                entry['label'] = f'Primary Cell ({gen})'
+
+            # Determine radio type from the actual reported band.
+            # The "_5G_" field family may contain an LTE PCell on NSA.
+            band_rat, _ = _parse_band_name(entry.get('band'))
+
+            if band_rat == 'NR':
+                entry['gen'] = '5G'
+            elif band_rat == 'LTE':
+                entry['gen'] = 'LTE'
             else:
-                # NCOS labels SCELL0 as "Cell 1" in its Live Status view
-                entry['label'] = f'Cell {idx + 1} ({gen})'
+                entry['gen'] = gen
+
+            display_radio = (
+                '5G NR'
+                if entry.get('gen') == '5G'
+                else entry.get('gen')
+            )
+
+            if role == 'P':
+                if (
+                    service_mode == '5G NSA'
+                    and entry.get('gen') == 'LTE'
+                ):
+                    entry['label'] = 'PCell (LTE Anchor)'
+                else:
+                    entry['label'] = 'PCell (Primary)'
+            else:
+                entry['label'] = f'SCell{idx} ({display_radio})'
+
             # Aggregation SINR arrives in tenths of a dB
             if 'sinr' in entry:
                 entry['sinr'] = _scale_sinr(entry['sinr'])
@@ -821,54 +855,113 @@ def _collect_cellular_snapshot(interface, include_active_carriers=False):
             if val is not None:
                 snapshot[out_key] = val
 
+        service_mode = _determine_service_mode(diagnostics)
+
+        if service_mode:
+            snapshot['service_mode'] = service_mode
+
+        # Tower identity follows the serving primary radio.
+        #
+        # LTE / NSA:
+        #   CELL_ID + PHY_CELL_ID identify the LTE serving/anchor cell.
+        #
+        # 5G SA:
+        #   Prefer NR_CELL_ID + PHY_CELL_ID_5G because there is no LTE
+        #   anchor. Fall back to the generic fields for modem/firmware
+        #   variants that do not expose the NR-specific keys.
+        if service_mode == '5G SA':
+            if _is_present(snapshot.get('nr_cell_id')):
+                snapshot['cell_id'] = snapshot['nr_cell_id']
+
+            if _is_present(snapshot.get('phy_cell_id_5g')):
+                snapshot['phy_cell_id'] = snapshot['phy_cell_id_5g']
+
         # Carrier aggregation
         cells, unmatched = _parse_aggregation_cells(diagnostics)
 
-        # Devices observed so far expose only SCELL keys, so synthesize the
-        # primary row.
-        #
-        # The SCELL0 band/bandwidth match the serving 5G fields exactly
-        # (BAND_5G_SCELL0 == RF Band 5G), meaning SCELL0 *is* the serving NR
-        # carrier. Building the primary from those fields would duplicate it
-        # and double-count bandwidth. NCOS instead reports the LTE anchor as
-        # the CA primary cell on NSA (Band 66 @ 10 MHz alongside n41), so use
-        # the LTE serving fields.
+        service_mode = (
+            snapshot.get('service_mode')
+            or _determine_service_mode(diagnostics)
+        )
+
+        # Explicit NCOS PCell telemetry is preferred. Some platforms/states
+        # expose only SCells, so synthesize a primary only when needed.
         if cells and not any(c.get('role') == 'P' for c in cells):
             primary = None
-            if _is_present(snapshot.get('rf_band')):
-                primary = {
-                    'label': 'Primary Cell (LTE anchor)', 'role': 'P',
-                    'gen': 'LTE',
-                    'band': snapshot.get('rf_band'),
-                    'bandwidth': snapshot.get('lte_bandwidth'),
-                    'channel': snapshot.get('rf_channel'),
-                    'rssi': snapshot.get('signal_dbm'),
-                    'rsrp': snapshot.get('rsrp'),
-                    'rsrq': snapshot.get('rsrq'),
-                    'sinr': snapshot.get('sinr'),
-                    'phy_cell_id': snapshot.get('phy_cell_id'),
-                }
-            elif _is_present(snapshot.get('rf_band_5g')):
-                # 5G SA: no LTE anchor, so the NR serving cell is primary.
-                # Only valid when no SCELL already reports the same band.
-                dup = any(str(x.get('band', '')).upper() ==
-                          str(snapshot.get('rf_band_5g')).upper()
-                          for x in cells)
-                if not dup:
+
+            if service_mode == '5G SA':
+                # Standalone has no LTE anchor. Generic RFBAND may itself
+                # contain the NR serving band.
+                primary_band = (
+                    snapshot.get('rf_band_5g')
+                    or snapshot.get('rf_band')
+                )
+
+                primary_rat, _ = _parse_band_name(primary_band)
+
+                if primary_rat == 'NR':
+                    primary_bandwidth = snapshot.get('bandwidth_5g')
+
+                    if not _is_present(primary_bandwidth):
+                        primary_bandwidth = _first_present(
+                            diagnostics,
+                            ('RFBANDWIDTH',),
+                            _is_present
+                        )
+
                     primary = {
-                        'label': 'Primary Cell (5G SA)', 'role': 'P',
+                        'label': 'PCell (Primary)',
+                        'role': 'P',
                         'gen': '5G',
-                        'band': snapshot.get('rf_band_5g'),
-                        'bandwidth': snapshot.get('bandwidth_5g'),
-                        'channel': snapshot.get('rf_channel_5g'),
+                        'band': primary_band,
+                        'bandwidth': primary_bandwidth,
+                        'channel': (
+                            snapshot.get('rf_channel_5g')
+                            or snapshot.get('rf_channel')
+                        ),
                         'rssi': snapshot.get('rssi_5g'),
                         'rsrp': snapshot.get('rsrp_5g'),
                         'rsrq': snapshot.get('rsrq_5g'),
                         'sinr': snapshot.get('sinr_5g'),
-                        'phy_cell_id': snapshot.get('phy_cell_id_5g'),
+                        'phy_cell_id': snapshot.get(
+                            'phy_cell_id_5g'
+                        ),
                     }
+
+            else:
+                primary_band = snapshot.get('rf_band')
+                primary_rat, _ = _parse_band_name(primary_band)
+
+                # Never create an LTE anchor from an NR n-band merely
+                # because that n-band appeared in generic RFBAND.
+                if primary_rat == 'LTE':
+                    primary = {
+                        'label': (
+                            'PCell (LTE Anchor)'
+                            if service_mode == '5G NSA'
+                            else 'PCell (Primary)'
+                        ),
+                        'role': 'P',
+                        'gen': 'LTE',
+                        'band': primary_band,
+                        'bandwidth': snapshot.get('lte_bandwidth'),
+                        'channel': snapshot.get('rf_channel'),
+                        'rssi': snapshot.get('signal_dbm'),
+                        'rsrp': snapshot.get('rsrp'),
+                        'rsrq': snapshot.get('rsrq'),
+                        'sinr': snapshot.get('sinr'),
+                        'phy_cell_id': snapshot.get(
+                            'phy_cell_id'
+                        ),
+                    }
+
             if primary:
-                primary = {k: v for k, v in primary.items() if _is_present(v)}
+                primary = {
+                    key: value
+                    for key, value in primary.items()
+                    if _is_present(value)
+                }
+
                 if primary.get('band'):
                     cells.insert(0, primary)
 
@@ -1112,14 +1205,41 @@ def _dedupe_active_carriers(carriers):
 
         elif len(explicit_records) > 1:
             # Multiple physical carriers share the same RAT/band/bandwidth.
-            # Preserve every explicit channel and keep channel-less records
-            # separate because assigning them would be ambiguous.
+            # Preserve every explicit channel. A channel-less PCell record
+            # can still be safely merged when exactly one explicit PCell
+            # exists in the group; its role identifies the serving primary.
+            # Other channel-less records remain separate because their
+            # physical carrier identity is ambiguous.
+            explicit_pcells = [
+                carrier for carrier in explicit_records
+                if carrier.get('role') == 'pcell'
+            ]
+
+            remaining_channel_less = []
+
+            for carrier in channel_less:
+                if (
+                    carrier.get('role') == 'pcell'
+                    and len(explicit_pcells) == 1
+                ):
+                    target = explicit_pcells[0]
+                    merged = _merge_carrier_records(
+                        target,
+                        carrier
+                    )
+
+                    target_index = explicit_records.index(target)
+                    explicit_records[target_index] = merged
+                    explicit_pcells[0] = merged
+                else:
+                    remaining_channel_less.append(carrier)
+
             deduped.extend(explicit_records)
 
-            if channel_less:
-                merged_missing = channel_less[0]
+            if remaining_channel_less:
+                merged_missing = remaining_channel_less[0]
 
-                for carrier in channel_less[1:]:
+                for carrier in remaining_channel_less[1:]:
                     merged_missing = _merge_carrier_records(
                         merged_missing,
                         carrier
@@ -1162,6 +1282,7 @@ def _parse_active_carriers(diagnostics):
         return []
 
     carriers = []
+    service_mode = _determine_service_mode(diagnostics)
 
     def _get(key):
         v = diagnostics.get(key)
@@ -1176,19 +1297,53 @@ def _parse_active_carriers(diagnostics):
         s = str(val).strip().lower()
         return s in ('active', '1', 'true', 'yes')
 
-    # --- Family A: Standard LTE primary carrier ---
+    # --- Family A: Generic serving-radio fields ---
+
     rfband = _get('RFBAND')
+
     if rfband:
         rat, band = _parse_band_name(rfband)
+
         if rat:
-            bw = _parse_bandwidth_value(_get('LTEBANDWIDTH'))
+            if rat == 'NR':
+                bw = _parse_bandwidth_value(
+                    _get('RFBANDWIDTH')
+                    or _get('RFBANDWIDTH_5G')
+                )
+
+                role = (
+                    'pcell'
+                    if service_mode == '5G SA'
+                    else 'nr_primary'
+                )
+
+                rsrp = _get('RSRP_5G')
+                rsrq = _get('RSRQ_5G')
+                sinr = _get('SINR_5G')
+                pci = _get('PHY_CELL_ID_5G')
+
+            else:
+                bw = _parse_bandwidth_value(
+                    _get('LTEBANDWIDTH')
+                )
+
+                role = 'pcell'
+                rsrp = _get('RSRP')
+                rsrq = _get('RSRQ')
+                sinr = _get('SINR')
+                pci = _get('PHY_CELL_ID')
+
             carriers.append(_normalize_carrier(
-                role='pcell', rat=rat, band=rfband,
+                role=role,
+                rat=rat,
+                band=rfband,
                 bandwidth_mhz=bw,
                 channel=_get('RFCHANNEL'),
                 active=True,
-                rsrp=_get('RSRP'), rsrq=_get('RSRQ'),
-                sinr=_get('SINR'), pci=_get('PHY_CELL_ID')
+                rsrp=rsrp,
+                rsrq=rsrq,
+                sinr=sinr,
+                pci=pci
             ))
 
     # --- Family B: Direct NR fields ---
@@ -1198,7 +1353,11 @@ def _parse_active_carriers(diagnostics):
         if rat:
             bw = _parse_bandwidth_value(_get('RFBANDWIDTH_5G'))
             carriers.append(_normalize_carrier(
-                role='nr_primary', rat=rat, band=rfband_5g,
+                role=(
+                    'pcell'
+                    if service_mode == '5G SA' and rat == 'NR'
+                    else 'nr_primary'
+                ), rat=rat, band=rfband_5g,
                 bandwidth_mhz=bw,
                 channel=_get('RFCHANNEL_5G'),
                 active=True,

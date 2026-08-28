@@ -2,7 +2,7 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.0.1
+**Documentation version:** 1.0.2
 **Application release family:** 1.0.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
@@ -37,7 +37,7 @@ The documented application behavior uses several persistent or packaged data sou
 
 Application version information is carried in `package.ini`.
 
-The current branded application release is `1.0.0`. Speedtest Analyzer 1.0.0 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline.
+The current branded application release is `1.0.2`. Speedtest Analyzer 1.0.0 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline.
 
 ## 2.2 Device validation catalog
 
@@ -228,13 +228,13 @@ This value describes the downlink bandwidth available in the serving-carrier sta
 In the expanded **Progress** section:
 
 - **Downlink** displays the dynamic RX/downlink carrier timeline captured during download traffic.
-- **Observed Uplink Anchor** displays the first valid PCell or primary serving carrier observed while upload traffic was running, including its radio type, band, and reported bandwidth.
+- **Observed Serving Primary** displays the first valid PCell or primary serving carrier observed while upload traffic was running, including its radio type, band, and reported bandwidth.
 - The Uplink anchor remains fixed for the result and is not replaced as RX/downlink secondary carriers activate or disappear.
 - **Current Uplink CA: Not reported by NCOS** identifies that active uplink component-carrier participation cannot currently be determined.
-- **Published Maximum Uplink CA** displays the matched modem's published capability when available.
+- **Published Maximum Uplink CA** uses the matched modem's published Upload configuration for the service mode observed during the test.
 - The Uplink section does not display RX secondary carriers, aggregate RX/downlink bandwidth, timestamps, or transition snapshots as active Uplink CA.
 
-The serving anchor and its reported bandwidth are valid observations from the upload phase. They do not prove whether one or more additional uplink component carriers transported traffic.
+The serving primary and its reported bandwidth are valid observations from the upload phase. They do not prove whether one or more additional uplink component carriers transported traffic.
 
 The published maximum is a modem capability reference. It does not indicate the number of uplink carriers currently active.
 
@@ -283,9 +283,11 @@ If the catalog is missing or invalid, the app logs a nonfatal error and omits th
 
 Where NCOS provides enough information, Carrier Activity identifies roles such as:
 
-- `PCell (Anchor)`
-- `SCell 1`
-- `SCell 2`
+- `PCell (LTE Anchor)` for the LTE primary in 5G NSA.
+- `PCell (Primary)` for LTE-only and 5G SA.
+- `SCell0`
+- `SCell1`
+- Later carriers continue the native zero-based NCOS numbering.
 - `NR Carrier`
 
 The app does not guess an NR secondary-carrier role when NCOS does not explicitly provide that relationship.
@@ -351,7 +353,7 @@ v2.5.3 uses ASCII separators in these progress fields for better compatibility w
 
 Existing final Cell Stats / dynamic carrier columns remain available when the final cellular snapshot contains aggregation records.
 
-Published modem capability references are intentionally excluded from CSV exports. Existing CSV columns, values, and semantics remain unchanged.
+Published modem capability references are intentionally excluded from CSV exports. Existing CSV columns and schema remain unchanged. Carrier role text uses the corrected mode-aware PCell terminology and native zero-based SCell numbering.
 
 ---
 
@@ -368,38 +370,32 @@ May include:
 - Service detail
 - Signal/health information
 
-### 6.9.2 LTE
+### 6.9.2 Serving radio sections
 
-May include:
+The radio-summary areas are service-mode aware.
 
-- Band
-- Bandwidth
-- RSSI
-- SINR
-- RSRP
-- RSRQ
+For **LTE-only** connections, the primary section displays the serving LTE radio.
 
-### 6.9.3 5G NR
+For **5G NSA** connections:
 
-May include:
-
-- Band
-- Bandwidth
-- SINR
-- RSRP
-- RSRQ
-
-The expanded 5G NR section does not display a separate RSSI value.
-
-When NCOS explicitly reports an NSA state where LTE is active and NR is idle, the 5G NR section remains visible and displays the warning:
+- The first section remains **LTE** and represents the LTE serving/anchor radio.
+- The second section remains **5G NR** and represents the reported NR connection.
+- If NCOS explicitly reports NR idle, the existing warning remains:
 
 ```text
 NR idle — throughput came from LTE only
 ```
 
-Any unavailable NR values are displayed as `--`.
+For **5G SA** connections:
 
-This prevents an idle NR leg from being incorrectly counted as an active throughput carrier while still preserving the NR diagnostic information reported by NCOS.
+- There is no LTE anchor.
+- The first section is **5G NR** and represents the NR PCell.
+- When an indexed NR secondary carrier is active, the second section represents the first reported NR SCell, such as **5G NR — SCell0**.
+- The complete PCell/SCell topology remains visible in the Carrier Aggregation table.
+
+### 6.9.3 RF measurement availability
+
+RF values are displayed only when NCOS reports them. PCell measurements are not copied into an SCell when SCell-specific measurements are unavailable; those values remain `--`.
 
 ### 6.9.4 Carrier Aggregation / active carrier details
 
@@ -417,7 +413,16 @@ Component-carrier information may include:
 - PCI
 - Carrier state
 
-LTE carrier aggregation and LTE + NR NSA dual connectivity are represented from the actual carrier records reported by the modem. The app does not treat the presence of a `5G` field name by itself as proof that a carrier is NR.
+Carrier RAT is determined from the reported band value rather than from the diagnostic key family alone. NCOS may report an LTE band under an indexed `_5G_` PCell key during 5G NSA operation.
+
+Normalized topology preserves:
+
+- **PCell (LTE Anchor)** for the LTE primary in 5G NSA.
+- **PCell (Primary)** for the serving primary in 5G SA.
+- Native secondary identities such as **SCell0**, **SCell1**, and **SCell2**.
+- Same-band carriers when they use different explicit channels.
+- Active carriers that explicitly report `0 MHz`.
+- One physical carrier when direct and indexed fields describe the same RAT, band, and channel.
 
 ### 6.9.5 Tower & Network
 
@@ -426,6 +431,15 @@ When reported by NCOS/modem status:
 - Cell ID
 - Physical Cell ID
 - Active APN
+
+For LTE and 5G NSA, the normal LTE serving-cell identifiers remain authoritative.
+
+For 5G SA, the application prefers:
+
+- `NR_CELL_ID` for **Cell Tower ID**
+- `PHY_CELL_ID_5G` for **Physical Cell ID**
+
+If an NR-specific identifier is unavailable, `CELL_ID` or `PHY_CELL_ID` remains the fallback.
 
 Fields that are not reported by the modem are omitted or displayed as unavailable.
 
@@ -1353,6 +1367,22 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.0.2
+
+- Corrected **5G Standalone (SA)** serving-carrier normalization so an NR serving PCell is no longer interpreted or displayed as an LTE anchor.
+- Added support for unnumbered indexed NCOS PCell fields such as `BAND_5G_PCELL`, `BANDWIDTH_5G_PCELL`, and `CHANNEL_5G_PCELL`.
+- Carrier radio type is now determined from the reported band value rather than assuming that an `_5G_` diagnostic key always represents NR. This supports NSA states where indexed 5G-family keys contain an LTE PCell.
+- Preserved native NCOS secondary-carrier identities as **SCell0**, **SCell1**, **SCell2**, and later zero-based indexes.
+- Preserved distinct same-band carriers when they have different explicit channels and retained active carriers reporting `0 MHz`.
+- Normalized direct and indexed representations of the same physical carrier to prevent duplicate carrier counting.
+- Made live cellular radio summaries service-mode aware: LTE and 5G NSA retain LTE / 5G NR presentation, while 5G SA presents the NR PCell and first reported NR SCell when available.
+- Updated Carrier Activity and CSV role presentation to use **PCell (LTE Anchor)** only for the LTE primary in 5G NSA and **PCell (Primary)** for LTE-only and 5G SA.
+- Changed the Carrier Activity uplink label from **Observed Uplink Anchor** to **Observed Serving Primary** while preserving the rule that active uplink CA is not inferred when NCOS does not expose uplink component-carrier telemetry.
+- Corrected **Published Maximum Uplink CA** to use the published upload configuration for the service mode observed during the test instead of a generic modem-wide maximum.
+- For 5G SA, tower identity now prefers `NR_CELL_ID` and `PHY_CELL_ID_5G`, with `CELL_ID` and `PHY_CELL_ID` retained as fallbacks.
+- Validated the normalization logic against captured W1855-5GC 5G SA telemetry and W2255-5GF 5G NSA telemetry, including mixed LTE/NR component carriers and an active `0 MHz` NR carrier.
+- No throughput-engine, WAN-selection, routing, scheduler, server-management, persistence, or SDK appdata architecture changes were made.
 
 ## v1.0.1
 
