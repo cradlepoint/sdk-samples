@@ -18,6 +18,9 @@ from threading import Thread
 # Constants
 PORT = 8000
 HISTORY_FILE = 'tmp/speedtest_history.json'
+HISTORY_BACKUP_FILE = HISTORY_FILE + '.bak'
+HISTORY_TEMP_FILE = HISTORY_FILE + '.tmp'
+HISTORY_CORRUPT_FILE = HISTORY_FILE + '.corrupt'
 MAX_HISTORY = 100
 
 # Read app version from package.ini
@@ -43,6 +46,7 @@ current_test = {
     'error': None
 }
 test_lock = threading.Lock()
+history_lock = threading.RLock()
 
 # Active local iPerf3 subprocess used for immediate Stop handling.
 _iperf3_process_lock = threading.Lock()
@@ -2269,32 +2273,235 @@ def _record_carrier_phase_window(phase, started_at, ended_at):
         return False
 
 
-def load_history():
-    """Load test history from file."""
+def _read_history_file(path):
+    """Read and validate a history JSON file."""
+    with open(path, 'r') as f:
+        history = json.load(f)
+    if not isinstance(history, list):
+        raise ValueError('history root must be a JSON array')
+    return history
+
+
+def _remove_history_file(path):
+    """Best-effort removal of a history working file."""
     try:
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, 'r') as f:
-                return json.load(f)
+        if os.path.exists(path):
+            os.remove(path)
     except Exception as e:
-        cp.log(f'Error loading history: {e}')
-    return []
+        cp.log(f'Unable to remove history file {path}: {e}')
+
+
+def _fsync_history_directory():
+    """Best-effort sync of history directory metadata after rename."""
+    try:
+        directory_fd = os.open('tmp', os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        pass
+
+
+def _write_history_temp(history):
+    """Write a complete, validated temporary history file."""
+    os.makedirs('tmp', exist_ok=True)
+    records = history[-MAX_HISTORY:]
+
+    with open(HISTORY_TEMP_FILE, 'w') as f:
+        json.dump(records, f)
+        f.flush()
+        os.fsync(f.fileno())
+
+    check = _read_history_file(HISTORY_TEMP_FILE)
+    if check != records:
+        raise IOError('temporary history validation failed')
+
+    return records
+
+
+def _quarantine_corrupt_primary():
+    """Move an invalid primary aside without replacing a good backup."""
+    if not os.path.exists(HISTORY_FILE):
+        return
+
+    os.replace(HISTORY_FILE, HISTORY_CORRUPT_FILE)
+    _fsync_history_directory()
+
+
+def _restore_history(history, source_name):
+    """Restore validated history data to the primary file."""
+    records = _write_history_temp(history)
+
+    if os.path.exists(HISTORY_FILE):
+        _quarantine_corrupt_primary()
+
+    os.replace(HISTORY_TEMP_FILE, HISTORY_FILE)
+    _fsync_history_directory()
+
+    cp.log(f'History recovered from {source_name}')
+    return records
+
+
+def _load_history_locked():
+    """Load primary history or recover from a valid local copy."""
+    candidates_exist = any(
+        os.path.exists(path)
+        for path in (
+            HISTORY_FILE,
+            HISTORY_TEMP_FILE,
+            HISTORY_BACKUP_FILE,
+        )
+    )
+
+    if os.path.exists(HISTORY_FILE):
+        try:
+            history = _read_history_file(HISTORY_FILE)
+
+            # A valid primary is authoritative. Any remaining temp file
+            # belongs to an uncommitted write and can be discarded.
+            _remove_history_file(HISTORY_TEMP_FILE)
+
+            return history
+
+        except Exception as e:
+            cp.log(f'Primary history is invalid: {e}')
+
+    for path, source_name in (
+        (HISTORY_TEMP_FILE, 'temporary history'),
+        (HISTORY_BACKUP_FILE, 'history backup'),
+    ):
+        if not os.path.exists(path):
+            continue
+
+        try:
+            history = _read_history_file(path)
+            return _restore_history(history, source_name)
+
+        except Exception as e:
+            cp.log(f'Unable to recover from {source_name}: {e}')
+
+    if not candidates_exist:
+        return []
+
+    raise RuntimeError('no valid history copy is available')
+
+
+def load_history():
+    """Load test history, recovering local history when possible."""
+    with history_lock:
+        try:
+            return _load_history_locked()
+
+        except Exception as e:
+            cp.log(f'History unavailable: {e}')
+            return []
+
+
+def _load_history_for_update():
+    """Load history for mutation; never turn corruption into [] silently."""
+    try:
+        return _load_history_locked()
+
+    except Exception as e:
+        cp.log(f'History update blocked: {e}')
+        return None
 
 
 def save_history(history):
-    """Save test history to file."""
-    try:
-        os.makedirs('tmp', exist_ok=True)
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(history[-MAX_HISTORY:], f)
-    except Exception as e:
-        cp.log(f'Error saving history: {e}')
+    """Atomically save history while retaining one last-known-good copy."""
+    with history_lock:
+        try:
+            _write_history_temp(history)
+
+            if os.path.exists(HISTORY_FILE):
+                # Validate the live history before rotating it into backup.
+                # A corrupt primary must never replace a known-good backup.
+                _read_history_file(HISTORY_FILE)
+
+                os.replace(
+                    HISTORY_FILE,
+                    HISTORY_BACKUP_FILE
+                )
+                _fsync_history_directory()
+
+            try:
+                os.replace(
+                    HISTORY_TEMP_FILE,
+                    HISTORY_FILE
+                )
+                _fsync_history_directory()
+
+            except Exception:
+                # If the primary was already rotated but promotion of the
+                # new temp file failed, immediately restore the old primary.
+                if (
+                    not os.path.exists(HISTORY_FILE)
+                    and os.path.exists(HISTORY_BACKUP_FILE)
+                ):
+                    os.replace(
+                        HISTORY_BACKUP_FILE,
+                        HISTORY_FILE
+                    )
+                    _fsync_history_directory()
+
+                raise
+
+            return True
+
+        except Exception as e:
+            cp.log(f'Error saving history atomically: {e}')
+
+            # Preserve a completed temp file when the primary disappeared;
+            # it may be usable by recovery on the next load.
+            if os.path.exists(HISTORY_FILE):
+                _remove_history_file(HISTORY_TEMP_FILE)
+
+            return False
+
+
+def clear_history_storage():
+    """Intentionally clear primary history and all recovery copies."""
+    with history_lock:
+        try:
+            os.makedirs('tmp', exist_ok=True)
+
+            for path in (
+                HISTORY_FILE,
+                HISTORY_BACKUP_FILE,
+                HISTORY_TEMP_FILE,
+                HISTORY_CORRUPT_FILE,
+            ):
+                _remove_history_file(path)
+
+            _write_history_temp([])
+
+            os.replace(
+                HISTORY_TEMP_FILE,
+                HISTORY_FILE
+            )
+            _fsync_history_directory()
+
+            return True
+
+        except Exception as e:
+            cp.log(f'Error clearing history: {e}')
+            return False
 
 
 def add_result(result):
-    """Add a test result to history."""
-    history = load_history()
-    history.append(result)
-    save_history(history)
+    """Add a test result to history as one serialized transaction."""
+    with history_lock:
+        history = _load_history_for_update()
+
+        if history is None:
+            cp.log(
+                'New test result not saved because history is unrecoverable'
+            )
+            return False
+
+        history.append(result)
+        return save_history(history)
 
 
 # =============================================================================
@@ -11179,30 +11386,66 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         self.send_json({'status': 'stopped'})
 
     def handle_clear_history(self):
-        """Clear test history."""
-        save_history([])
+        """Clear test history and all local recovery copies."""
+        if not clear_history_storage():
+            self.send_json(
+                {'error': 'Unable to clear history'},
+                500
+            )
+            return
+
         self.send_json({'status': 'cleared'})
 
     def handle_delete_history_entry(self):
         """Delete a single history entry by index."""
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+
         try:
             data = json.loads(body)
         except json.JSONDecodeError:
             self.send_json({'error': 'Invalid JSON'}, 400)
             return
+
         idx = data.get('index')
+
         if not isinstance(idx, int):
-            self.send_json({'error': 'index must be an integer'}, 400)
+            self.send_json(
+                {'error': 'index must be an integer'},
+                400
+            )
             return
-        history = load_history()
-        if idx < 0 or idx >= len(history):
-            self.send_json({'error': 'index out of range'}, 400)
-            return
-        history.pop(idx)
-        save_history(history)
-        self.send_json({'status': 'deleted', 'history': history})
+
+        with history_lock:
+            history = _load_history_for_update()
+
+            if history is None:
+                self.send_json(
+                    {'error': 'History is unavailable'},
+                    500
+                )
+                return
+
+            if idx < 0 or idx >= len(history):
+                self.send_json(
+                    {'error': 'index out of range'},
+                    400
+                )
+                return
+
+            history.pop(idx)
+
+            if not save_history(history):
+                self.send_json(
+                    {'error': 'Unable to save history'},
+                    500
+                )
+                return
+
+        self.send_json({
+            'status': 'deleted',
+            'history': history
+        })
 
     def get_netperf_servers(self):
         """Return Netperf servers without touching iPerf3 appdata."""
