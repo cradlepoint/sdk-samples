@@ -14,6 +14,9 @@ import threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from datetime import datetime
 from threading import Thread
+from urllib.parse import parse_qs, urlparse
+
+from cellular_analysis import build_cellular_analysis
 
 # Constants
 PORT = 8000
@@ -840,7 +843,9 @@ def _collect_cellular_snapshot(interface, include_active_carriers=False):
                 return val.strip().lower() not in _empty_strings
             return True  # Numeric 0 and other types are retained
 
-        snapshot = {}
+        snapshot = {
+            'device_uid': matched_uid,
+        }
 
         # Status fields (signal strength score, health, registration)
         status = matched_dev.get('status', {})
@@ -1572,16 +1577,93 @@ def _build_carrier_summary(carriers):
     }
 
 
-def _carrier_snapshot(diagnostics):
-    """Take a complete carrier snapshot from diagnostics.
+def _serving_cell_snapshot(diagnostics):
+    """Normalize primary serving-cell identity for one diagnostics poll."""
+    if not diagnostics or not isinstance(diagnostics, dict):
+        return {}
 
-    Returns a dict with service_mode, carriers list, and summary.
-    """
+    empty = {'', 'none', 'n/a', 'unknown', '--'}
+
+    def present(value):
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip().lower() not in empty
+        return True
+
+    def first(*keys):
+        return _first_present(diagnostics, keys, present)
+
+    service_mode = _determine_service_mode(diagnostics)
+
+    if service_mode == '5G SA':
+        cell_id = first('NR_CELL_ID', 'CELL_ID')
+        pci = first('PHY_CELL_ID_5G', 'PCI_5G', 'PHY_CELL_ID')
+        band = first('BAND_5G', 'RFBAND_5G', 'RFBAND')
+        channel = first(
+            'CHANNEL_5G',
+            'RFCHANNEL_5G',
+            'NR_RFCHANNEL',
+            'RFCHANNEL'
+        )
+        source = 'NR'
+    else:
+        cell_id = first('CELL_ID')
+        pci = first('PHY_CELL_ID')
+        band = first('RFBAND')
+        channel = first('RFCHANNEL')
+        source = 'LTE'
+
+    serving = {
+        'service_mode': service_mode,
+        'cell_id_source': source
+    }
+
+    values = {
+        'cell_id': cell_id,
+        'plmn': first('CUR_PLMN', 'CURRENT_PLMN'),
+        'tac': first('TAC', 'TRACKING_AREA_CODE'),
+        'pci': pci,
+        'band': band,
+        'channel': channel,
+        'carrier': first('CARRID'),
+    }
+
+    for key, value in values.items():
+        if present(value):
+            serving[key] = value
+
+    return serving
+
+
+def _serving_cell_snapshot_signature(snapshot):
+    """Return fields that identify meaningful serving-cell changes."""
+    if not snapshot or not isinstance(snapshot, dict):
+        return ()
+
+    serving = snapshot.get('serving_cell')
+
+    if not isinstance(serving, dict):
+        return ()
+
+    return (
+        str(serving.get('cell_id_source') or '').strip().upper(),
+        str(serving.get('cell_id') or '').strip(),
+        str(serving.get('plmn') or '').strip(),
+        str(serving.get('tac') or '').strip(),
+        str(serving.get('pci') or '').strip(),
+    )
+
+
+def _carrier_snapshot(diagnostics):
+    """Take a complete carrier and serving-cell snapshot."""
     carriers = _parse_active_carriers(diagnostics)
     service_mode = _determine_service_mode(diagnostics)
     summary = _build_carrier_summary(carriers)
+
     return {
         'service_mode': service_mode,
+        'serving_cell': _serving_cell_snapshot(diagnostics),
         'carriers': carriers,
         'carrier_count': summary['carrier_count'],
         'bands': summary['bands'],
@@ -1634,6 +1716,12 @@ def _snapshots_differ(a, b):
         return True
 
     if a.get('service_mode') != b.get('service_mode'):
+        return True
+
+    if (
+        _serving_cell_snapshot_signature(a)
+        != _serving_cell_snapshot_signature(b)
+    ):
         return True
 
     if a.get('carrier_count') != b.get('carrier_count'):
@@ -1690,6 +1778,284 @@ def _get_modem_diagnostics_for_interface(interface):
         return None, None
 
 
+def _canonical_serving_cell_id(value):
+    """Normalize NCOS decimal + hex serving-cell formatting."""
+    if value is None:
+        return ''
+
+    value = str(value).strip()
+
+    if not value:
+        return ''
+
+    match = re.match(
+        r'^(\d+)\s*\(0x[0-9a-f]+\)$',
+        value,
+        flags=re.IGNORECASE
+    )
+
+    return match.group(1) if match else value
+
+
+def _serving_cell_identity_key(cell):
+    """Return stable primary-cell identity or None when unidentified."""
+    if not isinstance(cell, dict):
+        return None
+
+    cell_id = _canonical_serving_cell_id(
+        cell.get('cell_id')
+    )
+
+    if not cell_id:
+        return None
+
+    return (
+        str(
+            cell.get('cell_id_source')
+            or ''
+        ).strip().upper(),
+        str(
+            cell.get('plmn')
+            or ''
+        ).strip(),
+        cell_id,
+    )
+
+
+def _traffic_serving_cell_handoff_summary(
+    download_activity,
+    upload_activity,
+):
+    """Summarize proven serving-cell transitions during active traffic.
+
+    Unknown/missing identity never bridges two known cells into an invented
+    handoff. A Download -> Upload boundary change is preserved separately
+    because its exact transition second is not known.
+    """
+    result = {
+        'start_cell': None,
+        'end_cell': None,
+        'handoffs': [],
+    }
+
+    previous_phase_last = None
+
+    for phase_name, activity in (
+        ('download', download_activity),
+        ('upload', upload_activity),
+    ):
+        if not isinstance(activity, dict):
+            continue
+
+        timeline = activity.get('timeline')
+
+        if not isinstance(timeline, list) or not timeline:
+            continue
+
+        observations = []
+
+        for state in timeline:
+            if not isinstance(state, dict):
+                continue
+
+            cell = state.get('serving_cell')
+
+            if not isinstance(cell, dict):
+                cell = {}
+
+            observations.append({
+                'elapsed_s': state.get('elapsed_s', 0),
+                'cell': dict(cell),
+                'key': _serving_cell_identity_key(cell),
+            })
+
+        if not observations:
+            continue
+
+        first_known = next(
+            (
+                item
+                for item in observations
+                if item['key'] is not None
+            ),
+            None
+        )
+
+        last_known = next(
+            (
+                item
+                for item in reversed(observations)
+                if item['key'] is not None
+            ),
+            None
+        )
+
+        if (
+            result['start_cell'] is None
+            and first_known is not None
+        ):
+            result['start_cell'] = dict(
+                first_known['cell']
+            )
+
+        # Only the actual first phase observation can prove a phase-boundary
+        # transition. Do not skip an Unknown state and infer a change.
+        phase_first = observations[0]
+
+        if (
+            previous_phase_last is not None
+            and phase_first['key'] is not None
+            and previous_phase_last['key']
+                != phase_first['key']
+        ):
+            result['handoffs'].append({
+                'phase': phase_name,
+                'elapsed_s': None,
+                'phase_boundary': True,
+                'from': dict(
+                    previous_phase_last['cell']
+                ),
+                'to': dict(
+                    phase_first['cell']
+                ),
+            })
+
+        for index in range(
+            1,
+            len(observations)
+        ):
+            previous = observations[index - 1]
+            current = observations[index]
+
+            if (
+                previous['key'] is None
+                or current['key'] is None
+            ):
+                continue
+
+            if previous['key'] == current['key']:
+                continue
+
+            result['handoffs'].append({
+                'phase': phase_name,
+                'elapsed_s': current.get(
+                    'elapsed_s',
+                    0
+                ),
+                'phase_boundary': False,
+                'from': dict(previous['cell']),
+                'to': dict(current['cell']),
+            })
+
+        if last_known is not None:
+            result['end_cell'] = dict(
+                last_known['cell']
+            )
+
+            previous_phase_last = last_known
+
+    return result
+
+
+def _classify_post_test_stability(
+    start_cell,
+    end_cell,
+    checks,
+):
+    """Classify three post-test serving-cell observations conservatively."""
+    start_key = _serving_cell_identity_key(
+        start_cell
+    )
+
+    end_key = _serving_cell_identity_key(
+        end_cell
+    )
+
+    identified = []
+
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+
+        key = _serving_cell_identity_key(
+            check.get('serving_cell')
+        )
+
+        if key is None:
+            continue
+
+        identified.append({
+            'elapsed_s': check.get(
+                'elapsed_s'
+            ),
+            'key': key,
+        })
+
+    result = {
+        'status': 'inconclusive',
+        'checks_requested': len(checks),
+        'checks_identifiable': len(identified),
+        'reverted_at_s': None,
+    }
+
+    # We deliberately require all three +2/+4/+6 checks for a firm
+    # persistence/reversion/continued-handoff conclusion.
+    if (
+        len(checks) != 3
+        or len(identified) != 3
+    ):
+        return result
+
+    keys = [
+        item['key']
+        for item in identified
+    ]
+
+    unique_keys = set(keys)
+
+    if (
+        end_key is not None
+        and all(
+            key == end_key
+            for key in keys
+        )
+    ):
+        result['status'] = 'persisted'
+        return result
+
+    if (
+        start_key is not None
+        and end_key is not None
+        and start_key != end_key
+        and all(
+            key == start_key
+            for key in keys
+        )
+    ):
+        result['status'] = 'reverted'
+        result['reverted_at_s'] = (
+            identified[0]['elapsed_s']
+        )
+        return result
+
+    if len(unique_keys) == 1:
+        only_key = keys[0]
+
+        if (
+            only_key != start_key
+            and only_key != end_key
+        ):
+            result['status'] = (
+                'continued_handoff'
+            )
+            return result
+
+    if len(unique_keys) > 1:
+        result['status'] = 'unstable'
+
+    return result
+
+
 class CarrierTelemetryCollector:
     """Background collector for active carrier telemetry during speed tests.
 
@@ -1709,6 +2075,12 @@ class CarrierTelemetryCollector:
         self.changes = []  # List of (elapsed_seconds, snapshot, description)
         self.peak = None
         self.final = None
+
+        # Populated only when active-traffic telemetry proves a serving-cell
+        # handoff. These samples are deliberately separate from _samples so
+        # they cannot influence Peak Observed or traffic-phase RF/config data.
+        self.post_test = None
+
         self._last_snapshot = None
         self._start_time = None
 
@@ -1789,6 +2161,209 @@ class CarrierTelemetryCollector:
                 f'Carrier telemetry final capture error (non-fatal): {e}'
             )
 
+    def _traffic_handoff_summary(self):
+        """Build traffic-only serving-cell handoff state from captured data."""
+        with self._lock:
+            samples = [
+                (
+                    sample_time,
+                    self._copy_snapshot(snapshot)
+                )
+                for sample_time, snapshot
+                in self._samples
+            ]
+
+            phase_windows = {
+                phase: dict(window)
+                for phase, window
+                in self._phase_windows.items()
+            }
+
+        download_activity = self._build_phase_activity(
+            'download',
+            samples,
+            phase_windows.get('download')
+        )
+
+        upload_activity = self._build_phase_activity(
+            'upload',
+            samples,
+            phase_windows.get('upload')
+        )
+
+        return _traffic_serving_cell_handoff_summary(
+            download_activity,
+            upload_activity,
+        )
+
+    def collect_post_test_stability(self):
+        """Conditionally sample the modem at +2/+4/+6 seconds after a handoff.
+
+        Stable tests return immediately with no additional polling. Post-test
+        observations are diagnostic only and never feed Peak Observed,
+        traffic RF, carrier configuration, or throughput calculations.
+        """
+        try:
+            summary = self._traffic_handoff_summary()
+
+            if not summary.get('handoffs'):
+                return False
+
+            cp.log(
+                'Carrier telemetry: in-test serving-cell handoff detected; '
+                'checking post-test state at +2/+4/+6 seconds'
+            )
+
+            with self._lock:
+                immediate_snapshot = (
+                    self._copy_snapshot(self.final)
+                    if self.final
+                    else None
+                )
+
+            immediate = None
+
+            if immediate_snapshot:
+                immediate = {
+                    'elapsed_s': 0,
+                    'available': True,
+                    'service_mode': immediate_snapshot.get(
+                        'service_mode',
+                        ''
+                    ),
+                    'serving_cell': dict(
+                        immediate_snapshot.get(
+                            'serving_cell',
+                            {}
+                        )
+                    ),
+                }
+
+            checks = []
+            started_at = time.monotonic()
+
+            for elapsed_s in (2, 4, 6):
+                target = (
+                    started_at
+                    + elapsed_s
+                )
+
+                remaining = (
+                    target
+                    - time.monotonic()
+                )
+
+                if remaining > 0:
+                    time.sleep(remaining)
+
+                diag, uid = (
+                    _get_modem_diagnostics_for_interface(
+                        self.interface
+                    )
+                )
+
+                if not diag:
+                    checks.append({
+                        'elapsed_s': elapsed_s,
+                        'available': False,
+                        'service_mode': '',
+                        'serving_cell': {},
+                    })
+                    continue
+
+                snapshot = _carrier_snapshot(
+                    diag
+                )
+
+                checks.append({
+                    'elapsed_s': elapsed_s,
+                    'available': True,
+                    'service_mode': snapshot.get(
+                        'service_mode',
+                        ''
+                    ),
+                    'serving_cell': dict(
+                        snapshot.get(
+                            'serving_cell',
+                            {}
+                        )
+                    ),
+                })
+
+            classification = (
+                _classify_post_test_stability(
+                    summary.get(
+                        'start_cell'
+                    ),
+                    summary.get(
+                        'end_cell'
+                    ),
+                    checks,
+                )
+            )
+
+            post_test = {
+                'triggered': True,
+                'reason': (
+                    'in_test_serving_cell_handoff'
+                ),
+                'window_s': 6,
+                'start_cell': dict(
+                    summary.get(
+                        'start_cell'
+                    )
+                    or {}
+                ),
+                'end_cell': dict(
+                    summary.get(
+                        'end_cell'
+                    )
+                    or {}
+                ),
+                'immediate': immediate,
+                'checks': checks,
+                'status': classification.get(
+                    'status',
+                    'inconclusive'
+                ),
+                'checks_requested': (
+                    classification.get(
+                        'checks_requested',
+                        3
+                    )
+                ),
+                'checks_identifiable': (
+                    classification.get(
+                        'checks_identifiable',
+                        0
+                    )
+                ),
+                'reverted_at_s': (
+                    classification.get(
+                        'reverted_at_s'
+                    )
+                ),
+            }
+
+            with self._lock:
+                self.post_test = post_test
+
+            cp.log(
+                'Carrier telemetry: post-test serving-cell state '
+                f'{post_test["status"]} '
+                f'({post_test["checks_identifiable"]}/'
+                f'{post_test["checks_requested"]} identifiable checks)'
+            )
+
+            return True
+
+        except Exception as e:
+            cp.log(
+                'Carrier telemetry post-test stability error '
+                f'(non-fatal): {e}'
+            )
+            return False
+
     def _poll_loop(self):
         """Background polling loop — every 2 seconds."""
         while self._running:
@@ -1834,6 +2409,12 @@ class CarrierTelemetryCollector:
             dict(carrier)
             for carrier in snapshot.get('carriers', [])
         ]
+
+        serving_cell = snapshot.get('serving_cell')
+
+        if isinstance(serving_cell, dict):
+            copied['serving_cell'] = dict(serving_cell)
+
         return copied
 
     def record_phase_window(self, phase, started_at, ended_at):
@@ -1896,6 +2477,9 @@ class CarrierTelemetryCollector:
 
         record = {
             'service_mode': snapshot.get('service_mode', ''),
+            'serving_cell': dict(
+                snapshot.get('serving_cell', {})
+            ),
             'carrier_count': snapshot.get('carrier_count', 0),
             'bands': snapshot.get('bands', ''),
             'bandwidth_mhz': snapshot.get('bandwidth_mhz', 0),
@@ -2067,6 +2651,23 @@ class CarrierTelemetryCollector:
         parts = []
         if prev.get('service_mode') != curr.get('service_mode'):
             parts.append(curr.get('service_mode', ''))
+
+        if (
+            _serving_cell_snapshot_signature(prev)
+            != _serving_cell_snapshot_signature(curr)
+        ):
+            previous_cell = (
+                prev.get('serving_cell') or {}
+            ).get('cell_id')
+
+            current_cell = (
+                curr.get('serving_cell') or {}
+            ).get('cell_id')
+
+            if previous_cell != current_cell:
+                parts.append('serving cell changed')
+            else:
+                parts.append('serving-cell details changed')
         if prev.get('carrier_count', 0) < curr.get('carrier_count', 0):
             diff = curr['carrier_count'] - prev.get('carrier_count', 0)
             parts.append(f'+{diff} carrier' + ('s' if diff > 1 else ''))
@@ -2111,6 +2712,130 @@ class CarrierTelemetryCollector:
                 for phase, window in self._phase_windows.items()
             }
 
+            post_test = None
+
+            if isinstance(self.post_test, dict):
+                post_test = {
+                    'triggered': bool(
+                        self.post_test.get(
+                            'triggered'
+                        )
+                    ),
+                    'reason': self.post_test.get(
+                        'reason',
+                        ''
+                    ),
+                    'window_s': self.post_test.get(
+                        'window_s',
+                        0
+                    ),
+                    'start_cell': dict(
+                        self.post_test.get(
+                            'start_cell',
+                            {}
+                        )
+                    ),
+                    'end_cell': dict(
+                        self.post_test.get(
+                            'end_cell',
+                            {}
+                        )
+                    ),
+                    'immediate': (
+                        {
+                            'elapsed_s': (
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'elapsed_s',
+                                    0
+                                )
+                            ),
+                            'available': bool(
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'available'
+                                )
+                            ),
+                            'service_mode': (
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'service_mode',
+                                    ''
+                                )
+                            ),
+                            'serving_cell': dict(
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'serving_cell',
+                                    {}
+                                )
+                            ),
+                        }
+                        if isinstance(
+                            self.post_test.get(
+                                'immediate'
+                            ),
+                            dict
+                        )
+                        else None
+                    ),
+                    'checks': [
+                        {
+                            'elapsed_s': check.get(
+                                'elapsed_s'
+                            ),
+                            'available': bool(
+                                check.get(
+                                    'available'
+                                )
+                            ),
+                            'service_mode': check.get(
+                                'service_mode',
+                                ''
+                            ),
+                            'serving_cell': dict(
+                                check.get(
+                                    'serving_cell',
+                                    {}
+                                )
+                            ),
+                        }
+                        for check in self.post_test.get(
+                            'checks',
+                            []
+                        )
+                        if isinstance(
+                            check,
+                            dict
+                        )
+                    ],
+                    'status': self.post_test.get(
+                        'status',
+                        'inconclusive'
+                    ),
+                    'checks_requested': (
+                        self.post_test.get(
+                            'checks_requested',
+                            0
+                        )
+                    ),
+                    'checks_identifiable': (
+                        self.post_test.get(
+                            'checks_identifiable',
+                            0
+                        )
+                    ),
+                    'reverted_at_s': (
+                        self.post_test.get(
+                            'reverted_at_s'
+                        )
+                    ),
+                }
+
         download_activity = self._build_phase_activity(
             'download',
             samples,
@@ -2151,6 +2876,9 @@ class CarrierTelemetryCollector:
         result = {
             'baseline': {
                 'service_mode': baseline.get('service_mode', ''),
+                'serving_cell': dict(
+                    baseline.get('serving_cell', {})
+                ),
                 'carrier_count': baseline.get('carrier_count', 0),
                 'bands': baseline.get('bands', ''),
                 'bandwidth_mhz': baseline.get('bandwidth_mhz', 0),
@@ -2161,6 +2889,9 @@ class CarrierTelemetryCollector:
             },
             'peak': {
                 'service_mode': peak.get('service_mode', ''),
+                'serving_cell': dict(
+                    peak.get('serving_cell', {})
+                ),
                 'carrier_count': peak.get('carrier_count', 0),
                 'bands': peak.get('bands', ''),
                 'bandwidth_mhz': peak.get('bandwidth_mhz', 0),
@@ -2183,6 +2914,9 @@ class CarrierTelemetryCollector:
             # as a CA End CSV field.
             'final': {
                 'service_mode': final.get('service_mode', ''),
+                'serving_cell': dict(
+                    final.get('serving_cell', {})
+                ),
                 'carrier_count': final.get('carrier_count', 0),
                 'bands': final.get('bands', ''),
                 'bandwidth_mhz': final.get('bandwidth_mhz', 0),
@@ -2190,11 +2924,17 @@ class CarrierTelemetryCollector:
             } if final else None,
         }
 
+        if post_test:
+            result['post_test'] = post_test
+
         # Record meaningful transitions only, not every two-second poll.
         for elapsed, snap, desc in changes:
             result['changes'].append({
                 'elapsed_s': elapsed,
                 'service_mode': snap.get('service_mode', ''),
+                'serving_cell': dict(
+                    snap.get('serving_cell', {})
+                ),
                 'carrier_count': snap.get('carrier_count', 0),
                 'bands': snap.get('bands', ''),
                 'bandwidth_mhz': snap.get('bandwidth_mhz', 0),
@@ -10544,6 +11284,20 @@ def run_test_thread(engine, params):
             cellular = _collect_cellular_snapshot(interface)
             if cellular:
                 entry['cellular'] = cellular
+
+            # Only tests with a proven traffic-active serving-cell handoff
+            # incur the short +2/+4/+6 second stabilization window. The
+            # immediate top-level cellular snapshot above is intentionally
+            # captured first so its semantics do not change.
+            if carrier_collector:
+                try:
+                    carrier_collector.collect_post_test_stability()
+                except Exception as e:
+                    cp.log(
+                        'Carrier telemetry post-test check error '
+                        f'(non-fatal): {e}'
+                    )
+
             # Add carrier activity telemetry from collector
             if carrier_collector:
                 try:
@@ -10622,6 +11376,20 @@ def run_test_thread(engine, params):
             cellular = _collect_cellular_snapshot(interface)
             if cellular:
                 entry['cellular'] = cellular
+
+            # Only tests with a proven traffic-active serving-cell handoff
+            # incur the short +2/+4/+6 second stabilization window. The
+            # immediate top-level cellular snapshot above is intentionally
+            # captured first so its semantics do not change.
+            if carrier_collector:
+                try:
+                    carrier_collector.collect_post_test_stability()
+                except Exception as e:
+                    cp.log(
+                        'Carrier telemetry post-test check error '
+                        f'(non-fatal): {e}'
+                    )
+
             # Add carrier activity telemetry from collector
             if carrier_collector:
                 try:
@@ -10847,6 +11615,22 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                     if part.startswith('iface='):
                         iface = part[6:]
             self.send_json(self.get_cellular_status(iface))
+        elif (
+            self.path == '/api/cellular_analysis'
+            or self.path.startswith('/api/cellular_analysis?')
+        ):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+
+            self.send_json(
+                build_cellular_analysis(
+                    load_history(),
+                    interface=params.get('iface', [''])[0],
+                    scope=params.get('history', ['all'])[0],
+                    selected_cell_key=params.get('cell', [''])[0],
+                )
+            )
+
         elif self.path == '/api/version':
             self.send_json({'version': APP_VERSION})
         elif self.path == '/api/capabilities' or self.path.startswith('/api/capabilities?'):

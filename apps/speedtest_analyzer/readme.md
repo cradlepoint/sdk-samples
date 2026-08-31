@@ -2,7 +2,7 @@
 
 Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.0.2
+**Version:** 1.1.0
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -747,9 +747,26 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 
 ---
 
-# Changelog — 1.0.x
+# Changelog — 1.x
 
-The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.0.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.1.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.1.0
+
+- Added the new **Cellular Analysis** workspace for historical cellular-resource analysis using telemetry retained with Speedtest Analyzer test results.
+- Added per-cellular-interface and retained-history analysis for **Serving Cell Distribution**, **Serving Cell Timeline**, **Cellular Change Activity**, **Serving Cell Details**, **RF Conditions**, **Technology Usage**, and **Peak Observed Radio Configurations**.
+- Added explicit **LTE Only**, **LTE + 5G NR (NSA)**, and **5G SA** handling with mode-aware serving-primary and secondary-carrier presentation.
+- Extended active-traffic telemetry so serving-cell identity is retained throughout Download and Upload instead of relying only on the final post-test cellular snapshot.
+- Added traffic-aware serving-cell analysis that preserves cells observed only during an in-test handoff and does not invent transitions through unidentified telemetry.
+- Added thin **in-test serving-cell handoff markers** to the long-term Serving Cell Timeline without representing temporary handoffs as false multi-hour attachment periods.
+- Updated Serving Cell Distribution to distinguish **Tests Seen** from mutually exclusive **Active Traffic** percentage when timed traffic telemetry is available.
+- Added selected-cell RF and radio-configuration analysis so each serving cell uses its own matching PCell/anchor telemetry and observed Peak configuration.
+- Added conditional **+2 / +4 / +6 second post-test serving-cell stabilization checks** only after an identifiable in-test handoff, allowing the application to classify the post-test state as persisted, reverted, continued handoff, unstable, or inconclusive without adding continuous polling.
+- Redesigned **History & Reports** cellular details into **Connection Health**, **Network**, and **Serving Cell** sections with Cell ID, PLMN, TAC, PCI, and mode-aware LTE/NR Channel reporting.
+- Added transition-only **Serving Cell Activity** details to History & Reports, including Start, in-test handoff timing, End, and post-test stabilization status.
+- Expanded CSV export with normalized **Cell ID**, **PLMN**, **TAC**, **PCI**, LTE/NR Channel fields, and a single chronological **Serving Cell Activity** field.
+- Hardened local test-history persistence with atomic writes, flush/fsync, last-known-good backup recovery, corrupt-history protection, serialized history transactions, and the existing rolling 100-result retention behavior.
+- Peak Observed radio configuration remains limited to valid active-traffic observations, and secondary-carrier telemetry is not interpreted as unsupported upload carrier aggregation.
 
 ## v1.0.2
 

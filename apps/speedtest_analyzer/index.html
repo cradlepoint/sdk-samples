@@ -1152,8 +1152,8 @@
            No cards/borders — just label above value in a grid cell. */
         .cell-detail-content .cell-metrics {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 0.2rem 1rem;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.2rem 0.8rem;
         }
         .cell-detail-content .cell-metric {
             padding: 0.2rem 0;
@@ -1184,25 +1184,139 @@
             background: rgba(234, 179, 8, 0.1); border-radius: 2px; padding: 0 0.25rem;
         }
 
-        /* Two-column header row (Connection Health + Network & Tower) */
+        /* Compact identity row: Connection Health | Network | Serving Cell. */
         .cell-header-row {
             display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 2rem;
+            grid-template-columns:
+                minmax(170px, 0.75fr)
+                minmax(0, 1.25fr)
+                minmax(0, 1.65fr);
+            gap: 1rem;
             margin-bottom: 0.75rem;
+            align-items: start;
         }
-        .cell-header-group { }
+        .cell-header-group {
+            min-width: 0;
+        }
         .cell-header-group .cell-section-title {
             font-weight: 700; font-size: 0.65rem; text-transform: uppercase;
             letter-spacing: 0.06em; color: var(--text-secondary);
             margin-bottom: 0.3rem;
         }
         .cell-header-group .cell-inline {
-            display: flex; flex-wrap: wrap; gap: 0.3rem 1.5rem;
+            display: flex; flex-wrap: wrap; gap: 0.3rem 1.25rem;
             font-size: 0.78rem;
         }
         .cell-header-group .cell-inline .cell-item {
             display: inline-flex; gap: 0.3rem; border-bottom: none; padding: 0;
+        }
+
+        .cell-network-grid {
+            display: grid;
+            grid-template-columns:
+                minmax(0, 0.8fr)
+                minmax(0, 1.4fr);
+            gap: 0.45rem 1rem;
+        }
+        .cell-network-field,
+        .cell-serving-field {
+            min-width: 0;
+        }
+        .cell-network-field.is-wide {
+            grid-column: 1 / -1;
+        }
+        .cell-header-field-label {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .cell-header-field-value {
+            display: block;
+            margin-top: 0.08rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            min-width: 0;
+        }
+        .cell-network-field.is-wide .cell-header-field-value {
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .cell-serving-grid {
+            display: grid;
+            grid-template-columns:
+                minmax(0, 1.7fr)
+                minmax(0, 0.9fr)
+                minmax(0, 0.9fr)
+                minmax(0, 0.7fr);
+            gap: 0.45rem 0.9rem;
+        }
+        .cell-serving-field .cell-header-field-value {
+            white-space: nowrap;
+        }
+
+        .serving-activity {
+            display: grid;
+            gap: 0.3rem;
+            font-size: 0.76rem;
+        }
+        .serving-activity-row {
+            display: grid;
+            grid-template-columns: minmax(88px, auto) 1fr;
+            gap: 0.7rem;
+            align-items: baseline;
+        }
+        .serving-activity-when {
+            color: var(--text-secondary);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .serving-activity-value {
+            min-width: 0;
+            font-variant-numeric: tabular-nums;
+            overflow-wrap: anywhere;
+        }
+        .serving-activity-transition {
+            color: var(--warning-color);
+            font-weight: 700;
+        }
+
+        @media (max-width: 1050px) {
+            .cell-header-row {
+                grid-template-columns:
+                    minmax(150px, 0.8fr)
+                    minmax(0, 2.2fr);
+            }
+
+            .cell-header-group.cell-serving-group {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .cell-header-row {
+                grid-template-columns: 1fr;
+                gap: 0.8rem;
+            }
+
+            .cell-header-group.cell-serving-group {
+                grid-column: auto;
+            }
+
+            .cell-serving-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .cell-detail-content .cell-metrics {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
         }
 
         /* Carrier aggregation table: numeric columns right-aligned and
@@ -1421,6 +1535,1158 @@
             visibility: visible;
         }
 
+        /* Cellular Analysis instant tooltips */
+        .ca-tooltip-trigger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 0.18rem;
+            color: var(--primary-color);
+            cursor: default;
+            outline: none;
+            vertical-align: middle;
+        }
+
+        .ca-help-icon {
+            font-size: 0.76rem;
+            line-height: 1;
+        }
+
+        .ca-tooltip-trigger:hover,
+        .ca-tooltip-trigger:focus {
+            color: var(--info-color);
+        }
+
+        .ca-floating-tooltip {
+            position: fixed;
+            z-index: 99999;
+            width: max-content;
+            max-width: 320px;
+            padding: 0.6rem 0.7rem;
+            border: 1px solid #b8c6e3;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #111827;
+            box-shadow:
+                0 8px 24px rgba(15, 23, 42, 0.20),
+                0 2px 6px rgba(15, 23, 42, 0.12);
+            opacity: 1;
+            backdrop-filter: none;
+            pointer-events: none;
+            font-size: 0.68rem;
+            font-weight: 400;
+            line-height: 1.4;
+        }
+
+        [data-theme="dark"] .ca-floating-tooltip {
+            border-color: #475569;
+            background: #111827;
+            color: #f9fafb;
+            box-shadow:
+                0 8px 24px rgba(0, 0, 0, 0.45),
+                0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        .ca-floating-tooltip-line {
+            color: #334155;
+        }
+
+        [data-theme="dark"] .ca-floating-tooltip-line {
+            color: #e5e7eb;
+        }
+
+        .ca-floating-tooltip-title {
+            margin-bottom: 0.28rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .ca-floating-tooltip-line {
+            margin-top: 0.12rem;
+        }
+
+        /* Cellular Analysis scope/technology polish */
+        .ca-serving-scope {
+            display: flex;
+            align-items: flex-end;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding: 0.7rem 0.8rem;
+            margin-bottom: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-surface);
+        }
+
+        .ca-serving-scope-control {
+            flex: 0 1 340px;
+            min-width: 250px;
+        }
+
+        .ca-serving-scope-control label {
+            display: block;
+            margin-bottom: 0.3rem;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.035em;
+            text-transform: uppercase;
+        }
+
+        .ca-serving-scope-control #ca-cell-select {
+            width: 100%;
+            min-height: 38px;
+        }
+
+        .ca-serving-scope-note {
+            padding-bottom: 0.55rem;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+        }
+
+        .ca-tech-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .ca-info-tip {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            color: var(--text-secondary);
+            cursor: default;
+            outline: none;
+        }
+
+        .ca-info-tip > i {
+            font-size: 0.62rem;
+        }
+
+        .ca-info-tip-box {
+            position: absolute;
+            z-index: 50;
+            top: calc(100% + 6px);
+            left: 0;
+            width: 275px;
+            display: none;
+            padding: 0.6rem 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-surface);
+            box-shadow: 0 5px 16px rgba(0,0,0,0.16);
+            color: var(--text-primary);
+            font-size: 0.68rem;
+            font-weight: 400;
+            line-height: 1.4;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .ca-info-tip:hover .ca-info-tip-box,
+        .ca-info-tip:focus .ca-info-tip-box {
+            display: grid;
+            gap: 0.22rem;
+        }
+
+        .ca-info-tip-box strong {
+            margin-bottom: 0.1rem;
+            font-size: 0.7rem;
+        }
+
+        .ca-info-tip-box small {
+            margin-top: 0.15rem;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            line-height: 1.35;
+        }
+
+        @media (max-width: 650px) {
+            .ca-serving-scope {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .ca-serving-scope-control {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .ca-serving-scope-note {
+                padding-bottom: 0;
+            }
+
+            .ca-info-tip-box {
+                left: auto;
+                right: 0;
+                width: 245px;
+            }
+        }
+
+        /* Cellular Analysis top/change polish */
+        #cellular-analysis > .section-title {
+            margin: 0 0 0.75rem;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .ca-geo-view {
+            min-height: 132px;
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.1rem;
+            border: 1px dashed var(--border-color);
+            border-radius: 7px;
+            background:
+                linear-gradient(
+                    135deg,
+                    var(--card-surface),
+                    transparent
+                );
+        }
+
+        .ca-geo-placeholder {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr) auto;
+            gap: 0.85rem;
+            align-items: center;
+        }
+
+        .ca-geo-icon {
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-surface);
+            color: var(--text-secondary);
+            font-size: 1.3rem;
+        }
+
+        .ca-geo-title {
+            margin-bottom: 0.2rem;
+            font-size: 0.86rem;
+            font-weight: 700;
+        }
+
+        .ca-geo-note {
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            line-height: 1.35;
+        }
+
+        .ca-geo-configure {
+            white-space: nowrap;
+        }
+
+        .ca-analysis-controls {
+            display: grid;
+            grid-template-columns:
+                minmax(260px, 360px)
+                minmax(170px, 220px)
+                auto;
+            justify-content: start;
+            align-items: end;
+            gap: 0.75rem;
+            padding: 0.7rem 0.8rem;
+        }
+
+        .ca-analysis-controls label {
+            display: block !important;
+            margin-bottom: 0.3rem !important;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 700 !important;
+            letter-spacing: 0.035em;
+            text-transform: uppercase;
+        }
+
+        .ca-interface-control,
+        .ca-history-control {
+            min-width: 0;
+            width: 100%;
+        }
+
+        .ca-refresh-control {
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .ca-refresh-control .btn {
+            min-height: 38px;
+            white-space: nowrap;
+        }
+
+        .ca-change-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(4, minmax(150px, 1fr));
+            gap: 0.65rem;
+        }
+
+        .ca-change-card {
+            min-height: 92px;
+            display: grid;
+            grid-template-columns: 38px minmax(0, 1fr);
+            gap: 0.65rem;
+            align-items: center;
+            padding: 0.7rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            background: var(--card-surface);
+        }
+
+        .ca-change-icon {
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 7px;
+            background: var(--background-secondary);
+            color: var(--primary-color);
+            font-size: 1rem;
+        }
+
+        .ca-change-title {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            color: var(--text-secondary);
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .ca-change-title i {
+            font-size: 0.58rem;
+        }
+
+        .ca-change-value {
+            margin-top: 0.15rem;
+            color: var(--text-primary);
+            font-size: 1.35rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .ca-change-note {
+            margin-top: 0.2rem;
+            color: var(--text-secondary);
+            font-size: 0.61rem;
+            line-height: 1.25;
+        }
+
+        @media (max-width: 900px) {
+            .ca-analysis-controls {
+                grid-template-columns:
+                    minmax(220px, 1fr)
+                    minmax(160px, 200px)
+                    auto;
+            }
+
+            .ca-change-grid {
+                grid-template-columns:
+                    repeat(2, minmax(160px, 1fr));
+            }
+        }
+
+        @media (max-width: 650px) {
+            .ca-geo-placeholder {
+                grid-template-columns: 42px 1fr;
+            }
+
+            .ca-geo-configure {
+                grid-column: 1 / -1;
+                justify-self: start;
+            }
+
+            .ca-analysis-controls {
+                grid-template-columns: 1fr;
+            }
+
+            .ca-refresh-control {
+                justify-content: flex-start;
+            }
+
+            .ca-change-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cellular Analysis lower-panel polish */
+        .ca-selected-toolbar {
+            display: grid;
+            grid-template-columns: 110px minmax(180px, 1fr);
+            gap: 0.65rem;
+            align-items: center;
+            margin-bottom: 0.65rem;
+        }
+
+        .ca-selected-toolbar label {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+
+        .ca-selected-toolbar #ca-cell-select {
+            min-height: 34px;
+            max-width: 330px;
+        }
+
+        .ca-selected-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: center;
+            padding: 0.65rem 0.75rem;
+            margin-bottom: 0.55rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-surface);
+        }
+
+        .ca-selected-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        .ca-selected-subtitle {
+            margin-top: 0.15rem;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+        }
+
+        .ca-selected-cellid {
+            min-width: 115px;
+            text-align: right;
+        }
+
+        .ca-selected-cellid span,
+        .ca-selected-field span {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+
+        .ca-selected-cellid strong {
+            display: block;
+            margin-top: 0.15rem;
+            font-size: 0.88rem;
+        }
+
+        .ca-selected-fields {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(85px, 1fr));
+            gap: 0;
+        }
+
+        .ca-selected-field {
+            min-width: 0;
+            padding: 0.45rem 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .ca-selected-field strong {
+            display: block;
+            margin-top: 0.15rem;
+            overflow: hidden;
+            font-size: 0.74rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ca-rf-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(115px, 1fr));
+            gap: 0.55rem;
+        }
+
+        .ca-rf-card {
+            min-height: 105px;
+            padding: 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-surface);
+        }
+
+        .ca-rf-label {
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+
+        .ca-rf-value {
+            margin-top: 0.45rem;
+            color: var(--primary-color);
+            font-size: 1.45rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .ca-rf-value span {
+            margin-left: 0.18rem;
+            color: var(--text-secondary);
+            font-size: 0.66rem;
+            font-weight: 500;
+        }
+
+        .ca-rf-detail {
+            margin-top: 0.6rem;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            line-height: 1.35;
+        }
+
+        .ca-health-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            margin-top: 0.6rem;
+        }
+
+        .ca-health-label {
+            margin-right: 0.15rem;
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .ca-health-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.28rem 0.48rem;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: var(--card-surface);
+            font-size: 0.66rem;
+        }
+
+        .ca-health-chip span {
+            color: var(--text-secondary);
+        }
+
+        .ca-radio-grid {
+            display: grid;
+            grid-template-columns:
+                minmax(230px, 0.7fr)
+                minmax(420px, 1.8fr);
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .ca-tech-panel {
+            padding-right: 1rem;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .ca-subsection-title {
+            margin-bottom: 0.55rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+
+        .ca-tech-layout {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            min-height: 105px;
+        }
+
+        .ca-tech-layout > div:first-child {
+            width: 88px !important;
+            height: 88px !important;
+            flex: 0 0 88px !important;
+        }
+
+        .ca-tech-layout > div:first-child > div {
+            width: 54px !important;
+            height: 54px !important;
+            font-size: 0.62rem !important;
+        }
+
+        .ca-subsection-heading {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .ca-subsection-heading i {
+            margin-bottom: 0.55rem;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+        }
+
+        .cana-radio-config-table {
+            width: 100%;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .cana-radio-config-row {
+            display: grid;
+            grid-template-columns:
+                minmax(260px, 1fr)
+                82px
+                55px
+                minmax(105px, 0.55fr);
+            gap: 0.65rem;
+            align-items: center;
+            min-height: 37px;
+            padding: 0.4rem 0.6rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.72rem;
+        }
+
+        .cana-radio-config-row:last-child {
+            border-bottom: 0;
+        }
+
+        .cana-radio-config-header {
+            min-height: 32px;
+            background: var(--card-surface);
+            color: var(--text-secondary);
+            font-size: 0.64rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .cana-radio-config-name {
+            font-weight: 600;
+        }
+
+        .cana-radio-config-bandwidth,
+        .cana-radio-config-tests {
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .cana-radio-config-usage {
+            display: grid;
+            grid-template-columns: 36px 1fr;
+            gap: 0.4rem;
+            align-items: center;
+        }
+
+        .cana-radio-config-note {
+            margin-top: 0.45rem;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            line-height: 1.35;
+        }
+
+        @media (max-width: 1100px) {
+            .ca-radio-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ca-tech-panel {
+                padding-right: 0;
+                padding-bottom: 0.8rem;
+                border-right: 0;
+                border-bottom: 1px solid var(--border-color);
+            }
+        }
+
+        @media (max-width: 760px) {
+            .ca-selected-fields {
+                grid-template-columns: repeat(2, minmax(85px, 1fr));
+            }
+
+            .ca-rf-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ca-selected-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .ca-selected-cellid {
+                text-align: left;
+            }
+        }
+
+        /* Cellular Analysis visual polish */
+        .ca-overview-grid {
+            display: grid;
+            grid-template-columns:
+                minmax(180px, 0.8fr)
+                minmax(180px, 0.8fr)
+                minmax(340px, 1.5fr);
+            gap: 0.75rem;
+        }
+
+        .ca-overview-card {
+            min-height: 128px;
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-surface);
+        }
+
+        .ca-overview-label {
+            margin-bottom: 0.45rem;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.045em;
+            text-transform: uppercase;
+        }
+
+        .ca-overview-value {
+            color: var(--primary-color);
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .ca-overview-value-info {
+            color: var(--info-color);
+        }
+
+        .ca-overview-note {
+            margin-top: 0.65rem;
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+            line-height: 1.35;
+        }
+
+        .ca-mode-layout {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-height: 82px;
+        }
+
+        .ca-mode-layout > div:first-child {
+            width: 78px !important;
+            height: 78px !important;
+        }
+
+        .ca-mode-layout > div:first-child > div {
+            width: 49px !important;
+            height: 49px !important;
+            font-size: 0.63rem !important;
+        }
+
+        .ca-mode-legend {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ca-serving-table {
+            width: 100%;
+        }
+
+        .ca-serving-row {
+            display: grid;
+            grid-template-columns:
+                minmax(220px, 1.6fr)
+                minmax(110px, 0.85fr)
+                78px
+                minmax(135px, 1fr);
+            gap: 0.7rem;
+            align-items: center;
+            min-height: 49px;
+            padding: 0.45rem 0.25rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.78rem;
+        }
+
+        .ca-serving-row:last-child {
+            border-bottom: 0;
+        }
+
+        .ca-serving-header {
+            min-height: auto;
+            padding-top: 0;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+
+        .ca-serving-name {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            min-width: 0;
+        }
+
+        .ca-cell-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            flex: 0 0 22px;
+            border-radius: 50%;
+            color: white;
+            font-size: 0.68rem;
+            font-weight: 700;
+        }
+
+        .ca-serving-name strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.79rem;
+        }
+
+        .ca-serving-sub {
+            margin-top: 0.12rem;
+            overflow: hidden;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .ca-serving-tech,
+        .ca-serving-count {
+            font-weight: 600;
+        }
+
+        .ca-serving-percent {
+            display: grid;
+            grid-template-columns: 38px 1fr;
+            gap: 0.45rem;
+            align-items: center;
+        }
+
+        .ca-mini-bar {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: var(--border-color);
+        }
+
+        .ca-mini-bar > div {
+            height: 100%;
+            border-radius: 999px;
+        }
+
+        .ca-timeline-title {
+            margin-bottom: 0.7rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.035em;
+            text-transform: uppercase;
+        }
+
+        .ca-timeline-track {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 34px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--border-color);
+        }
+
+        .ca-timeline-segment {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            display: flex;
+            min-width: 3px;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-right: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            font-size: 0.68rem;
+            font-weight: 700;
+            cursor: default;
+        }
+
+        .ca-timeline-segment:last-child {
+            border-right: 0;
+        }
+
+        /*
+         * Proven in-test serving-cell handoff.
+         *
+         * This is intentionally an event marker, not another timeline
+         * duration segment. We know the handoff occurred during this test;
+         * we do not know how long that temporary cell persisted between
+         * scheduled tests.
+         */
+        .ca-timeline-handoff-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            margin-left: -2px;
+            z-index: 4;
+            border-left: 1px solid var(--card-surface);
+            border-right: 1px solid var(--card-surface);
+            background: var(--warning-color);
+            cursor: default;
+        }
+
+        .ca-timeline-handoff-marker::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 0;
+            height: 0;
+            transform: translateX(-50%);
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid var(--warning-color);
+        }
+
+        .ca-timeline-handoff-marker:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: -1px;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .ca-timeline-handoff-marker:hover {
+                filter: brightness(1.08);
+            }
+        }
+
+        .ca-timeline-segment:focus-visible {
+            z-index: 2;
+            outline: 2px solid var(--primary-color);
+            outline-offset: -2px;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .ca-timeline-segment:hover {
+                z-index: 1;
+                filter: brightness(1.08);
+            }
+        }
+
+        .ca-timeline-footer {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0.5rem;
+            margin-top: 0.4rem;
+            color: var(--text-secondary);
+            font-size: 0.64rem;
+        }
+
+        .ca-timeline-footer span:nth-child(2) {
+            text-align: center;
+        }
+
+        .ca-timeline-footer span:last-child {
+            text-align: right;
+        }
+
+        .ca-empty-state {
+            padding: 0.75rem 0;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+        }
+
+        @media (max-width: 1100px) {
+            .ca-overview-grid {
+                grid-template-columns:
+                    repeat(2, minmax(180px, 1fr));
+            }
+
+            .ca-mode-card {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .ca-overview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ca-mode-card {
+                grid-column: auto;
+            }
+
+            .ca-serving-row {
+                grid-template-columns:
+                    minmax(180px, 1fr)
+                    82px
+                    minmax(110px, 0.8fr);
+            }
+
+            .ca-serving-header > div:nth-child(2),
+            .ca-serving-tech {
+                display: none;
+            }
+        }
+
+        /* Cellular Analysis 1.1 layout */
+        #cellular-analysis {
+            width: 100%;
+        }
+
+        #cellular-analysis > .card,
+        #cellular-analysis .ca-detail-grid > .card {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            box-shadow: none;
+            overflow: hidden;
+        }
+
+        #cellular-analysis .card-header {
+            padding: 0.7rem 0.9rem 0.25rem;
+            border-bottom: 0;
+            background: transparent;
+        }
+
+        #cellular-analysis .card-header h3 {
+            margin: 0;
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        #cellular-analysis .card-body {
+            padding: 0.65rem 0.9rem 0.9rem;
+        }
+
+        .ca-analysis-controls {
+            display: flex;
+            align-items: flex-end;
+            gap: 0.85rem;
+            flex-wrap: wrap;
+            padding: 0.75rem 0.85rem;
+            margin-bottom: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-surface);
+        }
+
+        .ca-interface-control {
+            flex: 0 1 360px;
+            min-width: 260px;
+        }
+
+        .ca-history-control {
+            flex: 0 0 220px;
+            min-width: 180px;
+        }
+
+        #ca-interface-select,
+        #ca-history-select,
+        #ca-cell-select {
+            width: 100%;
+            min-height: 38px;
+            padding: 0.4rem 2rem 0.4rem 0.65rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-surface);
+            color: var(--text-primary);
+            font-size: 0.84rem;
+        }
+
+        #ca-serving-body {
+            display: grid;
+            grid-template-columns:
+                minmax(0, 1.05fr)
+                minmax(360px, 0.95fr);
+            gap: 1.25rem;
+            align-items: start;
+        }
+
+        #ca-serving-timeline {
+            margin-top: 0 !important;
+            padding-left: 1.15rem;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .ca-detail-grid {
+            display: grid;
+            grid-template-columns:
+                minmax(330px, 0.9fr)
+                minmax(0, 1.1fr);
+            gap: 0.8rem;
+            align-items: stretch;
+            margin-bottom: 1rem;
+        }
+
+        .ca-detail-grid > .card {
+            margin-bottom: 0 !important;
+            height: 100%;
+        }
+
+        #ca-change-activity > div {
+            grid-template-columns:
+                repeat(4, minmax(150px, 1fr)) !important;
+        }
+
+        #ca-location-settings {
+            max-width: 920px;
+        }
+
+        @media (max-width: 1100px) {
+            #ca-serving-body {
+                grid-template-columns: 1fr;
+            }
+
+            #ca-serving-timeline {
+                padding-left: 0;
+                padding-top: 1rem;
+                border-left: 0;
+                border-top: 1px solid var(--border-color);
+            }
+
+            .ca-detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #ca-change-activity > div {
+                grid-template-columns:
+                    repeat(2, minmax(160px, 1fr)) !important;
+            }
+        }
+
+        @media (max-width: 650px) {
+            .ca-analysis-controls {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .ca-interface-control,
+            .ca-history-control {
+                min-width: 0;
+                width: 100%;
+            }
+
+            #ca-change-activity > div {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
         /* Theme-aware Speedtest Analyzer sidebar header */
         [data-theme="dark"] .sidebar-header {
             background: #1e293b;
@@ -1507,6 +2773,11 @@
                         <li>
                             <a href="#" class="nav-item active" data-section="run-test" title="Test Center">
                                 <i class="fas fa-play-circle"></i> <span>Test Center</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-section="cellular-analysis" title="Cellular Analysis">
+                                <i class="fas fa-signal"></i> <span>Cellular Analysis</span>
                             </a>
                         </li>
                         <li>
@@ -1900,6 +3171,283 @@
                         </div>
                     </section>
 
+                    <!-- CELLULAR ANALYSIS -->
+                    <section class="element-section" id="cellular-analysis">
+                        <h2 class="section-title">Cellular Analysis</h2>
+
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3>SITE CELLULAR GEO VIEW — ALL CELLULAR INTERFACES</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="ca-geo-view" class="ca-geo-view">
+                                    <div>
+                                        <i class="fas fa-map-marked-alt"
+                                           style="font-size:2rem; color:var(--text-secondary); margin-bottom:0.75rem;"></i>
+                                        <div style="font-weight:600; margin-bottom:0.35rem;">
+                                            Estimated Serving Cell Geography
+                                        </div>
+                                        <div style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.75rem;">
+                                            Location provider is not configured.
+                                            Local Cellular Analysis remains fully available.
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-secondary"
+                                                id="btn-ca-configure-location">
+                                            <i class="fas fa-cog"></i> Configure
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ca-location-settings"
+                             class="card"
+                             style="display:none; margin-bottom:1rem;">
+                            <div class="card-header"
+                                 style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+                                <h3>Cellular Location Settings</h3>
+
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        id="btn-ca-close-location">
+                                    <i class="fas fa-times"></i> Close
+                                </button>
+                            </div>
+
+                            <div class="card-body">
+                                <div style="padding:0.75rem 0.9rem;
+                                            margin-bottom:1rem;
+                                            border:1px solid var(--border-color);
+                                            border-radius:var(--radius-md);
+                                            background:var(--card-surface);
+                                            color:var(--text-secondary);
+                                            font-size:0.82rem;">
+                                    Cellular location is optional enrichment.
+                                    All Cellular Analysis features operate locally
+                                    without a location provider.
+                                    Google and Unwired Labs integration will be
+                                    enabled after local analysis validation.
+                                </div>
+
+                                <div style="display:grid;
+                                            grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+                                            gap:1rem;">
+
+                                    <div>
+                                        <label for="ca-location-provider"
+                                               style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                            Location Provider
+                                        </label>
+
+                                        <select id="ca-location-provider"
+                                                class="form-control"
+                                                style="width:100%;">
+                                            <option value="none">No Location Provider</option>
+                                            <option value="google" disabled>
+                                                Google Maps Platform — Deferred
+                                            </option>
+                                            <option value="unwired" disabled>
+                                                Unwired Labs — Deferred
+                                            </option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                            Site Location Source
+                                        </label>
+
+                                        <select class="form-control"
+                                                id="ca-site-location-source"
+                                                style="width:100%;"
+                                                disabled>
+                                            <option>Not Configured</option>
+                                            <option>Device GPS</option>
+                                            <option>Manual Coordinates</option>
+                                            <option>Address Lookup</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="ca-site-latitude"
+                                               style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                            Site Latitude
+                                        </label>
+
+                                        <input id="ca-site-latitude"
+                                               class="form-control"
+                                               type="text"
+                                               placeholder="Not configured"
+                                               disabled>
+                                    </div>
+
+                                    <div>
+                                        <label for="ca-site-longitude"
+                                               style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                            Site Longitude
+                                        </label>
+
+                                        <input id="ca-site-longitude"
+                                               class="form-control"
+                                               type="text"
+                                               placeholder="Not configured"
+                                               disabled>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex;
+                                            gap:0.65rem;
+                                            flex-wrap:wrap;
+                                            margin-top:1rem;">
+                                    <button type="button"
+                                            class="btn btn-secondary"
+                                            disabled
+                                            title="Device GPS site-location capture will be enabled with geolocation support.">
+                                        <i class="fas fa-crosshairs"></i>
+                                        Query Device GPS
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn btn-secondary"
+                                            disabled
+                                            title="Provider connectivity testing will be enabled with geolocation support.">
+                                        <i class="fas fa-plug"></i>
+                                        Test Configuration
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn btn-primary"
+                                            disabled>
+                                        Save Location Settings
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr style="border:0; border-top:1px solid var(--border-color); margin:1.25rem 0;">
+
+                        <div class="ca-analysis-controls">
+                            <div class="ca-interface-control">
+                                <label for="ca-interface-select"
+                                       style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                    Interface
+                                </label>
+                                <select id="ca-interface-select"
+                                        class="form-control"
+                                        style="width:100%;">
+                                    <option value="">No cellular interfaces found</option>
+                                </select>
+                            </div>
+
+                            <div class="ca-history-control">
+                                <label for="ca-history-select"
+                                       style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                    History Range
+                                </label>
+                                <select id="ca-history-select"
+                                        class="form-control"
+                                        style="width:100%;">
+                                    <option value="all">Available History</option>
+                                    <option value="12h">Last 12 Hours</option>
+                                    <option value="24h">Last 24 Hours</option>
+                                    <option value="3d">Last 3 Days</option>
+                                    <option value="7d">Last 7 Days</option>
+                                </select>
+                            </div>
+
+                            <div class="ca-refresh-control">
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        id="btn-ca-refresh">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Refresh Data
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3 id="ca-overview-title">CELLULAR OVERVIEW</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="ca-overview-content">
+                                    <p style="color:var(--text-secondary);">
+                                        Select a cellular interface to analyze retained test history.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3>Serving Cell Distribution</h3>
+                            </div>
+                            <div class="card-body" id="ca-serving-body">
+                                <div id="ca-serving-distribution"></div>
+                                <div id="ca-serving-timeline"
+                                     style="margin-top:1rem;"></div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3>Cellular Change Activity</h3>
+                            </div>
+                            <div class="card-body" id="ca-change-body">
+                                <div id="ca-change-activity"></div>
+                            </div>
+                        </div>
+
+                        <div class="ca-serving-scope">
+                            <div class="ca-serving-scope-control">
+                                <label for="ca-cell-select">
+                                    Serving Cell
+                                </label>
+
+                                <select id="ca-cell-select">
+                                    <option value="">
+                                        No serving cells available
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="ca-serving-scope-note">
+                                Applies to Serving Cell Details,
+                                RF Conditions, and Radio Resource Summary.
+                            </div>
+                        </div>
+
+                        <div class="ca-detail-grid">
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3>Serving Cell Details</h3>
+                            </div>
+                            <div class="card-body" id="ca-selected-body">
+                                <div id="ca-selected-cell"></div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3>RF Conditions</h3>
+                            </div>
+                            <div class="card-body" id="ca-rf-body">
+                                <div id="ca-rf-conditions"></div>
+                            </div>
+                        </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Radio Resource Summary</h3>
+                            </div>
+                            <div class="card-body" id="ca-radio-body">
+                                <div id="ca-radio-summary"></div>
+                            </div>
+                        </div>
+                    </section>
+
                     <!-- HISTORY (combined stats + graphs + table) -->
                     <section class="element-section" id="history">
                         <h2 class="section-title">History &amp; Reports</h2>
@@ -2223,6 +3771,8 @@
             if (!skipRefresh) {
                 if (id === 'run-test') {
                     refreshRunTestPage();
+                } else if (id === 'cellular-analysis') {
+                    loadCellularAnalysis();
                 } else if (id === 'history') {
                     loadHistory();
                 } else if (id === 'servers') {
@@ -5247,6 +6797,2942 @@
             window._testLogOpenFilterMenu = null;
         });
 
+        // ===== CELLULAR ANALYSIS =====
+        var cellularAnalysisState = {
+            interface: '',
+            history: 'all',
+            selectedCell: ''
+        };
+
+        function caEscapeHtml(value) {
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function caModeColor(mode) {
+            if (mode === 'lte_only') {
+                return 'var(--primary-color)';
+            }
+
+            if (mode === 'lte_5g_nsa') {
+                return 'var(--info-color)';
+            }
+
+            if (mode === '5g_sa') {
+                return 'var(--success-color)';
+            }
+
+            return 'var(--text-secondary)';
+        }
+
+        function caBuildDonut(modes) {
+            if (!Array.isArray(modes) || modes.length === 0) {
+                return (
+                    '<div style="' +
+                    'width:92px;height:92px;border-radius:50%;' +
+                    'background:var(--border-color);' +
+                    'display:flex;align-items:center;justify-content:center;' +
+                    '">' +
+                        '<div style="' +
+                        'width:58px;height:58px;border-radius:50%;' +
+                        'background:var(--card-surface);' +
+                        'display:flex;align-items:center;justify-content:center;' +
+                        'font-size:0.72rem;color:var(--text-secondary);' +
+                        'text-align:center;">No Data</div>' +
+                    '</div>'
+                );
+            }
+
+            var parts = [];
+            var start = 0;
+
+            for (var i = 0; i < modes.length; i++) {
+                var pct = Number(modes[i].usage_pct || 0);
+                var end = start + pct;
+
+                parts.push(
+                    caModeColor(modes[i].mode) +
+                    ' ' + start + '% ' + end + '%'
+                );
+
+                start = end;
+            }
+
+            if (start < 100) {
+                parts.push(
+                    'var(--border-color) ' + start + '% 100%'
+                );
+            }
+
+            return (
+                '<div style="' +
+                'width:92px;height:92px;border-radius:50%;' +
+                'background:conic-gradient(' + parts.join(',') + ');' +
+                'display:flex;align-items:center;justify-content:center;' +
+                'flex:0 0 auto;' +
+                '">' +
+                    '<div style="' +
+                    'width:58px;height:58px;border-radius:50%;' +
+                    'background:var(--card-surface);' +
+                    'display:flex;align-items:center;justify-content:center;' +
+                    'font-size:0.72rem;font-weight:600;' +
+                    'color:var(--text-secondary);text-align:center;">' +
+                    'Mode<br>Mix' +
+                    '</div>' +
+                '</div>'
+            );
+        }
+
+        function caRenderNetworkLegend(modes) {
+            if (!Array.isArray(modes) || modes.length === 0) {
+                return (
+                    '<div style="color:var(--text-secondary);font-size:0.82rem;">' +
+                    'No network-mode data available.' +
+                    '</div>'
+                );
+            }
+
+            var html = '';
+
+            for (var i = 0; i < modes.length; i++) {
+                var item = modes[i];
+
+                html +=
+                    '<div style="' +
+                    'display:flex;align-items:center;gap:0.45rem;' +
+                    'margin-bottom:0.35rem;font-size:0.8rem;' +
+                    '">' +
+                        '<span style="' +
+                        'width:9px;height:9px;border-radius:50%;' +
+                        'display:inline-block;flex:0 0 auto;' +
+                        'background:' + caModeColor(item.mode) + ';' +
+                        '"></span>' +
+                        '<span style="flex:1;">' +
+                            caEscapeHtml(item.label || 'Unknown') +
+                        '</span>' +
+                        '<strong>' +
+                            caEscapeHtml(item.tests || 0) +
+                        '</strong>' +
+                        '<span style="color:var(--text-secondary);min-width:44px;text-align:right;">' +
+                            caEscapeHtml(item.usage_pct || 0) + '%' +
+                        '</span>' +
+                    '</div>';
+            }
+
+            return html;
+        }
+
+        function caPopulateInterfaces(data) {
+            var select = document.getElementById(
+                'ca-interface-select'
+            );
+
+            if (!select) {
+                return;
+            }
+
+            var interfaces = Array.isArray(data.interfaces)
+                ? data.interfaces
+                : [];
+
+            var selected = data.scope && data.scope.interface
+                ? data.scope.interface
+                : '';
+
+            select.innerHTML = '';
+
+            if (interfaces.length === 0) {
+                var emptyOption = document.createElement('option');
+                emptyOption.value = '';
+                emptyOption.textContent =
+                    'No cellular interfaces found';
+
+                select.appendChild(emptyOption);
+                select.disabled = true;
+
+                cellularAnalysisState.interface = '';
+
+                return;
+            }
+
+            select.disabled = false;
+
+            for (var i = 0; i < interfaces.length; i++) {
+                var item = interfaces[i];
+                var option = document.createElement('option');
+
+                option.value = item.interface || '';
+
+                var label = item.label || item.interface || 'Cellular';
+
+                option.textContent = label;
+
+                if (option.value === selected) {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            }
+
+            cellularAnalysisState.interface = selected;
+        }
+
+        function caRenderOverview(data) {
+            var container = document.getElementById(
+                'ca-overview-content'
+            );
+
+            var title = document.getElementById(
+                'ca-overview-title'
+            );
+
+            if (!container || !title) {
+                return;
+            }
+
+            var scope = data.scope || {};
+            var overview = data.overview || {};
+            var modes = Array.isArray(overview.network_modes)
+                ? overview.network_modes
+                : [];
+
+            var interfaceLabel =
+                scope.interface_label ||
+                scope.interface ||
+                '';
+
+            title.textContent = interfaceLabel
+                ? 'CELLULAR OVERVIEW — ' +
+                    interfaceLabel.toUpperCase()
+                : 'CELLULAR OVERVIEW';
+
+            var tests = Number(
+                overview.tests_analyzed || 0
+            );
+
+            var cells = Number(
+                overview.serving_cells_observed || 0
+            );
+
+            var dominant = overview.dominant_cell;
+
+            var servingCells =
+                Array.isArray(data.serving_cells)
+                    ? data.serving_cells
+                    : [];
+
+            var dominantDetail = null;
+
+            if (dominant) {
+                var dominantKey = String(
+                    dominant.key || ''
+                );
+
+                for (
+                    var dominantIndex = 0;
+                    dominantIndex < servingCells.length;
+                    dominantIndex++
+                ) {
+                    if (
+                        String(
+                            servingCells[
+                                dominantIndex
+                            ].key || ''
+                        ) === dominantKey
+                    ) {
+                        dominantDetail =
+                            servingCells[
+                                dominantIndex
+                            ];
+
+                        break;
+                    }
+                }
+            }
+
+            var dominantText =
+                'No usable serving-cell identity';
+
+            if (dominant) {
+                var dominantLabel =
+                    caEscapeHtml(
+                        dominant.label ||
+                        dominant.view_label ||
+                        ''
+                    );
+
+                var dominantActiveSeconds =
+                    Number(
+                        dominantDetail &&
+                        dominantDetail.active_traffic_s
+                            ? dominantDetail.active_traffic_s
+                            : 0
+                    );
+
+                var dominantActivePct =
+                    Number(
+                        dominantDetail &&
+                        dominantDetail.active_traffic_pct != null
+                            ? dominantDetail.active_traffic_pct
+                            : 0
+                    );
+
+                if (
+                    isFinite(dominantActiveSeconds) &&
+                    dominantActiveSeconds > 0 &&
+                    isFinite(dominantActivePct)
+                ) {
+                    dominantText =
+                        'Most active traffic: Cell ' +
+                        dominantLabel +
+                        ' (' +
+                        dominantActivePct
+                            .toFixed(1)
+                            .replace('.0', '') +
+                        '%)';
+                } else {
+                    dominantText =
+                        'Most observed: Cell ' +
+                        dominantLabel +
+                        ' · seen in ' +
+                        Number(
+                            dominant.usage_pct || 0
+                        )
+                            .toFixed(1)
+                            .replace('.0', '') +
+                        '% of tests';
+                }
+            }
+
+            container.innerHTML =
+                '<div class="ca-overview-grid">' +
+
+                    '<div class="ca-overview-card">' +
+                        '<div class="ca-overview-label">' +
+                            'Tests Analyzed' +
+                        '</div>' +
+
+                        '<div class="ca-overview-value">' +
+                            tests +
+                        '</div>' +
+
+                        '<div class="ca-overview-note">' +
+                            'Selected interface and history range' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="ca-overview-card">' +
+                        '<div class="ca-overview-label">' +
+                            'Serving Cells Observed' +
+                        '</div>' +
+
+                        '<div class="ca-overview-value ca-overview-value-info">' +
+                            cells +
+                        '</div>' +
+
+                        '<div class="ca-overview-note">' +
+                            dominantText +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="ca-overview-card ca-mode-card">' +
+                        '<div class="ca-overview-label">' +
+                            'Network Mode' +
+                        '</div>' +
+
+                        '<div class="ca-mode-layout">' +
+                            caBuildDonut(modes) +
+
+                            '<div class="ca-mode-legend">' +
+                                caRenderNetworkLegend(modes) +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+
+                '</div>';
+        }
+
+        function caCellKey(item) {
+            if (!item || typeof item !== 'object') {
+                return 'unknown';
+            }
+
+            return String(
+                item.key ||
+                item.cell_key ||
+                item.cell_id ||
+                'unknown'
+            );
+        }
+
+        function caCellIsUnknown(item) {
+            if (!item || typeof item !== 'object') {
+                return true;
+            }
+
+            var key = caCellKey(item).toLowerCase();
+            var cellId = String(item.cell_id || '').trim().toLowerCase();
+
+            return (
+                item.unknown === true ||
+                key === 'unknown' ||
+                key === '' ||
+                cellId === 'unknown'
+            );
+        }
+
+        function caCellColor(index, unknown) {
+            if (unknown) {
+                return 'var(--text-secondary)';
+            }
+
+            var colors = [
+                'var(--primary-color)',
+                'var(--info-color)',
+                'var(--success-color)',
+                'var(--warning-color)',
+                'var(--danger-color)'
+            ];
+
+            return colors[index % colors.length];
+        }
+
+        function caServingLabel(item, index) {
+            if (caCellIsUnknown(item)) {
+                return 'Unknown';
+            }
+
+            if (item.label) {
+                return String(item.label);
+            }
+
+            if (index >= 0 && index < 26) {
+                return String.fromCharCode(65 + index);
+            }
+
+            return String(index + 1);
+        }
+
+        function caServingSubtitle(item) {
+            if (!item || typeof item !== 'object') {
+                return '';
+            }
+
+            var parts = [];
+
+            if (item.carrier) {
+                parts.push(String(item.carrier));
+            }
+
+            if (item.technology) {
+                parts.push(String(item.technology));
+            } else if (item.network_mode_label) {
+                parts.push(String(item.network_mode_label));
+            }
+
+            if (item.band) {
+                parts.push(String(item.band));
+            }
+
+            return parts.join(' • ');
+        }
+
+        function caFormatLocalTimestamp(value) {
+            if (
+                value === null ||
+                value === undefined ||
+                value === ''
+            ) {
+                return '';
+            }
+
+            var date = new Date(value);
+
+            if (isNaN(date.getTime())) {
+                return String(value);
+            }
+
+            try {
+                return new Intl.DateTimeFormat(
+                    undefined,
+                    {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZoneName: 'short'
+                    }
+                ).format(date);
+            } catch (error) {
+                return date.toLocaleString();
+            }
+        }
+
+        function caShortBand(value) {
+            var band = String(
+                value === null || value === undefined
+                    ? ''
+                    : value
+            ).trim();
+
+            if (!band) {
+                return '';
+            }
+
+            var match = band.match(/^Band\s+(\d+)$/i);
+
+            if (match) {
+                return 'B' + match[1];
+            }
+
+            match = band.match(/^LTE\s+B?(\d+)$/i);
+
+            if (match) {
+                return 'B' + match[1];
+            }
+
+            match = band.match(/^B(\d+)$/i);
+
+            if (match) {
+                return 'B' + match[1];
+            }
+
+            match = band.match(/^(?:NR\s+)?n(\d+)$/i);
+
+            if (match) {
+                return 'n' + match[1];
+            }
+
+            return band;
+        }
+
+        function caPrimaryTechnology(cell) {
+            if (!cell || caCellIsUnknown(cell)) {
+                return '—';
+            }
+
+            var role = String(
+                cell.technology_role || ''
+            ).trim();
+
+            if (!role) {
+                role = (
+                    String(
+                        cell.cell_id_source || ''
+                    ).toUpperCase() === 'NR'
+                )
+                    ? '5G SA PCell'
+                    : 'Primary Cell';
+            }
+
+            var band = caShortBand(cell.band);
+
+            return band
+                ? role + ' • ' + band
+                : role;
+        }
+
+        function caTimelineSegmentBounds(
+            events,
+            index,
+            timelineStartMs,
+            timelineEndMs
+        ) {
+            if (
+                !Array.isArray(events) ||
+                index < 0 ||
+                index >= events.length ||
+                !isFinite(timelineStartMs) ||
+                !isFinite(timelineEndMs) ||
+                timelineEndMs <= timelineStartMs
+            ) {
+                return null;
+            }
+
+            function toMillis(value) {
+                if (!value) {
+                    return NaN;
+                }
+
+                var parsed = new Date(value).getTime();
+
+                return isFinite(parsed)
+                    ? parsed
+                    : NaN;
+            }
+
+            var event = events[index] || {};
+            var eventStartMs = toMillis(event.start);
+
+            if (!isFinite(eventStartMs)) {
+                return null;
+            }
+
+            var eventEndMs = toMillis(
+                event.end || event.start
+            );
+
+            if (
+                !isFinite(eventEndMs) ||
+                eventEndMs < eventStartMs
+            ) {
+                eventEndMs = eventStartMs;
+            }
+
+            var visualStartMs =
+                index === 0
+                    ? timelineStartMs
+                    : eventStartMs;
+
+            var visualEndMs =
+                index === events.length - 1
+                    ? timelineEndMs
+                    : eventEndMs;
+
+            if (index > 0) {
+                var previous = events[index - 1] || {};
+
+                var previousEndMs = toMillis(
+                    previous.end || previous.start
+                );
+
+                if (
+                    isFinite(previousEndMs) &&
+                    previousEndMs <= eventStartMs
+                ) {
+                    visualStartMs =
+                        previousEndMs +
+                        (
+                            eventStartMs -
+                            previousEndMs
+                        ) / 2;
+                }
+            }
+
+            if (index + 1 < events.length) {
+                var next = events[index + 1] || {};
+
+                var nextStartMs = toMillis(
+                    next.start
+                );
+
+                if (
+                    isFinite(nextStartMs) &&
+                    nextStartMs >= eventEndMs
+                ) {
+                    visualEndMs =
+                        eventEndMs +
+                        (
+                            nextStartMs -
+                            eventEndMs
+                        ) / 2;
+                }
+            }
+
+            visualStartMs = Math.max(
+                timelineStartMs,
+                Math.min(
+                    timelineEndMs,
+                    visualStartMs
+                )
+            );
+
+            visualEndMs = Math.max(
+                visualStartMs,
+                Math.min(
+                    timelineEndMs,
+                    visualEndMs
+                )
+            );
+
+            var span =
+                timelineEndMs -
+                timelineStartMs;
+
+            return {
+                left:
+                    (
+                        visualStartMs -
+                        timelineStartMs
+                    ) /
+                    span *
+                    100,
+                width:
+                    (
+                        visualEndMs -
+                        visualStartMs
+                    ) /
+                    span *
+                    100
+            };
+        }
+
+        function caTimelineHandoffPosition(
+            event,
+            timelineStartMs,
+            timelineEndMs
+        ) {
+            if (
+                !event ||
+                !isFinite(timelineStartMs) ||
+                !isFinite(timelineEndMs)
+            ) {
+                return null;
+            }
+
+            /*
+             * A single sampled test has no elapsed wall-clock span on the
+             * long-term timeline. Center its event marker rather than
+             * manufacturing a duration.
+             */
+            if (timelineEndMs <= timelineStartMs) {
+                return 50;
+            }
+
+            var timestampMs =
+                new Date(
+                    event.timestamp
+                ).getTime();
+
+            if (!isFinite(timestampMs)) {
+                return null;
+            }
+
+            var position =
+                (
+                    timestampMs -
+                    timelineStartMs
+                ) /
+                (
+                    timelineEndMs -
+                    timelineStartMs
+                ) *
+                100;
+
+            /*
+             * Keep the four-pixel marker fully visible at the endpoints.
+             * This tiny visual clamp does not change timeline timing math.
+             */
+            return Math.max(
+                0.4,
+                Math.min(
+                    99.6,
+                    position
+                )
+            );
+        }
+
+        function caTimelineHandoffCellText(
+            cell,
+            label
+        ) {
+            cell =
+                cell &&
+                typeof cell === 'object'
+                    ? cell
+                    : {};
+
+            var parts = [];
+
+            if (label) {
+                parts.push(
+                    'Cell ' + label
+                );
+            }
+
+            if (cell.cell_id) {
+                parts.push(
+                    String(cell.cell_id)
+                );
+            }
+
+            if (cell.pci) {
+                parts.push(
+                    'PCI ' + String(cell.pci)
+                );
+            }
+
+            return parts.length
+                ? parts.join(' • ')
+                : 'Unidentified serving cell';
+        }
+
+        function caFormatCompactLocalTimestamp(value) {
+            if (!value) {
+                return '';
+            }
+
+            var date = new Date(value);
+
+            if (isNaN(date.getTime())) {
+                return caFormatLocalTimestamp(value);
+            }
+
+            try {
+                var day =
+                    new Intl.DateTimeFormat(
+                        undefined,
+                        {
+                            month: 'short',
+                            day: 'numeric'
+                        }
+                    ).format(date);
+
+                var time =
+                    new Intl.DateTimeFormat(
+                        undefined,
+                        {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                        }
+                    ).format(date);
+
+                return day + ' • ' + time;
+            } catch (error) {
+                return caFormatLocalTimestamp(value);
+            }
+        }
+
+        function caRenderServingCells(data) {
+            var distribution = document.getElementById(
+                'ca-serving-distribution'
+            );
+
+            var timeline = document.getElementById(
+                'ca-serving-timeline'
+            );
+
+            if (!distribution || !timeline) {
+                return;
+            }
+
+            var cells = Array.isArray(data.serving_cells)
+                ? data.serving_cells
+                : [];
+
+            var events = Array.isArray(data.timeline)
+                ? data.timeline
+                : [];
+
+            var handoffEvents =
+                Array.isArray(data.timeline_events)
+                    ? data.timeline_events
+                    : [];
+
+            if (!cells.length) {
+                distribution.innerHTML =
+                    '<div class="ca-empty-state">' +
+                        'No serving-cell observations are available ' +
+                        'for this interface and history range.' +
+                    '</div>';
+
+                timeline.innerHTML = '';
+                return;
+            }
+
+            var cellMeta = {};
+
+            var table =
+                '<div class="ca-serving-table">' +
+
+                    '<div class="ca-serving-row ca-serving-header">' +
+                        '<div>Serving Cell</div>' +
+                        '<div class="ca-tech-header">' +
+                            'Technology' +
+                            '<span class="ca-tooltip-trigger ca-help-icon" ' +
+                            'tabindex="0" ' +
+                            'data-ca-tooltip="' +
+                                'Primary serving-cell role|' +
+                                '• LTE PCell — LTE primary cell|' +
+                                '• LTE Anchor — anchor for 5G NSA|' +
+                                '• 5G SA PCell — NR primary in SA|' +
+                                '• PCell / NSA Anchor — same LTE cell observed in both modes' +
+                            '">' +
+                                '<i class="fas fa-info-circle"></i>' +
+                            '</span>' +
+                        '</div>' +
+                        '<div class="ca-tech-header">' +
+                            'Tests Seen' +
+                            '<span class="ca-tooltip-trigger ca-help-icon" ' +
+                            'tabindex="0" ' +
+                            'data-ca-tooltip="' +
+                                'Distinct tests in which this serving cell was observed.|' +
+                                'A single test can appear under more than one cell when an in-test handoff occurs.' +
+                            '">' +
+                                '<i class="fas fa-info-circle"></i>' +
+                            '</span>' +
+                        '</div>' +
+
+                        '<div class="ca-tech-header">' +
+                            'Active Traffic' +
+                            '<span class="ca-tooltip-trigger ca-help-icon" ' +
+                            'tabindex="0" ' +
+                            'data-ca-tooltip="' +
+                                'Share of measured active Download/Upload time observed on this serving cell.|' +
+                                'Unlike Tests Seen, these percentages are mutually exclusive and total approximately 100% when timed traffic telemetry is available.' +
+                            '">' +
+                                '<i class="fas fa-info-circle"></i>' +
+                            '</span>' +
+                        '</div>' +
+                    '</div>';
+
+            for (var i = 0; i < cells.length; i++) {
+                var cell = cells[i];
+                var unknown = caCellIsUnknown(cell);
+                var key = caCellKey(cell);
+                var label = caServingLabel(cell, i);
+                var color = caCellColor(i, unknown);
+
+                cellMeta[key] = {
+                    label: label,
+                    color: color,
+                    unknown: unknown,
+                    cell: cell
+                };
+
+                var testsSeen = Number(
+                    cell.tests_seen != null
+                        ? cell.tests_seen
+                        : (
+                            cell.tests || 0
+                        )
+                );
+
+                if (
+                    !isFinite(testsSeen) ||
+                    testsSeen < 0
+                ) {
+                    testsSeen = 0;
+                }
+
+                var activeTrafficSeconds =
+                    Number(
+                        cell.active_traffic_s || 0
+                    );
+
+                var activeTrafficPct =
+                    Number(
+                        cell.active_traffic_pct || 0
+                    );
+
+                var hasActiveTraffic =
+                    isFinite(activeTrafficSeconds) &&
+                    activeTrafficSeconds > 0 &&
+                    isFinite(activeTrafficPct);
+
+                if (hasActiveTraffic) {
+                    activeTrafficPct = Math.max(
+                        0,
+                        Math.min(
+                            100,
+                            activeTrafficPct
+                        )
+                    );
+                }
+
+                var tech = caPrimaryTechnology(cell);
+
+                var identity = [];
+
+                if (cell.pci) {
+                    identity.push(
+                        'PCI ' + caEscapeHtml(cell.pci)
+                    );
+                }
+
+                if (cell.tac) {
+                    identity.push(
+                        'TAC ' + caEscapeHtml(cell.tac)
+                    );
+                }
+
+                table +=
+                    '<div class="ca-serving-row">' +
+
+                        '<div class="ca-serving-name">' +
+                            '<span class="ca-cell-badge" style="' +
+                            'background:' + color + ';">' +
+                                caEscapeHtml(label) +
+                            '</span>' +
+
+                            '<div>' +
+                                '<strong>' +
+                                    (
+                                        unknown
+                                            ? 'Unable to identify'
+                                            : (
+                                                caEscapeHtml(
+                                                    cell.carrier || 'Cellular'
+                                                ) +
+                                                (
+                                                    cell.cell_id
+                                                        ? ' • Cell ' +
+                                                          caEscapeHtml(
+                                                              cell.cell_id
+                                                          )
+                                                        : ''
+                                                )
+                                            )
+                                    ) +
+                                '</strong>' +
+
+                                (
+                                    identity.length
+                                        ? '<div class="ca-serving-sub">' +
+                                          identity.join(' • ') +
+                                          '</div>'
+                                        : ''
+                                ) +
+                            '</div>' +
+                        '</div>' +
+
+                        '<div class="ca-serving-tech">' +
+                            caEscapeHtml(
+                                tech || '—'
+                            ) +
+                        '</div>' +
+
+                        '<div class="ca-serving-count">' +
+                            testsSeen +
+                        '</div>' +
+
+                        '<div class="ca-serving-percent">' +
+                            (
+                                hasActiveTraffic
+                                    ? (
+                                        '<span>' +
+                                            activeTrafficPct
+                                                .toFixed(1)
+                                                .replace('.0', '') +
+                                            '%' +
+                                        '</span>' +
+
+                                        '<div class="ca-mini-bar">' +
+                                            '<div style="' +
+                                            'width:' +
+                                            activeTrafficPct +
+                                            '%;' +
+                                            'background:' +
+                                            color +
+                                            ';' +
+                                            '"></div>' +
+                                        '</div>'
+                                    )
+                                    : (
+                                        '<span title="' +
+                                        'Timed active-traffic telemetry is not available for these retained records.' +
+                                        '">—</span>'
+                                    )
+                            ) +
+                        '</div>' +
+
+                    '</div>';
+            }
+
+            table += '</div>';
+
+            distribution.innerHTML = table;
+
+            if (!events.length) {
+                timeline.innerHTML =
+                    '<div class="ca-empty-state">' +
+                        'No serving-cell timeline data available.' +
+                    '</div>';
+
+                return;
+            }
+
+            var total = 0;
+
+            for (var t = 0; t < events.length; t++) {
+                var count = Number(
+                    events[t].tests || 1
+                );
+
+                if (!isFinite(count) || count < 1) {
+                    count = 1;
+                }
+
+                total += count;
+            }
+
+            function caTimelineMillis(value) {
+                if (!value) {
+                    return NaN;
+                }
+
+                var parsed = new Date(value).getTime();
+
+                return isFinite(parsed)
+                    ? parsed
+                    : NaN;
+            }
+
+            function caTimelineSameLocalDay(a, b) {
+                var first = new Date(a);
+                var last = new Date(b);
+
+                if (
+                    isNaN(first.getTime()) ||
+                    isNaN(last.getTime())
+                ) {
+                    return false;
+                }
+
+                return (
+                    first.getFullYear() === last.getFullYear() &&
+                    first.getMonth() === last.getMonth() &&
+                    first.getDate() === last.getDate()
+                );
+            }
+
+            function caTimelineShort(value, includeDate) {
+                if (!value) {
+                    return '';
+                }
+
+                var date = new Date(value);
+
+                if (isNaN(date.getTime())) {
+                    return '';
+                }
+
+                var options = includeDate
+                    ? {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    }
+                    : {
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    };
+
+                try {
+                    return new Intl.DateTimeFormat(
+                        undefined,
+                        options
+                    ).format(date);
+                } catch (error) {
+                    return caFormatLocalTimestamp(value);
+                }
+            }
+
+            function caTimelineDay(value) {
+                if (!value) {
+                    return '';
+                }
+
+                var date = new Date(value);
+
+                if (isNaN(date.getTime())) {
+                    return '';
+                }
+
+                try {
+                    return new Intl.DateTimeFormat(
+                        undefined,
+                        {
+                            month: 'short',
+                            day: 'numeric'
+                        }
+                    ).format(date);
+                } catch (error) {
+                    return '';
+                }
+            }
+
+            var lastEvent =
+                events[events.length - 1] || {};
+
+            var firstTimelineValue =
+                events[0].start;
+
+            var lastTimelineValue =
+                lastEvent.end ||
+                lastEvent.start;
+
+            var timelineStartMs =
+                caTimelineMillis(firstTimelineValue);
+
+            var timelineEndMs =
+                caTimelineMillis(lastTimelineValue);
+
+            var timelineHasScale =
+                isFinite(timelineStartMs) &&
+                isFinite(timelineEndMs) &&
+                timelineEndMs > timelineStartMs;
+
+            var timelineSpanMs =
+                timelineHasScale
+                    ? timelineEndMs - timelineStartMs
+                    : 0;
+
+            var html =
+                '<div class="ca-timeline-title">' +
+                    'Serving Cell Timeline' +
+                '</div>' +
+                '<div class="ca-timeline-track">';
+
+            var cumulativeCount = 0;
+
+            for (var e = 0; e < events.length; e++) {
+                var event = events[e] || {};
+
+                var eventCount = Number(
+                    event.tests || 1
+                );
+
+                if (!isFinite(eventCount) || eventCount < 1) {
+                    eventCount = 1;
+                }
+
+                var key = String(
+                    event.key || 'unknown'
+                );
+
+                var meta = cellMeta[key] || {
+                    label: 'Unknown',
+                    color: 'var(--text-secondary)',
+                    unknown: true,
+                    cell: {}
+                };
+
+                var left = 0;
+                var width = 0;
+
+                var bounds =
+                    caTimelineSegmentBounds(
+                        events,
+                        e,
+                        timelineStartMs,
+                        timelineEndMs
+                    );
+
+                if (
+                    timelineHasScale &&
+                    bounds
+                ) {
+                    left = bounds.left;
+                    width = bounds.width;
+                } else {
+                    left =
+                        total > 0
+                            ? cumulativeCount / total * 100
+                            : 0;
+
+                    width =
+                        total > 0
+                            ? eventCount / total * 100
+                            : 0;
+                }
+
+                cumulativeCount += eventCount;
+
+                left = Math.max(
+                    0,
+                    Math.min(100, left)
+                );
+
+                width = Math.max(
+                    0,
+                    Math.min(100 - left, width)
+                );
+
+                var tooltipLines = [
+                    meta.unknown
+                        ? 'Unknown Serving Cell'
+                        : 'Serving Cell ' + meta.label
+                ];
+
+                var cell = meta.cell || {};
+                var identity = [];
+
+                if (cell.cell_id) {
+                    identity.push(
+                        'Cell ' + String(cell.cell_id)
+                    );
+                }
+
+                var technology =
+                    caPrimaryTechnology(cell);
+
+                if (technology) {
+                    identity.push(technology);
+                }
+
+                if (identity.length) {
+                    tooltipLines.push(
+                        identity.join(' • ')
+                    );
+                }
+
+                tooltipLines.push(
+                    eventCount +
+                    (
+                        eventCount === 1
+                            ? ' test observed'
+                            : ' tests observed'
+                    )
+                );
+
+                if (event.start) {
+                    tooltipLines.push(
+                        (
+                            eventCount === 1
+                                ? 'Observed: '
+                                : 'First: '
+                        ) +
+                        caFormatLocalTimestamp(
+                            event.start
+                        )
+                    );
+                }
+
+                if (
+                    event.end &&
+                    event.end !== event.start
+                ) {
+                    tooltipLines.push(
+                        'Last: ' +
+                        caFormatLocalTimestamp(
+                            event.end
+                        )
+                    );
+                }
+
+                var tooltip =
+                    tooltipLines.join('|');
+
+                var ariaLabel =
+                    tooltipLines.join('. ');
+
+                html +=
+                    '<div class="ca-timeline-segment" ' +
+                    'tabindex="0" ' +
+                    'aria-label="' +
+                    caEscapeHtml(ariaLabel) +
+                    '" ' +
+                    'data-ca-tooltip="' +
+                    caEscapeHtml(tooltip) +
+                    '" style="' +
+                    'left:' + left + '%;' +
+                    'width:' + width + '%;' +
+                    'background:' + meta.color + ';' +
+                    '">' +
+                        (
+                            width >= 5
+                                ? caEscapeHtml(meta.label)
+                                : ''
+                        ) +
+                    '</div>';
+            }
+
+            /*
+             * Overlay proven in-test handoffs after the continuity blocks.
+             * They are event markers only and therefore never affect segment
+             * width, midpoint boundaries, or sampled-cell continuity.
+             */
+            for (
+                var h = 0;
+                h < handoffEvents.length;
+                h++
+            ) {
+                var handoff =
+                    handoffEvents[h] || {};
+
+                var handoffLeft =
+                    caTimelineHandoffPosition(
+                        handoff,
+                        timelineStartMs,
+                        timelineEndMs
+                    );
+
+                if (handoffLeft == null) {
+                    continue;
+                }
+
+                var phaseText;
+
+                if (handoff.phase_boundary) {
+                    phaseText =
+                        'Between Download / Upload';
+
+                } else {
+                    var phaseName =
+                        handoff.phase === 'upload'
+                            ? 'Upload'
+                            : 'Download';
+
+                    var elapsed =
+                        Number(
+                            handoff.elapsed_s || 0
+                        );
+
+                    phaseText =
+                        phaseName +
+                        ' +' +
+                        elapsed.toFixed(1) +
+                        ' sec';
+                }
+
+                var fromText =
+                    caTimelineHandoffCellText(
+                        handoff.from,
+                        handoff.from_label
+                    );
+
+                var toText =
+                    caTimelineHandoffCellText(
+                        handoff.to,
+                        handoff.to_label
+                    );
+
+                var handoffTooltipLines = [
+                    'In-Test Serving Cell Handoff',
+                    phaseText,
+                    fromText + ' \u2192 ' + toText
+                ];
+
+                if (handoff.timestamp) {
+                    handoffTooltipLines.push(
+                        'Test: ' +
+                        caFormatLocalTimestamp(
+                            handoff.timestamp
+                        )
+                    );
+                }
+
+                var handoffTooltip =
+                    handoffTooltipLines.join('|');
+
+                html +=
+                    '<div class="ca-timeline-handoff-marker" ' +
+                    'tabindex="0" ' +
+                    'aria-label="' +
+                    caEscapeHtml(
+                        handoffTooltipLines.join('. ')
+                    ) +
+                    '" ' +
+                    'data-ca-tooltip="' +
+                    caEscapeHtml(
+                        handoffTooltip
+                    ) +
+                    '" ' +
+                    'style="left:' +
+                    handoffLeft +
+                    '%;"></div>';
+            }
+
+            var sameTimelineDay =
+                caTimelineSameLocalDay(
+                    firstTimelineValue,
+                    lastTimelineValue
+                );
+
+            var footerLeft =
+                caTimelineShort(
+                    firstTimelineValue,
+                    !sameTimelineDay
+                ) || 'Oldest';
+
+            var footerCenter =
+                sameTimelineDay
+                    ? caTimelineDay(
+                        firstTimelineValue
+                    )
+                    : '';
+
+            var footerRight =
+                caTimelineShort(
+                    lastTimelineValue,
+                    !sameTimelineDay
+                ) || 'Newest';
+
+            html +=
+                '</div>' +
+                '<div class="ca-timeline-footer">' +
+                    '<span>' +
+                        caEscapeHtml(footerLeft) +
+                    '</span>' +
+                    '<span>' +
+                        caEscapeHtml(footerCenter) +
+                    '</span>' +
+                    '<span>' +
+                        caEscapeHtml(footerRight) +
+                    '</span>' +
+                '</div>';
+
+            timeline.innerHTML = html;
+        }
+
+        function caChangeCard(
+            icon,
+            title,
+            value,
+            note,
+            tooltip
+        ) {
+            return (
+                '<div class="ca-change-card">' +
+
+                    '<div class="ca-change-icon">' +
+                        '<i class="fas ' +
+                        caEscapeHtml(icon) +
+                        '"></i>' +
+                    '</div>' +
+
+                    '<div class="ca-change-content">' +
+                        '<div class="ca-change-title">' +
+                            caEscapeHtml(title) +
+                            '<span class="ca-tooltip-trigger ca-help-icon" ' +
+                            'tabindex="0" ' +
+                            'data-ca-tooltip="' +
+                                caEscapeHtml(tooltip) +
+                            '">' +
+                                '<i class="fas fa-info-circle"></i>' +
+                            '</span>' +
+                        '</div>' +
+
+                        '<div class="ca-change-value">' +
+                            Number(value || 0) +
+                        '</div>' +
+
+                        '<div class="ca-change-note">' +
+                            caEscapeHtml(note) +
+                        '</div>' +
+                    '</div>' +
+
+                '</div>'
+            );
+        }
+
+        function caRenderChangeActivity(data) {
+            var container = document.getElementById(
+                'ca-change-activity'
+            );
+
+            if (!container) {
+                return;
+            }
+
+            var activity = data.change_activity || {};
+
+            container.innerHTML =
+                '<div class="ca-change-grid">' +
+
+                    caChangeCard(
+                        'fa-broadcast-tower',
+                        'Serving Cell Changes',
+                        activity.serving_cell_changes,
+                        'Between consecutive tests',
+                        'Serving cell changed between consecutive tests in the selected history range.'
+                    ) +
+
+                    caChangeCard(
+                        'fa-layer-group',
+                        'Peak Config Changes',
+                        activity.peak_config_changes,
+                        'Radio configuration changes',
+                        'Peak observed radio configuration changed between consecutive tests.'
+                    ) +
+
+                    caChangeCard(
+                        'fa-arrows-alt-h',
+                        'Bandwidth Changes',
+                        activity.bandwidth_changes,
+                        'Total observed bandwidth changes',
+                        'Total Peak Observed radio bandwidth changed between consecutive tests.'
+                    ) +
+
+                    caChangeCard(
+                        'fa-random',
+                        'Network Mode Changes',
+                        activity.network_mode_changes,
+                        'LTE Only / NSA / SA',
+                        'Primary network mode changed between LTE Only, 5G NSA, or 5G SA.'
+                    ) +
+
+                '</div>';
+        }
+
+        function caValue(value) {
+            if (
+                value === null ||
+                value === undefined ||
+                value === ''
+            ) {
+                return '—';
+            }
+
+            return caEscapeHtml(value);
+        }
+
+        function caSelectedValue(cell, names) {
+            if (!cell || typeof cell !== 'object') {
+                return null;
+            }
+
+            for (var i = 0; i < names.length; i++) {
+                var value = cell[names[i]];
+
+                if (
+                    value !== null &&
+                    value !== undefined &&
+                    value !== ''
+                ) {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        function caIdentityField(label, value) {
+            return (
+                '<div style="' +
+                'padding:0.7rem 0;' +
+                'border-bottom:1px solid var(--border-color);' +
+                '">' +
+                    '<div style="' +
+                    'font-size:0.72rem;' +
+                    'text-transform:uppercase;' +
+                    'letter-spacing:0.035em;' +
+                    'color:var(--text-secondary);' +
+                    'margin-bottom:0.2rem;' +
+                    '">' +
+                        caEscapeHtml(label) +
+                    '</div>' +
+                    '<div style="' +
+                    'font-size:0.9rem;' +
+                    'font-weight:600;' +
+                    'word-break:break-word;' +
+                    '">' +
+                        caValue(value) +
+                    '</div>' +
+                '</div>'
+            );
+        }
+
+        function caPopulateCellSelector(data) {
+            var select = document.getElementById(
+                'ca-cell-select'
+            );
+
+            if (!select) {
+                return;
+            }
+
+            var cells = Array.isArray(data.serving_cells)
+                ? data.serving_cells
+                : [];
+
+            var known = [];
+
+            for (var i = 0; i < cells.length; i++) {
+                if (!caCellIsUnknown(cells[i])) {
+                    known.push(cells[i]);
+                }
+            }
+
+            select.innerHTML = '';
+
+            if (!known.length) {
+                var empty = document.createElement('option');
+
+                empty.value = '';
+                empty.textContent =
+                    'No identifiable serving cells';
+
+                select.appendChild(empty);
+                select.disabled = true;
+
+                cellularAnalysisState.selectedCell = '';
+                return;
+            }
+
+            select.disabled = false;
+
+            var selected = data.selected_cell;
+
+            var selectedKey =
+                cellularAnalysisState.selectedCell ||
+                (
+                    selected
+                        ? String(
+                            selected.key ||
+                            selected.cell_key ||
+                            selected.cell_id ||
+                            ''
+                        )
+                        : ''
+                );
+
+            if (!selectedKey) {
+                selectedKey = caCellKey(known[0]);
+            }
+
+            var found = false;
+
+            for (var c = 0; c < known.length; c++) {
+                var item = known[c];
+                var key = caCellKey(item);
+                var label = caServingLabel(item, c);
+
+                var option = document.createElement('option');
+
+                option.value = key;
+                option.textContent =
+                    'Serving Cell ' +
+                    label +
+                    (
+                        item.cell_id
+                            ? ' — ' + item.cell_id
+                            : ''
+                    );
+
+                if (key === selectedKey) {
+                    option.selected = true;
+                    found = true;
+                }
+
+                select.appendChild(option);
+            }
+
+            if (!found) {
+                selectedKey = caCellKey(known[0]);
+                select.value = selectedKey;
+            }
+
+            cellularAnalysisState.selectedCell = selectedKey;
+
+            caBindSelectedCell();
+        }
+
+        function caRenderSelectedCell(data) {
+            var container = document.getElementById(
+                'ca-selected-cell'
+            );
+
+            if (!container) {
+                return;
+            }
+
+            var cells = Array.isArray(data.serving_cells)
+                ? data.serving_cells
+                : [];
+
+            var selected = data.selected_cell;
+
+            if (!selected) {
+                container.innerHTML =
+                    '<div class="ca-empty-state">' +
+                        'No serving-cell details available.' +
+                    '</div>';
+                return;
+            }
+
+            var selectedKey = String(
+                selected.key ||
+                selected.cell_key ||
+                selected.cell_id ||
+                cellularAnalysisState.selectedCell ||
+                ''
+            );
+
+            var label = '';
+
+            for (var x = 0; x < cells.length; x++) {
+                if (caCellKey(cells[x]) === selectedKey) {
+                    label = caServingLabel(cells[x], x);
+                    break;
+                }
+            }
+
+            var carrier = caSelectedValue(
+                selected,
+                ['carrier', 'carrier_name']
+            );
+
+            var role = caSelectedValue(
+                selected,
+                ['technology_role']
+            );
+
+            var band = caShortBand(
+                caSelectedValue(
+                    selected,
+                    ['band', 'rf_band']
+                )
+            );
+
+            var headerParts = [];
+
+            if (carrier) {
+                headerParts.push(carrier);
+            }
+
+            if (role) {
+                headerParts.push(role);
+            }
+
+            if (band) {
+                headerParts.push(band);
+            }
+
+            var testsSeen = caSelectedValue(
+                selected,
+                [
+                    'tests_seen',
+                    'tests',
+                    'count'
+                ]
+            );
+
+            var activeTrafficSeconds =
+                Number(
+                    caSelectedValue(
+                        selected,
+                        ['active_traffic_s']
+                    ) || 0
+                );
+
+            var activeTrafficPct =
+                Number(
+                    caSelectedValue(
+                        selected,
+                        ['active_traffic_pct']
+                    ) || 0
+                );
+
+            var activeTrafficValue = null;
+
+            if (
+                isFinite(activeTrafficSeconds) &&
+                activeTrafficSeconds > 0 &&
+                isFinite(activeTrafficPct)
+            ) {
+                activeTrafficValue =
+                    activeTrafficPct
+                        .toFixed(1)
+                        .replace('.0', '') +
+                    '%';
+            }
+
+            var fields = [
+                [
+                    'PLMN',
+                    caSelectedValue(
+                        selected,
+                        ['plmn', 'current_plmn']
+                    )
+                ],
+                [
+                    'TAC',
+                    caSelectedValue(
+                        selected,
+                        ['tac', 'tracking_area_code']
+                    )
+                ],
+                [
+                    'PCI',
+                    caSelectedValue(
+                        selected,
+                        ['pci', 'phy_cell_id']
+                    )
+                ],
+                [
+                    'Channel',
+                    caSelectedValue(
+                        selected,
+                        ['channel', 'rf_channel']
+                    )
+                ],
+                [
+                    'First Seen',
+                    caFormatCompactLocalTimestamp(
+                        caSelectedValue(
+                            selected,
+                            ['first_seen', 'first_seen_at']
+                        )
+                    )
+                ],
+                [
+                    'Last Seen',
+                    caFormatCompactLocalTimestamp(
+                        caSelectedValue(
+                            selected,
+                            ['last_seen', 'last_seen_at']
+                        )
+                    )
+                ],
+                [
+                    'Tests Seen',
+                    testsSeen
+                ],
+                [
+                    'Active Traffic',
+                    activeTrafficValue
+                ]
+            ];
+
+            var fieldHtml = '';
+
+            for (var f = 0; f < fields.length; f++) {
+                fieldHtml +=
+                    '<div class="ca-selected-field">' +
+                        '<span>' +
+                            caEscapeHtml(fields[f][0]) +
+                        '</span>' +
+                        '<strong>' +
+                            caValue(fields[f][1]) +
+                        '</strong>' +
+                    '</div>';
+            }
+
+            container.innerHTML =
+                '<div class="ca-selected-header">' +
+                    '<div>' +
+                        '<div class="ca-selected-title">' +
+                            'Serving Cell ' +
+                            caEscapeHtml(label) +
+                        '</div>' +
+
+                        '<div class="ca-selected-subtitle">' +
+                            caEscapeHtml(
+                                headerParts.join(' • ') ||
+                                'Primary serving cell'
+                            ) +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="ca-selected-cellid">' +
+                        '<span>Cell ID</span>' +
+                        '<strong>' +
+                            caValue(
+                                caSelectedValue(
+                                    selected,
+                                    ['cell_id', 'id']
+                                )
+                            ) +
+                        '</strong>' +
+                    '</div>' +
+                '</div>' +
+
+                '<div class="ca-selected-fields">' +
+                    fieldHtml +
+                '</div>';
+        }
+
+        function caBindSelectedCell() {
+            var select = document.getElementById(
+                'ca-cell-select'
+            );
+
+            if (!select || select.dataset.caBound === '1') {
+                return;
+            }
+
+            select.dataset.caBound = '1';
+
+            select.addEventListener(
+                'change',
+                function() {
+                    cellularAnalysisState.selectedCell =
+                        this.value || '';
+
+                    loadCellularAnalysis();
+                }
+            );
+        }
+
+        function caRfMetricCard(label, metric, unit) {
+            metric = metric || {};
+
+            var avg = metric.avg;
+            var best = metric.best;
+            var worst = metric.worst;
+            var count = Number(metric.count || 0);
+
+            if (!count) {
+                return (
+                    '<div style="' +
+                    'padding:0.9rem;' +
+                    'border:1px solid var(--border-color);' +
+                    'border-radius:var(--radius-md);' +
+                    'background:var(--card-surface);' +
+                    '">' +
+                        '<div style="' +
+                        'font-size:0.78rem;' +
+                        'font-weight:600;' +
+                        'margin-bottom:0.4rem;' +
+                        '">' +
+                            caEscapeHtml(label) +
+                        '</div>' +
+                        '<div style="' +
+                        'color:var(--text-secondary);' +
+                        'font-size:0.82rem;' +
+                        '">' +
+                            'No samples' +
+                        '</div>' +
+                    '</div>'
+                );
+            }
+
+            return (
+                '<div style="' +
+                'padding:0.9rem;' +
+                'border:1px solid var(--border-color);' +
+                'border-radius:var(--radius-md);' +
+                'background:var(--card-surface);' +
+                '">' +
+
+                    '<div style="' +
+                    'font-size:0.78rem;' +
+                    'font-weight:600;' +
+                    'margin-bottom:0.45rem;' +
+                    '">' +
+                        caEscapeHtml(label) +
+                    '</div>' +
+
+                    '<div style="' +
+                    'font-size:1.45rem;' +
+                    'font-weight:700;' +
+                    'color:var(--primary-color);' +
+                    'margin-bottom:0.45rem;' +
+                    '">' +
+                        caValue(avg) +
+                        '<span style="' +
+                        'font-size:0.72rem;' +
+                        'font-weight:500;' +
+                        'color:var(--text-secondary);' +
+                        'margin-left:0.2rem;' +
+                        '">' +
+                            caEscapeHtml(unit) +
+                        '</span>' +
+                    '</div>' +
+
+                    '<div style="' +
+                    'display:flex;' +
+                    'justify-content:space-between;' +
+                    'gap:0.6rem;' +
+                    'font-size:0.72rem;' +
+                    'color:var(--text-secondary);' +
+                    '">' +
+                        '<span>Best <strong>' +
+                            caValue(best) +
+                        '</strong></span>' +
+
+                        '<span>Worst <strong>' +
+                            caValue(worst) +
+                        '</strong></span>' +
+
+                        '<span>' +
+                            count +
+                            (count === 1
+                                ? ' sample'
+                                : ' samples') +
+                        '</span>' +
+                    '</div>' +
+
+                '</div>'
+            );
+        }
+
+        function caRenderRfConditions(data) {
+            var container = document.getElementById(
+                'ca-rf-conditions'
+            );
+
+            if (!container) {
+                return;
+            }
+
+            var selected = data.selected_cell;
+
+            if (!selected) {
+                container.innerHTML =
+                    '<div class="ca-empty-state">' +
+                        'Select a serving cell to view RF conditions.' +
+                    '</div>';
+                return;
+            }
+
+            var rf = selected.rf || {};
+
+            function metric(label, value, unit, detail) {
+                return (
+                    '<div class="ca-rf-card">' +
+                        '<div class="ca-rf-label">' +
+                            caEscapeHtml(label) +
+                        '</div>' +
+
+                        '<div class="ca-rf-value">' +
+                            caValue(value) +
+                            '<span>' +
+                                caEscapeHtml(unit) +
+                            '</span>' +
+                        '</div>' +
+
+                        '<div class="ca-rf-detail">' +
+                            caEscapeHtml(detail) +
+                        '</div>' +
+                    '</div>'
+                );
+            }
+
+            function detail(metricData) {
+                metricData = metricData || {};
+
+                if (!metricData.count) {
+                    return 'No samples';
+                }
+
+                return (
+                    'Best ' +
+                    caValue(metricData.best) +
+                    ' • Worst ' +
+                    caValue(metricData.worst) +
+                    ' • ' +
+                    Number(metricData.count) +
+                    (
+                        Number(metricData.count) === 1
+                            ? ' sample'
+                            : ' samples'
+                    )
+                );
+            }
+
+            var health = Array.isArray(rf.health)
+                ? rf.health
+                : [];
+
+            var healthHtml = '';
+
+            if (health.length) {
+                healthHtml =
+                    '<div class="ca-health-row">' +
+                        '<span class="ca-health-label">' +
+                            'Cellular Health' +
+                        '</span>';
+
+                for (var i = 0; i < health.length; i++) {
+                    healthHtml +=
+                        '<span class="ca-health-chip">' +
+                            '<strong>' +
+                                caEscapeHtml(
+                                    health[i].category || 'Unknown'
+                                ) +
+                            '</strong>' +
+                            '<span>' +
+                                caEscapeHtml(health[i].tests || 0) +
+                                ' · ' +
+                                caEscapeHtml(
+                                    health[i].usage_pct || 0
+                                ) +
+                                '%' +
+                            '</span>' +
+                        '</span>';
+                }
+
+                healthHtml += '</div>';
+            }
+
+            container.innerHTML =
+                '<div class="ca-rf-grid">' +
+
+                    metric(
+                        'Avg RSRP',
+                        (rf.rsrp || {}).avg,
+                        'dBm',
+                        detail(rf.rsrp)
+                    ) +
+
+                    metric(
+                        'Avg RSRQ',
+                        (rf.rsrq || {}).avg,
+                        'dB',
+                        detail(rf.rsrq)
+                    ) +
+
+                    metric(
+                        'Avg SINR',
+                        (rf.sinr || {}).avg,
+                        'dB',
+                        detail(rf.sinr)
+                    ) +
+
+                '</div>' +
+
+                healthHtml;
+        }
+
+        function caTechnologyUsageHtml(usage) {
+            if (!Array.isArray(usage) || !usage.length) {
+                return (
+                    '<div style="color:var(--text-secondary);">' +
+                    'No technology usage data available.' +
+                    '</div>'
+                );
+            }
+
+            var html = '';
+
+            for (var i = 0; i < usage.length; i++) {
+                var item = usage[i];
+                var pct = Number(item.usage_pct || 0);
+
+                if (!isFinite(pct)) {
+                    pct = 0;
+                }
+
+                pct = Math.max(0, Math.min(100, pct));
+
+                html +=
+                    '<div style="' +
+                    (i
+                        ? 'border-top:1px solid var(--border-color);'
+                        : '') +
+                    'padding:0.65rem 0;' +
+                    '">' +
+
+                        '<div style="' +
+                        'display:flex;' +
+                        'justify-content:space-between;' +
+                        'gap:0.75rem;' +
+                        'margin-bottom:0.35rem;' +
+                        '">' +
+                            '<span style="font-weight:600;">' +
+                                caEscapeHtml(
+                                    item.label || 'Unknown'
+                                ) +
+                            '</span>' +
+
+                            '<span style="' +
+                            'color:var(--text-secondary);' +
+                            'font-size:0.8rem;' +
+                            '">' +
+                                caEscapeHtml(item.tests || 0) +
+                                ' tests · ' +
+                                caEscapeHtml(item.usage_pct || 0) +
+                                '%' +
+                            '</span>' +
+                        '</div>' +
+
+                        '<div style="' +
+                        'height:6px;' +
+                        'background:var(--border-color);' +
+                        'border-radius:999px;' +
+                        'overflow:hidden;' +
+                        '">' +
+                            '<div style="' +
+                            'height:100%;' +
+                            'width:' + pct + '%;' +
+                            'background:' +
+                            caModeColor(item.mode) + ';' +
+                            'border-radius:999px;' +
+                            '"></div>' +
+                        '</div>' +
+
+                    '</div>';
+            }
+
+            return html;
+        }
+
+        function caRadioConfigurationsHtml(configs, eligible) {
+            if (!Array.isArray(configs) || !configs.length) {
+                return (
+                    '<div style="color:var(--text-secondary);">' +
+                    'No peak radio configuration data is available ' +
+                    'for this serving cell.' +
+                    '</div>'
+                );
+            }
+
+            var html =
+                '<div style="' +
+                'overflow-x:auto;' +
+                'border:1px solid var(--border-color);' +
+                'border-radius:var(--radius-md);' +
+                '">' +
+
+                    '<table style="' +
+                    'width:100%;' +
+                    'border-collapse:collapse;' +
+                    'font-size:0.82rem;' +
+                    '">' +
+
+                        '<thead>' +
+                            '<tr style="' +
+                            'background:var(--card-surface);' +
+                            'text-align:left;' +
+                            '">' +
+                                '<th style="padding:0.65rem 0.75rem;">' +
+                                    'Peak Observed Radio Configuration' +
+                                '</th>' +
+                                '<th style="' +
+                                'padding:0.65rem 0.75rem;' +
+                                'text-align:right;' +
+                                'white-space:nowrap;' +
+                                '">' +
+                                    'Tests' +
+                                '</th>' +
+                                '<th style="' +
+                                'padding:0.65rem 0.75rem;' +
+                                'text-align:right;' +
+                                'white-space:nowrap;' +
+                                '">' +
+                                    'Usage' +
+                                '</th>' +
+                            '</tr>' +
+                        '</thead>' +
+
+                        '<tbody>';
+
+            for (var i = 0; i < configs.length; i++) {
+                var item = configs[i];
+
+                html +=
+                    '<tr style="' +
+                    (i
+                        ? 'border-top:1px solid var(--border-color);'
+                        : '') +
+                    '">' +
+                        '<td style="' +
+                        'padding:0.7rem 0.75rem;' +
+                        'font-weight:600;' +
+                        '">' +
+                            caEscapeHtml(
+                                item.label || 'Unknown configuration'
+                            ) +
+                        '</td>' +
+
+                        '<td style="' +
+                        'padding:0.7rem 0.75rem;' +
+                        'text-align:right;' +
+                        'white-space:nowrap;' +
+                        '">' +
+                            caEscapeHtml(item.tests || 0) +
+                        '</td>' +
+
+                        '<td style="' +
+                        'padding:0.7rem 0.75rem;' +
+                        'text-align:right;' +
+                        'white-space:nowrap;' +
+                        '">' +
+                            caEscapeHtml(item.usage_pct || 0) +
+                            '%' +
+                        '</td>' +
+                    '</tr>';
+            }
+
+            html +=
+                        '</tbody>' +
+                    '</table>' +
+                '</div>' +
+
+                '<div style="' +
+                'font-size:0.72rem;' +
+                'color:var(--text-secondary);' +
+                'margin-top:0.45rem;' +
+                '">' +
+                    caEscapeHtml(eligible || 0) +
+                    ' retained tests contained a usable peak radio configuration.' +
+                '</div>';
+
+            return html;
+        }
+
+        function caRenderRadioSummary(data) {
+            var container = document.getElementById(
+                'ca-radio-summary'
+            );
+
+            if (!container) {
+                return;
+            }
+
+            var selected = data.selected_cell;
+
+            if (!selected) {
+                container.innerHTML =
+                    '<div class="ca-empty-state">' +
+                        'Select a serving cell to view radio resources.' +
+                    '</div>';
+                return;
+            }
+
+            var technology = Array.isArray(
+                selected.technology_usage
+            )
+                ? selected.technology_usage
+                : [];
+
+            var configs = Array.isArray(
+                selected.radio_configurations
+            )
+                ? selected.radio_configurations
+                : [];
+
+            var configHtml = '';
+
+            if (!configs.length) {
+                configHtml =
+                    '<div class="ca-empty-state">' +
+                        'No peak radio configuration data available.' +
+                    '</div>';
+            } else {
+                configHtml =
+                    '<div class="cana-radio-config-table">' +
+
+                        '<div class="cana-radio-config-row cana-radio-config-header">' +
+                            '<div>Peak Observed Radio Configuration</div>' +
+                            '<div>Total BW</div>' +
+                            '<div>Tests</div>' +
+                            '<div>Usage</div>' +
+                        '</div>';
+
+                for (var i = 0; i < configs.length; i++) {
+                    var item = configs[i];
+                    var pct = Number(item.usage_pct || 0);
+
+                    if (!isFinite(pct)) {
+                        pct = 0;
+                    }
+
+                    pct = Math.max(0, Math.min(100, pct));
+
+                    configHtml +=
+                        '<div class="cana-radio-config-row">' +
+
+                            '<div class="cana-radio-config-name">' +
+                                caEscapeHtml(
+                                    item.label ||
+                                    'Unknown / Insufficient Data'
+                                ) +
+                            '</div>' +
+
+                            '<div class="cana-radio-config-bandwidth">' +
+                                (
+                                    Number(item.total_bandwidth_mhz || 0) > 0
+                                        ? caEscapeHtml(
+                                            item.total_bandwidth_mhz
+                                        ) + ' MHz'
+                                        : '—'
+                                ) +
+                            '</div>' +
+
+                            '<div class="cana-radio-config-tests">' +
+                                caEscapeHtml(item.tests || 0) +
+                            '</div>' +
+
+                            '<div class="cana-radio-config-usage">' +
+                                '<span>' +
+                                    caEscapeHtml(
+                                        item.usage_pct || 0
+                                    ) +
+                                    '%' +
+                                '</span>' +
+
+                                '<div class="ca-mini-bar">' +
+                                    '<div style="' +
+                                    'width:' + pct + '%;' +
+                                    'background:var(--primary-color);' +
+                                    '"></div>' +
+                                '</div>' +
+                            '</div>' +
+
+                        '</div>';
+                }
+
+                configHtml += '</div>';
+            }
+
+            container.innerHTML =
+                '<div class="ca-radio-grid">' +
+
+                    '<div class="ca-tech-panel">' +
+                        '<div class="ca-subsection-title">' +
+                            'Technology Usage' +
+                        '</div>' +
+
+                        '<div class="ca-tech-layout">' +
+                            caBuildDonut(technology) +
+
+                            '<div class="ca-mode-legend">' +
+                                caRenderNetworkLegend(
+                                    technology
+                                ) +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="ca-config-panel">' +
+                        '<div class="ca-subsection-heading">' +
+                            '<div class="ca-subsection-title">' +
+                                'Peak Observed Radio Configurations' +
+                            '</div>' +
+
+                            '<span class="ca-tooltip-trigger ca-help-icon" ' +
+                            'tabindex="0" ' +
+                            'data-ca-tooltip="' +
+                                'Peak observed configuration|' +
+                                '• Most complete active carrier set seen during test traffic|' +
+                                '• Secondary-carrier telemetry is not available for upload traffic' +
+                            '">' +
+                                '<i class="fas fa-info-circle"></i>' +
+                            '</span>' +
+                        '</div>' +
+
+                        configHtml +
+
+                        '<div class="cana-radio-config-note">' +
+                            'Peak Observed = most complete active ' +
+                            'component-carrier configuration observed ' +
+                            'during active test traffic. ' +
+                            'Secondary-carrier telemetry is not ' +
+                            'available for upload traffic.' +
+                        '</div>' +
+                    '</div>' +
+
+                '</div>';
+        }
+
+        function caRenderGeo(data) {
+            var geoView = document.getElementById(
+                'ca-geo-view'
+            );
+
+            if (!geoView) {
+                return;
+            }
+
+            var geo = data.geo || {};
+            var configured = geo.configured === true;
+
+            geoView.innerHTML =
+                '<div class="ca-geo-placeholder">' +
+
+                    '<div class="ca-geo-icon">' +
+                        '<i class="fas fa-map-marked-alt"></i>' +
+                    '</div>' +
+
+                    '<div class="ca-geo-copy">' +
+                        '<div class="ca-geo-title">' +
+                            'Estimated Serving Cell Geography' +
+                        '</div>' +
+
+                        '<div class="ca-geo-note">' +
+                            (
+                                configured
+                                    ? 'Location provider configured. Map rendering will be enabled with geolocation support.'
+                                    : 'No location provider configured. Local Cellular Analysis remains fully available.'
+                            ) +
+                        '</div>' +
+                    '</div>' +
+
+                    '<button type="button" ' +
+                    'class="btn btn-secondary ca-geo-configure" ' +
+                    'id="btn-ca-configure-location">' +
+                        '<i class="fas fa-cog"></i> Configure' +
+                    '</button>' +
+
+                '</div>';
+
+            caBindGeoControls();
+        }
+
+        function caOpenLocationSettings() {
+            var panel = document.getElementById(
+                'ca-location-settings'
+            );
+
+            if (!panel) {
+                return;
+            }
+
+            panel.style.display = 'block';
+
+            try {
+                panel.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            } catch (error) {
+                panel.scrollIntoView();
+            }
+        }
+
+        function caCloseLocationSettings() {
+            var panel = document.getElementById(
+                'ca-location-settings'
+            );
+
+            if (panel) {
+                panel.style.display = 'none';
+            }
+        }
+
+        function caBindGeoControls() {
+            var configure = document.getElementById(
+                'btn-ca-configure-location'
+            );
+
+            if (
+                configure &&
+                configure.dataset.caBound !== '1'
+            ) {
+                configure.dataset.caBound = '1';
+
+                configure.addEventListener(
+                    'click',
+                    caOpenLocationSettings
+                );
+            }
+
+            var close = document.getElementById(
+                'btn-ca-close-location'
+            );
+
+            if (
+                close &&
+                close.dataset.caBound !== '1'
+            ) {
+                close.dataset.caBound = '1';
+
+                close.addEventListener(
+                    'click',
+                    caCloseLocationSettings
+                );
+            }
+        }
+
+        var caActiveTooltip = null;
+
+        function caHideTooltip() {
+            if (caActiveTooltip) {
+                caActiveTooltip.remove();
+                caActiveTooltip = null;
+            }
+        }
+
+        function caShowTooltip(trigger) {
+            caHideTooltip();
+
+            var raw = trigger.getAttribute(
+                'data-ca-tooltip'
+            );
+
+            if (!raw) {
+                return;
+            }
+
+            var lines = raw.split('|');
+
+            var tooltip = document.createElement('div');
+            tooltip.className = 'ca-floating-tooltip';
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = document.createElement('div');
+
+                line.textContent = lines[i];
+
+                line.className = i === 0
+                    ? 'ca-floating-tooltip-title'
+                    : 'ca-floating-tooltip-line';
+
+                tooltip.appendChild(line);
+            }
+
+            document.body.appendChild(tooltip);
+
+            caActiveTooltip = tooltip;
+
+            var triggerRect =
+                trigger.getBoundingClientRect();
+
+            var tooltipRect =
+                tooltip.getBoundingClientRect();
+
+            var left =
+                triggerRect.left +
+                triggerRect.width / 2 -
+                tooltipRect.width / 2;
+
+            var top =
+                triggerRect.bottom + 7;
+
+            var margin = 8;
+
+            left = Math.max(
+                margin,
+                Math.min(
+                    left,
+                    window.innerWidth -
+                    tooltipRect.width -
+                    margin
+                )
+            );
+
+            if (
+                top + tooltipRect.height >
+                window.innerHeight - margin
+            ) {
+                top =
+                    triggerRect.top -
+                    tooltipRect.height -
+                    7;
+            }
+
+            tooltip.style.left =
+                Math.round(left) + 'px';
+
+            tooltip.style.top =
+                Math.round(
+                    Math.max(margin, top)
+                ) + 'px';
+        }
+
+        function caBindTooltips() {
+            var triggers = document.querySelectorAll(
+                '[data-ca-tooltip]'
+            );
+
+            for (var i = 0; i < triggers.length; i++) {
+                var trigger = triggers[i];
+
+                if (
+                    trigger.dataset.caTooltipBound === '1'
+                ) {
+                    continue;
+                }
+
+                trigger.dataset.caTooltipBound = '1';
+
+                trigger.addEventListener(
+                    'mouseenter',
+                    function() {
+                        caShowTooltip(this);
+                    }
+                );
+
+                trigger.addEventListener(
+                    'mouseleave',
+                    caHideTooltip
+                );
+
+                trigger.addEventListener(
+                    'focus',
+                    function() {
+                        caShowTooltip(this);
+                    }
+                );
+
+                trigger.addEventListener(
+                    'blur',
+                    caHideTooltip
+                );
+
+                trigger.addEventListener(
+                    'keydown',
+                    function(event) {
+                        if (event.key === 'Escape') {
+                            caHideTooltip();
+                            this.blur();
+                        }
+                    }
+                );
+            }
+        }
+
+        window.addEventListener(
+            'scroll',
+            caHideTooltip,
+            true
+        );
+
+        window.addEventListener(
+            'resize',
+            caHideTooltip
+        );
+
+        function caRenderLoadError(message) {
+            var container = document.getElementById(
+                'ca-overview-content'
+            );
+
+            if (!container) {
+                return;
+            }
+
+            container.innerHTML =
+                '<div class="no-data">' +
+                    '<i class="fas fa-exclamation-triangle"></i>' +
+                    '<p>' + caEscapeHtml(message) + '</p>' +
+                '</div>';
+        }
+
+        function loadCellularAnalysis() {
+            var interfaceSelect = document.getElementById(
+                'ca-interface-select'
+            );
+
+            var historySelect = document.getElementById(
+                'ca-history-select'
+            );
+
+            var selectedInterface =
+                interfaceSelect && !interfaceSelect.disabled
+                    ? interfaceSelect.value
+                    : cellularAnalysisState.interface;
+
+            var historyScope =
+                historySelect
+                    ? historySelect.value
+                    : cellularAnalysisState.history;
+
+            cellularAnalysisState.interface =
+                selectedInterface || '';
+
+            cellularAnalysisState.history =
+                historyScope || 'all';
+
+            var url =
+                '/api/cellular_analysis?iface=' +
+                encodeURIComponent(
+                    cellularAnalysisState.interface
+                ) +
+                '&history=' +
+                encodeURIComponent(
+                    cellularAnalysisState.history
+                );
+
+            if (cellularAnalysisState.selectedCell) {
+                url +=
+                    '&cell=' +
+                    encodeURIComponent(
+                        cellularAnalysisState.selectedCell
+                    );
+            }
+
+            return fetch(url)
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error(
+                            'HTTP ' + response.status
+                        );
+                    }
+
+                    return response.json();
+                })
+                .then(function(data) {
+                    caRenderGeo(data);
+                    caPopulateInterfaces(data);
+                    caRenderOverview(data);
+                    caRenderServingCells(data);
+                    caRenderChangeActivity(data);
+                    caPopulateCellSelector(data);
+                    caRenderSelectedCell(data);
+                    caRenderRfConditions(data);
+                    caRenderRadioSummary(data);
+                    caBindTooltips();
+
+                    window._cellularAnalysisData = data;
+                    return true;
+                })
+                .catch(function(error) {
+                    console.error(
+                        'Cellular Analysis load failed:',
+                        error
+                    );
+
+                    caRenderLoadError(
+                        'Unable to load Cellular Analysis data.'
+                    );
+
+                    return false;
+                });
+        }
+
+        caBindGeoControls();
+
+        var caRefreshButton =
+            document.getElementById('btn-ca-refresh');
+
+        if (caRefreshButton) {
+            caRefreshButton.addEventListener(
+                'click',
+                function() {
+                    var button = this;
+
+                    button.disabled = true;
+                    button.innerHTML =
+                        '<i class="fas fa-sync-alt fa-spin"></i> ' +
+                        'Refreshing…';
+
+                    loadCellularAnalysis().then(
+                        function(success) {
+                            button.innerHTML = success
+                                ? '<i class="fas fa-check"></i> Updated'
+                                : '<i class="fas fa-exclamation-triangle"></i> Retry';
+
+                            window.setTimeout(
+                                function() {
+                                    button.disabled = false;
+                                    button.innerHTML =
+                                        '<i class="fas fa-sync-alt"></i> ' +
+                                        'Refresh Data';
+                                },
+                                1200
+                            );
+                        }
+                    );
+                }
+            );
+        }
+
+        var caInterfaceSelect =
+            document.getElementById('ca-interface-select');
+
+        if (caInterfaceSelect) {
+            caInterfaceSelect.addEventListener(
+                'change',
+                function() {
+                    cellularAnalysisState.interface =
+                        this.value || '';
+
+                    cellularAnalysisState.selectedCell = '';
+
+                    loadCellularAnalysis();
+                }
+            );
+        }
+
+        var caHistorySelect =
+            document.getElementById('ca-history-select');
+
+        if (caHistorySelect) {
+            caHistorySelect.addEventListener(
+                'change',
+                function() {
+                    cellularAnalysisState.history =
+                        this.value || 'all';
+
+                    cellularAnalysisState.selectedCell = '';
+
+                    loadCellularAnalysis();
+                }
+            );
+        }
+
         function loadHistory() {
             fetch('/api/history')
                 .then(function(r) {
@@ -5619,7 +10105,7 @@
                     html += '</div></td></tr>';
                     // Hidden expandable cellular detail row
                     if (hasCell) {
-                        html += '<tr class="cell-detail-row" id="cell-detail-' + i + '" style="display:none;"><td colspan="12"><div class="cell-detail-content">' + buildCellDetail(r.cellular) + '</div></td></tr>';
+                        html += '<tr class="cell-detail-row" id="cell-detail-' + i + '" style="display:none;"><td colspan="12"><div class="cell-detail-content">' + buildCellDetail(r.cellular, r.carrier_activity) + '</div></td></tr>';
                     }
                     // Hidden expandable Carrier Activity row for cellular WANs.
                     if (!satelliteWan && r.carrier_activity) {
@@ -5657,7 +10143,556 @@
                 }
         }
 
-        function buildCellDetail(c) {
+        function servingCellCanonicalId(value) {
+            if (value == null) return '';
+
+            var text = String(value).trim();
+
+            if (!text) return '';
+
+            var match = text.match(
+                /^(\d+)\s*\(0x[0-9a-f]+\)$/i
+            );
+
+            return match
+                ? match[1]
+                : text;
+        }
+
+        function servingCellIdentity(state) {
+            var cell =
+                state &&
+                state.serving_cell;
+
+            if (
+                !cell ||
+                typeof cell !== 'object'
+            ) {
+                return null;
+            }
+
+            var cellId =
+                servingCellCanonicalId(
+                    cell.cell_id
+                );
+
+            if (!cellId) {
+                return null;
+            }
+
+            return {
+                key: [
+                    String(
+                        cell.cell_id_source || ''
+                    ).toUpperCase(),
+                    String(cell.plmn || ''),
+                    cellId
+                ].join('|'),
+
+                cell_id: cellId,
+                plmn: String(cell.plmn || ''),
+                tac: String(cell.tac || ''),
+                pci: String(cell.pci || ''),
+
+                source: String(
+                    cell.cell_id_source || ''
+                ).toUpperCase()
+            };
+        }
+
+        function summarizeServingCellActivity(
+            activity
+        ) {
+            var result = {
+                start: null,
+                end: null,
+                transitions: []
+            };
+
+            if (
+                !activity ||
+                typeof activity !== 'object'
+            ) {
+                return result;
+            }
+
+            var phaseNames = [
+                'download',
+                'upload'
+            ];
+
+            var lastKnownFromPreviousPhase =
+                null;
+
+            for (
+                var p = 0;
+                p < phaseNames.length;
+                p++
+            ) {
+                var phaseName =
+                    phaseNames[p];
+
+                var phase =
+                    activity[phaseName];
+
+                if (
+                    !phase ||
+                    !Array.isArray(
+                        phase.timeline
+                    ) ||
+                    !phase.timeline.length
+                ) {
+                    continue;
+                }
+
+                var observations = [];
+
+                for (
+                    var i = 0;
+                    i < phase.timeline.length;
+                    i++
+                ) {
+                    var state =
+                        phase.timeline[i] || {};
+
+                    observations.push({
+                        elapsed_s: Number(
+                            state.elapsed_s || 0
+                        ),
+
+                        cell:
+                            servingCellIdentity(
+                                state
+                            )
+                    });
+                }
+
+                var firstKnown = null;
+                var lastKnown = null;
+
+                for (
+                    var j = 0;
+                    j < observations.length;
+                    j++
+                ) {
+                    if (
+                        observations[j].cell
+                    ) {
+                        firstKnown =
+                            observations[j].cell;
+                        break;
+                    }
+                }
+
+                for (
+                    var k =
+                        observations.length - 1;
+                    k >= 0;
+                    k--
+                ) {
+                    if (
+                        observations[k].cell
+                    ) {
+                        lastKnown =
+                            observations[k].cell;
+                        break;
+                    }
+                }
+
+                if (
+                    !result.start &&
+                    firstKnown
+                ) {
+                    result.start =
+                        firstKnown;
+                }
+
+                var phaseStartCell =
+                    observations.length
+                        ? observations[0].cell
+                        : null;
+
+                if (
+                    lastKnownFromPreviousPhase &&
+                    phaseStartCell &&
+                    lastKnownFromPreviousPhase.key
+                        !== phaseStartCell.key
+                ) {
+                    result.transitions.push({
+                        phase: phaseName,
+                        elapsed_s: null,
+                        phase_boundary: true,
+
+                        from:
+                            lastKnownFromPreviousPhase,
+
+                        to:
+                            phaseStartCell
+                    });
+                }
+
+                for (
+                    var n = 1;
+                    n < observations.length;
+                    n++
+                ) {
+                    var previous =
+                        observations[n - 1];
+
+                    var current =
+                        observations[n];
+
+                    /*
+                     * Missing identity is not
+                     * evidence of a direct
+                     * serving-cell handoff.
+                     */
+                    if (
+                        !previous.cell ||
+                        !current.cell
+                    ) {
+                        continue;
+                    }
+
+                    if (
+                        previous.cell.key ===
+                        current.cell.key
+                    ) {
+                        continue;
+                    }
+
+                    result.transitions.push({
+                        phase: phaseName,
+
+                        elapsed_s:
+                            current.elapsed_s,
+
+                        phase_boundary: false,
+
+                        from:
+                            previous.cell,
+
+                        to:
+                            current.cell
+                    });
+                }
+
+                if (lastKnown) {
+                    result.end =
+                        lastKnown;
+
+                    lastKnownFromPreviousPhase =
+                        lastKnown;
+                }
+            }
+
+            return result;
+        }
+
+        function servingCellIdentityText(
+            cell
+        ) {
+            if (!cell) return '--';
+
+            var text =
+                cell.cell_id || '--';
+
+            if (cell.pci) {
+                text +=
+                    ' · PCI ' +
+                    cell.pci;
+            }
+
+            return text;
+        }
+
+        function postTestServingCellSampleText(
+            sample,
+            fallbackLabel
+        ) {
+            if (
+                !sample ||
+                sample.available === false
+            ) {
+                return (
+                    fallbackLabel +
+                    ': unavailable'
+                );
+            }
+
+            var cell =
+                servingCellIdentity({
+                    serving_cell:
+                        sample.serving_cell || {}
+                });
+
+            return (
+                fallbackLabel +
+                ': ' +
+                (
+                    cell
+                        ? servingCellIdentityText(
+                            cell
+                        )
+                        : 'unidentified'
+                )
+            );
+        }
+
+        function postTestServingCellPresentation(
+            postTest
+        ) {
+            if (
+                !postTest ||
+                postTest.triggered !== true
+            ) {
+                return null;
+            }
+
+            var identifiable =
+                Number(
+                    postTest.checks_identifiable || 0
+                );
+
+            var requested =
+                Number(
+                    postTest.checks_requested || 3
+                );
+
+            var windowSeconds =
+                Number(
+                    postTest.window_s || 6
+                );
+
+            var status =
+                String(
+                    postTest.status ||
+                    'inconclusive'
+                );
+
+            var label;
+
+            if (status === 'persisted') {
+                label =
+                    '\u2713 Persisted';
+
+            } else if (status === 'reverted') {
+                label =
+                    '\u21A9 Reverted';
+
+                if (
+                    postTest.reverted_at_s != null
+                ) {
+                    label +=
+                        ' \u00B7 original cell restored at +' +
+                        Number(
+                            postTest.reverted_at_s
+                        ) +
+                        ' sec';
+
+                    /*
+                     * Reverted already includes its timing,
+                     * so don't append the generic check/window
+                     * text below.
+                     */
+                    requested = 0;
+                }
+
+            } else if (
+                status === 'continued_handoff'
+            ) {
+                label =
+                    '\u2192 Continued Handoff';
+
+            } else if (
+                status === 'unstable'
+            ) {
+                label =
+                    '\u21C4 Unstable';
+
+            } else {
+                label =
+                    '? Inconclusive';
+            }
+
+            if (requested > 0) {
+                label +=
+                    ' \u00B7 ' +
+                    identifiable +
+                    '/' +
+                    requested +
+                    ' checks' +
+                    ' \u00B7 ' +
+                    windowSeconds +
+                    ' sec';
+            }
+
+            var tooltip = [];
+
+            tooltip.push(
+                postTestServingCellSampleText(
+                    postTest.immediate,
+                    'Immediate'
+                )
+            );
+
+            var checks =
+                Array.isArray(postTest.checks)
+                    ? postTest.checks
+                    : [];
+
+            for (
+                var i = 0;
+                i < checks.length;
+                i++
+            ) {
+                var check =
+                    checks[i] || {};
+
+                tooltip.push(
+                    postTestServingCellSampleText(
+                        check,
+                        '+' +
+                        Number(
+                            check.elapsed_s || 0
+                        ) +
+                        ' sec'
+                    )
+                );
+            }
+
+            return {
+                label: label,
+                tooltip: tooltip.join('\n')
+            };
+        }
+
+        function selectPreferredNrRadioCells(
+            radioCells
+        ) {
+            radioCells =
+                Array.isArray(radioCells)
+                    ? radioCells
+                    : [];
+
+            var firstPrimary = null;
+            var usablePrimary = null;
+
+            var firstSecondary = null;
+            var usableSecondary = null;
+
+            function usable(cell) {
+                if (
+                    !cell ||
+                    typeof cell !== 'object'
+                ) {
+                    return false;
+                }
+
+                var state = String(
+                    cell.state || ''
+                ).trim().toUpperCase();
+
+                if (
+                    state.indexOf('INACTIVE') !== -1 ||
+                    state.indexOf('NOT ACTIVE') !== -1 ||
+                    state.indexOf('NOT REGISTERED') !== -1 ||
+                    state.indexOf('DISABLED') !== -1
+                ) {
+                    return false;
+                }
+
+                /*
+                 * A reported 0-MHz secondary is not the carrier we want
+                 * representing the NR leg when another usable NR SCell
+                 * exists.
+                 */
+                var bandwidth = parseFloat(
+                    String(
+                        cell.bandwidth || ''
+                    ).replace(
+                        /[^\d.]/g,
+                        ''
+                    )
+                );
+
+                if (
+                    isFinite(bandwidth) &&
+                    bandwidth === 0
+                ) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            for (
+                var i = 0;
+                i < radioCells.length;
+                i++
+            ) {
+                var cell =
+                    radioCells[i] || {};
+
+                var role = String(
+                    cell.role || ''
+                ).toUpperCase();
+
+                var gen = String(
+                    cell.gen || ''
+                ).toUpperCase();
+
+                /*
+                 * speedtest_web.py normalizes gen from the actual band.
+                 * Therefore an NSA Band 66 entry reported through an
+                 * NCOS *_5G_* field family remains LTE here and cannot be
+                 * mistaken for the NR leg.
+                 */
+                if (gen !== '5G') {
+                    continue;
+                }
+
+                if (role === 'P') {
+                    if (!firstPrimary) {
+                        firstPrimary = cell;
+                    }
+
+                    if (
+                        !usablePrimary &&
+                        usable(cell)
+                    ) {
+                        usablePrimary = cell;
+                    }
+
+                } else if (role === 'S') {
+                    if (!firstSecondary) {
+                        firstSecondary = cell;
+                    }
+
+                    if (
+                        !usableSecondary &&
+                        usable(cell)
+                    ) {
+                        usableSecondary = cell;
+                    }
+                }
+            }
+
+            return {
+                primary:
+                    usablePrimary ||
+                    firstPrimary,
+
+                secondary:
+                    usableSecondary ||
+                    firstSecondary
+            };
+        }
+
+        function buildCellDetail(
+            c,
+            carrierActivity
+        ) {
             if (!c) return '';
             var _skip = {'': true, 'none': true, 'n/a': true, 'unknown': true, '--': true};
             var changed = c._changedFields || [];
@@ -5720,40 +10755,166 @@
 
             var html = '';
 
-            // 1. HEADER ROW: Connection Health (left) + Network & Tower (right)
+            // 1. HEADER ROW: Connection Health | Network | Serving Cell
             var healthTxt = null;
-            if (ok(c.cellular_health_score) && ok(c.cellular_health_category)) {
-                healthTxt = fmtScore(c.cellular_health_score) + ' \u00B7 ' +
-                            titleCase(c.cellular_health_category);
-            } else if (ok(c.cellular_health_score)) {
-                healthTxt = fmtScore(c.cellular_health_score);
-            } else if (ok(c.cellular_health_category)) {
-                healthTxt = titleCase(c.cellular_health_category);
+
+            if (
+                ok(c.cellular_health_score) &&
+                ok(c.cellular_health_category)
+            ) {
+                healthTxt =
+                    fmtScore(
+                        c.cellular_health_score
+                    ) +
+                    ' \u00B7 ' +
+                    titleCase(
+                        c.cellular_health_category
+                    );
+
+            } else if (
+                ok(c.cellular_health_score)
+            ) {
+                healthTxt =
+                    fmtScore(
+                        c.cellular_health_score
+                    );
+
+            } else if (
+                ok(c.cellular_health_category)
+            ) {
+                healthTxt =
+                    titleCase(
+                        c.cellular_health_category
+                    );
+            }
+
+            function headerField(
+                label,
+                value,
+                wide
+            ) {
+                var has = ok(value);
+
+                return (
+                    '<div class="cell-network-field' +
+                    (wide ? ' is-wide' : '') +
+                    '">' +
+                    '<span class="cell-header-field-label">' +
+                    label +
+                    '</span>' +
+                    '<span class="cell-header-field-value">' +
+                    (has ? esc(value) : '--') +
+                    '</span></div>'
+                );
+            }
+
+            function servingField(
+                label,
+                value
+            ) {
+                var has = ok(value);
+
+                return (
+                    '<div class="cell-serving-field">' +
+                    '<span class="cell-header-field-label">' +
+                    label +
+                    '</span>' +
+                    '<span class="cell-header-field-value">' +
+                    (has ? esc(value) : '--') +
+                    '</span></div>'
+                );
             }
 
             var headerLeft = '';
-            headerLeft += item('Cellular Health', healthTxt);
-            headerLeft += item('Signal Strength', unit(c.signal_strength, ' %'));
 
-            var headerRight = '';
-            headerRight += item('Carrier', c.carrier, 'carrier');
-            headerRight += item('Service Type', c.service_type);
-            headerRight += item('Service Detail', c.service_details);
-            headerRight += item('APN', c.active_apn);
-            headerRight += item('Cell Tower ID', c.cell_id, 'cell_id');
-            headerRight += item('Physical Cell ID', c.phy_cell_id, 'phy_cell_id');
+            headerLeft += item(
+                'Cellular Health',
+                healthTxt
+            );
 
-            html += '<div class="cell-header-row">';
-            if (headerLeft) {
-                html += '<div class="cell-header-group">' +
-                        '<div class="cell-section-title">Connection Health</div>' +
-                        '<div class="cell-inline">' + headerLeft + '</div></div>';
-            }
-            if (headerRight) {
-                html += '<div class="cell-header-group">' +
-                        '<div class="cell-section-title">Network &amp; Tower</div>' +
-                        '<div class="cell-inline">' + headerRight + '</div></div>';
-            }
+            headerLeft += item(
+                'Signal Strength',
+                unit(
+                    c.signal_strength,
+                    ' %'
+                )
+            );
+
+            var networkHtml = '';
+
+            networkHtml += headerField(
+                'Carrier',
+                c.carrier,
+                false
+            );
+
+            networkHtml += headerField(
+                'Service Detail',
+                c.service_details,
+                false
+            );
+
+            networkHtml += headerField(
+                'Service Type',
+                c.service_type,
+                false
+            );
+
+            networkHtml += headerField(
+                'APN',
+                c.active_apn,
+                false
+            );
+
+            var servingHtml = '';
+
+            servingHtml += servingField(
+                'Cell ID',
+                c.cell_id
+            );
+
+            servingHtml += servingField(
+                'PLMN',
+                c.plmn
+            );
+
+            servingHtml += servingField(
+                'TAC',
+                c.tac
+            );
+
+            servingHtml += servingField(
+                'PCI',
+                c.phy_cell_id
+            );
+
+            html +=
+                '<div class="cell-header-row">';
+
+            html +=
+                '<div class="cell-header-group">' +
+                '<div class="cell-section-title">Connection Health</div>' +
+                '<div class="cell-inline">' +
+                (
+                    headerLeft ||
+                    '<span class="cell-empty">--</span>'
+                ) +
+                '</div></div>';
+
+            html +=
+                '<div class="cell-header-group">' +
+                '<div class="cell-section-title">Network</div>' +
+                '<div class="cell-network-grid">' +
+                networkHtml +
+                '</div></div>';
+
+            html +=
+                '<div class="cell-header-group cell-serving-group">' +
+                '<div class="cell-section-title">Serving Cell</div>' +
+                '<div class="cell-serving-grid">' +
+                servingHtml +
+                '</div></div>';
+
             html += '</div>';
 
             // 2. PRIMARY RADIO -----------------------------------------------------
@@ -5778,40 +10939,21 @@
                 )
             );
 
-            var primaryCell = null;
-            var firstNrSecondary = null;
+            var nrRadioSelection =
+                selectPreferredNrRadioCells(
+                    radioCells
+                );
 
-            for (
-                var radioIdx = 0;
-                radioIdx < radioCells.length;
-                radioIdx++
-            ) {
-                var radioCell = radioCells[radioIdx] || {};
+            var preferredNrPrimary =
+                nrRadioSelection.primary;
 
-                var radioRole = String(
-                    radioCell.role || ''
-                ).toUpperCase();
-
-                var radioGen = String(
-                    radioCell.gen || ''
-                ).toUpperCase();
-
-                if (!primaryCell && radioRole === 'P') {
-                    primaryCell = radioCell;
-                }
-
-                if (
-                    !firstNrSecondary &&
-                    radioRole === 'S' &&
-                    radioGen === '5G'
-                ) {
-                    firstNrSecondary = radioCell;
-                }
-            }
+            var preferredNrSecondary =
+                nrRadioSelection.secondary;
 
             if (isStandalone) {
 
-                var saPrimary = primaryCell || {};
+                var saPrimary =
+                    preferredNrPrimary || {};
 
                 // Keep the first radio block in the same location, but
                 // represent the NR PCell instead of a nonexistent LTE
@@ -5822,7 +10964,7 @@
                         'Band',
                         ok(saPrimary.band)
                             ? saPrimary.band
-                            : (c.rf_band_5g || c.rf_band),
+                            : c.rf_band_5g,
                         'rf_band_5g'
                     ],
 
@@ -5835,6 +10977,17 @@
                             ' MHz'
                         ),
                         'bandwidth_5g'
+                    ],
+
+                    [
+                        'Channel',
+                        ok(saPrimary.channel)
+                            ? saPrimary.channel
+                            : (
+                                c.rf_channel_5g ||
+                                c.rf_channel
+                            ),
+                        'rf_channel_5g'
                     ],
 
                     [
@@ -5892,6 +11045,12 @@
                         'lte_bandwidth'
                     ],
 
+                    [
+                        'Channel',
+                        c.rf_channel,
+                        'rf_channel'
+                    ],
+
                     ['RSSI', unit(c.signal_dbm, ' dBm')],
 
                     ['SINR', unit(c.sinr, ' dB')],
@@ -5920,12 +11079,12 @@
                 // In SA, the second existing radio-summary area represents
                 // the first active NR secondary cell. The full carrier set
                 // remains visible in the CA table below.
-                if (firstNrSecondary) {
+                if (preferredNrSecondary) {
 
                     var secondaryName = 'SCell';
 
                     var secondaryMatch = String(
-                        firstNrSecondary.label || ''
+                        preferredNrSecondary.label || ''
                     ).match(/^(SCell\d+)/i);
 
                     if (secondaryMatch) {
@@ -5938,21 +11097,26 @@
 
                             [
                                 'Band',
-                                firstNrSecondary.band
+                                preferredNrSecondary.band
                             ],
 
                             [
                                 'Bandwidth',
                                 unit(
-                                    firstNrSecondary.bandwidth,
+                                    preferredNrSecondary.bandwidth,
                                     ' MHz'
                                 )
                             ],
 
                             [
+                                'Channel',
+                                preferredNrSecondary.channel
+                            ],
+
+                            [
                                 'SINR',
                                 unit(
-                                    firstNrSecondary.sinr,
+                                    preferredNrSecondary.sinr,
                                     ' dB'
                                 )
                             ],
@@ -5960,7 +11124,7 @@
                             [
                                 'RSRP',
                                 unit(
-                                    firstNrSecondary.rsrp,
+                                    preferredNrSecondary.rsrp,
                                     ' dBm'
                                 )
                             ],
@@ -5968,7 +11132,7 @@
                             [
                                 'RSRQ',
                                 unit(
-                                    firstNrSecondary.rsrq,
+                                    preferredNrSecondary.rsrq,
                                     ' dB'
                                 )
                             ]
@@ -5979,27 +11143,193 @@
 
             } else {
 
-                // NSA retains the existing direct NR summary.
+                /*
+                 * NSA NR leg:
+                 * prefer the normalized active NR SCell. This resolves
+                 * BAND/BANDWIDTH/CHANNEL/RF from *_5G_SCELLn diagnostics.
+                 * Top-level NR values remain compatibility fallbacks.
+                 */
+                var nsaNrCell =
+                    preferredNrSecondary || {};
+
                 html += section('5G NR', metrics([
 
-                    ['Band', c.rf_band_5g, 'rf_band_5g'],
+                    [
+                        'Band',
+                        ok(nsaNrCell.band)
+                            ? nsaNrCell.band
+                            : c.rf_band_5g,
+                        'rf_band_5g'
+                    ],
 
                     [
                         'Bandwidth',
-                        unit(c.bandwidth_5g, ' MHz'),
+                        unit(
+                            ok(nsaNrCell.bandwidth)
+                                ? nsaNrCell.bandwidth
+                                : c.bandwidth_5g,
+                            ' MHz'
+                        ),
                         'bandwidth_5g'
                     ],
 
-                    ['SINR', unit(c.sinr_5g, ' dB')],
+                    [
+                        'Channel',
+                        ok(nsaNrCell.channel)
+                            ? nsaNrCell.channel
+                            : c.rf_channel_5g,
+                        'rf_channel_5g'
+                    ],
 
-                    ['RSRP', unit(c.rsrp_5g, ' dBm')],
+                    [
+                        'SINR',
+                        unit(
+                            ok(nsaNrCell.sinr)
+                                ? nsaNrCell.sinr
+                                : c.sinr_5g,
+                            ' dB'
+                        )
+                    ],
 
-                    ['RSRQ', unit(c.rsrq_5g, ' dB')]
+                    [
+                        'RSRP',
+                        unit(
+                            ok(nsaNrCell.rsrp)
+                                ? nsaNrCell.rsrp
+                                : c.rsrp_5g,
+                            ' dBm'
+                        )
+                    ],
+
+                    [
+                        'RSRQ',
+                        unit(
+                            ok(nsaNrCell.rsrq)
+                                ? nsaNrCell.rsrq
+                                : c.rsrq_5g,
+                            ' dB'
+                        )
+                    ]
 
                 ], !!nrNote), nrNote);
             }
 
-            // 4. CARRIER AGGREGATION ----------------------------------------------
+            // 4. SERVING CELL ACTIVITY -------------------------------------------
+            var servingActivity =
+                summarizeServingCellActivity(
+                    carrierActivity
+                );
+
+            if (
+                servingActivity.transitions.length
+            ) {
+                var activityHtml =
+                    '<div class="serving-activity">';
+
+                if (servingActivity.start) {
+                    activityHtml +=
+                        '<div class="serving-activity-row">' +
+                        '<span class="serving-activity-when">Start</span>' +
+                        '<span class="serving-activity-value">' +
+                        esc(
+                            servingCellIdentityText(
+                                servingActivity.start
+                            )
+                        ) +
+                        '</span></div>';
+                }
+
+                for (
+                    var activityIndex = 0;
+                    activityIndex <
+                        servingActivity.transitions.length;
+                    activityIndex++
+                ) {
+                    var activityTransition =
+                        servingActivity.transitions[
+                            activityIndex
+                        ];
+
+                    var activityPhase =
+                        activityTransition.phase ===
+                        'upload'
+                            ? 'Upload'
+                            : 'Download';
+
+                    var activityWhen =
+                        activityTransition.phase_boundary
+                            ? 'Between D/U'
+                            : (
+                                activityPhase +
+                                ' +' +
+                                activityTransition.elapsed_s +
+                                's'
+                            );
+
+                    activityHtml +=
+                        '<div class="serving-activity-row">' +
+                        '<span class="serving-activity-when">' +
+                        esc(activityWhen) +
+                        '</span>' +
+                        '<span class="serving-activity-value serving-activity-transition">' +
+                        esc(
+                            servingCellIdentityText(
+                                activityTransition.from
+                            )
+                        ) +
+                        ' \u2192 ' +
+                        esc(
+                            servingCellIdentityText(
+                                activityTransition.to
+                            )
+                        ) +
+                        '</span></div>';
+                }
+
+                if (servingActivity.end) {
+                    activityHtml +=
+                        '<div class="serving-activity-row">' +
+                        '<span class="serving-activity-when">End</span>' +
+                        '<span class="serving-activity-value">' +
+                        esc(
+                            servingCellIdentityText(
+                                servingActivity.end
+                            )
+                        ) +
+                        '</span></div>';
+                }
+
+                var postTestPresentation =
+                    postTestServingCellPresentation(
+                        carrierActivity &&
+                        carrierActivity.post_test
+                    );
+
+                if (postTestPresentation) {
+                    activityHtml +=
+                        '<div class="serving-activity-row">' +
+                        '<span class="serving-activity-when">Post-test</span>' +
+                        '<span class="serving-activity-value" ' +
+                        'data-ca-tooltip="' +
+                        esc(
+                            postTestPresentation.tooltip
+                        ) +
+                        '">' +
+                        esc(
+                            postTestPresentation.label
+                        ) +
+                        '</span></div>';
+                }
+
+                activityHtml += '</div>';
+
+                html += section(
+                    'Serving Cell Activity',
+                    activityHtml
+                );
+            }
+
+            // 5. CARRIER AGGREGATION ----------------------------------------------
             var cells = c.aggregation || [];
             if (cells.length) {
                 var totalNote = '';
@@ -6056,7 +11386,7 @@
                     esc(JSON.stringify(c.aggregation_unmatched)) + '</div>');
             }
 
-            // 5. Done — no separate Tower & Network section, it's in the header.
+            // 6. Done — Network and Serving Cell identity are in the header.
             return html || '<span class="cell-empty">No cellular details</span>';
         }
 
@@ -8239,6 +13569,119 @@
                     return parts.join(' -> ');
                 }
 
+                function csvServingCellIdentity(
+                    cell
+                ) {
+                    if (!cell) return '';
+
+                    var value =
+                        String(
+                            cell.cell_id || ''
+                        ).trim();
+
+                    if (!value) return '';
+
+                    if (cell.pci) {
+                        value +=
+                            ' PCI' +
+                            String(cell.pci);
+                    }
+
+                    return value;
+                }
+
+                function csvServingCellActivity(
+                    record
+                ) {
+                    if (
+                        !record ||
+                        !record.carrier_activity
+                    ) {
+                        return '';
+                    }
+
+                    var summary =
+                        summarizeServingCellActivity(
+                            record.carrier_activity
+                        );
+
+                    /*
+                     * Stable tests do not need an activity
+                     * narrative. The primary identity columns
+                     * already describe their serving cell.
+                     */
+                    if (
+                        !summary ||
+                        !summary.transitions ||
+                        summary.transitions.length === 0
+                    ) {
+                        return '';
+                    }
+
+                    var parts = [];
+
+                    if (summary.start) {
+                        parts.push(
+                            'Start: ' +
+                            csvServingCellIdentity(
+                                summary.start
+                            )
+                        );
+                    }
+
+                    for (
+                        var i = 0;
+                        i < summary.transitions.length;
+                        i++
+                    ) {
+                        var transition =
+                            summary.transitions[i];
+
+                        var when;
+
+                        if (
+                            transition.phase_boundary
+                        ) {
+                            when =
+                                'Between Download/Upload';
+
+                        } else {
+                            var phase =
+                                transition.phase ===
+                                'upload'
+                                    ? 'Upload'
+                                    : 'Download';
+
+                            when =
+                                phase +
+                                ' +' +
+                                Number(
+                                    transition.elapsed_s || 0
+                                ) +
+                                's';
+                        }
+
+                        parts.push(
+                            when +
+                            ': ' +
+                            csvServingCellIdentity(
+                                transition.to
+                            )
+                        );
+                    }
+
+                    if (summary.end) {
+                        parts.push(
+                            'End: ' +
+                            csvServingCellIdentity(
+                                summary.end
+                            )
+                        );
+                    }
+
+                    return parts.join(' > ');
+                }
+
                 // Determine max CA cells across all data for dynamic columns
                 var maxCaCells = 0;
                 for (var i = 0; i < data.length; i++) {
@@ -8262,9 +13705,9 @@
                     'CA Download Peak Carrier Count','CA Download Peak Carrier Set','CA Download Peak Bandwidth MHz',
                     'CA Upload Peak Carrier Count','CA Upload Peak Carrier Set','CA Upload Peak Bandwidth MHz',
                     'CA 0MHz Reported','CA Download Progress','CA Upload Progress',
-                    'LTE RSRP dBm','LTE RSRQ dB','LTE SINR dB','LTE RF Band','LTE Bandwidth',
-                    '5G RSRP dBm','5G RSRQ dB','5G SINR dB','5G RF Band',
-                    'Carrier','Cell ID','Physical Cell ID'
+                    'LTE RSRP dBm','LTE RSRQ dB','LTE SINR dB','LTE RF Band','LTE Bandwidth','LTE Channel',
+                    '5G RSRP dBm','5G RSRQ dB','5G SINR dB','5G RF Band','5G Channel',
+                    'Carrier','Cell ID','PLMN','TAC','PCI','Serving Cell Activity'
                 ];
                 // Dynamic CA cell columns
                 for (var ci = 0; ci < maxCaCells; ci++) {
@@ -8324,6 +13767,23 @@
                     var caUploadProgress = caProgress(
                         caUpload
                     );
+
+                    var servingCellActivity =
+                        csvServingCellActivity(
+                            r
+                        );
+
+                    var finalCellId =
+                        servingCellCanonicalId(
+                            c.cell_id ||
+                            c.nr_cell_id ||
+                            ''
+                        );
+
+                    var finalPci =
+                        c.phy_cell_id ||
+                        c.phy_cell_id_5g ||
+                        '';
 
                     var caZeroReported = r.carrier_activity
                         ? (
@@ -8413,13 +13873,18 @@
                         c.sinr != null ? c.sinr : '',
                         c.rf_band || '',
                         c.lte_bandwidth || '',
+                        c.rf_channel || '',
                         c.rsrp_5g != null ? c.rsrp_5g : '',
                         c.rsrq_5g != null ? c.rsrq_5g : '',
                         c.sinr_5g != null ? c.sinr_5g : '',
                         c.rf_band_5g || '',
+                        c.rf_channel_5g || '',
                         c.carrier || '',
-                        c.cell_id || '',
-                        c.phy_cell_id || ''
+                        finalCellId,
+                        c.plmn || '',
+                        c.tac || '',
+                        finalPci,
+                        servingCellActivity
                     ];
                     // Dynamic CA cell columns
                     var bwTotal = 0;
