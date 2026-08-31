@@ -1732,56 +1732,936 @@
             font-weight: 700;
         }
 
-        .ca-geo-view {
-            min-height: 132px;
-            display: flex;
-            align-items: center;
-            padding: 1rem 1.1rem;
-            border: 1px dashed var(--border-color);
-            border-radius: 7px;
+
+        /* ================================================================
+         * Cellular Analysis — Site GeoView
+         * Lightweight by design: pure HTML/CSS/vanilla JS, no map SDK.
+         * Provider-backed maps will be static images in a later phase.
+         * ================================================================ */
+
+        .ca-geo-card{overflow:visible;}
+        .ca-geo-card-header{display:flex;justify-content:space-between;align-items:center;gap:1rem;}
+        .ca-geo-heading{min-width:0;}
+        .ca-geo-heading h3{margin:0;}
+        .ca-geo-scope{margin-top:0.18rem;color:var(--text-secondary);font-size:0.66rem;font-weight:500;letter-spacing:0.01em;text-transform:none;}
+        .ca-geo-header-action{flex:0 0 auto;white-space:nowrap;}
+        .ca-geo-view{min-height:310px;}
+
+        .ca-geo-layout{
+            display:grid;
+            grid-template-columns:minmax(0,2.35fr) minmax(220px,0.8fr);
+            gap:0.9rem;
+            align-items:stretch;
+        }
+
+        .ca-geo-canvas{
+            position:relative;
+            min-height:286px;
+            overflow:hidden;
+            border:1px solid var(--border-color);
+            border-radius:8px;
             background:
+                radial-gradient(
+                    circle at center,
+                    rgba(124,58,237,0.055) 0,
+                    rgba(124,58,237,0.025) 26%,
+                    transparent 50%
+                ),
                 linear-gradient(
                     135deg,
                     var(--card-surface),
-                    transparent
+                    var(--background-secondary)
                 );
         }
 
-        .ca-geo-placeholder {
-            width: 100%;
-            display: grid;
-            grid-template-columns: 46px minmax(0, 1fr) auto;
-            gap: 0.85rem;
-            align-items: center;
+        .ca-geo-canvas::before,
+        .ca-geo-canvas::after{
+            content:'';
+            position:absolute;
+            pointer-events:none;
+            opacity:0.32;
         }
 
-        .ca-geo-icon {
-            width: 46px;
-            height: 46px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--card-surface);
-            color: var(--text-secondary);
-            font-size: 1.3rem;
+        .ca-geo-canvas::before{
+            inset:0;
+            background-image:
+                linear-gradient(
+                    to right,
+                    var(--border-color) 1px,
+                    transparent 1px
+                ),
+                linear-gradient(
+                    to bottom,
+                    var(--border-color) 1px,
+                    transparent 1px
+                );
+            background-size:44px 44px;
+            opacity:0.14;
         }
 
-        .ca-geo-title {
-            margin-bottom: 0.2rem;
-            font-size: 0.86rem;
-            font-weight: 700;
+        .ca-geo-canvas::after{
+            left:50%;
+            top:50%;
+            width:210px;
+            height:210px;
+            border:1px dashed var(--border-color);
+            border-radius:50%;
+            transform:translate(-50%,-50%);
         }
 
-        .ca-geo-note {
-            color: var(--text-secondary);
-            font-size: 0.72rem;
-            line-height: 1.35;
+        .ca-geo-schematic-label{
+            position:absolute;
+            top:0.65rem;
+            left:0.75rem;
+            z-index:2;
+            display:inline-flex;
+            align-items:center;
+            gap:0.35rem;
+            padding:0.28rem 0.5rem;
+            border:1px solid var(--border-color);
+            border-radius:999px;
+            background:var(--card-surface);
+            color:var(--text-secondary);
+            font-size:0.62rem;
+            font-weight:700;
+            letter-spacing:0.02em;
         }
 
-        .ca-geo-configure {
-            white-space: nowrap;
+        .ca-geo-schematic-label i{
+            color:var(--primary-color);
+        }
+
+        .ca-geo-site-node{
+            position:absolute;
+            left:50%;
+            top:50%;
+            z-index:3;
+            width:42px;
+            height:42px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border:2px solid var(--primary-color);
+            border-radius:50%;
+            transform:translate(-50%,-50%);
+            background:var(--card-surface);
+            color:var(--primary-color);
+            box-shadow:0 4px 16px rgba(0,0,0,0.12);
+            font-size:1rem;
+        }
+
+        .ca-geo-site-caption{
+            position:absolute;
+            left:50%;
+            top:calc(50% + 28px);
+            z-index:3;
+            transform:translateX(-50%);
+            color:var(--text-secondary);
+            font-size:0.62rem;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:0.04em;
+        }
+
+        .ca-geo-cell-node{
+            --ca-carrier-accent:var(--primary-color);
+            --ca-carrier-rgb:124,58,237;
+
+            position:absolute;
+            z-index:4;
+            width:34px;
+            height:34px;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            border:3px solid var(--card-surface);
+            border-radius:50%;
+
+            transform:translate(-50%,-50%);
+
+            background:var(--ca-carrier-accent);
+            color:#fff;
+
+            box-shadow:
+                0 0 0 1px rgba(var(--ca-carrier-rgb),0.28),
+                0 5px 14px rgba(0,0,0,0.16);
+
+            font-size:0.72rem;
+            font-weight:800;
+            cursor:pointer;
+        }
+
+        .ca-geo-cell-node:hover,
+        .ca-geo-cell-node:focus-visible,
+        .ca-geo-cell-node.is-active{
+            width:38px;
+            height:38px;
+            outline:none;
+
+            box-shadow:
+                0 0 0 4px rgba(var(--ca-carrier-rgb),0.16),
+                0 6px 18px rgba(0,0,0,0.18);
+        }
+
+        .ca-geo-cell-node.is-carrier-muted{
+            opacity:0.22;
+            filter:saturate(0.35);
+            cursor:default;
+            box-shadow:none;
+        }
+
+        .ca-geo-cell-node.is-carrier-muted:hover,
+        .ca-geo-cell-node.is-carrier-muted:focus-visible{
+            width:34px;
+            height:34px;
+            box-shadow:none;
+        }
+
+        .ca-carrier-tmobile{
+            --ca-carrier-accent:#E20074;
+            --ca-carrier-rgb:226,0,116;
+        }
+
+        .ca-carrier-verizon{
+            --ca-carrier-accent:#D52B1E;
+            --ca-carrier-rgb:213,43,30;
+        }
+
+        .ca-carrier-att{
+            --ca-carrier-accent:#067AB4;
+            --ca-carrier-rgb:6,122,180;
+        }
+
+        .ca-carrier-default{
+            --ca-carrier-accent:var(--primary-color);
+            --ca-carrier-rgb:124,58,237;
+        }
+
+        .ca-geo-cell-popover{
+            position:absolute;
+            top:0.7rem;
+            right:0.7rem;
+            z-index:8;
+
+            width:min(325px,calc(100% - 1.4rem));
+
+            overflow:hidden;
+
+            border:1px solid rgba(var(--ca-carrier-rgb),0.35);
+            border-radius:9px;
+
+            background:var(--card-surface);
+
+            box-shadow:
+                0 10px 28px rgba(0,0,0,0.18);
+        }
+
+        .ca-geo-popover-accent{
+            height:4px;
+            background:var(--ca-carrier-accent);
+        }
+
+        .ca-geo-popover-body{
+            padding:0.75rem 0.8rem 0.8rem;
+        }
+
+        .ca-geo-popover-head{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:0.6rem;
+            margin-bottom:0.65rem;
+        }
+
+        .ca-geo-popover-title{
+            font-size:0.87rem;
+            font-weight:800;
+        }
+
+        .ca-geo-carrier-badge{
+            display:inline-flex;
+            align-items:center;
+            gap:0.28rem;
+
+            margin-top:0.18rem;
+            padding:0.18rem 0.42rem;
+
+            border-radius:999px;
+
+            background:rgba(var(--ca-carrier-rgb),0.11);
+            color:var(--ca-carrier-accent);
+
+            font-size:0.64rem;
+            font-weight:800;
+        }
+
+        .ca-geo-popover-close{
+            width:26px;
+            height:26px;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            flex:0 0 auto;
+
+            border:0;
+            border-radius:6px;
+
+            background:transparent;
+            color:var(--text-secondary);
+
+            cursor:pointer;
+        }
+
+        .ca-geo-popover-close:hover{
+            background:var(--background-secondary);
+            color:var(--text-primary);
+        }
+
+        .ca-geo-popover-role{
+            margin-bottom:0.65rem;
+            color:var(--text-secondary);
+            font-size:0.69rem;
+            font-weight:600;
+        }
+
+        .ca-geo-cell-fields{
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            gap:0.5rem 0.8rem;
+
+            padding:0.58rem 0;
+
+            border-top:1px solid var(--border-color);
+            border-bottom:1px solid var(--border-color);
+        }
+
+        .ca-geo-cell-field{
+            min-width:0;
+            padding:0;
+            background:transparent;
+        }
+
+        .ca-geo-cell-field span{
+            display:block;
+
+            color:var(--text-secondary);
+
+            font-size:0.55rem;
+            font-weight:800;
+            letter-spacing:0.035em;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-cell-field strong{
+            display:block;
+            margin-top:0.12rem;
+
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+
+            font-size:0.69rem;
+            font-variant-numeric:tabular-nums;
+        }
+
+        .ca-geo-observed-heading{
+            margin-top:0.7rem;
+            margin-bottom:0.28rem;
+
+            color:var(--text-secondary);
+
+            font-size:0.58rem;
+            font-weight:800;
+            letter-spacing:0.04em;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-observed-list{
+            display:grid;
+            gap:0.22rem;
+        }
+
+        .ca-geo-observed-row{
+            display:grid;
+            grid-template-columns:minmax(0,1fr) auto;
+            gap:0.5rem;
+            align-items:center;
+
+            padding:0.32rem 0.4rem;
+
+            border-radius:5px;
+
+            background:var(--background-secondary);
+
+            font-size:0.65rem;
+        }
+
+        .ca-geo-observed-row span{
+            min-width:0;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+
+        .ca-geo-observed-row strong{
+            color:var(--text-secondary);
+            font-size:0.61rem;
+            font-weight:700;
+            white-space:nowrap;
+        }
+
+        .ca-geo-context{
+            min-height:286px;
+
+            display:flex;
+            flex-direction:column;
+
+            padding:0.8rem;
+
+            border:1px solid var(--border-color);
+            border-radius:8px;
+
+            background:var(--card-surface);
+        }
+
+        .ca-geo-context-title{
+            margin-bottom:0.6rem;
+
+            font-size:0.67rem;
+            font-weight:800;
+            letter-spacing:0.045em;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-context-grid{
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:0.45rem;
+        }
+
+        .ca-geo-context-stat{
+            min-width:0;
+
+            padding:0.52rem;
+
+            border-radius:6px;
+
+            background:var(--background-secondary);
+        }
+
+        .ca-geo-context-stat span{
+            display:block;
+
+            color:var(--text-secondary);
+
+            font-size:0.55rem;
+            font-weight:800;
+            letter-spacing:0.03em;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-context-stat strong{
+            display:block;
+            margin-top:0.16rem;
+            font-size:0.87rem;
+        }
+
+        .ca-geo-context-stat strong.ca-geo-provider-unconfigured{
+            color:var(--text-secondary);
+            font-size:0.50rem;
+            font-weight:600;
+            line-height:1.15;
+            letter-spacing:0.01em;
+            opacity:0.88;
+        }
+
+        .ca-geo-context-stat.is-wide{
+            grid-column:1 / -1;
+        }
+
+        .ca-geo-context-stat strong.ca-geo-location-value{
+            font-size:0.67rem;
+            line-height:1.3;
+            white-space:normal;
+            overflow-wrap:anywhere;
+        }
+
+        .ca-geo-carrier-list{
+            display:grid;
+            gap:0.38rem;
+            margin-top:0.75rem;
+        }
+
+        .ca-geo-carrier-chip{
+            display:grid;
+            width:100%;
+
+            grid-template-columns:8px minmax(0,1fr) auto;
+            gap:0.45rem;
+            align-items:center;
+
+            padding:0.42rem 0.48rem;
+
+            border:1px solid rgba(var(--ca-carrier-rgb),0.28);
+            border-radius:6px;
+
+            background:rgba(var(--ca-carrier-rgb),0.07);
+            color:var(--text-primary);
+
+            font-family:inherit;
+            font-size:0.65rem;
+            text-align:left;
+
+            cursor:pointer;
+
+            transition:
+                opacity 120ms ease,
+                border-color 120ms ease,
+                background 120ms ease;
+        }
+
+        .ca-geo-carrier-chip:hover,
+        .ca-geo-carrier-chip:focus-visible{
+            border-color:var(--ca-carrier-accent);
+            outline:none;
+        }
+
+        .ca-geo-carrier-chip:not(.is-selected){
+            opacity:0.42;
+            border-color:var(--border-color);
+            background:transparent;
+        }
+
+        .ca-geo-carrier-chip.is-last-selected{
+            cursor:default;
+        }
+
+        .ca-geo-carrier-dot{
+            width:8px;
+            height:8px;
+
+            border-radius:50%;
+            background:var(--ca-carrier-accent);
+        }
+
+        .ca-geo-carrier-chip span{
+            min-width:0;
+
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+
+            font-weight:700;
+        }
+
+        .ca-geo-carrier-chip strong{
+            color:var(--text-secondary);
+            font-size:0.6rem;
+            font-weight:700;
+            white-space:nowrap;
+        }
+
+        .ca-geo-context-note{
+            margin-top:auto;
+            padding-top:0.75rem;
+
+            color:var(--text-secondary);
+
+            font-size:0.62rem;
+            line-height:1.4;
+        }
+
+        .ca-geo-context-note i{
+            margin-right:0.28rem;
+            color:var(--primary-color);
+        }
+
+        .ca-geo-empty{
+            min-height:286px;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            padding:1.5rem;
+
+            border:1px dashed var(--border-color);
+            border-radius:8px;
+
+            color:var(--text-secondary);
+            text-align:center;
+        }
+
+        .ca-geo-modal-backdrop{
+            position:fixed;
+            inset:0;
+            z-index:12000;
+
+            display:none;
+            align-items:center;
+            justify-content:center;
+
+            padding:1rem;
+
+            background:rgba(8,10,18,0.62);
+            backdrop-filter:blur(2px);
+        }
+
+        .ca-geo-modal-backdrop.is-open{
+            display:flex;
+        }
+
+        .ca-geo-modal{
+            width:min(780px,96vw);
+            max-height:min(760px,92vh);
+
+            overflow:auto;
+
+            border:1px solid var(--border-color);
+            border-radius:10px;
+
+            background:var(--light-surface);
+
+            box-shadow:0 24px 60px rgba(0,0,0,0.35);
+        }
+
+        .ca-geo-modal-header{
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-start;
+            gap:1rem;
+
+            padding:1rem 1.1rem 0.85rem;
+
+            border-bottom:1px solid var(--border-color);
+        }
+
+        .ca-geo-modal-header h3{
+            margin:0;
+            font-size:1rem;
+        }
+
+        .ca-geo-modal-subtitle{
+            margin-top:0.22rem;
+            color:var(--text-secondary);
+            font-size:0.69rem;
+        }
+
+        .ca-geo-modal-close{
+            width:30px;
+            height:30px;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            border:0;
+            border-radius:6px;
+
+            background:transparent;
+            color:var(--text-secondary);
+
+            cursor:pointer;
+        }
+
+        .ca-geo-modal-close:hover{
+            background:var(--background-secondary);
+            color:var(--text-primary);
+        }
+
+        .ca-geo-modal-body{
+            padding:0.95rem 1.1rem 1.05rem;
+        }
+
+        .ca-geo-config-section + .ca-geo-config-section{
+            margin-top:1rem;
+            padding-top:1rem;
+
+            border-top:1px solid var(--border-color);
+        }
+
+        .ca-geo-config-label{
+            margin-bottom:0.55rem;
+
+            color:var(--text-secondary);
+
+            font-size:0.6rem;
+            font-weight:800;
+            letter-spacing:0.05em;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-provider-grid,
+        .ca-geo-location-grid{
+            display:grid;
+            grid-template-columns:repeat(3,minmax(0,1fr));
+            gap:0.55rem;
+        }
+
+        .ca-geo-choice-card{
+            position:relative;
+
+            min-height:100px;
+
+            padding:0.7rem;
+
+            border:1px solid var(--border-color);
+            border-radius:8px;
+
+            background:var(--card-surface);
+            color:var(--text-primary);
+
+            text-align:left;
+            cursor:pointer;
+        }
+
+        .ca-geo-choice-card:hover,
+        .ca-geo-choice-card:focus-visible{
+            border-color:var(--primary-color);
+            outline:none;
+        }
+
+        .ca-geo-choice-card.is-selected{
+            border-color:var(--primary-color);
+            box-shadow:0 0 0 2px rgba(124,58,237,0.11);
+        }
+
+        .ca-geo-choice-card[disabled]{
+            cursor:default;
+            opacity:0.58;
+        }
+
+        .ca-geo-choice-card i{
+            margin-bottom:0.45rem;
+            color:var(--primary-color);
+            font-size:1rem;
+        }
+
+        .ca-geo-choice-title{
+            display:block;
+            font-size:0.72rem;
+            font-weight:800;
+        }
+
+        .ca-geo-choice-note{
+            display:block;
+            margin-top:0.2rem;
+            color:var(--text-secondary);
+            font-size:0.6rem;
+            line-height:1.35;
+        }
+
+        .ca-geo-choice-status{
+            position:absolute;
+            top:0.45rem;
+            right:0.45rem;
+
+            padding:0.12rem 0.3rem;
+
+            border-radius:999px;
+
+            background:var(--background-secondary);
+            color:var(--text-secondary);
+
+            font-size:0.5rem;
+            font-weight:800;
+            letter-spacing:0.025em;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-gps-panel{
+            display:none;
+            align-items:center;
+            justify-content:space-between;
+            gap:0.8rem;
+
+            margin-top:0.7rem;
+            padding:0.68rem 0.75rem;
+
+            border:1px solid var(--border-color);
+            border-radius:7px;
+
+            background:var(--background-secondary);
+        }
+
+        .ca-geo-gps-panel.is-visible{
+            display:flex;
+        }
+
+        .ca-geo-gps-summary{
+            min-width:0;
+        }
+
+        .ca-geo-gps-status{
+            display:flex;
+            align-items:center;
+            gap:0.35rem;
+
+            font-size:0.67rem;
+            font-weight:800;
+        }
+
+        .ca-geo-gps-status i{
+            color:var(--text-secondary);
+        }
+
+        .ca-geo-gps-status.has-fix i{
+            color:var(--success-color);
+        }
+
+        .ca-geo-gps-coordinates{
+            margin-top:0.18rem;
+
+            font-size:0.72rem;
+            font-weight:700;
+            font-variant-numeric:tabular-nums;
+        }
+
+        .ca-geo-gps-meta{
+            margin-top:0.14rem;
+
+            color:var(--text-secondary);
+
+            font-size:0.58rem;
+        }
+
+        .ca-geo-manual-fields{
+            display:none;
+            grid-template-columns:1fr 1fr;
+            gap:0.6rem;
+
+            margin-top:0.65rem;
+        }
+
+        .ca-geo-manual-fields.is-visible{
+            display:grid;
+        }
+
+        .ca-geo-address-fields{
+            display:none;
+            margin-top:0.65rem;
+        }
+
+        .ca-geo-address-fields.is-visible{
+            display:block;
+        }
+
+        .ca-geo-address-note{
+            display:flex;
+            gap:0.4rem;
+            align-items:flex-start;
+
+            margin-top:0.45rem;
+
+            color:var(--text-secondary);
+
+            font-size:0.58rem;
+            line-height:1.35;
+        }
+
+        .ca-geo-address-note i{
+            margin-top:0.08rem;
+            color:var(--primary-color);
+        }
+
+        .ca-geo-field label{
+            display:block;
+            margin-bottom:0.25rem;
+
+            color:var(--text-secondary);
+
+            font-size:0.58rem;
+            font-weight:800;
+            text-transform:uppercase;
+        }
+
+        .ca-geo-field input{
+            width:100%;
+        }
+
+        .ca-geo-config-info{
+            display:flex;
+            gap:0.5rem;
+            align-items:flex-start;
+
+            margin-top:0.7rem;
+            padding:0.55rem 0.62rem;
+
+            border:1px solid var(--border-color);
+            border-radius:7px;
+
+            background:var(--background-secondary);
+            color:var(--text-secondary);
+
+            font-size:0.62rem;
+            line-height:1.4;
+        }
+
+        .ca-geo-config-info i{
+            margin-top:0.08rem;
+            color:var(--primary-color);
+        }
+
+        .ca-geo-modal-footer{
+            display:flex;
+            justify-content:flex-end;
+            gap:0.55rem;
+
+            padding:0.8rem 1.1rem;
+
+            border-top:1px solid var(--border-color);
+        }
+
+        @media (max-width:900px){
+            .ca-geo-layout{
+                grid-template-columns:1fr;
+            }
+
+            .ca-geo-context{
+                min-height:0;
+            }
+
+            .ca-geo-context-grid{
+                grid-template-columns:repeat(4,minmax(0,1fr));
+            }
+        }
+
+        @media (max-width:650px){
+            .ca-geo-card-header{
+                align-items:flex-start;
+                flex-direction:column;
+            }
+
+            .ca-geo-canvas{
+                min-height:330px;
+            }
+
+            .ca-geo-cell-popover{
+                top:auto;
+                right:0.55rem;
+                bottom:0.55rem;
+                width:calc(100% - 1.1rem);
+            }
+
+            .ca-geo-context-grid{
+                grid-template-columns:repeat(2,minmax(0,1fr));
+            }
+
+            .ca-geo-provider-grid,
+            .ca-geo-location-grid{
+                grid-template-columns:1fr;
+            }
+
+            .ca-geo-choice-card{
+                min-height:82px;
+            }
+
+            .ca-geo-manual-fields{
+                grid-template-columns:1fr;
+            }
         }
 
         .ca-analysis-controls {
@@ -3175,151 +4055,285 @@
                     <section class="element-section" id="cellular-analysis">
                         <h2 class="section-title">Cellular Analysis</h2>
 
-                        <div class="card" style="margin-bottom:1rem;">
-                            <div class="card-header">
-                                <h3>SITE CELLULAR GEO VIEW — ALL CELLULAR INTERFACES</h3>
+                        <div class="card ca-geo-card" style="margin-bottom:1rem;">
+                            <div class="card-header ca-geo-card-header">
+                                <div class="ca-geo-heading">
+                                    <h3>SITE CELLULAR GEOVIEW</h3>
+                                    <div class="ca-geo-scope">
+                                        Serving cells observed across all cellular interfaces and retained history
+                                    </div>
+                                </div>
+
+                                <button type="button"
+                                        class="btn btn-secondary ca-geo-header-action"
+                                        id="btn-ca-configure-location">
+                                    <i class="fas fa-map-marked-alt"></i>
+                                    Configure GeoView
+                                </button>
                             </div>
+
                             <div class="card-body">
                                 <div id="ca-geo-view" class="ca-geo-view">
-                                    <div>
-                                        <i class="fas fa-map-marked-alt"
-                                           style="font-size:2rem; color:var(--text-secondary); margin-bottom:0.75rem;"></i>
-                                        <div style="font-weight:600; margin-bottom:0.35rem;">
-                                            Estimated Serving Cell Geography
+                                    <div class="ca-geo-empty">
+                                        <div>
+                                            <i class="fas fa-circle-notch fa-spin"></i>
+                                            Loading site cellular context…
                                         </div>
-                                        <div style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.75rem;">
-                                            Location provider is not configured.
-                                            Local Cellular Analysis remains fully available.
-                                        </div>
-                                        <button type="button"
-                                                class="btn btn-secondary"
-                                                id="btn-ca-configure-location">
-                                            <i class="fas fa-cog"></i> Configure
-                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div id="ca-location-settings"
-                             class="card"
-                             style="display:none; margin-bottom:1rem;">
-                            <div class="card-header"
-                                 style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
-                                <h3>Cellular Location Settings</h3>
-
-                                <button type="button"
-                                        class="btn btn-secondary"
-                                        id="btn-ca-close-location">
-                                    <i class="fas fa-times"></i> Close
-                                </button>
-                            </div>
-
-                            <div class="card-body">
-                                <div style="padding:0.75rem 0.9rem;
-                                            margin-bottom:1rem;
-                                            border:1px solid var(--border-color);
-                                            border-radius:var(--radius-md);
-                                            background:var(--card-surface);
-                                            color:var(--text-secondary);
-                                            font-size:0.82rem;">
-                                    Cellular location is optional enrichment.
-                                    All Cellular Analysis features operate locally
-                                    without a location provider.
-                                    Google and Unwired Labs integration will be
-                                    enabled after local analysis validation.
-                                </div>
-
-                                <div style="display:grid;
-                                            grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
-                                            gap:1rem;">
-
+                        <div id="ca-geo-modal-backdrop"
+                             class="ca-geo-modal-backdrop"
+                             role="dialog"
+                             aria-modal="true"
+                             aria-labelledby="ca-geo-modal-title"
+                             aria-hidden="true">
+                            <div class="ca-geo-modal">
+                                <div class="ca-geo-modal-header">
                                     <div>
-                                        <label for="ca-location-provider"
-                                               style="display:block; font-weight:600; margin-bottom:0.35rem;">
-                                            Location Provider
-                                        </label>
-
-                                        <select id="ca-location-provider"
-                                                class="form-control"
-                                                style="width:100%;">
-                                            <option value="none">No Location Provider</option>
-                                            <option value="google" disabled>
-                                                Google Maps Platform — Deferred
-                                            </option>
-                                            <option value="unwired" disabled>
-                                                Unwired Labs — Deferred
-                                            </option>
-                                        </select>
+                                        <h3 id="ca-geo-modal-title">Configure GeoView</h3>
+                                        <div class="ca-geo-modal-subtitle">
+                                            Configure optional site location and cellular geolocation enrichment.
+                                            Cellular Analysis remains fully functional without a Geo Provider.
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <label style="display:block; font-weight:600; margin-bottom:0.35rem;">
-                                            Site Location Source
-                                        </label>
-
-                                        <select class="form-control"
-                                                id="ca-site-location-source"
-                                                style="width:100%;"
-                                                disabled>
-                                            <option>Not Configured</option>
-                                            <option>Device GPS</option>
-                                            <option>Manual Coordinates</option>
-                                            <option>Address Lookup</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label for="ca-site-latitude"
-                                               style="display:block; font-weight:600; margin-bottom:0.35rem;">
-                                            Site Latitude
-                                        </label>
-
-                                        <input id="ca-site-latitude"
-                                               class="form-control"
-                                               type="text"
-                                               placeholder="Not configured"
-                                               disabled>
-                                    </div>
-
-                                    <div>
-                                        <label for="ca-site-longitude"
-                                               style="display:block; font-weight:600; margin-bottom:0.35rem;">
-                                            Site Longitude
-                                        </label>
-
-                                        <input id="ca-site-longitude"
-                                               class="form-control"
-                                               type="text"
-                                               placeholder="Not configured"
-                                               disabled>
-                                    </div>
-                                </div>
-
-                                <div style="display:flex;
-                                            gap:0.65rem;
-                                            flex-wrap:wrap;
-                                            margin-top:1rem;">
                                     <button type="button"
-                                            class="btn btn-secondary"
-                                            disabled
-                                            title="Device GPS site-location capture will be enabled with geolocation support.">
-                                        <i class="fas fa-crosshairs"></i>
-                                        Query Device GPS
+                                            class="ca-geo-modal-close"
+                                            id="btn-ca-close-location"
+                                            aria-label="Close GeoView configuration">
+                                        <i class="fas fa-times"></i>
                                     </button>
+                                </div>
 
+                                <div class="ca-geo-modal-body">
+                                    <div class="ca-geo-config-section">
+                                        <div class="ca-geo-config-label">
+                                            Geo Provider
+                                        </div>
+
+                                        <div class="ca-geo-provider-grid">
+                                            <button type="button"
+                                                    class="ca-geo-choice-card is-selected"
+                                                    data-ca-provider="none"
+                                                    aria-pressed="true">
+                                                <i class="fas fa-shield-alt"></i>
+
+                                                <span class="ca-geo-choice-title">
+                                                    No Geo Provider
+                                                </span>
+
+                                                <span class="ca-geo-choice-note">
+                                                    Local site cellular context only.
+                                                    No external location requests.
+                                                </span>
+                                            </button>
+
+                                            <button type="button"
+                                                    class="ca-geo-choice-card"
+                                                    data-ca-provider="google"
+                                                    disabled>
+                                                <span class="ca-geo-choice-status">
+                                                    Research pending
+                                                </span>
+
+                                                <i class="fas fa-map"></i>
+
+                                                <span class="ca-geo-choice-title">
+                                                    Google
+                                                </span>
+
+                                                <span class="ca-geo-choice-note">
+                                                    Static-map and cellular-location workflow
+                                                    will be added after API validation.
+                                                </span>
+                                            </button>
+
+                                            <button type="button"
+                                                    class="ca-geo-choice-card"
+                                                    data-ca-provider="unwired"
+                                                    disabled>
+                                                <span class="ca-geo-choice-status">
+                                                    Research pending
+                                                </span>
+
+                                                <i class="fas fa-broadcast-tower"></i>
+
+                                                <span class="ca-geo-choice-title">
+                                                    Unwired
+                                                </span>
+
+                                                <span class="ca-geo-choice-note">
+                                                    Provider direction and current service model
+                                                    will be validated first.
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="ca-geo-config-section">
+                                        <div class="ca-geo-config-label">
+                                            Site Location
+                                        </div>
+
+                                        <div class="ca-geo-location-grid">
+                                            <button type="button"
+                                                    class="ca-geo-choice-card is-selected"
+                                                    data-ca-location-source="device_gps"
+                                                    aria-pressed="true">
+                                                <i class="fas fa-crosshairs"></i>
+
+                                                <span class="ca-geo-choice-title">
+                                                    Device GPS
+                                                </span>
+
+                                                <span class="ca-geo-choice-note">
+                                                    Query GPS only when requested.
+                                                    No continuous location polling.
+                                                </span>
+                                            </button>
+
+                                            <button type="button"
+                                                    class="ca-geo-choice-card"
+                                                    data-ca-location-source="manual_coordinates"
+                                                    aria-pressed="false">
+                                                <i class="fas fa-map-pin"></i>
+
+                                                <span class="ca-geo-choice-title">
+                                                    Manual Coordinates
+                                                </span>
+
+                                                <span class="ca-geo-choice-note">
+                                                    Save a fixed site latitude and longitude
+                                                    for this router.
+                                                </span>
+                                            </button>
+
+                                            <button type="button"
+                                                    class="ca-geo-choice-card"
+                                                    data-ca-location-source="site_address"
+                                                    aria-pressed="false">
+                                                <i class="fas fa-map-marker-alt"></i>
+
+                                                <span class="ca-geo-choice-title">
+                                                    Site Address
+                                                </span>
+
+                                                <span class="ca-geo-choice-note">
+                                                    Save an address as descriptive site information.
+                                                    No lookup or geocoding is performed.
+                                                </span>
+                                            </button>
+                                        </div>
+
+                                        <div id="ca-geo-gps-panel"
+                                             class="ca-geo-gps-panel is-visible">
+
+                                            <div class="ca-geo-gps-summary">
+                                                <div id="ca-geo-gps-status"
+                                                     class="ca-geo-gps-status">
+                                                    <i class="fas fa-map-marker-alt"></i>
+                                                    <span>GPS not captured yet</span>
+                                                </div>
+
+                                                <div id="ca-geo-gps-coordinates"
+                                                     class="ca-geo-gps-coordinates">
+                                                    —
+                                                </div>
+
+                                                <div id="ca-geo-gps-meta"
+                                                     class="ca-geo-gps-meta">
+                                                    Refresh GPS to query the router once.
+                                                </div>
+                                            </div>
+
+                                            <button type="button"
+                                                    class="btn btn-secondary"
+                                                    id="btn-ca-refresh-gps">
+                                                <i class="fas fa-sync-alt"></i>
+                                                Refresh GPS
+                                            </button>
+                                        </div>
+
+                                        <div id="ca-geo-manual-fields"
+                                             class="ca-geo-manual-fields">
+
+                                            <div class="ca-geo-field">
+                                                <label for="ca-site-latitude">
+                                                    Latitude
+                                                </label>
+
+                                                <input id="ca-site-latitude"
+                                                       class="form-control"
+                                                       type="text"
+                                                       inputmode="decimal"
+                                                       placeholder="39.768400">
+                                            </div>
+
+                                            <div class="ca-geo-field">
+                                                <label for="ca-site-longitude">
+                                                    Longitude
+                                                </label>
+
+                                                <input id="ca-site-longitude"
+                                                       class="form-control"
+                                                       type="text"
+                                                       inputmode="decimal"
+                                                       placeholder="-86.158100">
+                                            </div>
+                                        </div>
+
+                                        <div id="ca-geo-address-fields"
+                                             class="ca-geo-address-fields">
+
+                                            <div class="ca-geo-field">
+                                                <label for="ca-site-address">
+                                                    Site Address
+                                                </label>
+
+                                                <input id="ca-site-address"
+                                                       class="form-control"
+                                                       type="text"
+                                                       autocomplete="street-address"
+                                                       placeholder="123 Main Street, Indianapolis, IN">
+                                            </div>
+
+                                            <div class="ca-geo-address-note">
+                                                <i class="fas fa-info-circle"></i>
+
+                                                Stored exactly as entered for site context.
+                                                GeoView will not attempt to convert this address
+                                                to coordinates.
+                                            </div>
+                                        </div>
+
+                                        <div class="ca-geo-config-info">
+                                            <i class="fas fa-info-circle"></i>
+
+                                            <div>
+                                                This phase builds the local GeoView framework only.
+                                                Provider credentials and external API calls remain
+                                                disabled until the current Google and Unwired service
+                                                models are researched and validated.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="ca-geo-modal-footer">
                                     <button type="button"
                                             class="btn btn-secondary"
-                                            disabled
-                                            title="Provider connectivity testing will be enabled with geolocation support.">
-                                        <i class="fas fa-plug"></i>
-                                        Test Configuration
+                                            id="btn-ca-cancel-location">
+                                        Cancel
                                     </button>
 
                                     <button type="button"
                                             class="btn btn-primary"
-                                            disabled>
-                                        Save Location Settings
+                                            id="btn-ca-save-location">
+                                        <i class="fas fa-save"></i>
+                                        Save GeoView
                                     </button>
                                 </div>
                             </div>
@@ -9306,9 +10320,538 @@
                 '</div>';
         }
 
+        var caGeoActiveCellKey = '';
+        var caGeoDraftProvider = 'none';
+        var caGeoDraftLocationSource = 'device_gps';
+        var caGeoDraftGps = {
+            latitude: null,
+            longitude: null,
+            satellites: null,
+            accuracy: null,
+            gps_lock: false
+        };
+        var caGeoSelectedCarriers = {};
+
+        function caGeoCarrierKey(carrier) {
+            var value = String(
+                carrier || 'Other / Unknown'
+            ).trim().toLowerCase();
+
+            var compact = value.replace(
+                /[^a-z0-9&]+/g,
+                ''
+            );
+
+            if (compact.indexOf('tmobile') !== -1) {
+                return 'tmobile';
+            }
+
+            if (
+                compact.indexOf('verizon') !== -1 ||
+                compact.indexOf('vzw') !== -1
+            ) {
+                return 'verizon';
+            }
+
+            if (
+                compact.indexOf('at&t') !== -1 ||
+                compact === 'att' ||
+                compact.indexOf('att') !== -1
+            ) {
+                return 'att';
+            }
+
+            return compact || 'other';
+        }
+
+        function caGeoCarrierClass(carrier) {
+            var value = String(
+                carrier || ''
+            ).toLowerCase();
+
+            value = value.replace(
+                /[^a-z0-9&]+/g,
+                ''
+            );
+
+            if (
+                value.indexOf('tmobile') !== -1
+                || value.indexOf('t-mobile') !== -1
+            ) {
+                return 'ca-carrier-tmobile';
+            }
+
+            if (
+                value.indexOf('verizon') !== -1
+                || value === 'vzw'
+                || value.indexOf('vzw') !== -1
+            ) {
+                return 'ca-carrier-verizon';
+            }
+
+            if (
+                value.indexOf('at&t') !== -1
+                || value === 'att'
+                || value.indexOf('att') !== -1
+            ) {
+                return 'ca-carrier-att';
+            }
+
+            return 'ca-carrier-default';
+        }
+
+        function caGeoArrangeSchematicCells(cells) {
+            cells = Array.isArray(cells)
+                ? cells.slice()
+                : [];
+
+            if (cells.length <= 2) {
+                return cells;
+            }
+
+            var groups = {};
+            var order = [];
+
+            for (var i = 0; i < cells.length; i++) {
+                var key = caGeoCarrierKey(
+                    cells[i] && cells[i].carrier
+                );
+
+                if (!groups[key]) {
+                    groups[key] = [];
+                    order.push(key);
+                }
+
+                groups[key].push(cells[i]);
+            }
+
+            order.sort(function(a, b) {
+                return groups[b].length - groups[a].length;
+            });
+
+            /*
+             * Spread the dominant carrier around the ring first. This keeps
+             * a 3/2/1 site from clustering two cells from the largest carrier
+             * next to each other at the wrap point of a simple round-robin.
+             * Remaining carriers then fill the open radial slots in a
+             * round-robin sequence.
+             */
+            var arranged = new Array(cells.length);
+            var primaryKey = order.length
+                ? order[0]
+                : null;
+            var primaryGroup = primaryKey
+                ? groups[primaryKey]
+                : [];
+
+            if (primaryGroup.length) {
+                for (
+                    var primaryIndex = 0;
+                    primaryIndex < primaryGroup.length;
+                    primaryIndex++
+                ) {
+                    var target = Math.round(
+                        primaryIndex * cells.length /
+                        primaryGroup.length
+                    ) % cells.length;
+
+                    while (arranged[target]) {
+                        target = (target + 1) % cells.length;
+                    }
+
+                    arranged[target] = primaryGroup[primaryIndex];
+                }
+            }
+
+            var remainingGroups = order.slice(1).map(function(key) {
+                return groups[key].slice();
+            });
+
+            var remainingCells = [];
+            var stillRemaining = true;
+
+            while (stillRemaining) {
+                stillRemaining = false;
+
+                for (
+                    var groupIndex = 0;
+                    groupIndex < remainingGroups.length;
+                    groupIndex++
+                ) {
+                    if (remainingGroups[groupIndex].length) {
+                        remainingCells.push(
+                            remainingGroups[groupIndex].shift()
+                        );
+
+                        stillRemaining = true;
+                    }
+                }
+            }
+
+            var remainingIndex = 0;
+
+            for (
+                var slot = 0;
+                slot < arranged.length;
+                slot++
+            ) {
+                if (!arranged[slot]) {
+                    arranged[slot] =
+                        remainingCells[remainingIndex++];
+                }
+            }
+
+            return arranged.filter(Boolean);
+        }
+
+        function caGeoSchematicPosition(index, count) {
+            count = Math.max(
+                1,
+                Number(count || 1)
+            );
+
+            var angle =
+                -Math.PI / 2 +
+                index * (Math.PI * 2 / count);
+
+            var radiusX = count <= 2 ? 25 : 34;
+            var radiusY = count <= 2 ? 22 : 31;
+
+            return {
+                left:
+                    50 +
+                    Math.cos(angle) * radiusX,
+
+                top:
+                    50 +
+                    Math.sin(angle) * radiusY
+            };
+        }
+
+        function caGeoCellRoleText(cell) {
+            if (!cell) {
+                return 'Serving cell';
+            }
+
+            var parts = [];
+
+            if (cell.technology_role) {
+                parts.push(
+                    String(cell.technology_role)
+                );
+            }
+
+            if (cell.band) {
+                parts.push(
+                    String(cell.band)
+                );
+            }
+
+            return parts.length
+                ? parts.join(' • ')
+                : 'Serving cell';
+        }
+
+        function caGeoCarrierDisplayName(carrier) {
+            var key = caGeoCarrierKey(carrier);
+
+            if (key === 'tmobile') {
+                return 'T-Mobile';
+            }
+
+            if (key === 'verizon') {
+                return 'Verizon';
+            }
+
+            if (key === 'att') {
+                return 'AT&T';
+            }
+
+            return String(
+                carrier || 'Other / Unknown'
+            ).trim() || 'Other / Unknown';
+        }
+
+        function caGeoCarrierSummary(cells) {
+            var buckets = {};
+
+            for (var i = 0; i < cells.length; i++) {
+                var carrier = String(
+                    cells[i].carrier ||
+                    'Other / Unknown'
+                ).trim() || 'Other / Unknown';
+
+                var key =
+                    caGeoCarrierKey(carrier);
+
+                if (!buckets[key]) {
+                    buckets[key] = {
+                        name:
+                            caGeoCarrierDisplayName(
+                                carrier
+                            ),
+
+                        key:
+                            key,
+
+                        count:
+                            0
+                    };
+                }
+
+                buckets[key].count += 1;
+            }
+
+            return Object.keys(buckets)
+                .map(function(key) {
+                    return buckets[key];
+                })
+                .sort(function(a, b) {
+                    return b.count - a.count;
+                });
+        }
+
+        function caGeoRenderPopover(cell) {
+            if (!cell) {
+                return '';
+            }
+
+            var carrier = String(
+                cell.carrier ||
+                'Other / Unknown'
+            );
+
+            var carrierClass =
+                caGeoCarrierClass(carrier);
+
+            var interfaces = Array.isArray(
+                cell.interfaces
+            )
+                ? cell.interfaces
+                : [];
+
+            var observedHtml = '';
+
+            if (interfaces.length) {
+                for (
+                    var i = 0;
+                    i < interfaces.length;
+                    i++
+                ) {
+                    var item =
+                        interfaces[i] || {};
+
+                    observedHtml +=
+                        '<div class="ca-geo-observed-row">' +
+                            '<span>' +
+                                caEscapeHtml(
+                                    item.label ||
+                                    item.interface ||
+                                    'Cellular interface'
+                                ) +
+                            '</span>' +
+
+                            '<strong>' +
+                                Number(
+                                    item.tests || 0
+                                ) +
+                                ' test' +
+                                (
+                                    Number(
+                                        item.tests || 0
+                                    ) === 1
+                                        ? ''
+                                        : 's'
+                                ) +
+                            '</strong>' +
+                        '</div>';
+                }
+            } else {
+                observedHtml =
+                    '<div class="ca-geo-observed-row">' +
+                        '<span>' +
+                            'Interface details unavailable' +
+                        '</span>' +
+                        '<strong>—</strong>' +
+                    '</div>';
+            }
+
+            return (
+                '<div class="ca-geo-cell-popover ' +
+                carrierClass + '">' +
+
+                    '<div class="ca-geo-popover-accent"></div>' +
+
+                    '<div class="ca-geo-popover-body">' +
+
+                        '<div class="ca-geo-popover-head">' +
+
+                            '<div>' +
+                                '<div class="ca-geo-popover-title">' +
+                                    'Serving Cell ' +
+                                    caEscapeHtml(
+                                        cell.view_label ||
+                                        cell.label ||
+                                        ''
+                                    ) +
+                                '</div>' +
+
+                                '<div class="ca-geo-carrier-badge">' +
+                                    '<span class="ca-geo-carrier-dot"></span>' +
+                                    caEscapeHtml(
+                                        carrier
+                                    ) +
+                                '</div>' +
+                            '</div>' +
+
+                            '<button type="button" ' +
+                                    'class="ca-geo-popover-close" ' +
+                                    'data-ca-geo-close-cell ' +
+                                    'aria-label="Close serving-cell details">' +
+                                '<i class="fas fa-times"></i>' +
+                            '</button>' +
+
+                        '</div>' +
+
+                        '<div class="ca-geo-popover-role">' +
+                            caEscapeHtml(
+                                caGeoCellRoleText(
+                                    cell
+                                )
+                            ) +
+                        '</div>' +
+
+                        '<div class="ca-geo-cell-fields">' +
+
+                            caGeoCellFieldHtml(
+                                'Cell ID',
+                                cell.cell_id
+                            ) +
+
+                            caGeoCellFieldHtml(
+                                'PLMN',
+                                cell.plmn
+                            ) +
+
+                            caGeoCellFieldHtml(
+                                'TAC',
+                                cell.tac
+                            ) +
+
+                            caGeoCellFieldHtml(
+                                'PCI',
+                                cell.pci
+                            ) +
+
+                        '</div>' +
+
+                        '<div class="ca-geo-observed-heading">' +
+                            'Observed via' +
+                        '</div>' +
+
+                        '<div class="ca-geo-observed-list">' +
+                            observedHtml +
+                        '</div>' +
+
+                    '</div>' +
+
+                '</div>'
+            );
+        }
+
+        function caGeoCellFieldHtml(label, value) {
+            return (
+                '<div class="ca-geo-cell-field">' +
+
+                    '<span>' +
+                        caEscapeHtml(label) +
+                    '</span>' +
+
+                    '<strong title="' +
+                        caEscapeHtml(
+                            value || '—'
+                        ) +
+                    '">' +
+                        caEscapeHtml(
+                            value || '—'
+                        ) +
+                    '</strong>' +
+
+                '</div>'
+            );
+        }
+
+        function caGeoSiteLocationDisplay(location) {
+            location =
+                location &&
+                typeof location === 'object'
+                    ? location
+                    : {};
+
+            var source = String(
+                location.source ||
+                'device_gps'
+            );
+
+            if (source === 'site_address') {
+                return String(
+                    location.address ||
+                    'Not configured'
+                );
+            }
+
+            if (
+                source ===
+                'manual_coordinates'
+            ) {
+                if (
+                    location.latitude != null &&
+                    location.longitude != null
+                ) {
+                    return (
+                        Number(
+                            location.latitude
+                        ).toFixed(5) +
+                        ', ' +
+                        Number(
+                            location.longitude
+                        ).toFixed(5)
+                    );
+                }
+
+                return (
+                    'Manual coordinates not configured'
+                );
+            }
+
+            if (
+                location.latitude != null &&
+                location.longitude != null
+            ) {
+                return (
+                    Number(
+                        location.latitude
+                    ).toFixed(5) +
+                    ', ' +
+                    Number(
+                        location.longitude
+                    ).toFixed(5) +
+                    ' · Device GPS'
+                );
+            }
+
+            return (
+                'Device GPS · Not captured'
+            );
+        }
+
         function caRenderGeo(data) {
             var geoView = document.getElementById(
                 'ca-geo-view'
+            );
+
+            var configure = document.getElementById(
+                'btn-ca-configure-location'
             );
 
             if (!geoView) {
@@ -9316,81 +10859,1078 @@
             }
 
             var geo = data.geo || {};
-            var configured = geo.configured === true;
+
+            var cells = Array.isArray(
+                geo.cells
+            )
+                ? geo.cells.filter(
+                    function(cell) {
+                        return (
+                            cell &&
+                            !cell.unknown
+                        );
+                    }
+                )
+                : [];
+
+            var interfaces = Array.isArray(
+                geo.interfaces
+            )
+                ? geo.interfaces
+                : [];
+
+            if (configure) {
+                var geoConfigured =
+                    geo.configured === true;
+
+                configure.classList.toggle(
+                    'btn-primary',
+                    !geoConfigured
+                );
+
+                configure.classList.toggle(
+                    'btn-secondary',
+                    geoConfigured
+                );
+
+                configure.innerHTML =
+                    geoConfigured
+                        ? (
+                            '<i class="fas fa-cog"></i> ' +
+                            'Configure'
+                        )
+                        : (
+                            '<i class="fas fa-map-marked-alt"></i> ' +
+                            'Configure GeoView'
+                        );
+            }
+
+            if (!cells.length) {
+                geoView.innerHTML =
+                    '<div class="ca-geo-empty">' +
+
+                        '<div>' +
+
+                            '<i class="fas fa-broadcast-tower" ' +
+                               'style="font-size:1.4rem; margin-bottom:0.5rem;"></i>' +
+
+                            '<div style="font-weight:700; color:var(--text-primary);">' +
+                                'No serving cells observed yet' +
+                            '</div>' +
+
+                            '<div style="margin-top:0.25rem; font-size:0.7rem;">' +
+                                'Run cellular tests to populate the site-wide GeoView.' +
+                            '</div>' +
+
+                        '</div>' +
+
+                    '</div>';
+
+                caBindGeoControls();
+                return;
+            }
+
+            var carrierSummary =
+                caGeoCarrierSummary(
+                    cells
+                );
+
+            for (
+                var carrierIndex = 0;
+                carrierIndex <
+                    carrierSummary.length;
+                carrierIndex++
+            ) {
+                var summaryKey =
+                    carrierSummary[
+                        carrierIndex
+                    ].key;
+
+                if (
+                    !(
+                        summaryKey in
+                        caGeoSelectedCarriers
+                    )
+                ) {
+                    caGeoSelectedCarriers[
+                        summaryKey
+                    ] = true;
+                }
+            }
+
+            var selectedCarrierCount =
+                carrierSummary.filter(
+                    function(item) {
+                        return (
+                            caGeoSelectedCarriers[
+                                item.key
+                            ] !== false
+                        );
+                    }
+                ).length;
+
+            var cellNodes = '';
+
+            var schematicCells =
+                caGeoArrangeSchematicCells(
+                    cells
+                );
+
+            for (
+                var i = 0;
+                i < schematicCells.length;
+                i++
+            ) {
+                var cell =
+                    schematicCells[i];
+
+                var position =
+                    caGeoSchematicPosition(
+                        i,
+                        schematicCells.length
+                    );
+
+                var carrierKey =
+                    caGeoCarrierKey(
+                        cell.carrier
+                    );
+
+                var carrierSelected =
+                    caGeoSelectedCarriers[
+                        carrierKey
+                    ] !== false;
+
+                var active =
+                    carrierSelected &&
+                    caGeoActiveCellKey &&
+                    String(
+                        cell.key || ''
+                    ) ===
+                        String(
+                            caGeoActiveCellKey
+                        );
+
+                cellNodes +=
+                    '<button type="button" ' +
+
+                        'class="ca-geo-cell-node ' +
+                            caGeoCarrierClass(
+                                cell.carrier
+                            ) +
+                            (
+                                active
+                                    ? ' is-active'
+                                    : ''
+                            ) +
+                            (
+                                !carrierSelected
+                                    ? ' is-carrier-muted'
+                                    : ''
+                            ) +
+                        '" ' +
+
+                        'data-ca-geo-cell="' +
+                            caEscapeHtml(
+                                cell.key || ''
+                            ) +
+                        '" ' +
+
+                        'data-ca-geo-carrier-key="' +
+                            caEscapeHtml(
+                                carrierKey
+                            ) +
+                        '" ' +
+
+                        (
+                            !carrierSelected
+                                ? (
+                                    'disabled ' +
+                                    'aria-disabled="true" '
+                                )
+                                : ''
+                        ) +
+
+                        'aria-label="Open Serving Cell ' +
+                            caEscapeHtml(
+                                cell.view_label ||
+                                cell.label ||
+                                ''
+                            ) +
+                            ' details" ' +
+
+                        'style="left:' +
+                            position.left.toFixed(
+                                2
+                            ) +
+                            '%; top:' +
+                            position.top.toFixed(
+                                2
+                            ) +
+                            '%;">' +
+
+                        caEscapeHtml(
+                            cell.view_label ||
+                            cell.label ||
+                            String(i + 1)
+                        ) +
+
+                    '</button>';
+            }
+
+            var carrierHtml = '';
+
+            for (
+                var c = 0;
+                c < carrierSummary.length;
+                c++
+            ) {
+                var carrierItem =
+                    carrierSummary[c];
+
+                var carrierSelected =
+                    caGeoSelectedCarriers[
+                        carrierItem.key
+                    ] !== false;
+
+                var lastSelected =
+                    carrierSelected &&
+                    selectedCarrierCount === 1;
+
+                carrierHtml +=
+                    '<button type="button" ' +
+
+                    'class="ca-geo-carrier-chip ' +
+                        caGeoCarrierClass(
+                            carrierItem.name
+                        ) +
+                        (
+                            carrierSelected
+                                ? ' is-selected'
+                                : ''
+                        ) +
+                        (
+                            lastSelected
+                                ? ' is-last-selected'
+                                : ''
+                        ) +
+                    '" ' +
+
+                    'data-ca-geo-carrier="' +
+                        caEscapeHtml(
+                            carrierItem.key
+                        ) +
+                    '" ' +
+
+                    'aria-pressed="' +
+                        (
+                            carrierSelected
+                                ? 'true'
+                                : 'false'
+                        ) +
+                    '" ' +
+
+                    (
+                        lastSelected
+                            ? (
+                                'title="At least one carrier must remain selected."'
+                            )
+                            : ''
+                    ) +
+
+                    '>' +
+
+                        '<span class="ca-geo-carrier-dot"></span>' +
+
+                        '<span>' +
+                            caEscapeHtml(
+                                carrierItem.name
+                            ) +
+                        '</span>' +
+
+                        '<strong>' +
+                            carrierItem.count +
+                            ' cell' +
+                            (
+                                carrierItem.count === 1
+                                    ? ''
+                                    : 's'
+                            ) +
+                        '</strong>' +
+
+                    '</button>';
+            }
+
+            var activeCell = null;
+
+            if (caGeoActiveCellKey) {
+                for (
+                    var a = 0;
+                    a < cells.length;
+                    a++
+                ) {
+                    if (
+                        String(
+                            cells[a].key || ''
+                        ) ===
+                        String(
+                            caGeoActiveCellKey
+                        )
+                    ) {
+                        if (
+                            caGeoSelectedCarriers[
+                                caGeoCarrierKey(
+                                    cells[a].carrier
+                                )
+                            ] !== false
+                        ) {
+                            activeCell =
+                                cells[a];
+                        } else {
+                            caGeoActiveCellKey =
+                                '';
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            var providerLabel =
+                geo.provider &&
+                geo.provider !== 'none'
+                    ? String(
+                        geo.provider
+                    )
+                    : 'Not Configured';
+
+            var siteLocationLabel =
+                caGeoSiteLocationDisplay(
+                    geo.location
+                );
+
+            var estimatedCount =
+                Number(
+                    geo.estimated_locations ||
+                    0
+                );
 
             geoView.innerHTML =
-                '<div class="ca-geo-placeholder">' +
+                '<div class="ca-geo-layout">' +
 
-                    '<div class="ca-geo-icon">' +
-                        '<i class="fas fa-map-marked-alt"></i>' +
-                    '</div>' +
+                    '<div class="ca-geo-canvas">' +
 
-                    '<div class="ca-geo-copy">' +
-                        '<div class="ca-geo-title">' +
-                            'Estimated Serving Cell Geography' +
+                        '<div class="ca-geo-schematic-label">' +
+                            '<i class="fas fa-project-diagram"></i>' +
+                            'Local observation schematic — positions are not geographic' +
                         '</div>' +
 
-                        '<div class="ca-geo-note">' +
+                        '<div class="ca-geo-site-node" aria-hidden="true">' +
+                            '<i class="fas fa-home"></i>' +
+                        '</div>' +
+
+                        '<div class="ca-geo-site-caption">' +
+                            'Site' +
+                        '</div>' +
+
+                        cellNodes +
+
+                        caGeoRenderPopover(
+                            activeCell
+                        ) +
+
+                    '</div>' +
+
+                    '<aside class="ca-geo-context">' +
+
+                        '<div class="ca-geo-context-title">' +
+                            'Site Context' +
+                        '</div>' +
+
+                        '<div class="ca-geo-context-grid">' +
+
+                            '<div class="ca-geo-context-stat">' +
+                                '<span>Serving Cells</span>' +
+                                '<strong>' +
+                                    cells.length +
+                                '</strong>' +
+                            '</div>' +
+
+                            '<div class="ca-geo-context-stat">' +
+                                '<span>Carriers</span>' +
+                                '<strong>' +
+                                    carrierSummary.length +
+                                '</strong>' +
+                            '</div>' +
+
+                            '<div class="ca-geo-context-stat">' +
+                                '<span>Interfaces</span>' +
+                                '<strong>' +
+                                    interfaces.length +
+                                '</strong>' +
+                            '</div>' +
+
+                            '<div class="ca-geo-context-stat">' +
+                                '<span>Geo Provider</span>' +
+
+                                '<strong class="' +
+                                    (
+                                        providerLabel ===
+                                        'Not Configured'
+                                            ? (
+                                                'ca-geo-provider-unconfigured'
+                                            )
+                                            : ''
+                                    ) +
+                                '">' +
+
+                                    caEscapeHtml(
+                                        providerLabel
+                                    ) +
+
+                                '</strong>' +
+                            '</div>' +
+
+                            '<div class="ca-geo-context-stat is-wide">' +
+
+                                '<span>Site Location</span>' +
+
+                                '<strong class="ca-geo-location-value" title="' +
+                                    caEscapeHtml(
+                                        siteLocationLabel
+                                    ) +
+                                '">' +
+
+                                    caEscapeHtml(
+                                        siteLocationLabel
+                                    ) +
+
+                                '</strong>' +
+
+                            '</div>' +
+
+                        '</div>' +
+
+                        '<div class="ca-geo-carrier-list">' +
+                            carrierHtml +
+                        '</div>' +
+
+                        '<div class="ca-geo-context-note">' +
+
+                            '<i class="fas fa-info-circle"></i>' +
+
                             (
-                                configured
-                                    ? 'Location provider configured. Map rendering will be enabled with geolocation support.'
-                                    : 'No location provider configured. Local Cellular Analysis remains fully available.'
+                                providerLabel ===
+                                'Not Configured'
+                                    ? (
+                                        'Cell identities are available locally. ' +
+                                        'Configure a Geo Provider later to add ' +
+                                        'estimated geographic cell locations.'
+                                    )
+                                    : (
+                                        estimatedCount +
+                                        ' serving-cell locations currently have ' +
+                                        'geographic estimates.'
+                                    )
                             ) +
-                        '</div>' +
-                    '</div>' +
 
-                    '<button type="button" ' +
-                    'class="btn btn-secondary ca-geo-configure" ' +
-                    'id="btn-ca-configure-location">' +
-                        '<i class="fas fa-cog"></i> Configure' +
-                    '</button>' +
+                        '</div>' +
+
+                    '</aside>' +
 
                 '</div>';
 
             caBindGeoControls();
         }
 
-        function caOpenLocationSettings() {
-            var panel = document.getElementById(
-                'ca-location-settings'
+        function caGeoRenderGpsDraft(message) {
+            var status = document.getElementById(
+                'ca-geo-gps-status'
             );
 
-            if (!panel) {
-                return;
+            var coordinates = document.getElementById(
+                'ca-geo-gps-coordinates'
+            );
+
+            var meta = document.getElementById(
+                'ca-geo-gps-meta'
+            );
+
+            var hasCoordinates =
+                caGeoDraftGps.latitude != null &&
+                caGeoDraftGps.longitude != null;
+
+            if (status) {
+                status.classList.toggle(
+                    'has-fix',
+                    hasCoordinates
+                );
+
+                status.innerHTML =
+                    '<i class="fas fa-map-marker-alt"></i>' +
+                    '<span>' +
+                        caEscapeHtml(
+                            message ||
+                            (
+                                hasCoordinates
+                                    ? 'GPS coordinates available'
+                                    : 'GPS not captured yet'
+                            )
+                        ) +
+                    '</span>';
             }
 
-            panel.style.display = 'block';
+            if (coordinates) {
+                coordinates.textContent =
+                    hasCoordinates
+                        ? (
+                            Number(
+                                caGeoDraftGps.latitude
+                            ).toFixed(6) +
+                            ', ' +
+                            Number(
+                                caGeoDraftGps.longitude
+                            ).toFixed(6)
+                        )
+                        : '—';
+            }
 
-            try {
-                panel.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'nearest'
-                });
-            } catch (error) {
-                panel.scrollIntoView();
+            if (meta) {
+                var metaParts = [];
+
+                if (
+                    caGeoDraftGps.satellites != null
+                ) {
+                    metaParts.push(
+                        String(
+                            caGeoDraftGps.satellites
+                        ) +
+                        ' satellites'
+                    );
+                }
+
+                if (
+                    caGeoDraftGps.accuracy != null
+                ) {
+                    metaParts.push(
+                        'Accuracy ±' +
+                        String(
+                            caGeoDraftGps.accuracy
+                        ) +
+                        ' m'
+                    );
+                }
+
+                meta.textContent =
+                    metaParts.length
+                        ? metaParts.join(' • ')
+                        : (
+                            'Refresh GPS to query the router once.'
+                        );
             }
         }
 
-        function caCloseLocationSettings() {
-            var panel = document.getElementById(
-                'ca-location-settings'
+        function caGeoRefreshGps() {
+            var button = document.getElementById(
+                'btn-ca-refresh-gps'
             );
 
-            if (panel) {
-                panel.style.display = 'none';
+            if (button) {
+                button.disabled = true;
+
+                button.innerHTML =
+                    '<i class="fas fa-circle-notch fa-spin"></i> ' +
+                    'Refreshing…';
+            }
+
+            fetch('/api/geo_gps')
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error(
+                            'Unable to query device GPS'
+                        );
+                    }
+
+                    return response.json();
+                })
+                .then(function(gps) {
+                    if (
+                        gps &&
+                        gps.fix_available &&
+                        gps.latitude != null &&
+                        gps.longitude != null
+                    ) {
+                        caGeoDraftGps.latitude =
+                            gps.latitude;
+
+                        caGeoDraftGps.longitude =
+                            gps.longitude;
+
+                        caGeoDraftGps.satellites =
+                            gps.satellites;
+
+                        caGeoDraftGps.accuracy =
+                            gps.accuracy;
+
+                        caGeoDraftGps.gps_lock =
+                            !!gps.gps_lock;
+
+                        caGeoRenderGpsDraft(
+                            'GPS Fix Available'
+                        );
+                    } else {
+                        caGeoRenderGpsDraft(
+                            caGeoDraftGps.latitude != null
+                                ? (
+                                    'No current GPS fix · ' +
+                                    'saved coordinates retained'
+                                )
+                                : 'No GPS Fix Available'
+                        );
+                    }
+                })
+                .catch(function(error) {
+                    caGeoRenderGpsDraft(
+                        caGeoDraftGps.latitude != null
+                            ? (
+                                'GPS query failed · ' +
+                                'saved coordinates retained'
+                            )
+                            : 'GPS query failed'
+                    );
+
+                    console.error(
+                        'GeoView GPS refresh failed:',
+                        error
+                    );
+                })
+                .finally(function() {
+                    if (button) {
+                        button.disabled = false;
+
+                        button.innerHTML =
+                            '<i class="fas fa-sync-alt"></i> ' +
+                            'Refresh GPS';
+                    }
+                });
+        }
+
+        function caGeoSyncModalFromData() {
+            var data =
+                window._cellularAnalysisData ||
+                {};
+
+            var geo =
+                data.geo ||
+                {};
+
+            var location =
+                geo.location ||
+                {};
+
+            caGeoDraftProvider = String(
+                geo.provider ||
+                'none'
+            );
+
+            caGeoDraftLocationSource = String(
+                location.source ||
+                'device_gps'
+            );
+
+            caGeoDraftGps.latitude =
+                location.latitude != null
+                    ? location.latitude
+                    : null;
+
+            caGeoDraftGps.longitude =
+                location.longitude != null
+                    ? location.longitude
+                    : null;
+
+            caGeoDraftGps.satellites =
+                null;
+
+            caGeoDraftGps.accuracy =
+                null;
+
+            caGeoDraftGps.gps_lock =
+                false;
+
+            caGeoRenderGpsDraft();
+
+            var providerChoices =
+                document.querySelectorAll(
+                    '[data-ca-provider]'
+                );
+
+            for (
+                var p = 0;
+                p < providerChoices.length;
+                p++
+            ) {
+                var providerChoice =
+                    providerChoices[p];
+
+                var providerSelected =
+                    providerChoice.getAttribute(
+                        'data-ca-provider'
+                    ) === caGeoDraftProvider;
+
+                providerChoice.classList.toggle(
+                    'is-selected',
+                    providerSelected
+                );
+
+                providerChoice.setAttribute(
+                    'aria-pressed',
+                    providerSelected
+                        ? 'true'
+                        : 'false'
+                );
+            }
+
+            var latitude =
+                document.getElementById(
+                    'ca-site-latitude'
+                );
+
+            var longitude =
+                document.getElementById(
+                    'ca-site-longitude'
+                );
+
+            var address =
+                document.getElementById(
+                    'ca-site-address'
+                );
+
+            if (latitude) {
+                latitude.value =
+                    location.latitude != null
+                        ? String(
+                            location.latitude
+                        )
+                        : '';
+            }
+
+            if (longitude) {
+                longitude.value =
+                    location.longitude != null
+                        ? String(
+                            location.longitude
+                        )
+                        : '';
+            }
+
+            if (address) {
+                address.value = String(
+                    location.address ||
+                    ''
+                );
+            }
+
+            caGeoSelectLocationSource(
+                caGeoDraftLocationSource
+            );
+        }
+
+        function caGeoBuildSettingsPayload() {
+            var latitude =
+                document.getElementById(
+                    'ca-site-latitude'
+                );
+
+            var longitude =
+                document.getElementById(
+                    'ca-site-longitude'
+                );
+
+            var address =
+                document.getElementById(
+                    'ca-site-address'
+                );
+
+            var location = {
+                source:
+                    caGeoDraftLocationSource,
+
+                latitude:
+                    null,
+
+                longitude:
+                    null,
+
+                address:
+                    ''
+            };
+
+            if (
+                caGeoDraftLocationSource ===
+                'device_gps'
+            ) {
+                location.latitude =
+                    caGeoDraftGps.latitude;
+
+                location.longitude =
+                    caGeoDraftGps.longitude;
+            } else if (
+                caGeoDraftLocationSource ===
+                'manual_coordinates'
+            ) {
+                location.latitude =
+                    latitude
+                        ? latitude.value.trim()
+                        : '';
+
+                location.longitude =
+                    longitude
+                        ? longitude.value.trim()
+                        : '';
+            } else if (
+                caGeoDraftLocationSource ===
+                'site_address'
+            ) {
+                location.address =
+                    address
+                        ? address.value.trim()
+                        : '';
+            }
+
+            return {
+                provider:
+                    caGeoDraftProvider,
+
+                location:
+                    location
+            };
+        }
+
+        function caGeoSaveSettings() {
+            var saveButton =
+                document.getElementById(
+                    'btn-ca-save-location'
+                );
+
+            if (saveButton) {
+                saveButton.disabled = true;
+
+                saveButton.innerHTML =
+                    '<i class="fas fa-circle-notch fa-spin"></i> ' +
+                    'Saving…';
+            }
+
+            fetch('/api/geo_settings', {
+                method: 'POST',
+
+                headers: {
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body: JSON.stringify(
+                    caGeoBuildSettingsPayload()
+                )
+            })
+                .then(function(response) {
+                    return response
+                        .json()
+                        .then(function(payload) {
+                            if (!response.ok) {
+                                throw new Error(
+                                    payload.error ||
+                                    'Unable to save GeoView settings'
+                                );
+                            }
+
+                            return payload;
+                        });
+                })
+                .then(function(saved) {
+                    if (
+                        !window._cellularAnalysisData
+                    ) {
+                        window._cellularAnalysisData =
+                            {};
+                    }
+
+                    var data =
+                        window._cellularAnalysisData;
+
+                    data.geo =
+                        data.geo ||
+                        {};
+
+                    data.geo.provider =
+                        saved.provider ||
+                        'none';
+
+                    data.geo.configured =
+                        saved.configured === true;
+
+                    data.geo.status =
+                        data.geo.configured
+                            ? 'configured'
+                            : 'not_configured';
+
+                    data.geo.location =
+                        saved.location ||
+                        {};
+
+                    caRenderGeo(data);
+                    caCloseLocationSettings();
+                })
+                .catch(function(error) {
+                    alert(
+                        error.message
+                    );
+                })
+                .finally(function() {
+                    if (saveButton) {
+                        saveButton.disabled =
+                            false;
+
+                        saveButton.innerHTML =
+                            '<i class="fas fa-save"></i> ' +
+                            'Save GeoView';
+                    }
+                });
+        }
+
+        function caOpenLocationSettings() {
+            caGeoSyncModalFromData();
+
+            var backdrop =
+                document.getElementById(
+                    'ca-geo-modal-backdrop'
+                );
+
+            if (!backdrop) {
+                return;
+            }
+
+            backdrop.classList.add(
+                'is-open'
+            );
+
+            backdrop.setAttribute(
+                'aria-hidden',
+                'false'
+            );
+
+            document.body.style.overflow =
+                'hidden';
+        }
+
+        function caCloseLocationSettings() {
+            var backdrop =
+                document.getElementById(
+                    'ca-geo-modal-backdrop'
+                );
+
+            if (!backdrop) {
+                return;
+            }
+
+            backdrop.classList.remove(
+                'is-open'
+            );
+
+            backdrop.setAttribute(
+                'aria-hidden',
+                'true'
+            );
+
+            document.body.style.overflow =
+                '';
+        }
+
+        function caGeoSelectLocationSource(source) {
+            caGeoDraftLocationSource =
+                source;
+
+            var choices =
+                document.querySelectorAll(
+                    '[data-ca-location-source]'
+                );
+
+            for (
+                var i = 0;
+                i < choices.length;
+                i++
+            ) {
+                var choice =
+                    choices[i];
+
+                var selected =
+                    choice.getAttribute(
+                        'data-ca-location-source'
+                    ) === source;
+
+                choice.classList.toggle(
+                    'is-selected',
+                    selected
+                );
+
+                choice.setAttribute(
+                    'aria-pressed',
+                    selected
+                        ? 'true'
+                        : 'false'
+                );
+            }
+
+            var gpsPanel =
+                document.getElementById(
+                    'ca-geo-gps-panel'
+                );
+
+            if (gpsPanel) {
+                gpsPanel.classList.toggle(
+                    'is-visible',
+                    source ===
+                        'device_gps'
+                );
+            }
+
+            var manual =
+                document.getElementById(
+                    'ca-geo-manual-fields'
+                );
+
+            if (manual) {
+                manual.classList.toggle(
+                    'is-visible',
+                    source ===
+                        'manual_coordinates'
+                );
+            }
+
+            var address =
+                document.getElementById(
+                    'ca-geo-address-fields'
+                );
+
+            if (address) {
+                address.classList.toggle(
+                    'is-visible',
+                    source ===
+                        'site_address'
+                );
             }
         }
 
         function caBindGeoControls() {
-            var configure = document.getElementById(
-                'btn-ca-configure-location'
-            );
+            var configure =
+                document.getElementById(
+                    'btn-ca-configure-location'
+                );
 
             if (
                 configure &&
                 configure.dataset.caBound !== '1'
             ) {
-                configure.dataset.caBound = '1';
+                configure.dataset.caBound =
+                    '1';
 
                 configure.addEventListener(
                     'click',
@@ -9398,22 +11938,344 @@
                 );
             }
 
-            var close = document.getElementById(
-                'btn-ca-close-location'
-            );
+            var closeIds = [
+                'btn-ca-close-location',
+                'btn-ca-cancel-location'
+            ];
+
+            for (
+                var i = 0;
+                i < closeIds.length;
+                i++
+            ) {
+                var close =
+                    document.getElementById(
+                        closeIds[i]
+                    );
+
+                if (
+                    close &&
+                    close.dataset.caBound !== '1'
+                ) {
+                    close.dataset.caBound =
+                        '1';
+
+                    close.addEventListener(
+                        'click',
+                        caCloseLocationSettings
+                    );
+                }
+            }
+
+            var backdrop =
+                document.getElementById(
+                    'ca-geo-modal-backdrop'
+                );
 
             if (
-                close &&
-                close.dataset.caBound !== '1'
+                backdrop &&
+                backdrop.dataset.caBound !== '1'
             ) {
-                close.dataset.caBound = '1';
+                backdrop.dataset.caBound =
+                    '1';
 
-                close.addEventListener(
+                backdrop.addEventListener(
                     'click',
-                    caCloseLocationSettings
+                    function(event) {
+                        if (
+                            event.target ===
+                            backdrop
+                        ) {
+                            caCloseLocationSettings();
+                        }
+                    }
+                );
+            }
+
+            var locationChoices =
+                document.querySelectorAll(
+                    '[data-ca-location-source]:not([disabled])'
+                );
+
+            for (
+                var l = 0;
+                l < locationChoices.length;
+                l++
+            ) {
+                var locationChoice =
+                    locationChoices[l];
+
+                if (
+                    locationChoice.dataset.caBound ===
+                    '1'
+                ) {
+                    continue;
+                }
+
+                locationChoice.dataset.caBound =
+                    '1';
+
+                locationChoice.addEventListener(
+                    'click',
+                    function() {
+                        caGeoSelectLocationSource(
+                            this.getAttribute(
+                                'data-ca-location-source'
+                            )
+                        );
+                    }
+                );
+            }
+
+            var refreshGps =
+                document.getElementById(
+                    'btn-ca-refresh-gps'
+                );
+
+            if (
+                refreshGps &&
+                refreshGps.dataset.caBound !== '1'
+            ) {
+                refreshGps.dataset.caBound =
+                    '1';
+
+                refreshGps.addEventListener(
+                    'click',
+                    caGeoRefreshGps
+                );
+            }
+
+            var saveButton =
+                document.getElementById(
+                    'btn-ca-save-location'
+                );
+
+            if (
+                saveButton &&
+                saveButton.dataset.caBound !== '1'
+            ) {
+                saveButton.dataset.caBound =
+                    '1';
+
+                saveButton.addEventListener(
+                    'click',
+                    caGeoSaveSettings
+                );
+            }
+
+            var carrierButtons =
+                document.querySelectorAll(
+                    '[data-ca-geo-carrier]'
+                );
+
+            for (
+                var carrierButtonIndex = 0;
+                carrierButtonIndex <
+                    carrierButtons.length;
+                carrierButtonIndex++
+            ) {
+                var carrierButton =
+                    carrierButtons[
+                        carrierButtonIndex
+                    ];
+
+                if (
+                    carrierButton.dataset.caBound ===
+                    '1'
+                ) {
+                    continue;
+                }
+
+                carrierButton.dataset.caBound =
+                    '1';
+
+                carrierButton.addEventListener(
+                    'click',
+                    function() {
+                        var key =
+                            this.getAttribute(
+                                'data-ca-geo-carrier'
+                            );
+
+                        var data =
+                            window._cellularAnalysisData;
+
+                        var geo =
+                            data &&
+                            data.geo
+                                ? data.geo
+                                : {};
+
+                        var geoCells =
+                            Array.isArray(
+                                geo.cells
+                            )
+                                ? geo.cells.filter(
+                                    function(cell) {
+                                        return (
+                                            cell &&
+                                            !cell.unknown
+                                        );
+                                    }
+                                )
+                                : [];
+
+                        var summary =
+                            caGeoCarrierSummary(
+                                geoCells
+                            );
+
+                        var selectedCount =
+                            summary.filter(
+                                function(item) {
+                                    return (
+                                        caGeoSelectedCarriers[
+                                            item.key
+                                        ] !== false
+                                    );
+                                }
+                            ).length;
+
+                        var currentlySelected =
+                            caGeoSelectedCarriers[
+                                key
+                            ] !== false;
+
+                        if (
+                            currentlySelected &&
+                            selectedCount <= 1
+                        ) {
+                            return;
+                        }
+
+                        caGeoSelectedCarriers[
+                            key
+                        ] =
+                            !currentlySelected;
+
+                        if (
+                            window._cellularAnalysisData
+                        ) {
+                            caRenderGeo(
+                                window._cellularAnalysisData
+                            );
+                        }
+                    }
+                );
+            }
+
+            var cellButtons =
+                document.querySelectorAll(
+                    '[data-ca-geo-cell]'
+                );
+
+            for (
+                var c = 0;
+                c < cellButtons.length;
+                c++
+            ) {
+                var cellButton =
+                    cellButtons[c];
+
+                if (
+                    cellButton.dataset.caBound ===
+                    '1'
+                ) {
+                    continue;
+                }
+
+                cellButton.dataset.caBound =
+                    '1';
+
+                cellButton.addEventListener(
+                    'click',
+                    function() {
+                        caGeoActiveCellKey =
+                            this.getAttribute(
+                                'data-ca-geo-cell'
+                            ) ||
+                            '';
+
+                        if (
+                            window._cellularAnalysisData
+                        ) {
+                            caRenderGeo(
+                                window._cellularAnalysisData
+                            );
+                        }
+                    }
+                );
+            }
+
+            var cellClose =
+                document.querySelector(
+                    '[data-ca-geo-close-cell]'
+                );
+
+            if (
+                cellClose &&
+                cellClose.dataset.caBound !== '1'
+            ) {
+                cellClose.dataset.caBound =
+                    '1';
+
+                cellClose.addEventListener(
+                    'click',
+                    function() {
+                        caGeoActiveCellKey =
+                            '';
+
+                        if (
+                            window._cellularAnalysisData
+                        ) {
+                            caRenderGeo(
+                                window._cellularAnalysisData
+                            );
+                        }
+                    }
                 );
             }
         }
+
+        document.addEventListener(
+            'keydown',
+            function(event) {
+                if (
+                    event.key ===
+                    'Escape'
+                ) {
+                    var backdrop =
+                        document.getElementById(
+                            'ca-geo-modal-backdrop'
+                        );
+
+                    if (
+                        backdrop &&
+                        backdrop.classList.contains(
+                            'is-open'
+                        )
+                    ) {
+                        caCloseLocationSettings();
+                        return;
+                    }
+
+                    if (
+                        caGeoActiveCellKey
+                    ) {
+                        caGeoActiveCellKey =
+                            '';
+
+                        if (
+                            window._cellularAnalysisData
+                        ) {
+                            caRenderGeo(
+                                window._cellularAnalysisData
+                            );
+                        }
+                    }
+                }
+            }
+        );
 
         var caActiveTooltip = null;
 

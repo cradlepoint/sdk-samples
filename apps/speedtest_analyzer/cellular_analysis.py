@@ -2593,6 +2593,155 @@ def _selected_cell(records, cells, selected_key=''):
     return detail
 
 
+
+
+def build_site_cell_inventory(history):
+    """Build site-wide serving-cell inventory across all retained history.
+
+    GeoView intentionally ignores the lower-page interface and date filters.
+    It represents every identifiable serving cell observed by every cellular
+    interface in the retained local history. The existing traffic-aware cell
+    engine remains authoritative, so cells seen only during an in-test handoff
+    are preserved here as well.
+    """
+    history = history if isinstance(history, list) else []
+
+    records = [
+        record
+        for record in history
+        if _is_cellular_history_record(record)
+    ]
+
+    records.sort(
+        key=lambda record: (
+            _parse_timestamp(record.get('timestamp'))
+            or datetime.min
+        )
+    )
+
+    cells = [
+        dict(cell)
+        for cell in _cell_distribution(records)
+        if cell.get('key') != _UNKNOWN_CELL_KEY
+    ]
+
+    cells_by_key = {
+        cell.get('key'): cell
+        for cell in cells
+        if cell.get('key')
+    }
+
+    observed_by_interface = {
+        key: {}
+        for key in cells_by_key
+    }
+
+    for record in records:
+        interface = _record_interface(record)
+        interface_label = (
+            _text(record.get('interface_label'))
+            or interface
+        )
+
+        summary = _traffic_serving_cell_summary(record)
+        observed_cells = summary.get('cells_observed', [])
+
+        if not observed_cells:
+            fallback = _serving_cell_for_record(record)
+            if _cell_key(fallback) != _UNKNOWN_CELL_KEY:
+                observed_cells = [fallback]
+
+        final_cell = _serving_cell_for_record(record)
+        final_key = _cell_key(final_cell)
+
+        per_test_keys = set()
+
+        for observed in observed_cells:
+            key = _cell_key(observed)
+
+            if (
+                key == _UNKNOWN_CELL_KEY
+                or key not in cells_by_key
+                or key in per_test_keys
+            ):
+                continue
+
+            per_test_keys.add(key)
+            inventory_cell = cells_by_key[key]
+
+            # Traffic snapshots are authoritative for identity. The final
+            # snapshot may carry richer descriptive metadata for the same
+            # cell, so use it only to fill missing display attributes.
+            candidates = [observed]
+
+            if final_key == key:
+                candidates.append(final_cell)
+
+            for candidate in candidates:
+                if not isinstance(candidate, dict):
+                    continue
+
+                for attr in (
+                    'carrier',
+                    'plmn',
+                    'tac',
+                    'pci',
+                    'band',
+                    'channel',
+                    'cell_id_source',
+                ):
+                    if (
+                        not inventory_cell.get(attr)
+                        and candidate.get(attr)
+                    ):
+                        inventory_cell[attr] = candidate.get(attr)
+
+            interface_bucket = observed_by_interface[key].setdefault(
+                interface,
+                {
+                    'interface': interface,
+                    'label': interface_label,
+                    'tests': 0,
+                },
+            )
+
+            interface_bucket['tests'] += 1
+
+            # Prefer a human-friendly label whenever a later record supplies
+            # one for the same NCOS interface identifier.
+            if (
+                interface_label
+                and (
+                    not interface_bucket.get('label')
+                    or interface_bucket.get('label') == interface
+                )
+            ):
+                interface_bucket['label'] = interface_label
+
+    for cell in cells:
+        interface_rows = list(
+            observed_by_interface.get(
+                cell.get('key'),
+                {},
+            ).values()
+        )
+
+        interface_rows.sort(
+            key=lambda item: (
+                -int(item.get('tests', 0) or 0),
+                _text(item.get('label')).lower(),
+            )
+        )
+
+        cell['interfaces'] = interface_rows
+        cell['interface_count'] = len(interface_rows)
+
+    return {
+        'tests': len(records),
+        'cells': cells,
+        'interfaces': _history_interfaces(records),
+    }
+
 def build_cellular_analysis(history, interface='', scope='all', selected_cell_key='', now=None):
     """Build the complete local Cellular Analysis response from history."""
     history = history if isinstance(history, list) else []

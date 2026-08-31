@@ -16,7 +16,15 @@ from datetime import datetime
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
-from cellular_analysis import build_cellular_analysis
+from cellular_analysis import (
+    build_cellular_analysis,
+    build_site_cell_inventory,
+)
+from cellular_geo import (
+    apply_geo_settings,
+    load_geo_settings,
+    save_geo_settings,
+)
 
 # Constants
 PORT = 8000
@@ -11615,6 +11623,16 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                     if part.startswith('iface='):
                         iface = part[6:]
             self.send_json(self.get_cellular_status(iface))
+        elif self.path == '/api/geo_gps':
+            self.send_json(
+                self.get_geo_gps()
+            )
+
+        elif self.path == '/api/geo_settings':
+            self.send_json(
+                load_geo_settings()
+            )
+
         elif (
             self.path == '/api/cellular_analysis'
             or self.path.startswith('/api/cellular_analysis?')
@@ -11622,13 +11640,73 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
 
-            self.send_json(
-                build_cellular_analysis(
-                    load_history(),
-                    interface=params.get('iface', [''])[0],
-                    scope=params.get('history', ['all'])[0],
-                    selected_cell_key=params.get('cell', [''])[0],
+            history = load_history()
+
+            # Normal Cellular Analysis remains scoped by the lower-page
+            # Interface and History controls.
+            analysis = build_cellular_analysis(
+                history,
+                interface=params.get(
+                    'iface',
+                    ['']
+                )[0],
+                scope=params.get(
+                    'history',
+                    ['all']
+                )[0],
+                selected_cell_key=params.get(
+                    'cell',
+                    ['']
+                )[0],
+            )
+
+            # GeoView is deliberately site-wide. It uses every retained
+            # cellular result across all cellular interfaces, independent
+            # of the lower-page filters.
+            site_inventory = (
+                build_site_cell_inventory(
+                    history
                 )
+            )
+
+            geo = dict(
+                analysis.get('geo')
+                or {}
+            )
+
+            geo.update({
+                'cells':
+                    site_inventory.get(
+                        'cells',
+                        []
+                    ),
+
+                'interfaces':
+                    site_inventory.get(
+                        'interfaces',
+                        []
+                    ),
+
+                'tests':
+                    site_inventory.get(
+                        'tests',
+                        0
+                    ),
+
+                # External cell-location providers are intentionally not
+                # implemented in the v1.1.1 foundation.
+                'estimated_locations': 0,
+            })
+
+            analysis['geo'] = (
+                apply_geo_settings(
+                    geo,
+                    load_geo_settings(),
+                )
+            )
+
+            self.send_json(
+                analysis
             )
 
         elif self.path == '/api/version':
@@ -11719,6 +11797,8 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_save_schedule()
         elif self.path == '/api/outputs':
             self.handle_save_outputs()
+        elif self.path == '/api/geo_settings':
+            self.handle_save_geo_settings()
         else:
             self.send_error(404)
 
@@ -11728,6 +11808,71 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_delete_server()
         else:
             self.send_error(404)
+
+    def handle_save_geo_settings(self):
+        """Persist explicit provider-independent GeoView configuration."""
+        content_length = int(
+            self.headers.get(
+                'Content-Length',
+                0
+            )
+        )
+
+        body = (
+            self.rfile.read(
+                content_length
+            ).decode('utf-8')
+            if content_length
+            else '{}'
+        )
+
+        try:
+            data = json.loads(body)
+
+        except json.JSONDecodeError:
+            self.send_json(
+                {
+                    'error':
+                        'Invalid JSON'
+                },
+                400,
+            )
+            return
+
+        try:
+            saved = save_geo_settings(
+                data
+            )
+
+        except ValueError as exc:
+            self.send_json(
+                {
+                    'error':
+                        str(exc)
+                },
+                400,
+            )
+            return
+
+        except OSError as exc:
+            cp.log(
+                'Unable to save GeoView settings: %s'
+                % exc
+            )
+
+            self.send_json(
+                {
+                    'error':
+                        'Unable to save GeoView settings'
+                },
+                500,
+            )
+            return
+
+        self.send_json(
+            saved
+        )
+
 
     def handle_set_iperf3_server_mode(self):
         """Switch between Public and User iPerf3 server sources."""
@@ -11771,6 +11916,79 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             result,
             status_code
         )
+
+
+    def get_geo_gps(self):
+        """Return one on-demand local GPS status sample for GeoView."""
+        try:
+            gps = (
+                cp.get_gps_status()
+                or {}
+            )
+
+        except Exception as exc:
+            cp.log(
+                'GeoView GPS query failed: %s'
+                % exc
+            )
+
+            return {
+                'available': False,
+                'gps_lock': False,
+                'latitude': None,
+                'longitude': None,
+                'satellites': None,
+                'accuracy': None,
+                'last_fix_age': None,
+            }
+
+        latitude = gps.get(
+            'latitude'
+        )
+
+        longitude = gps.get(
+            'longitude'
+        )
+
+        fix_available = (
+            latitude is not None
+            and longitude is not None
+        )
+
+        return {
+            'available': True,
+
+            'gps_lock':
+                bool(
+                    gps.get(
+                        'gps_lock'
+                    )
+                ),
+
+            'fix_available':
+                fix_available,
+
+            'latitude':
+                latitude,
+
+            'longitude':
+                longitude,
+
+            'satellites':
+                gps.get(
+                    'satellites'
+                ),
+
+            'accuracy':
+                gps.get(
+                    'accuracy'
+                ),
+
+            'last_fix_age':
+                gps.get(
+                    'last_fix_age'
+                ),
+        }
 
 
     def get_status(self):

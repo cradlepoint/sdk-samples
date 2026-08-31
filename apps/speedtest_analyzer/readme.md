@@ -1,8 +1,8 @@
 # Speedtest Analyzer
 
-Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, iPerf3 server management, endpoint reliability tracking, and reporting.
+Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, historical Cellular Analysis, site-wide GeoView context, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.1.0
+**Version:** 1.1.1
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -29,6 +29,8 @@ Key capabilities include:
 - Filter results by interface, status, and time range.
 - View throughput trends and detailed test information.
 - Monitor cellular health, service type, serving bands, and Carrier Activity when NCOS exposes the required data.
+- Analyze retained cellular history by serving cell, network mode, RF conditions, radio configuration, and observed handoffs.
+- Review a site-wide **Cellular GeoView** showing serving cells observed across all retained cellular interfaces, with carrier filtering and per-cell interface context.
 - Review published modem Carrier Aggregation capability references for supported modem variants.
 - Track saved iPerf3 endpoint reliability.
 - Export results in CSV or HTML format.
@@ -478,6 +480,185 @@ Resetting Reliability statistics affects only the currently active Public or Use
 
 ---
 
+# Cellular Analysis
+
+**Cellular Analysis** uses cellular telemetry retained with Speedtest Analyzer test history to show which cellular network resources the router has been using over time.
+
+The page is designed for historical radio-resource analysis rather than throughput-correlation conclusions. Throughput can also be influenced by the selected test server, WAN path, internet congestion, server load, and other non-radio conditions.
+
+The lower Cellular Analysis workspace can be scoped by:
+
+- Cellular interface
+- Available retained history
+- Selected serving cell
+
+Analysis includes:
+
+- Tests Analyzed
+- Serving Cells Observed
+- LTE / 5G NSA / 5G SA technology usage
+- Serving Cell Distribution
+- Active Traffic percentage when timed telemetry is available
+- Long-term Serving Cell Timeline
+- In-test serving-cell handoff markers
+- Serving Cell Changes
+- Peak Radio Configuration Changes
+- Observed Bandwidth Changes
+- Network Mode Changes
+- Selected-cell identity
+- RSRP, RSRQ, and SINR summaries
+- Cellular Health observations
+- Peak Observed Radio Configurations
+
+A serving cell may appear in more than one test or on more than one cellular interface. **Tests Seen** therefore is not a mutually exclusive percentage. When timed in-test telemetry exists, **Active Traffic** represents the mutually exclusive share of measured Download/Upload traffic time associated with each identifiable serving cell.
+
+Unknown serving-cell observations are preserved when NCOS does not expose enough identity data. The application does not invent a handoff through an unidentified observation.
+
+## Site Cellular GeoView
+
+The top of Cellular Analysis contains **Site Cellular GeoView**.
+
+GeoView is intentionally **site-wide**. It uses serving cells observed across **all retained cellular interfaces and retained history**, regardless of the Interface and History Range selections used by the lower Cellular Analysis workspace.
+
+The v1.1.1 default view is a lightweight **local observation schematic**:
+
+- The center marker represents the router/site.
+- Serving cells are arranged around the site for visual separation.
+- Cell positions in this view are **not geographic locations**.
+- The schematic does not imply tower direction, distance, azimuth, or physical topology.
+- No interactive mapping framework or continuous location service is required.
+
+Serving cells are aggregated by their normalized serving-cell identity. If the same serving cell is observed through multiple cellular interfaces, GeoView represents it once and records each interface under **Observed Via**.
+
+Cells observed only during a retained in-test handoff remain eligible for the site inventory.
+
+Plain Ethernet/non-cellular history is excluded.
+
+### Site Context
+
+The Site Context panel summarizes:
+
+- Serving Cells
+- Carriers
+- Cellular Interfaces
+- Geo Provider state
+- Saved Site Location, when configured
+
+Carrier controls are derived from the carriers actually observed in retained history.
+
+All observed carriers begin selected. A carrier can be deselected to focus the schematic:
+
+- Its serving cells become dimmed.
+- Dimmed cells are non-interactive.
+- Reselecting the carrier restores those cells.
+- At least one carrier must always remain selected.
+
+Carrier-specific colors are used only as visual accents. The application does not use carrier logos, marks, or licensed artwork.
+
+### Serving-cell details
+
+Select an active serving-cell marker to open its details.
+
+The popup can include:
+
+- Serving Cell label
+- Carrier
+- Service role / band
+- Cell ID
+- PLMN
+- TAC
+- PCI
+- **Observed Via** interface names
+- Number of retained tests that observed the cell on each interface
+
+The popup intentionally does not claim an estimated physical location when no Geo Provider is configured.
+
+## Configure GeoView
+
+Select **Configure GeoView** to configure optional site context.
+
+After settings have been saved once, the header action changes to the smaller **Configure** control.
+
+### Geo Provider
+
+v1.1.1 supports the provider-independent GeoView framework.
+
+Available provider states in this release are:
+
+- **No Geo Provider** — fully functional local GeoView with no external cell-location requests.
+- **Google — Research Pending**
+- **Unwired — Research Pending**
+
+Google and Unwired are represented for future integration planning but are intentionally disabled in the v1.1.1 user interface.
+
+v1.1.1 does **not** include:
+
+- Provider API keys
+- Provider authentication
+- External cellular-location lookups
+- Address geocoding
+- Provider-derived tower/cell coordinates
+- Static provider map rendering
+
+Those capabilities require a later provider integration and are not prerequisites for local Cellular Analysis or GeoView.
+
+### Site Location
+
+A site location can be saved even when **No Geo Provider** is selected.
+
+Available location sources are:
+
+#### Device GPS
+
+**Refresh GPS** performs one explicit GPS query against the router.
+
+GeoView does not continuously poll GPS.
+
+When a valid GPS fix is returned, the modal can display:
+
+- Latitude
+- Longitude
+- GPS lock state
+- Satellite count, when exposed by NCOS
+- Accuracy, when exposed by NCOS
+
+Saved Device GPS coordinates remain available as site context even if a later refresh cannot obtain a current fix.
+
+#### Manual Coordinates
+
+Enter a fixed latitude and longitude for the site.
+
+GeoView validates:
+
+- Latitude from -90 through 90
+- Longitude from -180 through 180
+
+#### Site Address
+
+Site Address is descriptive text stored exactly as entered.
+
+v1.1.1 does **not** automatically geocode, resolve, or convert a Site Address into coordinates.
+
+## GeoView persistence and privacy
+
+GeoView settings are stored locally by the SDK application.
+
+The v1.1.1 settings include only:
+
+- Provider selection
+- Location-source selection
+- Optional latitude
+- Optional longitude
+- Optional descriptive Site Address
+
+Provider credentials do not exist in this release.
+
+GeoView does not require ICCID, IMEI, APN, device serial number, or other modem identity values for the local site inventory.
+
+Saving GeoView settings does not change Speedtest Analyzer test-history retention and does not cause continuous GPS or cellular polling.
+
+---
+
 # History & Reports
 
 **History & Reports** contains completed, partial, and failed tests.
@@ -750,6 +931,22 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 # Changelog — 1.x
 
 The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.1.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.1.1
+
+- Added **Site Cellular GeoView** as the site-wide view at the top of Cellular Analysis.
+- GeoView inventories identifiable serving cells across **all retained cellular interfaces and retained history**, independently from the lower Interface and History Range filters.
+- Added a lightweight **local observation schematic** that requires no mapping framework and explicitly does not represent geographic cell position.
+- Added carrier-aware serving-cell markers and carrier filters. All observed carriers start selected, deselected carriers and cells are dimmed, dimmed cells are non-interactive, and at least one carrier must remain selected.
+- Added compact serving-cell popups with carrier, service role/band, Cell ID, PLMN, TAC, PCI, and **Observed Via** interface/test counts.
+- Added aggregation of the same serving-cell identity across multiple cellular interfaces while retaining per-interface observation counts.
+- Preserved handoff-only serving cells in the site-wide GeoView inventory and continued to exclude plain Ethernet history.
+- Added **Configure GeoView** with provider-independent Site Location options for Device GPS, Manual Coordinates, or literal Site Address.
+- Added explicit on-demand **Refresh GPS** behavior. GeoView does not continuously poll GPS.
+- Added local GeoView settings persistence with validation and atomic file replacement.
+- **No Geo Provider** remains fully functional and performs no external cellular-location requests.
+- Google and Unwired provider choices are shown as **Research Pending** and remain disabled in v1.1.1.
+- v1.1.1 does not include provider API keys, address geocoding, external cell-location lookup, provider-derived geographic estimates, or provider map rendering.
 
 ## v1.1.0
 

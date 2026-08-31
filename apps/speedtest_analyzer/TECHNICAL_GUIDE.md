@@ -2,7 +2,7 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.1.0
+**Documentation version:** 1.1.1
 **Application release family:** 1.1.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
@@ -37,7 +37,7 @@ The documented application behavior uses several persistent or packaged data sou
 
 Application version information is carried in `package.ini`.
 
-The current branded application release is `1.1.0`. Speedtest Analyzer 1.0.0 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline.
+The current branded application release is `1.1.1`. Speedtest Analyzer 1.1.1 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline.
 
 ## 2.2 Device validation catalog
 
@@ -88,6 +88,38 @@ The 2.7.5 README documented configuration categories including:
 Exact internal JSON structures may change between application versions. Configuration should normally be managed through the web interface rather than edited directly.
 
 ---
+
+## 2.6 Cellular Analysis and GeoView modules
+
+The v1.1.x Cellular Analysis architecture is intentionally split so retained-history analysis, local GeoView settings, HTTP transport, and presentation remain independently maintainable.
+
+Primary components are:
+
+- `cellular_analysis.py`
+  - Normalizes retained serving-cell telemetry.
+  - Builds interface/history-scoped Cellular Analysis.
+  - Builds the site-wide serving-cell inventory used by GeoView.
+  - Preserves traffic-time handoffs and serving cells that may not be present in the final post-test snapshot.
+- `cellular_geo.py`
+  - Owns provider-independent local GeoView settings.
+  - Validates provider and Site Location selections.
+  - Persists settings using temporary-file write, flush/fsync, and atomic replacement.
+  - Contains no Google, Unwired, mapping, geocoding, or other external-provider adapter.
+- `speedtest_web.py`
+  - Serves Cellular Analysis and GeoView data.
+  - Exposes local GeoView settings endpoints.
+  - Performs the explicit on-demand NCOS GPS request.
+- `index.html`
+  - Renders the local site schematic.
+  - Implements carrier filtering, serving-cell details, Site Context, and the Configure GeoView modal using vanilla HTML/CSS/JavaScript.
+
+GeoView does not introduce a second continuous cellular telemetry collector. It reuses retained Speedtest Analyzer history and the Cellular Analysis normalization model.
+
+Local GeoView settings are stored in:
+
+    tmp/geoview_settings.json
+
+The settings file is local application state and is separate from Speedtest Analyzer test history.
 
 # 3. Platform Validation and Known Defects
 
@@ -1243,6 +1275,235 @@ History timestamps are stored in UTC but displayed using the viewer's browser ti
 
 Graph tooltips also identify the friendly WAN interface associated with each plotted result.
 
+## 11.3 Cellular Analysis scope versus GeoView scope
+
+The lower Cellular Analysis workspace and the Site Cellular GeoView intentionally use different scopes.
+
+Lower Cellular Analysis:
+
+- Applies the selected cellular Interface.
+- Applies the selected retained-history range.
+- Applies the selected serving-cell scope when requested.
+- Answers questions about the selected interface/history context.
+
+Site Cellular GeoView:
+
+- Uses every retained cellular test available to the application.
+- Includes all retained cellular interfaces.
+- Excludes plain Ethernet/non-cellular records.
+- Ignores the lower page Interface and History Range selectors.
+- Answers: **What identifiable cellular resources have been observed at this site?**
+
+The HTTP layer loads history once and builds both views from that retained dataset. GeoView does not trigger an additional modem-telemetry collection pass.
+
+## 11.4 Site-wide serving-cell inventory
+
+`build_site_cell_inventory(history)` constructs the provider-independent GeoView inventory.
+
+The builder:
+
+1. Filters retained history to cellular records.
+2. Sorts cellular records chronologically.
+3. Reuses the traffic-aware serving-cell normalization/distribution engine.
+4. Excludes the aggregate Unknown serving-cell identity from map/schematic markers.
+5. Preserves identifiable cells observed only during an in-test handoff.
+6. Deduplicates each serving cell once per test for interface observation counts.
+7. Aggregates the same normalized serving-cell identity across cellular interfaces.
+8. Supplements missing display metadata only from matching same-cell traffic/final observations.
+9. Returns site-wide tests, identifiable cells, and observed cellular interfaces.
+
+A serving cell is not made interface-specific merely because multiple modems observed it. The normalized serving-cell key remains the identity boundary, while `interfaces[]` records how the cell was observed.
+
+Each per-cell interface entry includes:
+
+- Interface identifier
+- Friendly interface label
+- Number of retained tests on that interface that observed the cell
+
+This information drives the **Observed Via** section in the UI.
+
+## 11.5 Local GeoView presentation
+
+The v1.1.1 default visualization is deliberately a non-geographic schematic.
+
+The site marker is centered and identifiable serving cells are distributed radially for readability.
+
+The positions:
+
+- Are not latitude/longitude.
+- Do not represent tower direction.
+- Do not represent distance.
+- Do not represent antenna azimuth.
+- Do not represent RF dominance.
+- Do not represent physical network topology.
+
+The UI explicitly labels the view as a local observation schematic so users are not encouraged to infer geographic meaning from marker placement.
+
+The frontend remains vanilla HTML/CSS/JavaScript and does not add Leaflet, Google Maps JavaScript, React, Vue, or another map/runtime framework.
+
+Carrier presentation uses simple color accents only. No carrier logos or carrier-owned artwork are embedded.
+
+### 11.5.1 Carrier focus behavior
+
+Carrier filter state is maintained only in the browser view.
+
+Rules are:
+
+- Every observed carrier starts selected.
+- More than one carrier may remain selected.
+- The final selected carrier cannot be deselected.
+- Deselected-carrier markers are visually dimmed.
+- Deselected-carrier serving-cell markers are disabled and cannot open a popup.
+- Reselecting a carrier restores marker interaction.
+
+There is no synthetic **All Carriers** option.
+
+### 11.5.2 Serving-cell popup
+
+An active serving-cell marker can display:
+
+- Stable view label
+- Carrier
+- Technology/service role
+- Band
+- Cell ID
+- PLMN
+- TAC
+- PCI
+- Observed Via interface/test counts
+
+First Seen and Last Seen are intentionally omitted from the compact GeoView popup because the lower Cellular Analysis workspace provides the historical analysis context.
+
+## 11.6 GeoView settings persistence
+
+`cellular_geo.py` owns the provider-independent settings schema.
+
+Current schema:
+
+    {
+      "schema_version": 1,
+      "configured": false,
+      "provider": "none",
+      "location": {
+        "source": "device_gps",
+        "latitude": null,
+        "longitude": null,
+        "address": ""
+      }
+    }
+
+Supported provider values in the settings model are:
+
+- `none`
+- `google`
+- `unwired`
+
+The v1.1.1 UI enables only `none`. Google and Unwired are visible as Research Pending and have no external adapter in this release.
+
+Supported Site Location sources are:
+
+- `device_gps`
+- `manual_coordinates`
+- `site_address`
+
+Validation includes:
+
+- Manual coordinates require both latitude and longitude.
+- Latitude must be between -90 and 90.
+- Longitude must be between -180 and 180.
+- Site Address must be non-empty when that source is selected.
+- Site Address is length-limited and stored literally.
+
+Saving settings marks the local GeoView configuration as configured even when the selected provider remains `none`.
+
+Settings persistence uses:
+
+1. Local temporary file creation.
+2. JSON serialization.
+3. File flush and fsync.
+4. Atomic `os.replace()`.
+5. Best-effort parent-directory fsync.
+6. Temporary-file cleanup.
+
+Missing or invalid settings safely fall back to the default unconfigured local GeoView state.
+
+## 11.7 GeoView HTTP API and GPS behavior
+
+The relevant local endpoints are:
+
+### `GET /api/cellular_analysis`
+
+Returns normal interface/history-scoped Cellular Analysis plus a site-wide `geo` object.
+
+The GeoView portion is rebuilt from the full retained history independently from the lower page selectors.
+
+The `geo` object includes site inventory, interfaces, settings state, Site Location, and the current estimated-location count.
+
+In v1.1.1, `estimated_locations` remains zero because no external provider adapter exists.
+
+### `GET /api/geo_settings`
+
+Returns normalized local GeoView settings.
+
+### `POST /api/geo_settings`
+
+Validates and atomically persists provider-independent GeoView configuration.
+
+Invalid user input returns a client error rather than writing partially valid settings.
+
+### `GET /api/geo_gps`
+
+Performs one explicit GPS status request through:
+
+    cp.get_gps_status()
+
+The endpoint is called only when the user selects **Refresh GPS**.
+
+GeoView does not:
+
+- Continuously poll GPS.
+- Start a GPS background worker.
+- Add GPS collection to every speed test.
+- Persist a stream of GPS samples.
+
+Returned GPS context can include:
+
+- GPS lock
+- Fix availability
+- Latitude
+- Longitude
+- Satellite count
+- Accuracy
+- Last-fix age
+
+GPS failure is nonfatal to Speedtest Analyzer and GeoView.
+
+If saved Device GPS coordinates already exist and a later refresh fails to obtain a current fix, the saved coordinates are not automatically destroyed.
+
+## 11.8 v1.1.1 Geo Provider trust boundary
+
+v1.1.1 intentionally stops before external Geo Provider integration.
+
+There are no provider API keys, secrets, or authentication tokens in the v1.1.1 implementation.
+
+There are no external cellular-location or mapping requests.
+
+There is no automatic Site Address geocoding.
+
+The provider-independent GeoView does not need to transmit:
+
+- ICCID
+- IMEI
+- APN
+- Router serial number
+- Other modem identity values
+
+The local site inventory is generated entirely from retained Speedtest Analyzer history.
+
+Future provider integration must maintain an explicit outbound-data allowlist and preserve the principle that only the minimum cell/site information required for an approved lookup is sent externally.
+
+External provider integration must also preserve failure isolation: provider unavailability must never prevent local Cellular Analysis, local GeoView, or speed testing from operating.
+
 # 12. Error Handling Principles
 
 The application is designed to fail safely rather than silently return misleading results.
@@ -1354,7 +1615,7 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
-| **1.1.x — Cellular Analysis** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF and radio-resource summaries, History & Reports serving-cell integration, and hardened local history persistence. |
+| **1.1.x — Cellular Analysis and GeoView** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, History & Reports integration, hardened local history persistence, and the site-wide provider-independent GeoView framework. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1368,6 +1629,77 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.1.1
+
+### Site-wide GeoView inventory
+
+- Added **Site Cellular GeoView** above the lower interface/history-scoped Cellular Analysis workspace.
+- GeoView is intentionally site-wide and evaluates all retained cellular history across every cellular interface.
+- Added `build_site_cell_inventory(history)` to reuse the existing traffic-aware serving-cell model without modifying the public `build_cellular_analysis()` response contract used by the existing regression suite.
+- Plain Ethernet/non-cellular history is excluded.
+- Identifiable serving cells observed only during an in-test handoff remain represented.
+- The same normalized serving-cell identity observed through multiple cellular interfaces is aggregated into one GeoView cell with per-interface test counts.
+- Per-test serving-cell/interface counting is deduplicated so two-second telemetry sampling does not inflate the number of tests associated with a cell.
+- Matching final cellular data can supplement missing display metadata for the same cell but cannot create a different serving-cell identity.
+
+### Local observation schematic and carrier focus
+
+- Replaced the earlier GeoView placeholder with a lightweight provider-independent local observation schematic.
+- The schematic explicitly states that marker positions are **not geographic**.
+- Added balanced radial placement for multiple observed cells without adding a mapping library or interactive map runtime.
+- Added carrier-specific color accents for T-Mobile, Verizon, AT&T, and a theme-default fallback without embedding carrier logos or marks.
+- Added carrier focus controls with all observed carriers selected initially.
+- Deselecting a carrier dims its serving-cell markers and disables marker interaction.
+- The final selected carrier cannot be deselected.
+- Added compact serving-cell popups containing Cell ID, PLMN, TAC, PCI, role/band, carrier, and Observed Via interface/test counts.
+
+### GeoView configuration
+
+- Added the **Configure GeoView** modal.
+- The first saved configuration changes the header action to the smaller gear-style **Configure** control.
+- Added Site Location choices for Device GPS, Manual Coordinates, and literal Site Address.
+- Site Address is descriptive text only and is not automatically geocoded.
+- Manual coordinate input is validated for valid latitude/longitude ranges.
+- **No Geo Provider** remains the enabled v1.1.1 provider mode.
+- Google and Unwired choices are displayed as **Research Pending** and remain disabled until their current APIs/service models are separately researched and validated.
+
+### Local settings persistence
+
+- Added `cellular_geo.py` as the provider-independent GeoView settings layer.
+- Added local settings file `tmp/geoview_settings.json`.
+- GeoView settings use a versioned schema.
+- Settings writes use flush/fsync and atomic replacement.
+- Missing, corrupt, or invalid settings fall back to a safe default state.
+- GeoView settings are independent from the rolling Speedtest Analyzer test-history file.
+
+### GeoView API and GPS
+
+- Added `GET /api/geo_settings`.
+- Added `POST /api/geo_settings`.
+- Added explicit `GET /api/geo_gps`.
+- `/api/cellular_analysis` now attaches site-wide GeoView inventory at the HTTP layer while preserving lower Cellular Analysis interface/history scoping.
+- GPS is queried only when the user explicitly presses **Refresh GPS**.
+- No continuous GPS polling, GPS worker, or additional per-test GPS collection was introduced.
+- GPS query failure is nonfatal and does not affect speed testing or local Cellular Analysis.
+
+### Provider and security boundary
+
+- No external Geo Provider calls are implemented in v1.1.1.
+- No provider API keys, credentials, or secrets are stored.
+- No automatic address geocoding is performed.
+- No provider-derived serving-cell geographic estimates or static provider maps are rendered.
+- Local GeoView does not require ICCID, IMEI, APN, router serial number, or similar modem identity values.
+- Future provider integration must use an explicit minimum-data outbound allowlist and remain isolated from the local test/analysis path.
+
+### Development validation
+
+- Existing Cellular Analysis regression coverage remained green after the GeoView foundation was added.
+- Added dedicated provider-independent GeoView regression coverage for site inventory, multi-interface aggregation, handoff-only cells, Ethernet exclusion, settings defaults, literal Site Address, and coordinate validation.
+- Backend regression checkpoint: **77 tests passing**.
+- Complete inline JavaScript parses successfully with the macOS JavaScript engine.
+- The current frontend was rendered and exercised in Chromium with a multi-carrier fixture covering carrier focus, disabled markers, serving-cell popups, settings persistence, Device GPS state, and responsive layout.
+- Live-router validation remains a separate deployment step because loading a new SDK application build clears the app's retained local test history.
 
 ## v1.1.0
 
