@@ -11342,6 +11342,56 @@
             caBindGeoControls();
         }
 
+        function caGeoGpsCoordinatesUsable(
+            latitude,
+            longitude
+        ) {
+            if (
+                latitude == null ||
+                longitude == null
+            ) {
+                return false;
+            }
+
+            var lat = Number(
+                latitude
+            );
+
+            var lon = Number(
+                longitude
+            );
+
+            if (
+                !isFinite(lat) ||
+                !isFinite(lon)
+            ) {
+                return false;
+            }
+
+            if (
+                lat < -90 ||
+                lat > 90 ||
+                lon < -180 ||
+                lon > 180
+            ) {
+                return false;
+            }
+
+            /*
+             * NCOS reports 0.0 / 0.0 when GPS is enabled
+             * but the receiver does not currently have a fix.
+             */
+            if (
+                lat === 0 &&
+                lon === 0
+            ) {
+                return false;
+            }
+
+            return true;
+        }
+
+
         function caGeoRenderGpsDraft(message) {
             var status = document.getElementById(
                 'ca-geo-gps-status'
@@ -11356,13 +11406,19 @@
             );
 
             var hasCoordinates =
-                caGeoDraftGps.latitude != null &&
-                caGeoDraftGps.longitude != null;
+                caGeoGpsCoordinatesUsable(
+                    caGeoDraftGps.latitude,
+                    caGeoDraftGps.longitude
+                );
+
+            var hasCurrentFix =
+                !!caGeoDraftGps.gps_lock &&
+                hasCoordinates;
 
             if (status) {
                 status.classList.toggle(
                     'has-fix',
-                    hasCoordinates
+                    hasCurrentFix
                 );
 
                 status.innerHTML =
@@ -11371,9 +11427,13 @@
                         caEscapeHtml(
                             message ||
                             (
-                                hasCoordinates
-                                    ? 'GPS coordinates available'
-                                    : 'GPS not captured yet'
+                                hasCurrentFix
+                                    ? 'GPS Fix Available'
+                                    : (
+                                        hasCoordinates
+                                            ? 'Saved GPS coordinates'
+                                            : 'GPS not captured yet'
+                                    )
                             )
                         ) +
                     '</span>';
@@ -11478,8 +11538,25 @@
                             'GPS Fix Available'
                         );
                     } else {
+                        caGeoDraftGps.gps_lock =
+                            false;
+
+                        if (gps) {
+                            caGeoDraftGps.satellites =
+                                gps.satellites;
+
+                            caGeoDraftGps.accuracy =
+                                gps.accuracy;
+                        }
+
+                        var hasSavedCoordinates =
+                            caGeoGpsCoordinatesUsable(
+                                caGeoDraftGps.latitude,
+                                caGeoDraftGps.longitude
+                            );
+
                         caGeoRenderGpsDraft(
-                            caGeoDraftGps.latitude != null
+                            hasSavedCoordinates
                                 ? (
                                     'No current GPS fix · ' +
                                     'saved coordinates retained'
@@ -11489,8 +11566,17 @@
                     }
                 })
                 .catch(function(error) {
+                    caGeoDraftGps.gps_lock =
+                        false;
+
+                    var hasSavedCoordinates =
+                        caGeoGpsCoordinatesUsable(
+                            caGeoDraftGps.latitude,
+                            caGeoDraftGps.longitude
+                        );
+
                     caGeoRenderGpsDraft(
-                        caGeoDraftGps.latitude != null
+                        hasSavedCoordinates
                             ? (
                                 'GPS query failed · ' +
                                 'saved coordinates retained'
@@ -11527,26 +11613,62 @@
                 geo.location ||
                 {};
 
+            var locations =
+                geo.locations ||
+                {};
+
+            var deviceGps =
+                locations.device_gps ||
+                {};
+
+            var manualCoordinates =
+                locations.manual_coordinates ||
+                {};
+
+            var siteAddress =
+                locations.site_address ||
+                {};
+
             caGeoDraftProvider = String(
                 geo.provider ||
                 'none'
             );
 
             caGeoDraftLocationSource = String(
+                geo.active_location_source ||
                 location.source ||
                 'device_gps'
             );
 
+            /*
+             * Schema-v2 values come from independent location stores.
+             * The location fallback keeps the modal compatible with an
+             * older schema-v1 response during development/migration.
+             */
             caGeoDraftGps.latitude =
-                location.latitude != null
-                    ? location.latitude
-                    : null;
+                deviceGps.latitude != null
+                    ? deviceGps.latitude
+                    : (
+                        location.source === 'device_gps' &&
+                        location.latitude != null
+                            ? location.latitude
+                            : null
+                    );
 
             caGeoDraftGps.longitude =
-                location.longitude != null
-                    ? location.longitude
-                    : null;
+                deviceGps.longitude != null
+                    ? deviceGps.longitude
+                    : (
+                        location.source === 'device_gps' &&
+                        location.longitude != null
+                            ? location.longitude
+                            : null
+                    );
 
+            /*
+             * GPS lock is current runtime state and is deliberately not
+             * restored from persisted configuration.
+             */
             caGeoDraftGps.satellites =
                 null;
 
@@ -11604,29 +11726,64 @@
                     'ca-site-address'
                 );
 
+            var savedManualLatitude =
+                manualCoordinates.latitude != null
+                    ? manualCoordinates.latitude
+                    : (
+                        location.source ===
+                            'manual_coordinates' &&
+                        location.latitude != null
+                            ? location.latitude
+                            : null
+                    );
+
+            var savedManualLongitude =
+                manualCoordinates.longitude != null
+                    ? manualCoordinates.longitude
+                    : (
+                        location.source ===
+                            'manual_coordinates' &&
+                        location.longitude != null
+                            ? location.longitude
+                            : null
+                    );
+
+            var savedAddress =
+                siteAddress.address != null
+                    ? String(
+                        siteAddress.address
+                    )
+                    : (
+                        location.source ===
+                            'site_address'
+                            ? String(
+                                location.address ||
+                                ''
+                            )
+                            : ''
+                    );
+
             if (latitude) {
                 latitude.value =
-                    location.latitude != null
+                    savedManualLatitude != null
                         ? String(
-                            location.latitude
+                            savedManualLatitude
                         )
                         : '';
             }
 
             if (longitude) {
                 longitude.value =
-                    location.longitude != null
+                    savedManualLongitude != null
                         ? String(
-                            location.longitude
+                            savedManualLongitude
                         )
                         : '';
             }
 
             if (address) {
-                address.value = String(
-                    location.address ||
-                    ''
-                );
+                address.value =
+                    savedAddress;
             }
 
             caGeoSelectLocationSource(
@@ -11650,58 +11807,65 @@
                     'ca-site-address'
                 );
 
-            var location = {
-                source:
-                    caGeoDraftLocationSource,
+            var gpsLatitude =
+                null;
 
-                latitude:
-                    null,
-
-                longitude:
-                    null,
-
-                address:
-                    ''
-            };
+            var gpsLongitude =
+                null;
 
             if (
-                caGeoDraftLocationSource ===
-                'device_gps'
+                caGeoGpsCoordinatesUsable(
+                    caGeoDraftGps.latitude,
+                    caGeoDraftGps.longitude
+                )
             ) {
-                location.latitude =
+                gpsLatitude =
                     caGeoDraftGps.latitude;
 
-                location.longitude =
+                gpsLongitude =
                     caGeoDraftGps.longitude;
-            } else if (
-                caGeoDraftLocationSource ===
-                'manual_coordinates'
-            ) {
-                location.latitude =
-                    latitude
-                        ? latitude.value.trim()
-                        : '';
-
-                location.longitude =
-                    longitude
-                        ? longitude.value.trim()
-                        : '';
-            } else if (
-                caGeoDraftLocationSource ===
-                'site_address'
-            ) {
-                location.address =
-                    address
-                        ? address.value.trim()
-                        : '';
             }
 
+            /*
+             * All Site Location methods are submitted together.
+             * active_location_source controls which one GeoView uses;
+             * switching methods never destroys the other saved values.
+             */
             return {
                 provider:
                     caGeoDraftProvider,
 
-                location:
-                    location
+                active_location_source:
+                    caGeoDraftLocationSource,
+
+                locations: {
+                    device_gps: {
+                        latitude:
+                            gpsLatitude,
+
+                        longitude:
+                            gpsLongitude
+                    },
+
+                    manual_coordinates: {
+                        latitude:
+                            latitude
+                                ? latitude.value.trim()
+                                : '',
+
+                        longitude:
+                            longitude
+                                ? longitude.value.trim()
+                                : ''
+                    },
+
+                    site_address: {
+                        address:
+                            address
+                                ? address.value.trim()
+                                : ''
+                    }
+                }
             };
         }
 
@@ -11760,21 +11924,10 @@
                         data.geo ||
                         {};
 
-                    data.geo.provider =
-                        saved.provider ||
-                        'none';
-
-                    data.geo.configured =
-                        saved.configured === true;
-
-                    data.geo.status =
-                        data.geo.configured
-                            ? 'configured'
-                            : 'not_configured';
-
-                    data.geo.location =
-                        saved.location ||
-                        {};
+                    caGeoApplySavedSettings(
+                        data.geo,
+                        saved
+                    );
 
                     caRenderGeo(data);
                     caCloseLocationSettings();
@@ -11796,7 +11949,62 @@
                 });
         }
 
-        function caOpenLocationSettings() {
+        function caGeoApplySavedSettings(
+            geo,
+            saved
+        ) {
+            if (
+                !geo ||
+                typeof geo !== 'object'
+            ) {
+                return;
+            }
+
+            saved =
+                saved &&
+                typeof saved === 'object'
+                    ? saved
+                    : {};
+
+            geo.schema_version =
+                saved.schema_version != null
+                    ? saved.schema_version
+                    : geo.schema_version;
+
+            geo.provider =
+                saved.provider ||
+                'none';
+
+            geo.configured =
+                saved.configured === true;
+
+            geo.status =
+                geo.configured
+                    ? 'configured'
+                    : 'not_configured';
+
+            geo.active_location_source =
+                saved.active_location_source ||
+                (
+                    saved.location &&
+                    saved.location.source
+                ) ||
+                'device_gps';
+
+            geo.locations =
+                saved.locations &&
+                typeof saved.locations === 'object'
+                    ? saved.locations
+                    : {};
+
+            geo.location =
+                saved.location &&
+                typeof saved.location === 'object'
+                    ? saved.location
+                    : {};
+        }
+
+        function caGeoShowLocationSettings() {
             caGeoSyncModalFromData();
 
             var backdrop =
@@ -11819,6 +12027,60 @@
 
             document.body.style.overflow =
                 'hidden';
+        }
+
+        function caOpenLocationSettings() {
+            /*
+             * Configure GeoView is an explicit user action, so refresh
+             * the persisted SDK appdata-backed settings before opening.
+             * Cached Cellular Analysis data remains the safe fallback if
+             * the local settings request fails.
+             */
+            fetch('/api/geo_settings')
+                .then(function(response) {
+                    return response
+                        .json()
+                        .then(function(payload) {
+                            if (!response.ok) {
+                                throw new Error(
+                                    payload.error ||
+                                    'Unable to load GeoView settings'
+                                );
+                            }
+
+                            return payload;
+                        });
+                })
+                .then(function(saved) {
+                    if (
+                        !window._cellularAnalysisData
+                    ) {
+                        window._cellularAnalysisData =
+                            {};
+                    }
+
+                    var data =
+                        window._cellularAnalysisData;
+
+                    data.geo =
+                        data.geo ||
+                        {};
+
+                    caGeoApplySavedSettings(
+                        data.geo,
+                        saved
+                    );
+
+                    caGeoShowLocationSettings();
+                })
+                .catch(function(error) {
+                    console.warn(
+                        'GeoView settings refresh failed:',
+                        error
+                    );
+
+                    caGeoShowLocationSettings();
+                });
         }
 
         function caCloseLocationSettings() {
@@ -12190,11 +12452,17 @@
                 cellButton.addEventListener(
                     'click',
                     function() {
-                        caGeoActiveCellKey =
+                        var clickedCellKey =
                             this.getAttribute(
                                 'data-ca-geo-cell'
                             ) ||
                             '';
+
+                        caGeoActiveCellKey =
+                            caGeoActiveCellKey ===
+                            clickedCellKey
+                                ? ''
+                                : clickedCellKey;
 
                         if (
                             window._cellularAnalysisData

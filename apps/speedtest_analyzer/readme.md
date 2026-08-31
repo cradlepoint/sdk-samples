@@ -641,23 +641,33 @@ v1.1.1 does **not** automatically geocode, resolve, or convert a Site Address in
 
 ## GeoView persistence and privacy
 
-GeoView settings are stored locally by the SDK application.
+GeoView configuration is stored in the router's persistent **NCOS SDK appdata** rather than in the application package filesystem. This allows the saved GeoView configuration to remain available when the Speedtest Analyzer SDK package is upgraded or replaced.
 
-The v1.1.1 settings include only:
+The GeoView appdata entry is:
 
-- Provider selection
-- Location-source selection
-- Optional latitude
-- Optional longitude
-- Optional descriptive Site Address
+| Appdata | Purpose |
+|---|---|
+| `geoview_settings` | Provider-independent GeoView configuration, active Site Location source, and saved Device GPS, Manual Coordinates, and Site Address values. |
 
-Provider credentials do not exist in this release.
+The v1.1.1 configuration stores:
 
-GeoView does not require ICCID, IMEI, APN, device serial number, or other modem identity values for the local site inventory.
+- The selected Geo Provider mode.
+- The active Site Location source.
+- Saved Device GPS coordinates, when the user explicitly obtains a valid GPS fix and saves the configuration.
+- Saved Manual Coordinates.
+- Saved literal Site Address text.
+
+Device GPS, Manual Coordinates, and Site Address are retained independently. Selecting or saving one location method does not erase the saved values for the other methods.
+
+Only the **active Site Location source** is used as the current GeoView site location. Reopening **Configure GeoView** restores the saved values for all three location methods.
+
+GPS is queried only when the user explicitly selects **Refresh GPS**. GeoView does not continuously poll GPS, and a later GPS lock does not automatically replace a manually selected Site Address or Manual Coordinates.
+
+GPS lock state, satellite count, accuracy, and other current-fix status are runtime information and are not persisted as GeoView configuration.
+
+GeoView v1.1.1 does not send Site Location, serving-cell data, device identifiers, or credentials to an external Geo Provider. Google and Unwired remain Research Pending and no provider API integration is active in this release.
 
 Saving GeoView settings does not change Speedtest Analyzer test-history retention and does not cause continuous GPS or cellular polling.
-
----
 
 # History & Reports
 
@@ -943,7 +953,7 @@ The README keeps a concise, user-facing changelog for the current Speedtest Anal
 - Preserved handoff-only serving cells in the site-wide GeoView inventory and continued to exclude plain Ethernet history.
 - Added **Configure GeoView** with provider-independent Site Location options for Device GPS, Manual Coordinates, or literal Site Address.
 - Added explicit on-demand **Refresh GPS** behavior. GeoView does not continuously poll GPS.
-- Added local GeoView settings persistence with validation and atomic file replacement.
+- Added persistent GeoView configuration using NCOS SDK appdata, including independently retained Device GPS, Manual Coordinates, and Site Address values.
 - **No Geo Provider** remains fully functional and performs no external cellular-location requests.
 - Google and Unwired provider choices are shown as **Research Pending** and remain disabled in v1.1.1.
 - v1.1.1 does not include provider API keys, address geocoding, external cell-location lookup, provider-derived geographic estimates, or provider map rendering.

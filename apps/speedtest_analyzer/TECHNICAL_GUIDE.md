@@ -115,11 +115,11 @@ Primary components are:
 
 GeoView does not introduce a second continuous cellular telemetry collector. It reuses retained Speedtest Analyzer history and the Cellular Analysis normalization model.
 
-Local GeoView settings are stored in:
+Local GeoView configuration is stored in NCOS SDK appdata under the application-owned key:
 
-    tmp/geoview_settings.json
+    geoview_settings
 
-The settings file is local application state and is separate from Speedtest Analyzer test history.
+The appdata entry is persistent device configuration and is separate from Speedtest Analyzer rolling test history. Code defaults are not written to appdata automatically; the entry is created or updated only after an explicit **Save GeoView** action.
 
 # 3. Platform Validation and Known Defects
 
@@ -1374,23 +1374,39 @@ An active serving-cell marker can display:
 
 First Seen and Last Seen are intentionally omitted from the compact GeoView popup because the lower Cellular Analysis workspace provides the historical analysis context.
 
+Clicking the currently open serving-cell marker a second time closes its popup. The explicit popup close control remains available.
+
 ## 11.6 GeoView settings persistence
 
-`cellular_geo.py` owns the provider-independent settings schema.
+`cellular_geo.py` owns the provider-independent settings schema and persists explicit user configuration through NCOS SDK appdata.
+
+The authoritative appdata key is:
+
+    geoview_settings
 
 Current schema:
 
     {
-      "schema_version": 1,
+      "schema_version": 2,
       "configured": false,
       "provider": "none",
-      "location": {
-        "source": "device_gps",
-        "latitude": null,
-        "longitude": null,
-        "address": ""
+      "active_location_source": "device_gps",
+      "locations": {
+        "device_gps": {
+          "latitude": null,
+          "longitude": null
+        },
+        "manual_coordinates": {
+          "latitude": null,
+          "longitude": null
+        },
+        "site_address": {
+          "address": ""
+        }
       }
     }
+
+The public HTTP response also includes a compatibility `location` object representing only the currently active Site Location. That compatibility object is derived from the canonical schema-v2 `locations` structure and is not separately persisted.
 
 Supported provider values in the settings model are:
 
@@ -1406,26 +1422,44 @@ Supported Site Location sources are:
 - `manual_coordinates`
 - `site_address`
 
+`active_location_source` determines which saved location method GeoView currently treats as the site location.
+
+The three Site Location methods are stored independently:
+
+- `device_gps` retains the last explicitly saved valid GPS coordinate pair.
+- `manual_coordinates` retains the user-entered latitude and longitude.
+- `site_address` retains the literal user-entered address.
+
+Changing the active Site Location source does not delete or overwrite the other saved values. A user may therefore switch between Site Address, Manual Coordinates, and Device GPS without re-entering previously saved configuration.
+
+A later GPS lock does not automatically replace Manual Coordinates or Site Address. GeoView performs no background GPS refresh. Device GPS coordinates change only after the user explicitly selects **Refresh GPS**, receives a usable fix, and then saves the GeoView configuration.
+
+GPS lock, satellite count, accuracy, and similar current-fix telemetry are intentionally transient and are not persisted in appdata.
+
 Validation includes:
 
-- Manual coordinates require both latitude and longitude.
+- Device GPS persisted coordinates must be a valid coordinate pair and cannot use the NCOS `0.0, 0.0` no-fix sentinel.
+- Manual Coordinates require both latitude and longitude when selected as the active source.
 - Latitude must be between -90 and 90.
 - Longitude must be between -180 and 180.
-- Site Address must be non-empty when that source is selected.
+- Site Address must be non-empty when selected as the active source.
 - Site Address is length-limited and stored literally.
 
-Saving settings marks the local GeoView configuration as configured even when the selected provider remains `none`.
+The schema-v2 normalizer can accept the earlier schema-v1 single-location structure and migrate it in memory into the independent location stores. Newly saved configuration is always written using schema v2.
 
-Settings persistence uses:
+Saving settings marks the GeoView configuration as configured even when the selected provider remains `none`.
 
-1. Local temporary file creation.
-2. JSON serialization.
-3. File flush and fsync.
-4. Atomic `os.replace()`.
-5. Best-effort parent-directory fsync.
-6. Temporary-file cleanup.
+Persistence uses the NCOS SDK appdata interface:
 
-Missing or invalid settings safely fall back to the default unconfigured local GeoView state.
+1. `cp.put_appdata('geoview_settings', serialized_json)` creates or updates the application-owned configuration value after an explicit Save action.
+2. `cp.get_appdata('geoview_settings')` immediately reads the value back.
+3. The returned JSON is normalized and compared with the intended canonical settings before the HTTP Save operation reports success.
+
+This readback verification prevents the application from reporting a successful save when the appdata value cannot be read back or does not match the intended configuration.
+
+Missing, empty, malformed, or invalid appdata safely falls back to the default unconfigured GeoView state without automatically writing defaults to the router configuration.
+
+SDK appdata is used because GeoView settings are configuration that must survive SDK application package replacement. The rolling Speedtest Analyzer test-history files remain separate local runtime data and continue to follow their existing retention lifecycle.
 
 ## 11.7 GeoView HTTP API and GPS behavior
 
@@ -1445,9 +1479,22 @@ In v1.1.1, `estimated_locations` remains zero because no external provider adapt
 
 Returns normalized local GeoView settings.
 
+Opening **Configure GeoView** performs an explicit request to this endpoint before the modal is populated. Persisted NCOS SDK appdata is therefore the configuration source of truth rather than potentially stale Cellular Analysis page state. If the settings request fails, the existing in-memory GeoView state remains available as a non-destructive fallback.
+
 ### `POST /api/geo_settings`
 
-Validates and atomically persists provider-independent GeoView configuration.
+Validates and persists provider-independent GeoView configuration through NCOS SDK appdata with immediate readback verification.
+
+After a successful Save response, the frontend synchronizes its complete schema-v2 GeoView state, including:
+
+- `schema_version`
+- `provider`
+- `configured`
+- `active_location_source`
+- `locations`
+- the derived compatibility `location` object
+
+This ensures the main GeoView immediately reflects the newly active Site Location and that reopening Configure GeoView preserves all independently saved Device GPS, Manual Coordinates, and Site Address values.
 
 Invalid user input returns a client error rather than writing partially valid settings.
 
@@ -1476,9 +1523,25 @@ Returned GPS context can include:
 - Accuracy
 - Last-fix age
 
+A Device GPS location is considered usable only when all of the following are true:
+
+- NCOS reports an active GPS lock.
+- Latitude and longitude are present and numeric.
+- Latitude is within -90 through 90.
+- Longitude is within -180 through 180.
+- The coordinate pair is not `0.0, 0.0`.
+
+NCOS can expose numeric `0.0, 0.0` coordinates while the GPS subsystem is enabled and running but no satellite fix has been acquired. GeoView treats that pair as a no-fix sentinel rather than a usable site location.
+
+The GPS endpoint therefore distinguishes the GPS subsystem being available from a valid current fix. A successful local GPS query can return `available: true` while also returning `fix_available: false`.
+
+The frontend presents **GPS Fix Available** only when a current GPS lock and valid coordinates are both present. Previously saved valid Device GPS coordinates are treated separately from the current-fix state.
+
 GPS failure is nonfatal to Speedtest Analyzer and GeoView.
 
-If saved Device GPS coordinates already exist and a later refresh fails to obtain a current fix, the saved coordinates are not automatically destroyed.
+If saved valid Device GPS coordinates already exist and a later refresh loses GPS lock or the GPS query fails, the saved coordinates are retained. A no-fix response cannot replace those coordinates with `0.0, 0.0`, and an invalid `0.0, 0.0` Device GPS value is not persisted as a valid site location.
+
+This behavior was validated against an E400-5GE-AM on NCOS 7.26.60 where the router GPS subsystem was enabled and running while NCOS repeatedly reported `lock: false` with latitude and longitude `0.0, 0.0`. The application mirrors NCOS by treating that state as **GPS available, no usable fix** rather than as a geographic position.
 
 ## 11.8 v1.1.1 Geo Provider trust boundary
 
@@ -1653,6 +1716,7 @@ Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` dev
 - Deselecting a carrier dims its serving-cell markers and disables marker interaction.
 - The final selected carrier cannot be deselected.
 - Added compact serving-cell popups containing Cell ID, PLMN, TAC, PCI, role/band, carrier, and Observed Via interface/test counts.
+- Clicking the already-open serving-cell marker a second time closes its popup while retaining the explicit close control.
 
 ### GeoView configuration
 
@@ -1667,21 +1731,34 @@ Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` dev
 ### Local settings persistence
 
 - Added `cellular_geo.py` as the provider-independent GeoView settings layer.
-- Added local settings file `tmp/geoview_settings.json`.
-- GeoView settings use a versioned schema.
-- Settings writes use flush/fsync and atomic replacement.
-- Missing, corrupt, or invalid settings fall back to a safe default state.
-- GeoView settings are independent from the rolling Speedtest Analyzer test-history file.
+- Added persistent NCOS SDK appdata key `geoview_settings`.
+- Moved GeoView configuration out of the replaceable application `tmp/` filesystem so saved Site Location settings can survive SDK package upgrades.
+- Advanced the GeoView settings model to schema version 2.
+- Device GPS, Manual Coordinates, and Site Address are retained independently.
+- Added `active_location_source` so one location method is authoritative without deleting the alternatives.
+- GPS lock, satellites, accuracy, and other current-fix state remain transient and are not persisted.
+- Appdata is written only after an explicit **Save GeoView** action; application defaults are not automatically seeded into NCOS configuration.
+- GeoView appdata writes are immediately read back, normalized, and verified before Save reports success.
+- Added in-memory normalization support for the earlier schema-v1 single-location model.
+- Missing, corrupt, or invalid appdata falls back to a safe default state.
+- GeoView configuration remains independent from the rolling Speedtest Analyzer test-history files.
 
 ### GeoView API and GPS
 
 - Added `GET /api/geo_settings`.
 - Added `POST /api/geo_settings`.
+- Configure GeoView now explicitly reloads persisted settings from `/api/geo_settings` whenever the modal is opened.
+- Successful GeoView saves synchronize the frontend's complete schema-v2 settings state before the page is re-rendered.
 - Added explicit `GET /api/geo_gps`.
 - `/api/cellular_analysis` now attaches site-wide GeoView inventory at the HTTP layer while preserving lower Cellular Analysis interface/history scoping.
 - GPS is queried only when the user explicitly presses **Refresh GPS**.
 - No continuous GPS polling, GPS worker, or additional per-test GPS collection was introduced.
 - GPS query failure is nonfatal and does not affect speed testing or local Cellular Analysis.
+- Hardened Device GPS validity so a usable fix requires an active NCOS GPS lock plus valid numeric latitude/longitude.
+- Added explicit rejection of the NCOS `0.0, 0.0` no-fix sentinel.
+- A no-fix refresh or GPS query failure preserves previously saved valid Device GPS coordinates rather than replacing them with invalid coordinates.
+- The frontend distinguishes a current GPS fix from retained saved coordinates and no longer presents an unlocked `0.0, 0.0` response as **GPS Fix Available**.
+- Added shared `gps_fix_is_usable()` production validation in `cellular_geo.py` so the HTTP API and regression suite enforce the same GPS validity rule.
 
 ### Provider and security boundary
 
@@ -1695,11 +1772,15 @@ Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` dev
 ### Development validation
 
 - Existing Cellular Analysis regression coverage remained green after the GeoView foundation was added.
-- Added dedicated provider-independent GeoView regression coverage for site inventory, multi-interface aggregation, handoff-only cells, Ethernet exclusion, settings defaults, literal Site Address, and coordinate validation.
-- Backend regression checkpoint: **77 tests passing**.
+- Added dedicated provider-independent GeoView regression coverage for site inventory, multi-interface aggregation, handoff-only cells, Ethernet exclusion, settings defaults, literal Site Address, coordinate validation, and Device GPS fix validity.
+- Added real-device-derived GPS regression cases covering unlocked `0.0, 0.0`, unlocked nonzero coordinates, locked `0.0, 0.0`, and a locked valid coordinate pair.
+- Final v1.1.1 regression checkpoint after GPS and appdata-persistence hardening: **83 tests passing** — 70 core Cellular Analysis tests plus 13 GeoView/GPS tests.
+- Real Chromium validation confirmed schema-v2 modal rehydration, Site Address → Manual Coordinates → Device GPS active-source switching, preservation of inactive saved location methods, and immediate Site Context updates after Save.
+- Live E400 validation confirmed `geoview_settings` persists in NCOS SDK appdata across Speedtest Analyzer SDK package replacement and is subsequently reloaded into Configure GeoView with the saved active Site Location restored.
 - Complete inline JavaScript parses successfully with the macOS JavaScript engine.
 - The current frontend was rendered and exercised in Chromium with a multi-carrier fixture covering carrier focus, disabled markers, serving-cell popups, settings persistence, Device GPS state, and responsive layout.
-- Live-router validation remains a separate deployment step because loading a new SDK application build clears the app's retained local test history.
+- Live E400 validation confirmed the no-fix protection requirement when NCOS returned GPS enabled/running with `lock: false` and `0.0, 0.0`.
+- Loading a new SDK application build clears the app's retained local test history, so device reloads remain deliberate validation events.
 
 ## v1.1.0
 

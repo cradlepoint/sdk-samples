@@ -22,6 +22,7 @@ from cellular_analysis import (
 )
 from cellular_geo import (
     apply_geo_settings,
+    gps_fix_is_usable,
     load_geo_settings,
     save_geo_settings,
 )
@@ -11935,6 +11936,7 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             return {
                 'available': False,
                 'gps_lock': False,
+                'fix_available': False,
                 'latitude': None,
                 'longitude': None,
                 'satellites': None,
@@ -11950,20 +11952,31 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             'longitude'
         )
 
-        fix_available = (
-            latitude is not None
-            and longitude is not None
+        gps_lock = bool(
+            gps.get(
+                'gps_lock'
+            )
+            if gps.get(
+                'gps_lock'
+            ) is not None
+            else gps.get(
+                'lock'
+            )
+        )
+
+        fix_available = gps_fix_is_usable(
+            {
+                'gps_lock': gps_lock,
+                'latitude': latitude,
+                'longitude': longitude,
+            }
         )
 
         return {
             'available': True,
 
             'gps_lock':
-                bool(
-                    gps.get(
-                        'gps_lock'
-                    )
-                ),
+                gps_lock,
 
             'fix_available':
                 fix_available,
@@ -11989,7 +12002,6 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                     'last_fix_age'
                 ),
         }
-
 
     def get_status(self):
         """Get current test status."""

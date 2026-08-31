@@ -1,33 +1,93 @@
-"""Local GeoView settings and provider-independent site context helpers.
+"""Provider-independent GeoView configuration and site context helpers.
 
-This module intentionally contains no external Geo Provider integrations.
+GeoView user configuration is persisted in NCOS SDK appdata so it survives
+SDK application package upgrades. This module intentionally contains no
+external Geo Provider integrations.
+
 Google/Unwired-style network calls belong in later provider adapters after
 those APIs are researched and their current contracts are confirmed.
 """
 
 import json
-import os
 import threading
 
+import cp
 
-GEO_SETTINGS_FILE = 'tmp/geoview_settings.json'
-GEO_SETTINGS_TEMP_FILE = GEO_SETTINGS_FILE + '.tmp'
-_GEO_SCHEMA_VERSION = 1
+
+GEO_APPDATA_KEY = 'geoview_settings'
+_GEO_SCHEMA_VERSION = 2
 _geo_lock = threading.RLock()
 
 
+def _empty_locations():
+    """Return independent storage for every supported Site Location method."""
+    return {
+        'device_gps': {
+            'latitude': None,
+            'longitude': None,
+        },
+        'manual_coordinates': {
+            'latitude': None,
+            'longitude': None,
+        },
+        'site_address': {
+            'address': '',
+        },
+    }
+
+
+def _active_location(
+    source,
+    locations,
+):
+    """Build the compatibility/public location object for the active source."""
+    if source == 'device_gps':
+        value = locations['device_gps']
+
+        return {
+            'source': source,
+            'latitude': value['latitude'],
+            'longitude': value['longitude'],
+            'address': '',
+        }
+
+    if source == 'manual_coordinates':
+        value = locations[
+            'manual_coordinates'
+        ]
+
+        return {
+            'source': source,
+            'latitude': value['latitude'],
+            'longitude': value['longitude'],
+            'address': '',
+        }
+
+    value = locations['site_address']
+
+    return {
+        'source': 'site_address',
+        'latitude': None,
+        'longitude': None,
+        'address': value['address'],
+    }
+
+
 def default_geo_settings():
-    """Return a fresh default GeoView settings object."""
+    """Return fresh code defaults without writing anything to appdata."""
+    locations = _empty_locations()
+    source = 'device_gps'
+
     return {
         'schema_version': _GEO_SCHEMA_VERSION,
         'configured': False,
         'provider': 'none',
-        'location': {
-            'source': 'device_gps',
-            'latitude': None,
-            'longitude': None,
-            'address': '',
-        },
+        'active_location_source': source,
+        'locations': locations,
+        'location': _active_location(
+            source,
+            locations,
+        ),
     }
 
 
@@ -37,17 +97,198 @@ def _number(value):
 
     try:
         return float(value)
-    except (TypeError, ValueError):
+
+    except (
+        TypeError,
+        ValueError,
+    ):
         return None
 
 
-def normalize_geo_settings(value, mark_configured=None):
-    """Validate and normalize one persisted/public GeoView settings object."""
-    if not isinstance(value, dict):
+def _validate_coordinates(
+    latitude,
+    longitude,
+    label,
+    required=False,
+    reject_zero_pair=False,
+):
+    """Normalize one optional coordinate pair."""
+    latitude_value = _number(
+        latitude
+    )
+
+    longitude_value = _number(
+        longitude
+    )
+
+    supplied = (
+        latitude not in (None, '')
+        or longitude not in (None, '')
+    )
+
+    if not supplied and not required:
+        return (
+            None,
+            None,
+        )
+
+    if (
+        latitude_value is None
+        or longitude_value is None
+    ):
+        raise ValueError(
+            '%s require latitude and longitude'
+            % label
+        )
+
+    if not (
+        -90.0 <= latitude_value <= 90.0
+    ):
+        raise ValueError(
+            '%s latitude must be between -90 and 90'
+            % label
+        )
+
+    if not (
+        -180.0 <= longitude_value <= 180.0
+    ):
+        raise ValueError(
+            '%s longitude must be between -180 and 180'
+            % label
+        )
+
+    if (
+        reject_zero_pair
+        and latitude_value == 0.0
+        and longitude_value == 0.0
+    ):
+        raise ValueError(
+            '%s cannot use 0.0, 0.0 without a valid GPS fix'
+            % label
+        )
+
+    return (
+        latitude_value,
+        longitude_value,
+    )
+
+
+def gps_fix_is_usable(gps):
+    """Return True only for a currently locked, usable Device GPS fix."""
+    if not isinstance(
+        gps,
+        dict,
+    ):
+        return False
+
+    gps_lock = gps.get(
+        'gps_lock'
+    )
+
+    if gps_lock is None:
+        gps_lock = gps.get(
+            'lock'
+        )
+
+    if not bool(
+        gps_lock
+    ):
+        return False
+
+    try:
+        latitude, longitude = (
+            _validate_coordinates(
+                gps.get(
+                    'latitude'
+                ),
+                gps.get(
+                    'longitude'
+                ),
+                'Device GPS',
+                required=True,
+                reject_zero_pair=True,
+            )
+        )
+
+    except ValueError:
+        return False
+
+    return (
+        latitude is not None
+        and longitude is not None
+    )
+
+
+def _legacy_locations(
+    value,
+    source,
+):
+    """Migrate the v1 single-location model into independent v2 locations."""
+    locations = _empty_locations()
+
+    legacy = value.get(
+        'location'
+    )
+
+    if not isinstance(
+        legacy,
+        dict,
+    ):
+        legacy = {}
+
+    if source == 'device_gps':
+        locations['device_gps'] = {
+            'latitude':
+                legacy.get(
+                    'latitude'
+                ),
+            'longitude':
+                legacy.get(
+                    'longitude'
+                ),
+        }
+
+    elif source == 'manual_coordinates':
+        locations[
+            'manual_coordinates'
+        ] = {
+            'latitude':
+                legacy.get(
+                    'latitude'
+                ),
+            'longitude':
+                legacy.get(
+                    'longitude'
+                ),
+        }
+
+    elif source == 'site_address':
+        locations['site_address'] = {
+            'address':
+                legacy.get(
+                    'address'
+                )
+                or '',
+        }
+
+    return locations
+
+
+def normalize_geo_settings(
+    value,
+    mark_configured=None,
+):
+    """Validate and normalize persisted/public GeoView settings."""
+    if not isinstance(
+        value,
+        dict,
+    ):
         value = {}
 
     provider = str(
-        value.get('provider')
+        value.get(
+            'provider'
+        )
         or 'none'
     ).strip().lower()
 
@@ -60,14 +301,26 @@ def normalize_geo_settings(value, mark_configured=None):
             'Unsupported Geo Provider'
         )
 
-    location = value.get('location')
+    legacy_location = value.get(
+        'location'
+    )
 
-    if not isinstance(location, dict):
-        location = {}
+    if not isinstance(
+        legacy_location,
+        dict,
+    ):
+        legacy_location = {}
 
     source = str(
-        location.get('source')
-        or value.get('location_source')
+        value.get(
+            'active_location_source'
+        )
+        or legacy_location.get(
+            'source'
+        )
+        or value.get(
+            'location_source'
+        )
         or 'device_gps'
     ).strip().lower()
 
@@ -80,44 +333,109 @@ def normalize_geo_settings(value, mark_configured=None):
             'Unsupported site location source'
         )
 
-    latitude = _number(
-        location.get('latitude')
+    raw_locations = value.get(
+        'locations'
     )
 
-    longitude = _number(
-        location.get('longitude')
+    if isinstance(
+        raw_locations,
+        dict,
+    ):
+        locations = {
+            'device_gps':
+                raw_locations.get(
+                    'device_gps'
+                )
+                if isinstance(
+                    raw_locations.get(
+                        'device_gps'
+                    ),
+                    dict,
+                )
+                else {},
+            'manual_coordinates':
+                raw_locations.get(
+                    'manual_coordinates'
+                )
+                if isinstance(
+                    raw_locations.get(
+                        'manual_coordinates'
+                    ),
+                    dict,
+                )
+                else {},
+            'site_address':
+                raw_locations.get(
+                    'site_address'
+                )
+                if isinstance(
+                    raw_locations.get(
+                        'site_address'
+                    ),
+                    dict,
+                )
+                else {},
+        }
+
+    else:
+        locations = _legacy_locations(
+            value,
+            source,
+        )
+
+    device = locations[
+        'device_gps'
+    ]
+
+    device_latitude, device_longitude = (
+        _validate_coordinates(
+            device.get(
+                'latitude'
+            ),
+            device.get(
+                'longitude'
+            ),
+            'Device GPS coordinates',
+            required=False,
+            reject_zero_pair=True,
+        )
+    )
+
+    manual = locations[
+        'manual_coordinates'
+    ]
+
+    manual_required = (
+        source ==
+        'manual_coordinates'
+    )
+
+    manual_latitude, manual_longitude = (
+        _validate_coordinates(
+            manual.get(
+                'latitude'
+            ),
+            manual.get(
+                'longitude'
+            ),
+            'Manual coordinates',
+            required=manual_required,
+            reject_zero_pair=False,
+        )
     )
 
     address = str(
-        location.get('address')
+        locations[
+            'site_address'
+        ].get(
+            'address'
+        )
         or ''
     ).strip()
 
     if len(address) > 300:
         raise ValueError(
             'Site address is too long'
-        )
-
-    if source == 'manual_coordinates':
-        if latitude is None or longitude is None:
-            raise ValueError(
-                'Manual coordinates require latitude and longitude'
-            )
-
-    if (
-        latitude is not None
-        and not (-90.0 <= latitude <= 90.0)
-    ):
-        raise ValueError(
-            'Latitude must be between -90 and 90'
-        )
-
-    if (
-        longitude is not None
-        and not (-180.0 <= longitude <= 180.0)
-    ):
-        raise ValueError(
-            'Longitude must be between -180 and 180'
         )
 
     if (
@@ -128,8 +446,29 @@ def normalize_geo_settings(value, mark_configured=None):
             'Site Address cannot be empty'
         )
 
+    normalized_locations = {
+        'device_gps': {
+            'latitude':
+                device_latitude,
+            'longitude':
+                device_longitude,
+        },
+        'manual_coordinates': {
+            'latitude':
+                manual_latitude,
+            'longitude':
+                manual_longitude,
+        },
+        'site_address': {
+            'address':
+                address,
+        },
+    }
+
     configured = bool(
-        value.get('configured')
+        value.get(
+            'configured'
+        )
     )
 
     if mark_configured is not None:
@@ -140,47 +479,86 @@ def normalize_geo_settings(value, mark_configured=None):
     return {
         'schema_version':
             _GEO_SCHEMA_VERSION,
-
         'configured':
             configured,
-
         'provider':
             provider,
-
-        'location': {
-            'source':
+        'active_location_source':
+            source,
+        'locations':
+            normalized_locations,
+        # Compatibility/public active location used by existing UI paths.
+        'location':
+            _active_location(
                 source,
-
-            'latitude':
-                latitude,
-
-            'longitude':
-                longitude,
-
-            'address':
-                address,
-        },
+                normalized_locations,
+            ),
     }
 
 
-def load_geo_settings(path=GEO_SETTINGS_FILE):
-    """Load local GeoView settings; invalid/missing data falls back safely."""
+def _persisted_settings(
+    normalized,
+):
+    """Return only canonical v2 values written to SDK appdata."""
+    return {
+        'schema_version':
+            _GEO_SCHEMA_VERSION,
+        'configured':
+            bool(
+                normalized[
+                    'configured'
+                ]
+            ),
+        'provider':
+            normalized[
+                'provider'
+            ],
+        'active_location_source':
+            normalized[
+                'active_location_source'
+            ],
+        'locations':
+            normalized[
+                'locations'
+            ],
+    }
+
+
+def load_geo_settings():
+    """Load GeoView configuration from NCOS SDK appdata."""
     with _geo_lock:
-        if not os.path.exists(path):
+        try:
+            raw = cp.get_appdata(
+                GEO_APPDATA_KEY
+            )
+
+        except Exception:
+            return default_geo_settings()
+
+        # Code defaults are intentionally not written to appdata.
+        if raw in (
+            None,
+            '',
+        ):
             return default_geo_settings()
 
         try:
-            with open(
-                path,
-                'r',
-                encoding='utf-8',
-            ) as handle:
-                value = json.load(handle)
+            if isinstance(
+                raw,
+                dict,
+            ):
+                value = raw
 
-            return normalize_geo_settings(value)
+            else:
+                value = json.loads(
+                    raw
+                )
+
+            return normalize_geo_settings(
+                value
+            )
 
         except (
-            OSError,
             ValueError,
             TypeError,
             json.JSONDecodeError,
@@ -188,79 +566,98 @@ def load_geo_settings(path=GEO_SETTINGS_FILE):
             return default_geo_settings()
 
 
-def save_geo_settings(value, path=GEO_SETTINGS_FILE):
-    """Atomically persist explicit GeoView configuration changes."""
+def save_geo_settings(value):
+    """Persist an explicit GeoView Save action into NCOS SDK appdata."""
     normalized = normalize_geo_settings(
         value,
         mark_configured=True,
     )
 
-    directory = (
-        os.path.dirname(path)
-        or '.'
+    persisted = _persisted_settings(
+        normalized
     )
 
-    temp_path = path + '.tmp'
+    serialized = json.dumps(
+        persisted,
+        separators=(
+            ',',
+            ':',
+        ),
+        sort_keys=True,
+    )
 
     with _geo_lock:
-        os.makedirs(
-            directory,
-            exist_ok=True,
+        cp.put_appdata(
+            GEO_APPDATA_KEY,
+            serialized,
         )
 
-        try:
-            with open(
-                temp_path,
-                'w',
-                encoding='utf-8',
-            ) as handle:
-                json.dump(
-                    normalized,
-                    handle,
-                    separators=(',', ':'),
-                    sort_keys=True,
-                )
+        # cp.put_appdata() intentionally has no success return value.
+        # Read back the appdata entry so the HTTP Save operation can
+        # fail closed instead of falsely reporting success.
+        raw = cp.get_appdata(
+            GEO_APPDATA_KEY
+        )
 
-                handle.flush()
-                os.fsync(handle.fileno())
-
-            os.replace(
-                temp_path,
-                path,
+        if raw in (
+            None,
+            '',
+        ):
+            raise OSError(
+                'Unable to verify GeoView appdata write'
             )
 
-            try:
-                directory_fd = os.open(
-                    directory,
-                    os.O_RDONLY,
+        try:
+            verified_value = (
+                raw
+                if isinstance(
+                    raw,
+                    dict,
                 )
+                else json.loads(
+                    raw
+                )
+            )
 
-                try:
-                    os.fsync(directory_fd)
+            verified = normalize_geo_settings(
+                verified_value
+            )
 
-                finally:
-                    os.close(directory_fd)
+        except (
+            ValueError,
+            TypeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise OSError(
+                'GeoView appdata verification failed'
+            ) from exc
 
-            except OSError:
-                # Directory fsync is best-effort on constrained platforms.
-                pass
-
-        finally:
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-
-                except OSError:
-                    pass
+        if (
+            _persisted_settings(
+                verified
+            )
+            != persisted
+        ):
+            raise OSError(
+                'GeoView appdata verification mismatch'
+            )
 
     return normalized
 
 
-def apply_geo_settings(geo, settings):
-    """Overlay public local settings onto a site-wide GeoView response."""
+def apply_geo_settings(
+    geo,
+    settings,
+):
+    """Overlay provider-independent settings onto the GeoView response."""
     result = (
-        dict(geo)
-        if isinstance(geo, dict)
+        dict(
+            geo
+        )
+        if isinstance(
+            geo,
+            dict,
+        )
         else {}
     )
 
@@ -268,22 +665,76 @@ def apply_geo_settings(geo, settings):
         settings
     )
 
-    result['provider'] = (
-        normalized['provider']
-    )
+    result[
+        'schema_version'
+    ] = normalized[
+        'schema_version'
+    ]
 
-    result['configured'] = (
-        normalized['configured']
-    )
+    result[
+        'provider'
+    ] = normalized[
+        'provider'
+    ]
 
-    result['status'] = (
+    result[
         'configured'
-        if normalized['configured']
+    ] = normalized[
+        'configured'
+    ]
+
+    result[
+        'status'
+    ] = (
+        'configured'
+        if normalized[
+            'configured'
+        ]
         else 'not_configured'
     )
 
-    result['location'] = dict(
-        normalized['location']
+    result[
+        'active_location_source'
+    ] = normalized[
+        'active_location_source'
+    ]
+
+    result[
+        'locations'
+    ] = {
+        'device_gps':
+            dict(
+                normalized[
+                    'locations'
+                ][
+                    'device_gps'
+                ]
+            ),
+        'manual_coordinates':
+            dict(
+                normalized[
+                    'locations'
+                ][
+                    'manual_coordinates'
+                ]
+            ),
+        'site_address':
+            dict(
+                normalized[
+                    'locations'
+                ][
+                    'site_address'
+                ]
+            ),
+    }
+
+    # Keep the active-location compatibility object for existing consumers.
+    result[
+        'location'
+    ] = dict(
+        normalized[
+            'location'
+        ]
     )
 
     # No provider adapter is active in this foundation phase.
