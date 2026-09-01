@@ -64,6 +64,10 @@ history_lock = threading.RLock()
 _iperf3_process_lock = threading.Lock()
 _active_iperf3_process = None
 
+# WAN/path snapshot for the currently running iPerf3 test.
+# Used only to distinguish a remote endpoint timeout from a local WAN failure.
+_active_iperf3_wan_guard = None
+
 # Dedicated execution slot. Unlike current_test['running'], this remains
 # reserved until the worker thread has completely exited its finally block.
 # This prevents manual and scheduled tests from overlapping during startup,
@@ -4838,6 +4842,23 @@ def _download_listener_failure_ports(
     ):
         return []
 
+    # New timeout-aware retry results explicitly identify only failures
+    # attributable to an iPerf3 listener. Healthy-WAN timeouts may be
+    # retryable operationally but must not redefine the existing
+    # Reliability -> Endpoint Failures metric.
+    explicit = result.get(
+        'listener_failure_ports'
+    )
+
+    if explicit is not None:
+        return sorted(
+            set(
+                explicit
+                or []
+            )
+        )
+
+    # Compatibility fallback for older retry results.
     attempted = set(
         result.get(
             'attempted',
@@ -4895,6 +4916,23 @@ def _upload_listener_failure_ports(
     ):
         return []
 
+    # Timeout-aware Uplink retries explicitly identify only failures
+    # attributable to an iPerf3 listener. A timeout on a verified healthy
+    # WAN may be retryable operationally but remains excluded from the
+    # existing Reliability -> Endpoint Failures metric.
+    explicit = upload_result.get(
+        'listener_failure_ports'
+    )
+
+    if explicit is not None:
+        return sorted(
+            set(
+                explicit
+                or []
+            )
+        )
+
+    # Compatibility fallback for older retry-result shapes.
     before = set(
         attempted_before
         or set()
@@ -8939,6 +8977,308 @@ def _iperf3_retryable_endpoint_reason(error):
     return ''
 
 
+def _iperf3_timeout_error(error):
+    """Return True only for an iPerf3 timeout-style error."""
+    message = str(error or '').strip().lower()
+
+    return (
+        'timed out' in message
+        or 'timeout' in message
+    )
+
+
+def _iperf3_validate_active_wan_path():
+    """Verify the selected WAN still owns the path after an iPerf3 timeout.
+
+    Returns:
+        Tuple of (healthy, detail).
+    """
+    guard = _active_iperf3_wan_guard
+
+    if not isinstance(guard, dict):
+        return False, 'WAN validation context unavailable'
+
+    device_uid = str(
+        guard.get('device_uid') or ''
+    ).strip()
+
+    source_ip = str(
+        guard.get('source_ip') or ''
+    ).strip()
+
+    expected_gateway = str(
+        guard.get('gateway') or ''
+    ).strip()
+
+    is_primary_wan = bool(
+        guard.get('is_primary_wan')
+    )
+
+    table_id = guard.get(
+        'source_route_table_id'
+    )
+
+    policy_index = guard.get(
+        'source_route_policy_index'
+    )
+
+    if not device_uid:
+        return False, 'selected WAN identity unavailable'
+
+    if not source_ip:
+        return False, 'selected WAN source IP unavailable'
+
+    # Gateway is supplemental validation data. Some NCOS WAN status
+    # responses may omit it even while the selected IPv4 WAN is healthy.
+    # When a baseline gateway is available, verify that it remains stable.
+    try:
+        devices = cp.get(
+            'status/wan/devices'
+        ) or {}
+
+        if not isinstance(devices, dict):
+            return False, 'WAN device state unavailable'
+
+        device = devices.get(
+            device_uid
+        )
+
+        if not isinstance(device, dict):
+            return False, 'selected WAN device disappeared'
+
+        status = device.get(
+            'status',
+            {}
+        )
+
+        if not isinstance(status, dict):
+            return False, 'selected WAN status unavailable'
+
+        connection_state = str(
+            status.get(
+                'connection_state',
+                ''
+            ) or ''
+        ).strip().lower()
+
+        if connection_state != 'connected':
+            return (
+                False,
+                'selected WAN is {}'.format(
+                    connection_state or 'not connected'
+                )
+            )
+
+        ipinfo = status.get(
+            'ipinfo',
+            {}
+        )
+
+        if not isinstance(ipinfo, dict):
+            return False, 'selected WAN IP state unavailable'
+
+        current_ip = str(
+            ipinfo.get(
+                'ip_address',
+                ''
+            ) or ''
+        ).strip()
+
+        if current_ip != source_ip:
+            return (
+                False,
+                'selected WAN source IP changed from {} to {}'.format(
+                    source_ip,
+                    current_ip or 'none'
+                )
+            )
+
+        current_gateway = str(
+            ipinfo.get(
+                'gateway',
+                ''
+            ) or ''
+        ).strip()
+
+        if (
+            expected_gateway
+            and current_gateway
+            and current_gateway != expected_gateway
+        ):
+            return (
+                False,
+                'selected WAN gateway changed from {} to {}'.format(
+                    expected_gateway,
+                    current_gateway or 'none'
+                )
+            )
+
+        if is_primary_wan:
+            current_primary = str(
+                cp.get_wan_primary_device() or ''
+            ).strip()
+
+            if current_primary != device_uid:
+                return (
+                    False,
+                    'primary WAN changed from {} to {}'.format(
+                        device_uid,
+                        current_primary or 'none'
+                    )
+                )
+
+            return True, 'selected primary WAN path healthy'
+
+        if not table_id or policy_index is None:
+            return (
+                False,
+                'non-primary source-routing context unavailable'
+            )
+
+        tables = _normalize_routing_list(
+            cp.get('config/routing/tables')
+        )
+
+        route_table = None
+
+        for table in tables:
+            if (
+                isinstance(table, dict)
+                and table.get('_id_') == table_id
+            ):
+                route_table = table
+                break
+
+        if route_table is None:
+            return (
+                False,
+                'temporary source-routing table disappeared'
+            )
+
+        routes = route_table.get(
+            'routes',
+            []
+        )
+
+        if not isinstance(routes, list):
+            return (
+                False,
+                'temporary source-routing table invalid'
+            )
+
+        route_valid = any(
+            isinstance(route, dict)
+            and route.get('ip_network') == '0.0.0.0/0'
+            and route.get('dev') == device_uid
+            and bool(route.get('auto_gateway'))
+            for route in routes
+        )
+
+        if not route_valid:
+            return (
+                False,
+                'temporary source route no longer targets selected WAN'
+            )
+
+        policy = cp.get(
+            'config/routing/policies/{}'.format(
+                policy_index
+            )
+        )
+
+        if not isinstance(policy, dict):
+            return (
+                False,
+                'temporary source-routing policy disappeared'
+            )
+
+        policy_valid = (
+            policy.get('table') == table_id
+            and policy.get('src_ip_network') == source_ip
+            and policy.get('ip_version') == 'ip4'
+            and policy.get('priority') == 1
+        )
+
+        if not policy_valid:
+            return (
+                False,
+                'temporary source-routing policy changed'
+            )
+
+        return True, 'selected non-primary WAN path healthy'
+
+    except Exception as exc:
+        return (
+            False,
+            'WAN path validation failed: {}'.format(
+                exc
+            )
+        )
+
+
+def _iperf3_runtime_retry_reason(error):
+    """Classify runtime retry eligibility without changing Reliability meaning.
+
+    Returns:
+        Tuple of (reason, listener_failure).
+
+        reason:
+            Non-empty when another listener port may be attempted.
+
+        listener_failure:
+            True only for the existing listener-specific failure classes
+            that are eligible for Reliability Endpoint Failure accounting.
+    """
+    listener_reason = (
+        _iperf3_retryable_endpoint_reason(
+            error
+        )
+    )
+
+    if listener_reason:
+        return (
+            listener_reason,
+            True
+        )
+
+    if not _iperf3_timeout_error(
+        error
+    ):
+        return (
+            '',
+            False
+        )
+
+    healthy, detail = (
+        _iperf3_validate_active_wan_path()
+    )
+
+    if healthy:
+        cp.log(
+            'iPerf3 timeout classified as retryable endpoint/path condition; '
+            '{}'.format(
+                detail
+            )
+        )
+
+        return (
+            'timed out',
+            False
+        )
+
+    cp.log(
+        'iPerf3 timeout classified as hard WAN/routing failure; '
+        '{}'.format(
+            detail
+        )
+    )
+
+    return (
+        '',
+        False
+    )
+
+
 def _choose_iperf3_unused_port(
     port_start,
     port_end,
@@ -8968,7 +9308,7 @@ def _choose_iperf3_unused_port(
     ) >= span:
         return None
 
-    # With a maximum attempted set of five ports, random collision
+    # With a maximum attempted set of three ports, random collision
     # probability is tiny for normal public-server ranges.
     for _ in range(
         16
@@ -9543,11 +9883,12 @@ def _iperf3_search_download_ports(
     bind_dev,
     is_primary_wan
 ):
-    """Search at most five unique listener ports for Downlink."""
+    """Search at most three unique listener ports for Downlink."""
     attempted = set()
+    listener_failures = set()
 
     budget = min(
-        5,
+        3,
         (
             int(
                 port_end
@@ -9572,6 +9913,8 @@ def _iperf3_search_download_ports(
                 'hard_failure': True,
                 'attempted':
                     attempted,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     None,
                 'error':
@@ -9615,6 +9958,8 @@ def _iperf3_search_download_ports(
                 'hard_failure': False,
                 'attempted':
                     attempted,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     attempt_port,
                 'bps':
@@ -9630,13 +9975,19 @@ def _iperf3_search_download_ports(
                     ''
             }
 
-        reason = (
-            _iperf3_retryable_endpoint_reason(
-                phase.get(
-                    'error'
-                )
+        (
+            reason,
+            listener_failure
+        ) = _iperf3_runtime_retry_reason(
+            phase.get(
+                'error'
             )
         )
+
+        if listener_failure:
+            listener_failures.add(
+                attempt_port
+            )
 
         if not reason:
             return {
@@ -9644,6 +9995,8 @@ def _iperf3_search_download_ports(
                 'hard_failure': True,
                 'attempted':
                     attempted,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     attempt_port,
                 'error':
@@ -9696,6 +10049,8 @@ def _iperf3_search_download_ports(
             False,
         'attempted':
             attempted,
+        'listener_failure_ports':
+            listener_failures,
         'port':
             (
                 last_phase.get(
@@ -9731,6 +10086,8 @@ def _iperf3_run_upload_with_retries(
     is_primary_wan
 ):
     """Run Uplink on the locked server with the shared port budget."""
+    listener_failures = set()
+
     phase = _run_iperf3_phase(
         iperf3_bin,
         server,
@@ -9749,6 +10106,8 @@ def _iperf3_run_upload_with_retries(
         return {
             'success':
                 True,
+            'listener_failure_ports':
+                listener_failures,
             'port':
                 successful_download_port,
             'bps':
@@ -9764,18 +10123,26 @@ def _iperf3_run_upload_with_retries(
                 ''
         }
 
-    reason = (
-        _iperf3_retryable_endpoint_reason(
-            phase.get(
-                'error'
-            )
+    (
+        reason,
+        listener_failure
+    ) = _iperf3_runtime_retry_reason(
+        phase.get(
+            'error'
         )
     )
+
+    if listener_failure:
+        listener_failures.add(
+            successful_download_port
+        )
 
     if not reason:
         return {
             'success':
                 False,
+            'listener_failure_ports':
+                listener_failures,
             'port':
                 successful_download_port,
             'bps':
@@ -9790,7 +10157,7 @@ def _iperf3_run_upload_with_retries(
         }
 
     budget = min(
-        5,
+        3,
         (
             int(
                 port_end
@@ -9813,6 +10180,8 @@ def _iperf3_run_upload_with_retries(
             return {
                 'success':
                     False,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     last_phase.get(
                         'port'
@@ -9896,6 +10265,8 @@ def _iperf3_run_upload_with_retries(
             return {
                 'success':
                     True,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     attempt_port,
                 'bps':
@@ -9911,13 +10282,19 @@ def _iperf3_run_upload_with_retries(
                     ''
             }
 
-        reason = (
-            _iperf3_retryable_endpoint_reason(
-                phase.get(
-                    'error'
-                )
+        (
+            reason,
+            listener_failure
+        ) = _iperf3_runtime_retry_reason(
+            phase.get(
+                'error'
             )
         )
+
+        if listener_failure:
+            listener_failures.add(
+                attempt_port
+            )
 
         if not reason:
             break
@@ -9925,6 +10302,8 @@ def _iperf3_run_upload_with_retries(
     return {
         'success':
             False,
+        'listener_failure_ports':
+            listener_failures,
         'port':
             last_phase.get(
                 'port'
@@ -9949,7 +10328,9 @@ def run_iperf3(
     context=None
 ):
     """Run bounded iPerf3 retries with optional Public backup."""
-    global current_test
+    global current_test, _active_iperf3_wan_guard
+
+    _active_iperf3_wan_guard = None
 
     context = (
         context
@@ -10061,6 +10442,7 @@ def run_iperf3(
 
     bind_ip = ''
     bind_dev = ''
+    selected_gateway = ''
     is_primary_wan = False
     matched_uid = ''
 
@@ -10103,6 +10485,17 @@ def run_iperf3(
                             {}
                         ).get(
                             'ip_address',
+                            ''
+                        )
+
+                        selected_gateway = dev.get(
+                            'status',
+                            {}
+                        ).get(
+                            'ipinfo',
+                            {}
+                        ).get(
+                            'gateway',
                             ''
                         )
 
@@ -10243,6 +10636,83 @@ def run_iperf3(
         if use_source_routing
         else bind_dev
     )
+
+    guard_uid = matched_uid
+
+    # Auto mode follows the current primary WAN. Do not change the
+    # existing bind behavior; this lookup is validation-only.
+    if not interface:
+        guard_uid = primary_uid
+
+    guard_source_ip = bind_ip
+    guard_gateway = selected_gateway
+
+    if guard_uid and (
+        not guard_source_ip
+        or not guard_gateway
+    ):
+        try:
+            guard_devices = cp.get(
+                'status/wan/devices'
+            ) or {}
+
+            if isinstance(
+                guard_devices,
+                dict
+            ):
+                guard_device = guard_devices.get(
+                    guard_uid,
+                    {}
+                )
+
+                if isinstance(
+                    guard_device,
+                    dict
+                ):
+                    guard_ipinfo = guard_device.get(
+                        'status',
+                        {}
+                    ).get(
+                        'ipinfo',
+                        {}
+                    )
+
+                    if not guard_source_ip:
+                        guard_source_ip = guard_ipinfo.get(
+                            'ip_address',
+                            ''
+                        )
+
+                    if not guard_gateway:
+                        guard_gateway = guard_ipinfo.get(
+                            'gateway',
+                            ''
+                        )
+
+        except Exception as exc:
+            cp.log(
+                'iPerf3 WAN validation snapshot warning: {}'.format(
+                    exc
+                )
+            )
+
+    _active_iperf3_wan_guard = {
+        'device_uid':
+            guard_uid,
+        'source_ip':
+            guard_source_ip,
+        'gateway':
+            guard_gateway,
+        'is_primary_wan':
+            bool(
+                guard_uid
+                and guard_uid == primary_uid
+            ),
+        'source_route_table_id':
+            source_route_table_id,
+        'source_route_policy_index':
+            source_route_policy_index,
+    }
 
     try:
         locked_server = server
@@ -10679,6 +11149,8 @@ def run_iperf3(
                 source_route_table_id,
                 source_route_policy_index
             )
+
+        _active_iperf3_wan_guard = None
 
 
 

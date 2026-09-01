@@ -34,6 +34,7 @@ Key capabilities include:
 - Review published modem Carrier Aggregation capability references for supported modem variants.
 - Track saved iPerf3 endpoint reliability.
 - Export results in CSV or HTML format.
+- Export Cellular Analysis as a self-contained HTML report optimized for browser printing and **Save as PDF**.
 - Write successful result summaries to supported NCOS-accessible output fields when desired.
 
 ---
@@ -638,6 +639,16 @@ GeoView validates:
 Site Address is descriptive text stored exactly as entered.
 
 v1.1.1 does **not** automatically geocode, resolve, or convert a Site Address into coordinates.
+
+## Exporting Cellular Analysis reports
+
+Cellular Analysis includes an **Export HTML Report** option for sharing or archiving the current analysis. The exported file is a self-contained HTML report that can be opened locally in a standard web browser without requiring continued access to the router.
+
+The report includes the selected cellular interface and history range, Cellular Overview, Site Cellular GeoView, serving-cell distribution and timeline, change activity, in-test handoff events when present, and detailed RF and radio-resource information for each identifiable serving cell.
+
+The exported HTML is also optimized for printing. Use the browser's **Print** function and select **Save as PDF** to create a portable PDF copy of the report. The print layout is optimized for **US Letter landscape**.
+
+The router does not generate or store the PDF. HTML report generation occurs in the browser, and PDF creation is handled by the browser's normal print/save workflow.
 
 ## GeoView persistence and privacy
 

@@ -2669,6 +2669,7 @@
             grid-template-columns:
                 minmax(260px, 360px)
                 minmax(170px, 220px)
+                auto
                 auto;
             justify-content: start;
             align-items: end;
@@ -2692,12 +2693,14 @@
             width: 100%;
         }
 
-        .ca-refresh-control {
+        .ca-refresh-control,
+        .ca-export-control {
             display: flex;
             align-items: flex-end;
         }
 
-        .ca-refresh-control .btn {
+        .ca-refresh-control .btn,
+        .ca-export-control .btn {
             min-height: 38px;
             white-space: nowrap;
         }
@@ -2768,6 +2771,7 @@
                 grid-template-columns:
                     minmax(220px, 1fr)
                     minmax(160px, 200px)
+                    auto
                     auto;
             }
 
@@ -4376,6 +4380,15 @@
                                         id="btn-ca-refresh">
                                     <i class="fas fa-sync-alt"></i>
                                     Refresh Data
+                                </button>
+                            </div>
+
+                            <div class="ca-export-control">
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        id="btn-ca-export-report">
+                                    <i class="fas fa-file-code"></i>
+                                    Export HTML Report
                                 </button>
                             </div>
                         </div>
@@ -7843,10 +7856,68 @@
             return 'var(--text-secondary)';
         }
 
+        function caDonutCenterLabel(modes) {
+            if (
+                !Array.isArray(modes) ||
+                modes.length === 0
+            ) {
+                return 'No Data';
+            }
+
+            var activeModes = [];
+
+            for (
+                var i = 0;
+                i < modes.length;
+                i++
+            ) {
+                if (
+                    Number(
+                        modes[i].usage_pct ||
+                        0
+                    ) > 0
+                ) {
+                    activeModes.push(
+                        modes[i]
+                    );
+                }
+            }
+
+            if (activeModes.length > 1) {
+                return 'Mixed';
+            }
+
+            if (activeModes.length === 0) {
+                return 'No Data';
+            }
+
+            var mode =
+                activeModes[0].mode;
+
+            if (mode === 'lte_only') {
+                return 'LTE';
+            }
+
+            if (mode === 'lte_5g_nsa') {
+                return 'NSA';
+            }
+
+            if (mode === '5g_sa') {
+                return 'SA';
+            }
+
+            return 'Mode';
+        }
+
         function caBuildDonut(modes) {
             if (!Array.isArray(modes) || modes.length === 0) {
                 return (
-                    '<div style="' +
+                    '<div class="ca-mode-donut" ' +
+                    'data-ca-donut="' +
+                    encodeURIComponent(
+                        JSON.stringify([])
+                    ) +
+                    '" style="' +
                     'width:92px;height:92px;border-radius:50%;' +
                     'background:var(--border-color);' +
                     'display:flex;align-items:center;justify-content:center;' +
@@ -7865,27 +7936,49 @@
             var start = 0;
 
             for (var i = 0; i < modes.length; i++) {
-                var pct = Number(modes[i].usage_pct || 0);
-                var end = start + pct;
-
-                parts.push(
-                    caModeColor(modes[i].mode) +
-                    ' ' + start + '% ' + end + '%'
+                var pct = Number(
+                    modes[i].usage_pct || 0
                 );
 
-                start = end;
+                var end =
+                    start + pct;
+
+                parts.push(
+                    caModeColor(
+                        modes[i].mode
+                    ) +
+                    ' ' +
+                    start +
+                    '% ' +
+                    end +
+                    '%'
+                );
+
+                start =
+                    end;
             }
 
             if (start < 100) {
                 parts.push(
-                    'var(--border-color) ' + start + '% 100%'
+                    'var(--border-color) ' +
+                    start +
+                    '% 100%'
                 );
             }
 
             return (
-                '<div style="' +
+                '<div class="ca-mode-donut" ' +
+                'data-ca-donut="' +
+                encodeURIComponent(
+                    JSON.stringify(
+                        modes
+                    )
+                ) +
+                '" style="' +
                 'width:92px;height:92px;border-radius:50%;' +
-                'background:conic-gradient(' + parts.join(',') + ');' +
+                'background:conic-gradient(' +
+                    parts.join(',') +
+                ');' +
                 'display:flex;align-items:center;justify-content:center;' +
                 'flex:0 0 auto;' +
                 '">' +
@@ -7895,7 +7988,11 @@
                     'display:flex;align-items:center;justify-content:center;' +
                     'font-size:0.72rem;font-weight:600;' +
                     'color:var(--text-secondary);text-align:center;">' +
-                    'Mode<br>Mix' +
+                    caEscapeHtml(
+                        caDonutCenterLabel(
+                            modes
+                        )
+                    ) +
                     '</div>' +
                 '</div>'
             );
@@ -12710,6 +12807,3316 @@
                 '</div>';
         }
 
+        // ===== CELLULAR ANALYSIS HTML REPORT =====
+
+        function caReportScopeValue(
+            selectId,
+            fallback
+        ) {
+            var select =
+                document.getElementById(
+                    selectId
+                );
+
+            if (
+                select &&
+                select.options &&
+                select.selectedIndex >= 0
+            ) {
+                return (
+                    select.options[
+                        select.selectedIndex
+                    ].textContent ||
+                    fallback ||
+                    ''
+                ).trim();
+            }
+
+            return fallback || '';
+        }
+
+        function caReportInterfaceLabel(data) {
+            if (
+                data &&
+                data._report_interface_label
+            ) {
+                return String(
+                    data._report_interface_label
+                );
+            }
+
+            var scope =
+                data &&
+                data.scope
+                    ? data.scope
+                    : {};
+
+            return (
+                scope.interface_label ||
+                caReportScopeValue(
+                    'ca-interface-select',
+                    scope.interface || ''
+                ) ||
+                'Cellular Interface'
+            );
+        }
+
+
+        function caReportHistoryLabel(data) {
+            if (
+                data &&
+                data._report_history_label
+            ) {
+                return String(
+                    data._report_history_label
+                );
+            }
+
+            var scope =
+                data &&
+                data.scope
+                    ? data.scope
+                    : {};
+
+            var explicitLabel =
+                String(
+                    scope.history_label ||
+                    ''
+                ).trim();
+
+            if (explicitLabel) {
+                return explicitLabel;
+            }
+
+            var history =
+                String(
+                    scope.history ||
+                    ''
+                ).trim();
+
+            var labels = {
+                'all':
+                    'Available History',
+                '12h':
+                    'Last 12 Hours',
+                '24h':
+                    'Last 24 Hours',
+                '3d':
+                    'Last 3 Days',
+                '7d':
+                    'Last 7 Days'
+            };
+
+            if (
+                history &&
+                labels[history]
+            ) {
+                return labels[history];
+            }
+
+            return caReportScopeValue(
+                'ca-history-select',
+                'Available History'
+            );
+        }
+
+        function caReportVersion(data) {
+            if (
+                data &&
+                data._report_version
+            ) {
+                return String(
+                    data._report_version
+                );
+            }
+
+            var version =
+                document.querySelector(
+                    '.sidebar-version'
+                );
+
+            return version
+                ? (
+                    version.textContent ||
+                    ''
+                ).trim()
+                : '';
+        }
+
+
+        function caReportDeviceLabel(data) {
+            if (
+                data &&
+                data._report_device_label
+            ) {
+                return String(
+                    data._report_device_label
+                );
+            }
+
+            var name =
+                document.getElementById(
+                    'device-name'
+                );
+
+            var model =
+                document.getElementById(
+                    'device-model'
+                );
+
+            var parts = [];
+
+            if (
+                name &&
+                name.textContent &&
+                name.textContent.trim() &&
+                name.textContent.trim() !== 'router'
+            ) {
+                parts.push(
+                    name.textContent.trim()
+                );
+            }
+
+            if (
+                model &&
+                model.textContent &&
+                model.textContent.trim()
+            ) {
+                parts.push(
+                    model.textContent.trim()
+                );
+            }
+
+            return parts.join(' • ');
+        }
+
+        function caReportSafeFilename(value) {
+            value = String(
+                value || 'cellular-analysis'
+            );
+
+            value = value
+                .replace(
+                    /[^A-Za-z0-9._-]+/g,
+                    '-'
+                )
+                .replace(
+                    /-+/g,
+                    '-'
+                )
+                .replace(
+                    /^-|-$/g,
+                    ''
+                );
+
+            return (
+                value ||
+                'cellular-analysis'
+            ).slice(
+                0,
+                100
+            );
+        }
+
+        function caReportFetchDataUrl(
+            url,
+            mimeType
+        ) {
+            return fetch(url)
+                .then(
+                    function(response) {
+                        if (!response.ok) {
+                            throw new Error(
+                                'HTTP ' + response.status
+                            );
+                        }
+
+                        return response.arrayBuffer();
+                    }
+                )
+                .then(
+                    function(buffer) {
+                        var bytes = new Uint8Array(
+                            buffer
+                        );
+
+                        var binary = '';
+                        var chunkSize = 0x8000;
+
+                        for (
+                            var offset = 0;
+                            offset < bytes.length;
+                            offset += chunkSize
+                        ) {
+                            binary += String.fromCharCode.apply(
+                                null,
+                                bytes.subarray(
+                                    offset,
+                                    Math.min(
+                                        offset + chunkSize,
+                                        bytes.length
+                                    )
+                                )
+                            );
+                        }
+
+                        return (
+                            'data:' +
+                            mimeType +
+                            ';base64,' +
+                            btoa(binary)
+                        );
+                    }
+                );
+        }
+
+        function caReportCollectCss() {
+            var inlineCss = '';
+
+            var styleNodes =
+                document.querySelectorAll(
+                    'style'
+                );
+
+            for (
+                var i = 0;
+                i < styleNodes.length;
+                i++
+            ) {
+                inlineCss +=
+                    '\n' +
+                    (
+                        styleNodes[i].textContent ||
+                        ''
+                    );
+            }
+
+            var baseCssPromise = fetch(
+                'static/css/style.css'
+            ).then(
+                function(response) {
+                    if (!response.ok) {
+                        throw new Error(
+                            'HTTP ' + response.status
+                        );
+                    }
+
+                    return response.text();
+                }
+            );
+
+            var iconCssPromise = fetch(
+                'static/libs/font-awesome.min.css'
+            ).then(
+                function(response) {
+                    if (!response.ok) {
+                        throw new Error(
+                            'HTTP ' + response.status
+                        );
+                    }
+
+                    return response.text();
+                }
+            );
+
+            var solidFontPromise =
+                caReportFetchDataUrl(
+                    'static/libs/webfonts/fa-solid-900.woff2',
+                    'font/woff2'
+                );
+
+            var regularFontPromise =
+                caReportFetchDataUrl(
+                    'static/libs/webfonts/fa-regular-400.woff2',
+                    'font/woff2'
+                );
+
+            var brandsFontPromise =
+                caReportFetchDataUrl(
+                    'static/libs/webfonts/fa-brands-400.woff2',
+                    'font/woff2'
+                );
+
+            return Promise.all([
+                baseCssPromise,
+                iconCssPromise,
+                solidFontPromise,
+                regularFontPromise,
+                brandsFontPromise
+            ])
+                .then(
+                    function(parts) {
+                        var baseCss =
+                            parts[0] || '';
+
+                        var iconCss =
+                            parts[1] || '';
+
+                        var solidFont =
+                            parts[2] || '';
+
+                        var regularFont =
+                            parts[3] || '';
+
+                        var brandsFont =
+                            parts[4] || '';
+
+                        if (
+                            !solidFont ||
+                            !regularFont ||
+                            !brandsFont
+                        ) {
+                            throw new Error(
+                                'One or more Font Awesome fonts could not be embedded.'
+                            );
+                        }
+
+                        iconCss =
+                            iconCss.replace(
+                                /url\((["']?)(?:\.\.\/)?webfonts\/fa-solid-900\.(?:eot|woff2|woff|ttf|svg)(?:[?#][^"')]+)?\1\)/g,
+                                'url("' +
+                                solidFont +
+                                '")'
+                            );
+
+                        iconCss =
+                            iconCss.replace(
+                                /url\((["']?)(?:\.\.\/)?webfonts\/fa-regular-400\.(?:eot|woff2|woff|ttf|svg)(?:[?#][^"')]+)?\1\)/g,
+                                'url("' +
+                                regularFont +
+                                '")'
+                            );
+
+                        iconCss =
+                            iconCss.replace(
+                                /url\((["']?)(?:\.\.\/)?webfonts\/fa-brands-400\.(?:eot|woff2|woff|ttf|svg)(?:[?#][^"')]+)?\1\)/g,
+                                'url("' +
+                                brandsFont +
+                                '")'
+                            );
+
+                        /*
+                         * The bundled Font Awesome CSS also advertises an
+                         * optional v4 compatibility font, but this SDK app
+                         * does not package that font and does not depend on
+                         * its compatibility glyphs. Remove that unused
+                         * @font-face block so the standalone report has no
+                         * unresolved local resource references.
+                         */
+                        iconCss =
+                            iconCss.replace(
+                                /@font-face\{[^{}]*fa-v4compatibility[^{}]*\}/gi,
+                                ''
+                            );
+
+                        if (
+                            /fa-v4compatibility\./i.test(
+                                iconCss
+                            )
+                        ) {
+                            throw new Error(
+                                'Font Awesome v4 compatibility resource could not be removed.'
+                            );
+                        }
+
+                        if (
+                            /url\([^)]*fa-(?:solid-900|regular-400|brands-400)\./i.test(
+                                iconCss
+                            )
+                        ) {
+                            throw new Error(
+                                'Font Awesome contains unresolved local font URLs.'
+                            );
+                        }
+
+                        return (
+                            baseCss +
+                            '\n' +
+                            iconCss +
+                            '\n' +
+                            inlineCss
+                        );
+                    }
+                )
+                .catch(
+                    function(error) {
+                        console.error(
+                            'Cellular report offline asset embedding failed:',
+                            error
+                        );
+
+                        throw new Error(
+                            'Unable to embed required offline report assets: ' +
+                            (
+                                (
+                                    error &&
+                                    error.message
+                                ) ||
+                                error ||
+                                'unknown asset error'
+                            )
+                        );
+                    }
+                );
+        }
+
+
+        function caReportCellKey(item) {
+            if (
+                !item ||
+                typeof item !== 'object'
+            ) {
+                return 'unknown';
+            }
+
+            var values = [
+                item.key,
+                item.cell_key,
+                item.cell_id
+            ];
+
+            for (
+                var i = 0;
+                i < values.length;
+                i++
+            ) {
+                if (
+                    values[i] !== null &&
+                    values[i] !== undefined &&
+                    values[i] !== ''
+                ) {
+                    return String(
+                        values[i]
+                    );
+                }
+            }
+
+            return 'unknown';
+        }
+
+        function caReportCellIsUnknown(item) {
+            if (
+                !item ||
+                typeof item !== 'object'
+            ) {
+                return true;
+            }
+
+            var key =
+                caReportCellKey(
+                    item
+                ).trim().toLowerCase();
+
+            var cellId = '';
+
+            if (
+                item.cell_id !== null &&
+                item.cell_id !== undefined &&
+                item.cell_id !== ''
+            ) {
+                cellId =
+                    String(
+                        item.cell_id
+                    ).trim().toLowerCase();
+            }
+
+            return (
+                item.unknown === true ||
+                key === 'unknown' ||
+                key === '' ||
+                cellId === 'unknown'
+            );
+        }
+
+        function caReportCellKeyFromData(data) {
+            var selected =
+                data &&
+                data.selected_cell;
+
+            if (!selected) {
+                return '';
+            }
+
+            if (
+                selected.key !== null &&
+                selected.key !== undefined &&
+                selected.key !== ''
+            ) {
+                return String(
+                    selected.key
+                );
+            }
+
+            if (
+                selected.cell_key !== null &&
+                selected.cell_key !== undefined &&
+                selected.cell_key !== ''
+            ) {
+                return String(
+                    selected.cell_key
+                );
+            }
+
+            if (
+                selected.cell_id !== null &&
+                selected.cell_id !== undefined &&
+                selected.cell_id !== ''
+            ) {
+                return String(
+                    selected.cell_id
+                );
+            }
+
+            return '';
+        }
+
+        function caReportSetProgress(
+            message
+        ) {
+            var button =
+                document.getElementById(
+                    'btn-ca-export-report'
+                );
+
+            if (!button) {
+                return;
+            }
+
+            button.innerHTML =
+                '<i class="fas fa-circle-notch fa-spin"></i> ' +
+                caEscapeHtml(
+                    message ||
+                    'Building Report…'
+                );
+        }
+
+        function caReportLoadServingCells(data) {
+            var cells = Array.isArray(
+                data &&
+                data.serving_cells
+            )
+                ? data.serving_cells
+                : [];
+
+            var known = [];
+
+            for (
+                var i = 0;
+                i < cells.length;
+                i++
+            ) {
+                if (!caReportCellIsUnknown(cells[i])) {
+                    known.push(
+                        cells[i]
+                    );
+                }
+            }
+
+            if (!known.length) {
+                return Promise.resolve([]);
+            }
+
+            var scope =
+                data.scope || {};
+
+            var interfaceName =
+                scope.interface || '';
+
+            var historyScope =
+                scope.history || 'all';
+
+            var currentKey =
+                caReportCellKeyFromData(
+                    data
+                );
+
+            var results = [];
+            var sequence =
+                Promise.resolve();
+
+            var completed = 0;
+            var total = known.length;
+
+            caReportSetProgress(
+                'Loading Serving Cells 0/' +
+                total
+            );
+
+            known.forEach(
+                function(cell) {
+                    sequence =
+                        sequence.then(
+                            function() {
+                                var key =
+                                    caReportCellKey(
+                                        cell
+                                    );
+
+                                /*
+                                 * The currently selected cell is already
+                                 * loaded in the page response. Reuse it.
+                                 */
+                                if (
+                                    currentKey &&
+                                    key === currentKey &&
+                                    data.selected_cell
+                                ) {
+                                    results.push(
+                                        data
+                                    );
+
+                                    completed += 1;
+
+                                    caReportSetProgress(
+                                        'Loading Serving Cells ' +
+                                        completed +
+                                        '/' +
+                                        total
+                                    );
+
+                                    return new Promise(
+                                        function(resolve) {
+                                            window.setTimeout(
+                                                resolve,
+                                                0
+                                            );
+                                        }
+                                    );
+                                }
+
+                                var url =
+                                    '/api/cellular_analysis?iface=' +
+                                    encodeURIComponent(
+                                        interfaceName
+                                    ) +
+                                    '&history=' +
+                                    encodeURIComponent(
+                                        historyScope
+                                    ) +
+                                    '&cell=' +
+                                    encodeURIComponent(
+                                        key
+                                    );
+
+                                return fetch(
+                                    url
+                                )
+                                    .then(
+                                        function(response) {
+                                            if (!response.ok) {
+                                                throw new Error(
+                                                    'HTTP ' +
+                                                    response.status
+                                                );
+                                            }
+
+                                            return response.json();
+                                        }
+                                    )
+                                    .then(
+                                        function(cellData) {
+                                            if (
+                                                !cellData ||
+                                                !cellData.selected_cell
+                                            ) {
+                                                throw new Error(
+                                                    'No detail data returned ' +
+                                                    'for serving cell ' +
+                                                    key
+                                                );
+                                            }
+
+                                            results.push(
+                                                cellData
+                                            );
+
+                                            completed += 1;
+
+                                            caReportSetProgress(
+                                                'Loading Serving Cells ' +
+                                                completed +
+                                                '/' +
+                                                total
+                                            );
+
+                                            return new Promise(
+                                                function(resolve) {
+                                                    window.setTimeout(
+                                                        resolve,
+                                                        0
+                                                    );
+                                                }
+                                            );
+                                        }
+                                    )
+                                    .catch(
+                                        function(error) {
+                                            console.warn(
+                                                'Cellular report serving-cell ' +
+                                                'detail load failed:',
+                                                key,
+                                                error
+                                            );
+
+                                            results.push({
+                                                '_report_error':
+                                                    String(
+                                                        (
+                                                            error &&
+                                                            error.message
+                                                        ) ||
+                                                        error ||
+                                                        'Detail unavailable'
+                                                    ),
+                                                '_report_cell_meta':
+                                                    cell
+                                            });
+
+                                            completed += 1;
+
+                                            caReportSetProgress(
+                                                'Loading Serving Cells ' +
+                                                completed +
+                                                '/' +
+                                                total
+                                            );
+
+                                            return new Promise(
+                                                function(resolve) {
+                                                    window.setTimeout(
+                                                        resolve,
+                                                        0
+                                                    );
+                                                }
+                                            );
+                                        }
+                                    );
+                            }
+                        );
+                }
+            );
+
+            return sequence.then(
+                function() {
+                    return results;
+                }
+            );
+        }
+
+        function caReportCssColor(
+            variableName,
+            fallback
+        ) {
+            try {
+                var value =
+                    window.getComputedStyle(
+                        document.documentElement
+                    ).getPropertyValue(
+                        variableName
+                    ).trim();
+
+                if (value) {
+                    return value;
+                }
+            } catch (error) {
+                // Use deterministic fallback below.
+            }
+
+            return fallback;
+        }
+
+        function caReportModeColor(
+            mode
+        ) {
+            if (mode === 'lte_only') {
+                return caReportCssColor(
+                    '--primary-color',
+                    '#4f46e5'
+                );
+            }
+
+            if (mode === 'lte_5g_nsa') {
+                return caReportCssColor(
+                    '--info-color',
+                    '#0891b2'
+                );
+            }
+
+            if (mode === '5g_sa') {
+                return caReportCssColor(
+                    '--success-color',
+                    '#10b981'
+                );
+            }
+
+            return caReportCssColor(
+                '--text-secondary',
+                '#64748b'
+            );
+        }
+
+        function caReportDonutSvg(
+            modes,
+            size
+        ) {
+            modes =
+                Array.isArray(
+                    modes
+                )
+                    ? modes
+                    : [];
+
+            size =
+                Number(size) || 78;
+
+            var borderColor =
+                caReportCssColor(
+                    '--border-color',
+                    '#d1d5db'
+                );
+
+            var cardColor =
+                caReportCssColor(
+                    '--light-surface',
+                    '#ffffff'
+                );
+
+            var textColor =
+                caReportCssColor(
+                    '--text-secondary',
+                    '#64748b'
+                );
+
+            var ringHtml =
+                '<circle ' +
+                'class="ca-report-donut-track" ' +
+                'cx="46" cy="46" r="37" ' +
+                'fill="none" ' +
+                'stroke="' +
+                    caEscapeHtml(
+                        borderColor
+                    ) +
+                '" ' +
+                'stroke-width="16"></circle>';
+
+            var startPct = 0;
+
+            for (
+                var i = 0;
+                i < modes.length;
+                i++
+            ) {
+                var pct =
+                    Number(
+                        modes[i].usage_pct ||
+                        0
+                    );
+
+                if (!isFinite(pct)) {
+                    pct = 0;
+                }
+
+                pct =
+                    Math.max(
+                        0,
+                        Math.min(
+                            pct,
+                            100 - startPct
+                        )
+                    );
+
+                if (pct <= 0) {
+                    continue;
+                }
+
+                var modeColor =
+                    caReportModeColor(
+                        modes[i].mode
+                    );
+
+                ringHtml +=
+                    '<circle ' +
+                    'cx="46" cy="46" r="37" ' +
+                    'fill="none" ' +
+                    'stroke="' +
+                        caEscapeHtml(
+                            modeColor
+                        ) +
+                    '" ' +
+                    'stroke-width="16" ' +
+                    'stroke-linecap="butt" ' +
+                    'pathLength="100" ' +
+                    'stroke-dasharray="' +
+                        pct +
+                        ' ' +
+                        (100 - pct) +
+                    '" ' +
+                    'stroke-dashoffset="' +
+                        (-startPct) +
+                    '" ' +
+                    'transform="rotate(-90 46 46)">' +
+                    '</circle>';
+
+                startPct +=
+                    pct;
+
+                if (startPct >= 100) {
+                    break;
+                }
+            }
+
+            var centerText;
+
+            var centerLabel =
+                caDonutCenterLabel(
+                    modes
+                );
+
+            centerText =
+                '<text ' +
+                'class="ca-report-donut-text" ' +
+                'x="46" y="49" ' +
+                'text-anchor="middle" ' +
+                'font-size="10" ' +
+                'font-weight="600" ' +
+                'fill="' +
+                    caEscapeHtml(
+                        textColor
+                    ) +
+                '">' +
+                    caEscapeHtml(
+                        centerLabel
+                    ) +
+                '</text>';
+
+            return (
+                '<svg ' +
+                'class="ca-report-donut-svg" ' +
+                'xmlns="http://www.w3.org/2000/svg" ' +
+                'viewBox="0 0 92 92" ' +
+                'width="' +
+                    size +
+                '" ' +
+                'height="' +
+                    size +
+                '" ' +
+                'style="' +
+                    'width:' +
+                    size +
+                    'px;' +
+                    'height:' +
+                    size +
+                    'px;' +
+                    'display:block;' +
+                    'flex:0 0 ' +
+                    size +
+                    'px;' +
+                '">' +
+
+                    ringHtml +
+
+                    '<circle ' +
+                    'class="ca-report-donut-center" ' +
+                    'cx="46" cy="46" r="29" ' +
+                    'fill="' +
+                        caEscapeHtml(
+                            cardColor
+                        ) +
+                    '">' +
+                    '</circle>' +
+
+                    centerText +
+
+                '</svg>'
+            );
+        }
+
+        function caReportConvertDonuts(
+            root
+        ) {
+            if (!root) {
+                return;
+            }
+
+            var donuts =
+                root.querySelectorAll(
+                    '.ca-mode-donut[data-ca-donut]'
+                );
+
+            for (
+                var i = 0;
+                i < donuts.length;
+                i++
+            ) {
+                var donut =
+                    donuts[i];
+
+                var modes = [];
+
+                try {
+                    modes =
+                        JSON.parse(
+                            decodeURIComponent(
+                                donut.getAttribute(
+                                    'data-ca-donut'
+                                ) ||
+                                '%5B%5D'
+                            )
+                        );
+                } catch (error) {
+                    modes = [];
+                }
+
+                var parent =
+                    donut.parentElement;
+
+                var size =
+                    parent &&
+                    parent.classList.contains(
+                        'ca-tech-layout'
+                    )
+                        ? 88
+                        : 78;
+
+                var holder =
+                    document.createElement(
+                        'div'
+                    );
+
+                holder.innerHTML =
+                    caReportDonutSvg(
+                        modes,
+                        size
+                    );
+
+                var svg =
+                    holder.firstElementChild;
+
+                if (svg) {
+                    donut.parentNode.replaceChild(
+                        svg,
+                        donut
+                    );
+                }
+            }
+        }
+
+        function caReportSanitizeStaticNode(
+            root
+        ) {
+            if (!root) {
+                return root;
+            }
+
+            var nodes = [
+                root
+            ];
+
+            var descendants =
+                root.querySelectorAll(
+                    '*'
+                );
+
+            for (
+                var d = 0;
+                d < descendants.length;
+                d++
+            ) {
+                nodes.push(
+                    descendants[d]
+                );
+            }
+
+            for (
+                var i = 0;
+                i < nodes.length;
+                i++
+            ) {
+                var node =
+                    nodes[i];
+
+                var tooltip =
+                    node.getAttribute(
+                        'data-ca-tooltip'
+                    );
+
+                /*
+                 * Preserve useful explanatory text in the standalone
+                 * artifact without requiring the live tooltip engine.
+                 */
+                if (tooltip) {
+                    if (
+                        !node.getAttribute(
+                            'title'
+                        )
+                    ) {
+                        node.setAttribute(
+                            'title',
+                            tooltip
+                                .split('|')
+                                .join('\n')
+                        );
+                    }
+
+                    node.removeAttribute(
+                        'data-ca-tooltip'
+                    );
+
+                    node.removeAttribute(
+                        'data-ca-tooltip-bound'
+                    );
+
+                    node.removeAttribute(
+                        'data-ca-bound'
+                    );
+
+                    node.removeAttribute(
+                        'tabindex'
+                    );
+
+                    if (
+                        node.getAttribute(
+                            'role'
+                        ) === 'button'
+                    ) {
+                        node.removeAttribute(
+                            'role'
+                        );
+                    }
+
+                } else {
+                    node.removeAttribute(
+                        'data-ca-tooltip-bound'
+                    );
+
+                    node.removeAttribute(
+                        'data-ca-bound'
+                    );
+                }
+
+                /*
+                 * cloneNode() does not copy addEventListener handlers,
+                 * but remove any inline event attributes if one ever
+                 * appears in report content.
+                 */
+                var attributes =
+                    Array.prototype.slice.call(
+                        node.attributes ||
+                        []
+                    );
+
+                for (
+                    var a = 0;
+                    a < attributes.length;
+                    a++
+                ) {
+                    if (
+                        /^on/i.test(
+                            attributes[a].name
+                        )
+                    ) {
+                        node.removeAttribute(
+                            attributes[a].name
+                        );
+                    }
+                }
+            }
+
+            return root;
+        }
+
+        function caReportCloneCardHtml(
+            elementId
+        ) {
+            var content =
+                document.getElementById(
+                    elementId
+                );
+
+            if (!content) {
+                return '';
+            }
+
+            var card =
+                content.closest(
+                    '.card'
+                );
+
+            if (!card) {
+                return '';
+            }
+
+            var clone =
+                card.cloneNode(
+                    true
+                );
+
+            caReportConvertDonuts(
+                clone
+            );
+
+            if (
+                clone.hasAttribute(
+                    'id'
+                )
+            ) {
+                clone.removeAttribute(
+                    'id'
+                );
+            }
+
+            /*
+             * Repeated serving-cell blocks must not create duplicate
+             * document IDs in the exported artifact.
+             */
+            var idNodes =
+                clone.querySelectorAll(
+                    '[id]'
+                );
+
+            for (
+                var i = 0;
+                i < idNodes.length;
+                i++
+            ) {
+                idNodes[i].removeAttribute(
+                    'id'
+                );
+            }
+
+            caReportSanitizeStaticNode(
+                clone
+            );
+
+            return clone.outerHTML;
+        }
+
+        function caReportBuildServingCellBlocks(
+            cellDataSets,
+            originalData
+        ) {
+            if (
+                !Array.isArray(
+                    cellDataSets
+                ) ||
+                !cellDataSets.length
+            ) {
+                return (
+                    '<div class="ca-report-empty-state">' +
+                        '<div class="ca-report-empty-title">' +
+                            'No Identifiable Serving Cells' +
+                        '</div>' +
+                        '<div class="ca-report-empty-text">' +
+                            'No serving-cell identities were available ' +
+                            'for the selected interface and history range.' +
+                        '</div>' +
+                    '</div>'
+                );
+            }
+
+            var html = '';
+
+            /*
+             * Existing Cellular Analysis renderers remain the source of
+             * truth for visual presentation. Temporarily render each cell
+             * into the existing live containers, clone the resulting cards,
+             * then restore the user's original selected-cell view.
+             */
+            try {
+                for (
+                    var i = 0;
+                    i < cellDataSets.length;
+                    i++
+                ) {
+                    var cellData =
+                        cellDataSets[i];
+
+                    if (
+                        cellData &&
+                        cellData._report_error
+                    ) {
+                        var failedMeta =
+                            cellData._report_cell_meta ||
+                            {};
+
+                        var failedLabel =
+                            caServingLabel(
+                                failedMeta,
+                                i
+                            ) ||
+                            String(
+                                i + 1
+                            );
+
+                        var failedCellId =
+                            (
+                                failedMeta.cell_id !== null &&
+                                failedMeta.cell_id !== undefined &&
+                                failedMeta.cell_id !== ''
+                            )
+                                ? String(
+                                    failedMeta.cell_id
+                                )
+                                : '';
+
+                        html +=
+                            '<section class="ca-report-serving-cell-block">' +
+
+                                '<div class="ca-report-serving-cell-heading">' +
+
+                                    '<div>' +
+
+                                        '<div class="ca-report-serving-cell-kicker">' +
+                                            'Serving Cell Analysis' +
+                                        '</div>' +
+
+                                        '<div class="ca-report-serving-cell-title">' +
+
+                                            'Serving Cell ' +
+                                            caEscapeHtml(
+                                                failedLabel
+                                            ) +
+
+                                            (
+                                                failedCellId
+                                                    ? (
+                                                        ' — ' +
+                                                        caEscapeHtml(
+                                                            failedCellId
+                                                        )
+                                                    )
+                                                    : ''
+                                            ) +
+
+                                        '</div>' +
+
+                                    '</div>' +
+
+                                '</div>' +
+
+                                '<div class="ca-report-cell-error">' +
+
+                                    '<div class="ca-report-cell-error-title">' +
+                                        '<i class="fas fa-exclamation-triangle"></i> ' +
+                                        'Serving Cell Detail Unavailable' +
+                                    '</div>' +
+
+                                    '<div class="ca-report-cell-error-text">' +
+                                        'The summary identified this serving cell, ' +
+                                        'but its detailed analysis could not be loaded ' +
+                                        'while the report was generated.' +
+                                    '</div>' +
+
+                                    '<div class="ca-report-cell-error-detail">' +
+                                        caEscapeHtml(
+                                            cellData._report_error
+                                        ) +
+                                    '</div>' +
+
+                                '</div>' +
+
+                            '</section>';
+
+                        continue;
+                    }
+
+                    var selected =
+                        cellData.selected_cell ||
+                        {};
+
+                    var selectedKey =
+                        caReportCellKeyFromData(
+                            cellData
+                        );
+
+                    var cells = Array.isArray(
+                        cellData.serving_cells
+                    )
+                        ? cellData.serving_cells
+                        : [];
+
+                    var meta = null;
+                    var metaIndex = -1;
+
+                    for (
+                        var c = 0;
+                        c < cells.length;
+                        c++
+                    ) {
+                        if (
+                            caReportCellKey(
+                                cells[c]
+                            ) === selectedKey
+                        ) {
+                            meta =
+                                cells[c];
+
+                            metaIndex = c;
+                            break;
+                        }
+                    }
+
+                    var label =
+                        meta
+                            ? caServingLabel(
+                                meta,
+                                metaIndex
+                            )
+                            : String(
+                                i + 1
+                            );
+
+                    var cellId;
+
+                    if (
+                        selected.cell_id !== null &&
+                        selected.cell_id !== undefined &&
+                        selected.cell_id !== ''
+                    ) {
+                        cellId =
+                            String(
+                                selected.cell_id
+                            );
+
+                    } else if (
+                        meta &&
+                        meta.cell_id !== null &&
+                        meta.cell_id !== undefined &&
+                        meta.cell_id !== ''
+                    ) {
+                        cellId =
+                            String(
+                                meta.cell_id
+                            );
+
+                    } else {
+                        cellId = '';
+                    }
+
+                    var summaryParts = [];
+
+                    var carrier =
+                        selected.carrier ||
+                        (
+                            meta &&
+                            meta.carrier
+                        ) ||
+                        '';
+
+                    var role =
+                        selected.technology_role ||
+                        (
+                            meta &&
+                            meta.technology_role
+                        ) ||
+                        '';
+
+                    var band =
+                        caShortBand(
+                            selected.band ||
+                            (
+                                meta &&
+                                meta.band
+                            ) ||
+                            ''
+                        );
+
+                    if (carrier) {
+                        summaryParts.push(
+                            carrier
+                        );
+                    }
+
+                    if (role) {
+                        summaryParts.push(
+                            role
+                        );
+                    }
+
+                    if (band) {
+                        summaryParts.push(
+                            band
+                        );
+                    }
+
+                    caRenderSelectedCell(
+                        cellData
+                    );
+
+                    caRenderRfConditions(
+                        cellData
+                    );
+
+                    caRenderRadioSummary(
+                        cellData
+                    );
+
+                    var detailsHtml =
+                        caReportCloneCardHtml(
+                            'ca-selected-cell'
+                        );
+
+                    var rfHtml =
+                        caReportCloneCardHtml(
+                            'ca-rf-conditions'
+                        );
+
+                    var radioHtml =
+                        caReportCloneCardHtml(
+                            'ca-radio-summary'
+                        );
+
+                    html +=
+                        '<section class="ca-report-serving-cell-block">' +
+
+                            '<div class="ca-report-serving-cell-heading">' +
+
+                                '<div>' +
+
+                                    '<div class="ca-report-serving-cell-kicker">' +
+                                        'Serving Cell Analysis' +
+                                    '</div>' +
+
+                                    '<div class="ca-report-serving-cell-title">' +
+
+                                        'Serving Cell ' +
+                                        caEscapeHtml(
+                                            label
+                                        ) +
+
+                                        (
+                                            cellId
+                                                ? (
+                                                    ' — ' +
+                                                    caEscapeHtml(
+                                                        cellId
+                                                    )
+                                                )
+                                                : ''
+                                        ) +
+
+                                    '</div>' +
+
+                                '</div>' +
+
+                                '<div class="ca-report-serving-cell-summary">' +
+
+                                    caEscapeHtml(
+                                        summaryParts.join(
+                                            ' • '
+                                        )
+                                    ) +
+
+                                '</div>' +
+
+                            '</div>' +
+
+                            '<div class="ca-detail-grid">' +
+                                detailsHtml +
+                                rfHtml +
+                            '</div>' +
+
+                            radioHtml +
+
+                        '</section>';
+                }
+
+            } finally {
+                /*
+                 * Exporting must never leave the live page displaying a
+                 * different serving cell.
+                 */
+                caRenderSelectedCell(
+                    originalData
+                );
+
+                caRenderRfConditions(
+                    originalData
+                );
+
+                caRenderRadioSummary(
+                    originalData
+                );
+
+                caBindTooltips();
+            }
+
+            return html;
+        }
+
+        function caReportBuildHandoffTable(
+            data
+        ) {
+            var events = Array.isArray(
+                data &&
+                data.timeline_events
+            )
+                ? data.timeline_events
+                : [];
+
+            if (!events.length) {
+                return '';
+            }
+
+            function eventCell(
+                event,
+                side
+            ) {
+                var cell =
+                    event[side] ||
+                    {};
+
+                var label =
+                    event[
+                        side + '_label'
+                    ] ||
+                    '';
+
+                var parts = [];
+
+                if (label) {
+                    parts.push(
+                        'Cell ' +
+                        label
+                    );
+                }
+
+                if (
+                    cell.cell_id !== null &&
+                    cell.cell_id !== undefined &&
+                    cell.cell_id !== ''
+                ) {
+                    parts.push(
+                        String(
+                            cell.cell_id
+                        )
+                    );
+                }
+
+                if (
+                    cell.pci !== null &&
+                    cell.pci !== undefined &&
+                    cell.pci !== ''
+                ) {
+                    parts.push(
+                        'PCI ' +
+                        cell.pci
+                    );
+                }
+
+                return (
+                    parts.join(
+                        ' • '
+                    ) ||
+                    'Unknown'
+                );
+            }
+
+            var rows = '';
+
+            for (
+                var i = 0;
+                i < events.length;
+                i++
+            ) {
+                var event =
+                    events[i] ||
+                    {};
+
+                var phase;
+
+                if (event.phase_boundary) {
+                    phase =
+                        'Download / Upload Boundary';
+
+                } else {
+                    phase =
+                        String(
+                            event.phase ||
+                            'traffic'
+                        );
+
+                    if (phase) {
+                        phase =
+                            phase.charAt(
+                                0
+                            ).toUpperCase() +
+                            phase.slice(
+                                1
+                            );
+                    }
+                }
+
+                var elapsed =
+                    Number(
+                        event.elapsed_s ||
+                        0
+                    );
+
+                var offsetText =
+                    event.phase_boundary
+                        ? '—'
+                        : (
+                            '+' +
+                            (
+                                isFinite(
+                                    elapsed
+                                )
+                                    ? elapsed
+                                        .toFixed(
+                                            1
+                                        )
+                                        .replace(
+                                            '.0',
+                                            ''
+                                        )
+                                    : '0'
+                            ) +
+                            's'
+                        );
+
+                rows +=
+                    '<tr>' +
+
+                        '<td>' +
+                            caEscapeHtml(
+                                caFormatCompactLocalTimestamp(
+                                    event.timestamp
+                                )
+                            ) +
+                        '</td>' +
+
+                        '<td>' +
+                            caEscapeHtml(
+                                phase
+                            ) +
+                        '</td>' +
+
+                        '<td>' +
+                            caEscapeHtml(
+                                offsetText
+                            ) +
+                        '</td>' +
+
+                        '<td>' +
+                            caEscapeHtml(
+                                eventCell(
+                                    event,
+                                    'from'
+                                )
+                            ) +
+                        '</td>' +
+
+                        '<td>' +
+                            caEscapeHtml(
+                                eventCell(
+                                    event,
+                                    'to'
+                                )
+                            ) +
+                        '</td>' +
+
+                    '</tr>';
+            }
+
+            return (
+                '<div class="ca-report-handoff-events">' +
+
+                    '<div class="ca-report-handoff-title">' +
+                        'In-Test Serving Cell Events' +
+                    '</div>' +
+
+                    '<div class="ca-report-handoff-table-wrap">' +
+
+                        '<table class="ca-report-handoff-table">' +
+
+                            '<thead>' +
+                                '<tr>' +
+                                    '<th>Test</th>' +
+                                    '<th>Phase</th>' +
+                                    '<th>Offset</th>' +
+                                    '<th>From</th>' +
+                                    '<th>To</th>' +
+                                '</tr>' +
+                            '</thead>' +
+
+                            '<tbody>' +
+                                rows +
+                            '</tbody>' +
+
+                        '</table>' +
+
+                    '</div>' +
+
+                '</div>'
+            );
+        }
+
+        function caReportPrepareSnapshot(
+            servingCellBlocks,
+            handoffHtml
+        ) {
+            var source =
+                document.getElementById(
+                    'cellular-analysis'
+                );
+
+            if (!source) {
+                throw new Error(
+                    'Cellular Analysis view is unavailable.'
+                );
+            }
+
+            var clone =
+                source.cloneNode(
+                    true
+                );
+
+            clone.classList.add(
+                'active'
+            );
+
+            var removeSelectors = [
+                '.ca-analysis-controls',
+                '.ca-serving-scope',
+                '#ca-geo-modal-backdrop',
+                '#btn-ca-configure-location'
+            ];
+
+            for (
+                var r = 0;
+                r < removeSelectors.length;
+                r++
+            ) {
+                var matches =
+                    clone.querySelectorAll(
+                        removeSelectors[r]
+                    );
+
+                for (
+                    var m = 0;
+                    m < matches.length;
+                    m++
+                ) {
+                    matches[m].remove();
+                }
+            }
+
+            /*
+             * Give the static artifact semantic print groups so Chromium
+             * can paginate whole engineering sections naturally.
+             */
+            var reportGroupMap = [
+                [
+                    '.ca-geo-card',
+                    'ca-report-geo-card'
+                ],
+                [
+                    '#ca-overview-content',
+                    'ca-report-overview-card'
+                ],
+                [
+                    '#ca-serving-body',
+                    'ca-report-serving-card'
+                ],
+                [
+                    '#ca-change-body',
+                    'ca-report-change-card'
+                ]
+            ];
+
+            for (
+                var g = 0;
+                g < reportGroupMap.length;
+                g++
+            ) {
+                var groupNode =
+                    clone.querySelector(
+                        reportGroupMap[g][0]
+                    );
+
+                if (!groupNode) {
+                    continue;
+                }
+
+                var groupCard =
+                    groupNode.classList &&
+                    groupNode.classList.contains(
+                        'card'
+                    )
+                        ? groupNode
+                        : groupNode.closest(
+                            '.card'
+                        );
+
+                if (groupCard) {
+                    groupCard.classList.add(
+                        reportGroupMap[g][1]
+                    );
+                }
+            }
+
+            /*
+             * Timeline hover events disappear in a static artifact.
+             * Materialize them as a permanent engineering table.
+             */
+            if (handoffHtml) {
+                var timeline =
+                    clone.querySelector(
+                        '#ca-serving-timeline'
+                    );
+
+                if (timeline) {
+                    var handoff =
+                        document.createElement(
+                            'div'
+                        );
+
+                    handoff.innerHTML =
+                        handoffHtml;
+
+                    if (
+                        handoff.firstElementChild
+                    ) {
+                        timeline.insertAdjacentElement(
+                            'afterend',
+                            handoff.firstElementChild
+                        );
+                    }
+                }
+            }
+
+            /*
+             * Remove the single interactive cell view and replace it with
+             * every identifiable serving cell expanded in sequence.
+             */
+            if (servingCellBlocks) {
+                var detailGrid =
+                    clone.querySelector(
+                        '.ca-detail-grid'
+                    );
+
+                if (detailGrid) {
+                    var radioCard =
+                        detailGrid.nextElementSibling;
+
+                    var reportCells =
+                        document.createElement(
+                            'div'
+                        );
+
+                    reportCells.className =
+                        'ca-report-serving-cells';
+
+                    reportCells.innerHTML =
+                        servingCellBlocks;
+
+                    detailGrid.parentNode.insertBefore(
+                        reportCells,
+                        detailGrid
+                    );
+
+                    detailGrid.remove();
+
+                    if (
+                        radioCard &&
+                        radioCard.classList &&
+                        radioCard.classList.contains(
+                            'card'
+                        )
+                    ) {
+                        radioCard.remove();
+                    }
+                }
+            }
+
+            caReportConvertDonuts(
+                clone
+            );
+
+            caReportSanitizeStaticNode(
+                clone
+            );
+
+            return clone;
+        }
+
+        function caReportSummaryHtml(
+            data
+        ) {
+            data =
+                data &&
+                typeof data === 'object'
+                    ? data
+                    : {};
+
+            var overview =
+                data.overview &&
+                typeof data.overview === 'object'
+                    ? data.overview
+                    : {};
+
+            var tests =
+                Number(
+                    overview.tests_analyzed ||
+                    0
+                );
+
+            var cells =
+                Number(
+                    overview.serving_cells_observed ||
+                    0
+                );
+
+            if (!isFinite(tests)) {
+                tests = 0;
+            }
+
+            if (!isFinite(cells)) {
+                cells = 0;
+            }
+
+            var modes =
+                Array.isArray(
+                    overview.network_modes
+                )
+                    ? overview.network_modes
+                    : [];
+
+            var modeLabels = [];
+
+            for (
+                var i = 0;
+                i < modes.length;
+                i++
+            ) {
+                var modeTests =
+                    Number(
+                        modes[i].tests ||
+                        0
+                    );
+
+                var modePct =
+                    Number(
+                        modes[i].usage_pct ||
+                        0
+                    );
+
+                if (
+                    (
+                        !isFinite(modeTests) ||
+                        modeTests <= 0
+                    ) &&
+                    (
+                        !isFinite(modePct) ||
+                        modePct <= 0
+                    )
+                ) {
+                    continue;
+                }
+
+                var label =
+                    String(
+                        modes[i].label ||
+                        ''
+                    ).trim();
+
+                if (
+                    label &&
+                    modeLabels.indexOf(
+                        label
+                    ) === -1
+                ) {
+                    modeLabels.push(
+                        label
+                    );
+                }
+            }
+
+            var modeText =
+                'No Data';
+
+            if (
+                modeLabels.length === 1
+            ) {
+                modeText =
+                    modeLabels[0];
+
+            } else if (
+                modeLabels.length > 1
+            ) {
+                modeText =
+                    'Mixed Modes';
+            }
+
+            var events =
+                Array.isArray(
+                    data.timeline_events
+                )
+                    ? data.timeline_events
+                    : [];
+
+            var items = [
+                {
+                    'label':
+                        'Tests Analyzed',
+                    'value':
+                        tests
+                },
+                {
+                    'label':
+                        'Serving Cells Observed',
+                    'value':
+                        cells
+                },
+                {
+                    'label':
+                        'Network Mode',
+                    'value':
+                        modeText
+                },
+                {
+                    'label':
+                        'In-Test Events',
+                    'value':
+                        events.length
+                }
+            ];
+
+            var html =
+                '<div class="ca-report-summary">';
+
+            for (
+                var x = 0;
+                x < items.length;
+                x++
+            ) {
+                html +=
+                    '<div class="ca-report-summary-item">' +
+
+                        '<div class="ca-report-summary-label">' +
+                            caEscapeHtml(
+                                items[x].label
+                            ) +
+                        '</div>' +
+
+                        '<div class="ca-report-summary-value">' +
+                            caEscapeHtml(
+                                items[x].value
+                            ) +
+                        '</div>' +
+
+                    '</div>';
+            }
+
+            html +=
+                '</div>';
+
+            return html;
+        }
+
+        function caReportDocumentHtml(
+            snapshot,
+            data,
+            css
+        ) {
+            var interfaceLabel =
+                caReportInterfaceLabel(
+                    data
+                );
+
+            var historyLabel =
+                caReportHistoryLabel(
+                    data
+                );
+
+            var generatedDate =
+                data &&
+                data._report_generated_at
+                    ? new Date(
+                        data._report_generated_at
+                    )
+                    : new Date();
+
+            var generated =
+                generatedDate.toLocaleString();
+
+            var version =
+                caReportVersion(
+                    data
+                );
+
+            var device =
+                caReportDeviceLabel(
+                    data
+                );
+
+            var reportSummary =
+                caReportSummaryHtml(
+                    data
+                );
+
+            var theme =
+                data &&
+                data._report_theme
+                    ? String(
+                        data._report_theme
+                    )
+                    : (
+                        document.documentElement
+                            .getAttribute(
+                                'data-theme'
+                            ) === 'dark'
+                            ? 'dark'
+                            : 'light'
+                    );
+
+            theme =
+                theme === 'dark'
+                    ? 'dark'
+                    : 'light';
+
+            var reportCss = [
+                'html,body{overflow:visible!important;}',
+                'body{margin:0;padding:24px;background:var(--light-surface);}',
+                '.ca-report-document{max-width:1600px;margin:0 auto;}',
+                '.ca-report-header{',
+                'background:var(--card-surface);',
+                'border:1px solid var(--border-color);',
+                'border-radius:var(--radius-md);',
+                'padding:1rem 1.15rem;',
+                'margin-bottom:1rem;',
+                '}',
+                '.ca-report-title{',
+                'font-size:1.25rem;',
+                'font-weight:750;',
+                'color:var(--primary-color);',
+                'margin-bottom:.7rem;',
+                '}',
+                '.ca-report-meta{',
+                'display:grid;',
+                'grid-template-columns:repeat(4,minmax(180px,1fr));',
+                'gap:.65rem 1rem;',
+                '}',
+                '.ca-report-meta-item{min-width:0;}',
+                '.ca-report-meta-label{',
+                'font-size:.65rem;',
+                'font-weight:700;',
+                'text-transform:uppercase;',
+                'letter-spacing:.05em;',
+                'color:var(--text-secondary);',
+                'margin-bottom:.18rem;',
+                '}',
+                '.ca-report-meta-value{',
+                'font-size:.82rem;',
+                'font-weight:600;',
+                'color:var(--text-primary);',
+                'overflow-wrap:anywhere;',
+                '}',
+                '.ca-report-summary{',
+                'display:grid;',
+                'grid-template-columns:repeat(4,minmax(150px,1fr));',
+                'gap:.65rem;',
+                'margin-top:.9rem;',
+                'padding-top:.85rem;',
+                'border-top:1px solid var(--border-color);',
+                '}',
+                '.ca-report-summary-item{',
+                'min-width:0;',
+                'padding:.65rem .75rem;',
+                'background:var(--light-surface);',
+                'border:1px solid var(--border-color);',
+                'border-radius:var(--radius-sm);',
+                '}',
+                '.ca-report-summary-label{',
+                'font-size:.61rem;',
+                'font-weight:700;',
+                'text-transform:uppercase;',
+                'letter-spacing:.045em;',
+                'color:var(--text-secondary);',
+                'margin-bottom:.25rem;',
+                '}',
+                '.ca-report-summary-value{',
+                'font-size:1rem;',
+                'font-weight:750;',
+                'line-height:1.2;',
+                'color:var(--primary-color);',
+                'overflow-wrap:anywhere;',
+                '}',
+                '.ca-report-document #cellular-analysis{',
+                'display:block!important;',
+                'width:100%!important;',
+                '}',
+                '.ca-report-document .ca-analysis-controls,',
+                '.ca-report-document .ca-serving-scope,',
+                '.ca-report-document #ca-geo-modal-backdrop,',
+                '.ca-report-document #btn-ca-configure-location{',
+                'display:none!important;',
+                '}',
+                '.ca-report-document button{',
+                'cursor:default!important;',
+                '}',
+                '.ca-report-serving-cells{display:grid;gap:1.1rem;}',
+                '.ca-report-serving-cell-block{',
+                'padding-top:.2rem;',
+                'break-inside:avoid-page;',
+                '}',
+                '.ca-report-serving-cell-heading{',
+                'display:flex;',
+                'justify-content:space-between;',
+                'align-items:flex-end;',
+                'gap:1rem;',
+                'padding:.75rem .15rem .55rem;',
+                'border-bottom:2px solid var(--primary-color);',
+                'margin-bottom:.75rem;',
+                '}',
+                '.ca-report-serving-cell-kicker{',
+                'font-size:.62rem;',
+                'font-weight:700;',
+                'letter-spacing:.05em;',
+                'text-transform:uppercase;',
+                'color:var(--text-secondary);',
+                '}',
+                '.ca-report-serving-cell-title{',
+                'font-size:1rem;',
+                'font-weight:750;',
+                'color:var(--text-primary);',
+                'margin-top:.15rem;',
+                '}',
+                '.ca-report-serving-cell-summary{',
+                'font-size:.75rem;',
+                'font-weight:600;',
+                'color:var(--text-secondary);',
+                'text-align:right;',
+                '}',
+                '.ca-report-empty-state,',
+                '.ca-report-cell-error{',
+                'background:var(--card-surface);',
+                'border:1px solid var(--border-color);',
+                'border-radius:var(--radius-md);',
+                'padding:1rem 1.1rem;',
+                '}',
+                '.ca-report-empty-title,',
+                '.ca-report-cell-error-title{',
+                'font-size:.82rem;',
+                'font-weight:700;',
+                'color:var(--text-primary);',
+                'margin-bottom:.3rem;',
+                '}',
+                '.ca-report-empty-text,',
+                '.ca-report-cell-error-text{',
+                'font-size:.74rem;',
+                'color:var(--text-secondary);',
+                'line-height:1.45;',
+                '}',
+                '.ca-report-cell-error-detail{',
+                'font-size:.66rem;',
+                'color:var(--text-secondary);',
+                'margin-top:.5rem;',
+                'padding-top:.45rem;',
+                'border-top:1px solid var(--border-color);',
+                'overflow-wrap:anywhere;',
+                '}',
+                '.ca-report-serving-cell-block>.card{',
+                'margin-bottom:0!important;',
+                'border:1px solid var(--border-color);',
+                'border-radius:var(--radius-md);',
+                'box-shadow:none;',
+                'overflow:hidden;',
+                '}',
+                '.ca-report-donut-svg{',
+                'display:block;',
+                'overflow:visible;',
+                'flex-shrink:0;',
+                '}',
+                '.ca-report-handoff-events{',
+                'grid-column:1 / -1;',
+                'margin-top:.85rem;',
+                'padding-top:.75rem;',
+                'border-top:1px solid var(--border-color);',
+                '}',
+                '.ca-report-handoff-title{',
+                'font-size:.72rem;',
+                'font-weight:700;',
+                'text-transform:uppercase;',
+                'letter-spacing:.04em;',
+                'color:var(--text-primary);',
+                'margin-bottom:.45rem;',
+                '}',
+                '.ca-report-handoff-table-wrap{',
+                'overflow-x:auto;',
+                '}',
+                '.ca-report-handoff-table{',
+                'width:100%;',
+                'border-collapse:collapse;',
+                'font-size:.72rem;',
+                '}',
+                '.ca-report-handoff-table th,',
+                '.ca-report-handoff-table td{',
+                'padding:.45rem .55rem;',
+                'text-align:left;',
+                'border-top:1px solid var(--border-color);',
+                '}',
+                '.ca-report-handoff-table th{',
+                'font-size:.62rem;',
+                'text-transform:uppercase;',
+                'letter-spacing:.04em;',
+                'color:var(--text-secondary);',
+                '}',
+                '.ca-report-handoff-table thead{',
+                'display:table-header-group;',
+                '}',
+                '.ca-report-handoff-table tr{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+                '@media(max-width:900px){',
+                '.ca-report-meta{grid-template-columns:1fr 1fr;}',
+                '.ca-report-summary{grid-template-columns:1fr 1fr;}',
+                '}',
+                '@media print{',
+                '@page{size:Letter landscape;margin:.35in;}',
+                'html,body{overflow:visible!important;}',
+                'body{',
+                'padding:0;',
+                'background:#fff!important;',
+                '-webkit-print-color-adjust:exact;',
+                'print-color-adjust:exact;',
+                '}',
+
+                '.ca-report-document{',
+                'max-width:none;',
+                '--text-primary:#111827;',
+                '--text-secondary:#475569;',
+                '--card-surface:#ffffff;',
+                '--light-surface:#ffffff;',
+                '--background-secondary:#f8fafc;',
+                '--border-color:#c8d3eb;',
+                '--primary-color:#4f46e5;',
+                '--info-color:#0284c7;',
+                '--success-color:#059669;',
+                '--warning-color:#d97706;',
+                '--danger-color:#dc2626;',
+                'color:#111827;',
+                '}',
+
+                '.ca-report-document .ca-report-donut-track{',
+                'stroke:#d1d5db!important;',
+                '}',
+                '.ca-report-document .ca-report-donut-center{',
+                'fill:#fff!important;',
+                '}',
+                '.ca-report-document .ca-report-donut-text{',
+                'fill:#64748b!important;',
+                '}',
+
+                '.ca-report-header{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                /*
+                 * Keep paper surfaces neutral while retaining semantic
+                 * colors for metrics, serving cells, and carrier identity.
+                 */
+                '.ca-report-document .card,',
+                '.ca-report-document .ca-overview-card,',
+                '.ca-report-document .ca-change-card,',
+                '.ca-report-document .ca-rf-card,',
+                '.ca-report-document .ca-selected-header,',
+                '.ca-report-document .ca-report-summary-item{',
+                'background:#fff!important;',
+                'box-shadow:none!important;',
+                '}',
+                '.ca-report-document .ca-report-header,',
+                '.ca-report-document .ca-geo-canvas,',
+                '.ca-report-document .ca-geo-context,',
+                '.ca-report-document .ca-geo-schematic-label,',
+                '.ca-report-document .ca-geo-site-node,',
+                '.ca-report-document .ca-geo-context-stat,',
+                '.ca-report-document .ca-geo-carrier-chip,',
+                '.ca-report-document .cana-radio-config-header{',
+                'background:#fff!important;',
+                'background-image:none!important;',
+                '}',
+                '.ca-report-document .ca-geo-carrier-chip{',
+                'border-color:var(--border-color)!important;',
+                '}',
+
+                /*
+                 * Preserve the normal Cellular Analysis desktop composition
+                 * on 11 x 8.5 inch landscape paper rather than allowing
+                 * responsive tablet breakpoints to stack the page.
+                 */
+                '.ca-report-document .ca-overview-grid{',
+                'grid-template-columns:minmax(150px,.8fr) minmax(150px,.8fr) minmax(300px,1.5fr)!important;',
+                '}',
+
+                '.ca-report-document .ca-mode-card{',
+                'grid-column:auto!important;',
+                '}',
+
+                '.ca-report-document #ca-serving-body{',
+                'grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr)!important;',
+                'gap:.7rem!important;',
+                '}',
+                '.ca-report-document .ca-serving-row{',
+                'grid-template-columns:minmax(180px,1.55fr) minmax(90px,.8fr) 58px minmax(105px,.9fr)!important;',
+                'gap:.4rem!important;',
+                'font-size:.7rem!important;',
+                '}',
+                '.ca-report-document .ca-serving-percent{',
+                'grid-template-columns:34px minmax(52px,1fr)!important;',
+                'gap:.3rem!important;',
+                '}',
+
+                '.ca-report-document #ca-serving-timeline{',
+                'margin-top:0!important;',
+                'padding-left:.8rem!important;',
+                'padding-top:0!important;',
+                'border-left:1px solid var(--border-color)!important;',
+                'border-top:0!important;',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                '.ca-report-document #ca-change-activity>div,',
+                '.ca-report-document .ca-change-grid{',
+                'grid-template-columns:repeat(4,minmax(120px,1fr))!important;',
+                '}',
+
+                '.ca-report-document .ca-detail-grid{',
+                'grid-template-columns:minmax(300px,.9fr) minmax(0,1.1fr)!important;',
+                'gap:.65rem!important;',
+                '}',
+
+                '.ca-report-document .ca-rf-grid{',
+                'grid-template-columns:repeat(3,minmax(100px,1fr))!important;',
+                '}',
+
+                '.ca-report-document .ca-selected-fields{',
+                'grid-template-columns:repeat(4,minmax(70px,1fr))!important;',
+                '}',
+
+                /*
+                 * Dates should wrap on paper rather than being silently
+                 * ellipsized by the live-page compact field treatment.
+                 */
+                '.ca-report-document .ca-selected-field strong{',
+                'white-space:normal!important;',
+                'overflow:visible!important;',
+                'text-overflow:clip!important;',
+                '}',
+
+                '.ca-report-document .ca-radio-grid{',
+                'grid-template-columns:minmax(260px,.8fr) minmax(360px,1.7fr)!important;',
+                'gap:.7rem!important;',
+                '}',
+
+                '.ca-report-document .ca-tech-layout{',
+                'gap:.6rem!important;',
+                '}',
+
+                '.ca-report-document .ca-tech-panel{',
+                'padding-right:.7rem!important;',
+                'padding-bottom:0!important;',
+                'border-right:1px solid var(--border-color)!important;',
+                'border-bottom:0!important;',
+                '}',
+
+                '.ca-report-document .cana-radio-config-row{',
+                'grid-template-columns:minmax(230px,1fr) 70px 50px minmax(95px,.55fr)!important;',
+                '}',
+
+                '.ca-report-document .ca-geo-layout{',
+                'grid-template-columns:minmax(0,2.35fr) minmax(210px,.8fr)!important;',
+                '}',
+
+                '.ca-report-document .ca-geo-context-grid{',
+                'grid-template-columns:1fr 1fr!important;',
+                '}',
+
+                '.ca-report-document .ca-geo-card,',
+                '.ca-report-document .ca-overview-grid,',
+                '.ca-report-document .ca-change-grid{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                '.ca-report-document .ca-serving-row,',
+                '.ca-report-document .cana-radio-config-row{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                '.ca-report-document .ca-timeline-track{',
+                'overflow:visible;',
+                '}',
+
+                '.ca-report-document .ca-report-handoff-table-wrap{',
+                'overflow:visible;',
+                '}',
+
+                '.ca-report-document .ca-report-handoff-table thead{',
+                'display:table-header-group;',
+                '}',
+
+                '.ca-report-document .ca-report-handoff-table tr{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                /*
+                 * A realistic serving-cell block now fits comfortably on
+                 * one Letter-landscape page. Keep each cell together.
+                 */
+                '.ca-report-document .ca-report-serving-cell-block{',
+                'break-inside:avoid-page!important;',
+                'page-break-inside:avoid!important;',
+                '}',
+
+                '.ca-report-document .ca-report-serving-cell-block + ',
+                '.ca-report-serving-cell-block{',
+                'break-before:page;',
+                'page-break-before:always;',
+                '}',
+
+                '.ca-report-document .ca-report-serving-cell-heading{',
+                'break-after:avoid-page;',
+                'page-break-after:avoid;',
+                '}',
+
+                '.ca-report-document ',
+                '.ca-report-serving-cell-block .ca-detail-grid,',
+                '.ca-report-document ',
+                '.ca-report-serving-cell-block>.card{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                /*
+                 * PDF page composition:
+                 *   Flow report sections naturally into available space.
+                 *   Avoid splitting logical cards where practical.
+                 *   Subsequent serving-cell blocks may begin clean pages.
+                 */
+                '.ca-report-document #cellular-analysis>.section-title{',
+                'display:none!important;',
+                '}',
+
+                '.ca-report-document .ca-report-header{',
+                'padding:.65rem .8rem!important;',
+                'margin-bottom:.55rem!important;',
+                '}',
+
+                '.ca-report-document .ca-report-title{',
+                'margin-bottom:.45rem!important;',
+                '}',
+
+                '.ca-report-document .ca-report-meta{',
+                'gap:.35rem .7rem!important;',
+                '}',
+
+                '.ca-report-document .ca-report-summary{',
+                'margin-top:.5rem!important;',
+                'gap:.4rem!important;',
+                '}',
+
+                '.ca-report-document .ca-report-summary-item{',
+                'padding:.42rem .55rem!important;',
+                '}',
+
+                /*
+                 * Compact GeoView vertically just for print so it fits
+                 * naturally below the evidence header on Letter landscape.
+                 */
+                '.ca-report-document .ca-report-geo-card{',
+                'break-inside:avoid-page!important;',
+                'page-break-inside:avoid!important;',
+                'margin-bottom:0!important;',
+                '}',
+
+                '.ca-report-document .ca-geo-view{',
+                'min-height:220px!important;',
+                '}',
+
+                '.ca-report-document .ca-geo-canvas{',
+                'min-height:210px!important;',
+                '}',
+
+                '.ca-report-document .ca-geo-context{',
+                'min-height:210px!important;',
+                '}',
+
+                /*
+                 * Browser shadows look good interactively but rasterize
+                 * poorly in Chromium PDF. Print the nodes as crisp symbols.
+                 */
+                '.ca-report-document .ca-geo-site-node,',
+                '.ca-report-document .ca-geo-cell-node,',
+                '.ca-report-document .ca-geo-cell-node:hover,',
+                '.ca-report-document .ca-geo-cell-node:focus-visible,',
+                '.ca-report-document .ca-geo-cell-node.is-active{',
+                'box-shadow:none!important;',
+                'filter:none!important;',
+                '}',
+
+                /*
+                 * Keep Cellular Overview together, but do not force a
+                 * new page when usable space remains above or below it.
+                 */
+                '.ca-report-document .ca-report-overview-card{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                '.ca-report-document .ca-report-serving-card,',
+                '.ca-report-document .ca-report-change-card{',
+                'break-inside:avoid-page;',
+                'page-break-inside:avoid;',
+                '}',
+
+                '.ca-report-document .ca-report-serving-card>.card-header,',
+                '.ca-report-document .ca-report-change-card>.card-header{',
+                'break-after:avoid-page;',
+                'page-break-after:avoid;',
+                '}',
+
+                /*
+                 * Serving Cell Analysis flows naturally after the
+                 * preceding analysis sections.
+                 */
+
+                '}'
+
+            ].join('');
+
+            var meta =
+                '<div class="ca-report-meta">' +
+
+                    (
+                        device
+                            ? (
+                                '<div class="ca-report-meta-item">' +
+                                    '<div class="ca-report-meta-label">Device</div>' +
+                                    '<div class="ca-report-meta-value">' +
+                                        caEscapeHtml(device) +
+                                    '</div>' +
+                                '</div>'
+                            )
+                            : ''
+                    ) +
+
+                    '<div class="ca-report-meta-item">' +
+                        '<div class="ca-report-meta-label">Interface</div>' +
+                        '<div class="ca-report-meta-value">' +
+                            caEscapeHtml(
+                                interfaceLabel
+                            ) +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="ca-report-meta-item">' +
+                        '<div class="ca-report-meta-label">History Range</div>' +
+                        '<div class="ca-report-meta-value">' +
+                            caEscapeHtml(
+                                historyLabel
+                            ) +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="ca-report-meta-item">' +
+                        '<div class="ca-report-meta-label">Generated</div>' +
+                        '<div class="ca-report-meta-value">' +
+                            caEscapeHtml(
+                                generated
+                            ) +
+                        '</div>' +
+                    '</div>' +
+
+                    (
+                        version
+                            ? (
+                                '<div class="ca-report-meta-item">' +
+                                    '<div class="ca-report-meta-label">' +
+                                        'Application Version' +
+                                    '</div>' +
+                                    '<div class="ca-report-meta-value">' +
+                                        caEscapeHtml(version) +
+                                    '</div>' +
+                                '</div>'
+                            )
+                            : ''
+                    ) +
+
+                '</div>';
+
+            return (
+                '<!DOCTYPE html>' +
+                '<html lang="en" data-theme="' +
+                    theme +
+                '">' +
+                '<head>' +
+                    '<meta charset="UTF-8">' +
+                    '<meta name="viewport" ' +
+                    'content="width=device-width, initial-scale=1.0">' +
+                    '<title>' +
+                        caEscapeHtml(
+                            'Speedtest Analyzer - Cellular Analysis Report'
+                        ) +
+                    '</title>' +
+                    '<style>' +
+                        css +
+                        '\n' +
+                        reportCss +
+                    '</style>' +
+                '</head>' +
+
+                '<body>' +
+                    '<div class="ca-report-document">' +
+
+                        '<div class="ca-report-header">' +
+                            '<div class="ca-report-title">' +
+                                'Speedtest Analyzer — Cellular Analysis Report' +
+                            '</div>' +
+                            meta +
+                            reportSummary +
+                        '</div>' +
+
+                        snapshot.outerHTML +
+
+                    '</div>' +
+                '</body>' +
+                '</html>'
+            );
+        }
+
+        function caReportValidateDocumentHtml(
+            html
+        ) {
+            var parser =
+                new DOMParser();
+
+            var doc =
+                parser.parseFromString(
+                    html,
+                    'text/html'
+                );
+
+            if (
+                doc.querySelector(
+                    'script'
+                )
+            ) {
+                throw new Error(
+                    'Report integrity check failed: script content remains.'
+                );
+            }
+
+            if (
+                doc.querySelector(
+                    'link[rel="stylesheet"]'
+                )
+            ) {
+                throw new Error(
+                    'Report integrity check failed: external stylesheet remains.'
+                );
+            }
+
+            var forbiddenControls = [
+                '.ca-analysis-controls',
+                '.ca-serving-scope',
+                '#btn-ca-configure-location',
+                '#ca-geo-modal-backdrop'
+            ];
+
+            for (
+                var f = 0;
+                f < forbiddenControls.length;
+                f++
+            ) {
+                if (
+                    doc.querySelector(
+                        forbiddenControls[f]
+                    )
+                ) {
+                    throw new Error(
+                        'Report integrity check failed: interactive Cellular Analysis control remains.'
+                    );
+                }
+            }
+
+            if (
+                doc.querySelector(
+                    '.ca-mode-donut[data-ca-donut]'
+                )
+            ) {
+                throw new Error(
+                    'Report integrity check failed: CSS donut was not converted to SVG.'
+                );
+            }
+
+            var ids = {};
+            var idNodes =
+                doc.querySelectorAll(
+                    '[id]'
+                );
+
+            for (
+                var i = 0;
+                i < idNodes.length;
+                i++
+            ) {
+                var id =
+                    idNodes[i].id;
+
+                if (!id) {
+                    continue;
+                }
+
+                if (ids[id]) {
+                    throw new Error(
+                        'Report integrity check failed: duplicate DOM id "' +
+                        id +
+                        '".'
+                    );
+                }
+
+                ids[id] = true;
+            }
+
+            var resourceNodes =
+                doc.querySelectorAll(
+                    '[src], [href], [poster], [srcset]'
+                );
+
+            for (
+                var r = 0;
+                r < resourceNodes.length;
+                r++
+            ) {
+                var node =
+                    resourceNodes[r];
+
+                var attrs = [
+                    'src',
+                    'href',
+                    'poster',
+                    'srcset'
+                ];
+
+                for (
+                    var a = 0;
+                    a < attrs.length;
+                    a++
+                ) {
+                    if (
+                        !node.hasAttribute(
+                            attrs[a]
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    var value =
+                        String(
+                            node.getAttribute(
+                                attrs[a]
+                            ) ||
+                            ''
+                        ).trim();
+
+                    if (
+                        !value ||
+                        value.charAt(0) === '#' ||
+                        /^data:/i.test(
+                            value
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    throw new Error(
+                        'Report integrity check failed: unresolved resource "' +
+                        value +
+                        '".'
+                    );
+                }
+            }
+
+            var styles =
+                doc.querySelectorAll(
+                    'style'
+                );
+
+            for (
+                var st = 0;
+                st < styles.length;
+                st++
+            ) {
+                var css =
+                    styles[st].textContent ||
+                    '';
+
+                var urlPattern =
+                    /url\(\s*(["']?)([^)"']+)\1\s*\)/gi;
+
+                var match;
+
+                while (
+                    (
+                        match =
+                            urlPattern.exec(
+                                css
+                            )
+                    ) !== null
+                ) {
+                    var resource =
+                        String(
+                            match[2] ||
+                            ''
+                        ).trim();
+
+                    if (
+                        !resource ||
+                        resource.charAt(0) === '#' ||
+                        /^data:/i.test(
+                            resource
+                        )
+                    ) {
+                        continue;
+                    }
+
+                    throw new Error(
+                        'Report integrity check failed: unresolved CSS resource "' +
+                        resource +
+                        '".'
+                    );
+                }
+            }
+
+            return true;
+        }
+
+        function caReportDownload(
+            html,
+            data
+        ) {
+            var interfaceLabel =
+                caReportInterfaceLabel(
+                    data
+                );
+
+            var now =
+                data &&
+                data._report_generated_at
+                    ? new Date(
+                        data._report_generated_at
+                    )
+                    : new Date();
+
+            var dateStamp = [
+                now.getFullYear(),
+                String(
+                    now.getMonth() + 1
+                ).padStart(2, '0'),
+                String(
+                    now.getDate()
+                ).padStart(2, '0')
+            ].join('-');
+
+            var timeStamp = [
+                String(
+                    now.getHours()
+                ).padStart(2, '0'),
+                String(
+                    now.getMinutes()
+                ).padStart(2, '0'),
+                String(
+                    now.getSeconds()
+                ).padStart(2, '0')
+            ].join('');
+
+            var filename =
+                caReportSafeFilename(
+                    'Speedtest-Analyzer-Cellular-Analysis-' +
+                    interfaceLabel +
+                    '-' +
+                    dateStamp +
+                    '-' +
+                    timeStamp
+                ) +
+                '.html';
+
+            var blob =
+                new Blob(
+                    [html],
+                    {
+                        type:
+                            'text/html;charset=utf-8'
+                    }
+                );
+
+            var url =
+                URL.createObjectURL(
+                    blob
+                );
+
+            var link =
+                document.createElement(
+                    'a'
+                );
+
+            link.href = url;
+            link.download = filename;
+
+            document.body.appendChild(
+                link
+            );
+
+            link.click();
+            link.remove();
+
+            window.setTimeout(
+                function() {
+                    URL.revokeObjectURL(
+                        url
+                    );
+                },
+                1000
+            );
+        }
+
+        function caExportCellularAnalysisReport() {
+            var liveData =
+                window._cellularAnalysisData;
+
+            if (
+                !liveData ||
+                typeof liveData !== 'object'
+            ) {
+                return Promise.reject(
+                    new Error(
+                        'Cellular Analysis data has not loaded yet.'
+                    )
+                );
+            }
+
+            /*
+             * Freeze the top-level Cellular Analysis response at export
+             * start. All summary/timeline/scope content in this artifact
+             * must come from one consistent API snapshot even if the live
+             * page is refreshed while serving-cell details are loading.
+             */
+            var data;
+
+            try {
+                data =
+                    JSON.parse(
+                        JSON.stringify(
+                            liveData
+                        )
+                    );
+
+                data._report_generated_at =
+                    new Date().toISOString();
+
+                data._report_interface_label =
+                    caReportInterfaceLabel(
+                        data
+                    );
+
+                data._report_history_label =
+                    caReportHistoryLabel(
+                        data
+                    );
+
+                data._report_version =
+                    caReportVersion();
+
+                data._report_device_label =
+                    caReportDeviceLabel();
+
+                data._report_theme =
+                    document.documentElement
+                        .getAttribute(
+                            'data-theme'
+                        ) === 'dark'
+                            ? 'dark'
+                            : 'light';
+
+            } catch (error) {
+                return Promise.reject(
+                    new Error(
+                        'Unable to freeze Cellular Analysis report data.'
+                    )
+                );
+            }
+
+            return caReportLoadServingCells(
+                data
+            )
+                .then(
+                    function(cellDataSets) {
+                        caReportSetProgress(
+                            'Rendering Serving Cells…'
+                        );
+
+                        var servingCellBlocks =
+                            caReportBuildServingCellBlocks(
+                                cellDataSets,
+                                data
+                            );
+
+                        var handoffHtml =
+                            caReportBuildHandoffTable(
+                                data
+                            );
+
+                        var snapshot =
+                            caReportPrepareSnapshot(
+                                servingCellBlocks,
+                                handoffHtml
+                            );
+
+                        caReportSetProgress(
+                            'Embedding Offline Assets…'
+                        );
+
+                        return caReportCollectCss()
+                            .then(
+                                function(css) {
+                                    caReportSetProgress(
+                                        'Finalizing Report…'
+                                    );
+
+                                    var html =
+                                        caReportDocumentHtml(
+                                            snapshot,
+                                            data,
+                                            css
+                                        );
+
+                                    caReportSetProgress(
+                                        'Validating Offline Report…'
+                                    );
+
+                                    caReportValidateDocumentHtml(
+                                        html
+                                    );
+
+                                    caReportDownload(
+                                        html,
+                                        data
+                                    );
+
+                                    return true;
+                                }
+                            );
+                    }
+                );
+        }
+
         function loadCellularAnalysis() {
             var interfaceSelect = document.getElementById(
                 'ca-interface-select'
@@ -12825,6 +16232,111 @@
                             );
                         }
                     );
+                }
+            );
+        }
+
+        var caExportButton =
+            document.getElementById(
+                'btn-ca-export-report'
+            );
+
+        if (caExportButton) {
+            caExportButton.addEventListener(
+                'click',
+                function() {
+                    var button = this;
+
+                    var reportScopeControls = [
+                        document.getElementById(
+                            'ca-interface-select'
+                        ),
+                        document.getElementById(
+                            'ca-history-select'
+                        ),
+                        document.getElementById(
+                            'ca-cell-select'
+                        ),
+                        document.getElementById(
+                            'btn-ca-refresh'
+                        )
+                    ];
+
+                    var reportScopeStates = [];
+
+                    for (
+                        var i = 0;
+                        i < reportScopeControls.length;
+                        i++
+                    ) {
+                        var control =
+                            reportScopeControls[i];
+
+                        if (!control) {
+                            continue;
+                        }
+
+                        reportScopeStates.push({
+                            'control':
+                                control,
+                            'disabled':
+                                !!control.disabled
+                        });
+
+                        control.disabled =
+                            true;
+                    }
+
+                    button.disabled = true;
+                    button.innerHTML =
+                        '<i class="fas fa-circle-notch fa-spin"></i> ' +
+                        'Building Report…';
+
+                    caExportCellularAnalysisReport()
+                        .then(
+                            function() {
+                                button.innerHTML =
+                                    '<i class="fas fa-check"></i> ' +
+                                    'Report Exported';
+                            }
+                        )
+                        .catch(
+                            function(error) {
+                                console.error(
+                                    'Cellular Analysis report export failed:',
+                                    error
+                                );
+
+                                button.innerHTML =
+                                    '<i class="fas fa-exclamation-triangle"></i> ' +
+                                    'Export Failed';
+                            }
+                        )
+                        .then(
+                            function() {
+                                for (
+                                    var i = 0;
+                                    i < reportScopeStates.length;
+                                    i++
+                                ) {
+                                    reportScopeStates[i]
+                                        .control
+                                        .disabled =
+                                            reportScopeStates[i]
+                                                .disabled;
+                                }
+
+                                window.setTimeout(
+                                    function() {
+                                        button.disabled = false;
+                                        button.innerHTML =
+                                            '<i class="fas fa-file-code"></i> ' +
+                                            'Export HTML Report';
+                                    },
+                                    1400
+                                );
+                            }
+                        );
                 }
             );
         }

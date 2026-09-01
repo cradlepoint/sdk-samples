@@ -1678,7 +1678,7 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
-| **1.1.x — Cellular Analysis and GeoView** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, History & Reports integration, hardened local history persistence, and the site-wide provider-independent GeoView framework. |
+| **1.1.x — Cellular Analysis and GeoView** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready Cellular Analysis reporting, History & Reports integration, hardened local history persistence, and the site-wide provider-independent GeoView framework. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1694,6 +1694,29 @@ This section is the permanent engineering history for Speedtest Analyzer and its
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
 
 ## v1.1.1
+
+### Cellular Analysis report export architecture
+
+- Added **Export HTML Report** directly beside **Refresh Data** in the Cellular Analysis scope controls.
+- Report generation is browser-side. NCOS does not create, retain, or manage report files and does not generate PDF documents.
+- The exported artifact is a self-contained HTML document intended for local viewing, sharing, archival use, and browser-based **Print / Save as PDF**.
+- PDF print styling targets **US Letter landscape** while still allowing the browser print dialog to control the final output settings.
+- Report scope is frozen when export begins so the selected cellular interface, history range, generated timestamp, device label, application version, and theme remain internally consistent throughout report construction.
+- Cellular Analysis scope controls and Refresh are temporarily disabled while the report is generated to prevent a live-page refresh or scope change from racing the export.
+- The top-level Cellular Analysis API response is deep-copied at export start so overview, timeline, change activity, and report metadata come from one consistent analysis snapshot.
+- All identifiable serving cells in the selected analysis scope are loaded sequentially and rendered into the artifact. An individual serving-cell detail failure does not discard the remainder of the report.
+- Unknown serving-cell observations remain represented in overview, distribution, and timeline data but do not generate fabricated serving-cell identity detail sections.
+- In-test handoff observations are materialized as a static engineering table containing timestamp, test phase, phase offset, and from/to serving-cell information when available.
+- Interactive Cellular Analysis controls, configuration UI, JavaScript behavior, live tooltip bindings, and other browser-only controls are removed from the exported artifact.
+- Network Mode and Technology Usage donut visualizations are converted from CSS-gradient rendering to embedded SVG for consistent standalone HTML and Chromium PDF output.
+- Application CSS and required Font Awesome Solid, Regular, and Brands fonts are embedded directly into the report. The finished artifact does not depend on router-hosted stylesheets or font files.
+- A final offline-integrity validation rejects report generation if executable script content, unresolved stylesheet/resource URLs, unresolved CSS resources, duplicate DOM IDs, unconverted report donuts, or interactive Cellular Analysis controls remain.
+- Report filenames include the selected interface and generation timestamp so repeated exports do not overwrite or ambiguously reuse the same filename.
+- Print-specific rendering uses deterministic light-paper colors and removes gradient/shadow effects that were found to rasterize inconsistently in Chromium PDF output.
+- Print pagination allows major analysis sections to flow naturally through available page space while avoiding unnecessary internal card splits. Subsequent serving-cell analysis blocks may begin on clean page boundaries.
+- Serving-cell identifiers, PLMN, TAC, PCI, bands, channels, RF measurements, carrier aggregation information, Site Location, and other analysis data already displayed by Cellular Analysis may be included in the artifact.
+- Credentials, authentication/session data, API keys, cookies, IMEI, ICCID, router serial numbers, and other hidden security-sensitive values are not intentionally exported.
+- PDF creation remains a client/browser responsibility: the recipient opens the standalone HTML and uses the browser's normal **Print → Save as PDF** workflow.
 
 ### Site-wide GeoView inventory
 
