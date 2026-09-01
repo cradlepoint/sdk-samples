@@ -3273,6 +3273,78 @@
             border-radius: 999px;
         }
 
+        .ca-timeline-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.55rem;
+        }
+
+        .ca-timeline-title-row .ca-timeline-title {
+            margin-bottom: 0;
+        }
+
+        .ca-timeline-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex: 0 0 auto;
+        }
+
+        .ca-timeline-control {
+            min-width: 28px;
+            height: 26px;
+            padding: 0 0.45rem;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--card-surface);
+            color: var(--text-primary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .ca-timeline-control:hover:not(:disabled),
+        .ca-timeline-control:focus-visible {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .ca-timeline-control:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 1px;
+        }
+
+        .ca-timeline-control:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .ca-timeline-zoom-label {
+            min-width: 32px;
+            margin-left: 0.15rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .ca-timeline-viewport {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+        }
+
+        .ca-timeline-canvas {
+            position: relative;
+            width: 100%;
+            min-width: 100%;
+        }
+
         .ca-timeline-title {
             margin-bottom: 0.7rem;
             font-size: 0.72rem;
@@ -3284,6 +3356,7 @@
         .ca-timeline-track {
             position: relative;
             display: block;
+            box-sizing: border-box;
             width: 100%;
             height: 34px;
             overflow: hidden;
@@ -3355,6 +3428,104 @@
             .ca-timeline-handoff-marker:hover {
                 filter: brightness(1.08);
             }
+        }
+
+        /*
+         * Timeline event affordances.
+         *
+         * These markers have a fixed visual / pointer target so a transition
+         * remains visible even when its real proportional interval is only a
+         * few pixels or sub-pixel wide. They do not change timeline duration,
+         * segment width, midpoint boundaries, or serving-cell continuity.
+         */
+        .ca-timeline-transition-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 14px;
+            margin-left: -7px;
+            z-index: 3;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .ca-timeline-transition-marker::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            transform: translateX(-50%);
+            background: var(--text-primary);
+            box-shadow: 0 0 0 1px var(--card-surface);
+        }
+
+        .ca-timeline-transition-marker::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            width: 7px;
+            height: 7px;
+            transform: translate(-50%, -50%);
+            border: 2px solid var(--text-primary);
+            border-radius: 50%;
+            background: var(--card-surface);
+            z-index: 1;
+        }
+
+        .ca-timeline-transition-marker:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: -1px;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .ca-timeline-transition-marker:hover {
+                filter: brightness(1.12);
+            }
+        }
+
+        /*
+         * Proven in-test handoffs intentionally use a stronger marker than
+         * ordinary between-test transitions.
+         *
+         * The transparent 18px element is the hover/focus target. The actual
+         * event remains positioned at its mathematically correct percentage.
+         */
+        .ca-timeline-handoff-marker {
+            width: 18px;
+            margin-left: -9px;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .ca-timeline-handoff-marker::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 3px;
+            transform: translateX(-50%);
+            background: var(--warning-color);
+            box-shadow: 0 0 0 1px var(--card-surface);
+        }
+
+        .ca-timeline-handoff-marker::before {
+            content: '';
+            position: absolute;
+            top: 6px;
+            left: 50%;
+            width: 9px;
+            height: 9px;
+            transform:
+                translate(-50%, -50%)
+                rotate(45deg);
+            border: 2px solid var(--card-surface);
+            background: var(--warning-color);
+            z-index: 1;
         }
 
         .ca-timeline-segment:focus-visible {
@@ -7828,8 +7999,354 @@
         var cellularAnalysisState = {
             interface: '',
             history: 'all',
-            selectedCell: ''
+            selectedCell: '',
+            timelineZoom: 1
         };
+
+        var caTimelineZoomLevels = [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            64
+        ];
+
+        function caTimelineNormalizeZoom(value) {
+            value = Number(value || 1);
+
+            return (
+                caTimelineZoomLevels.indexOf(
+                    value
+                ) >= 0
+                    ? value
+                    : 1
+            );
+        }
+
+        function caTimelineUpdateZoomControls() {
+            var root =
+                document.getElementById(
+                    'ca-serving-timeline'
+                );
+
+            if (!root) {
+                return;
+            }
+
+            var zoom =
+                caTimelineNormalizeZoom(
+                    cellularAnalysisState.timelineZoom
+                );
+
+            var index =
+                caTimelineZoomLevels.indexOf(
+                    zoom
+                );
+
+            var outButton =
+                root.querySelector(
+                    '[data-ca-timeline-action="out"]'
+                );
+
+            var inButton =
+                root.querySelector(
+                    '[data-ca-timeline-action="in"]'
+                );
+
+            var fitButton =
+                root.querySelector(
+                    '[data-ca-timeline-action="fit"]'
+                );
+
+            var label =
+                root.querySelector(
+                    '[data-ca-timeline-zoom-label]'
+                );
+
+            if (outButton) {
+                outButton.disabled =
+                    index <= 0;
+            }
+
+            if (inButton) {
+                inButton.disabled =
+                    index >=
+                    caTimelineZoomLevels.length - 1;
+            }
+
+            if (fitButton) {
+                fitButton.disabled =
+                    zoom === 1;
+            }
+
+            if (label) {
+                label.textContent =
+                    zoom + '\u00d7';
+            }
+        }
+
+        function caTimelineSetZoom(
+            nextZoom,
+            focusPercent
+        ) {
+            var root =
+                document.getElementById(
+                    'ca-serving-timeline'
+                );
+
+            if (!root) {
+                return;
+            }
+
+            var viewport =
+                root.querySelector(
+                    '[data-ca-timeline-viewport]'
+                );
+
+            var canvas =
+                root.querySelector(
+                    '[data-ca-timeline-canvas]'
+                );
+
+            if (!viewport || !canvas) {
+                return;
+            }
+
+            var currentWidth =
+                Math.max(
+                    1,
+                    canvas.getBoundingClientRect().width
+                );
+
+            var focusValue =
+                Number(
+                    focusPercent
+                );
+
+            var hasExplicitFocus =
+                focusPercent !== undefined &&
+                focusPercent !== null &&
+                String(
+                    focusPercent
+                ).trim() !== '' &&
+                isFinite(
+                    focusValue
+                );
+
+            var anchorRatio;
+
+            if (hasExplicitFocus) {
+                anchorRatio =
+                    focusValue / 100;
+            } else {
+                anchorRatio =
+                    (
+                        viewport.scrollLeft +
+                        viewport.clientWidth / 2
+                    ) /
+                    currentWidth;
+            }
+
+            anchorRatio =
+                Math.max(
+                    0,
+                    Math.min(
+                        1,
+                        anchorRatio
+                    )
+                );
+
+            nextZoom =
+                caTimelineNormalizeZoom(
+                    nextZoom
+                );
+
+            cellularAnalysisState.timelineZoom =
+                nextZoom;
+
+            canvas.style.width =
+                (nextZoom * 100) + '%';
+
+            /*
+             * Reading the new geometry after setting width forces layout,
+             * allowing us to preserve the user's current visual center.
+             */
+            var newWidth =
+                Math.max(
+                    1,
+                    canvas.getBoundingClientRect().width
+                );
+
+            var maxScroll =
+                Math.max(
+                    0,
+                    newWidth -
+                    viewport.clientWidth
+                );
+
+            var nextScroll =
+                anchorRatio *
+                newWidth -
+                viewport.clientWidth / 2;
+
+            viewport.scrollLeft =
+                Math.max(
+                    0,
+                    Math.min(
+                        maxScroll,
+                        nextScroll
+                    )
+                );
+
+            caTimelineUpdateZoomControls();
+        }
+
+        function caBindTimelineZoomControls() {
+            var root =
+                document.getElementById(
+                    'ca-serving-timeline'
+                );
+
+            if (!root) {
+                return;
+            }
+
+            var buttons =
+                root.querySelectorAll(
+                    '[data-ca-timeline-action]'
+                );
+
+            for (
+                var i = 0;
+                i < buttons.length;
+                i++
+            ) {
+                buttons[i].addEventListener(
+                    'click',
+                    function() {
+                        var action =
+                            this.getAttribute(
+                                'data-ca-timeline-action'
+                            );
+
+                        var zoom =
+                            caTimelineNormalizeZoom(
+                                cellularAnalysisState.timelineZoom
+                            );
+
+                        var index =
+                            caTimelineZoomLevels.indexOf(
+                                zoom
+                            );
+
+                        if (action === 'fit') {
+                            caTimelineSetZoom(
+                                1
+                            );
+                            return;
+                        }
+
+                        if (
+                            action === 'in' &&
+                            index <
+                                caTimelineZoomLevels.length - 1
+                        ) {
+                            caTimelineSetZoom(
+                                caTimelineZoomLevels[
+                                    index + 1
+                                ]
+                            );
+                            return;
+                        }
+
+                        if (
+                            action === 'out' &&
+                            index > 0
+                        ) {
+                            caTimelineSetZoom(
+                                caTimelineZoomLevels[
+                                    index - 1
+                                ]
+                            );
+                        }
+                    }
+                );
+            }
+
+            var focusMarkers =
+                root.querySelectorAll(
+                    '[data-ca-timeline-focus]'
+                );
+
+            function focusTimelineMarker(
+                marker
+            ) {
+                var position =
+                    Number(
+                        marker.getAttribute(
+                            'data-ca-timeline-focus'
+                        )
+                    );
+
+                if (!isFinite(position)) {
+                    return;
+                }
+
+                var zoom =
+                    caTimelineNormalizeZoom(
+                        cellularAnalysisState.timelineZoom
+                    );
+
+                /*
+                 * 32x turns a multi-hour retained-history view into a
+                 * minutes-scale inspection window while preserving time
+                 * proportionality. A user already at 64x stays at 64x.
+                 */
+                if (zoom < 32) {
+                    zoom = 32;
+                }
+
+                caTimelineSetZoom(
+                    zoom,
+                    position
+                );
+            }
+
+            for (
+                var m = 0;
+                m < focusMarkers.length;
+                m++
+            ) {
+                focusMarkers[m].addEventListener(
+                    'click',
+                    function() {
+                        focusTimelineMarker(
+                            this
+                        );
+                    }
+                );
+
+                focusMarkers[m].addEventListener(
+                    'keydown',
+                    function(event) {
+                        if (
+                            event.key === 'Enter' ||
+                            event.key === ' '
+                        ) {
+                            event.preventDefault();
+
+                            focusTimelineMarker(
+                                this
+                            );
+                        }
+                    }
+                );
+            }
+
+            caTimelineUpdateZoomControls();
+        }
 
         function caEscapeHtml(value) {
             return String(value === null || value === undefined ? '' : value)
@@ -9086,13 +9603,90 @@
                     ? timelineEndMs - timelineStartMs
                     : 0;
 
+            var timelineZoom =
+                caTimelineNormalizeZoom(
+                    cellularAnalysisState.timelineZoom
+                );
+
+            cellularAnalysisState.timelineZoom =
+                timelineZoom;
+
+            var zoomIndex =
+                caTimelineZoomLevels.indexOf(
+                    timelineZoom
+                );
+
             var html =
-                '<div class="ca-timeline-title">' +
-                    'Serving Cell Timeline' +
+                '<div class="ca-timeline-title-row">' +
+
+                    '<div class="ca-timeline-title">' +
+                        'Serving Cell Timeline' +
+                    '</div>' +
+
+                    '<div class="ca-timeline-controls" ' +
+                    'aria-label="Timeline zoom controls">' +
+
+                        '<button type="button" ' +
+                        'class="ca-timeline-control" ' +
+                        'data-ca-timeline-action="out" ' +
+                        'title="Zoom out" ' +
+                        (
+                            zoomIndex <= 0
+                                ? 'disabled '
+                                : ''
+                        ) +
+                        'aria-label="Zoom out timeline">' +
+                            '&#8722;' +
+                        '</button>' +
+
+                        '<button type="button" ' +
+                        'class="ca-timeline-control" ' +
+                        'data-ca-timeline-action="in" ' +
+                        'title="Zoom in" ' +
+                        (
+                            zoomIndex >=
+                                caTimelineZoomLevels.length - 1
+                                ? 'disabled '
+                                : ''
+                        ) +
+                        'aria-label="Zoom in timeline">' +
+                            '+' +
+                        '</button>' +
+
+                        '<button type="button" ' +
+                        'class="ca-timeline-control" ' +
+                        'data-ca-timeline-action="fit" ' +
+                        'title="Fit complete history" ' +
+                        (
+                            timelineZoom === 1
+                                ? 'disabled '
+                                : ''
+                        ) +
+                        '>Fit</button>' +
+
+                        '<span class="ca-timeline-zoom-label" ' +
+                        'data-ca-timeline-zoom-label>' +
+                            timelineZoom +
+                            '\u00d7' +
+                        '</span>' +
+
+                    '</div>' +
+
                 '</div>' +
-                '<div class="ca-timeline-track">';
+
+                '<div class="ca-timeline-viewport" ' +
+                'data-ca-timeline-viewport>' +
+
+                    '<div class="ca-timeline-canvas" ' +
+                    'data-ca-timeline-canvas ' +
+                    'style="width:' +
+                    (timelineZoom * 100) +
+                    '%;">' +
+
+                        '<div class="ca-timeline-track">';
 
             var cumulativeCount = 0;
+            var transitionMarkers = '';
 
             for (var e = 0; e < events.length; e++) {
                 var event = events[e] || {};
@@ -9156,6 +9750,92 @@
                     0,
                     Math.min(100 - left, width)
                 );
+
+                if (e > 0) {
+                    var transitionPreviousEvent =
+                        events[e - 1] || {};
+
+                    var transitionPreviousKey =
+                        String(
+                            transitionPreviousEvent.key ||
+                            'unknown'
+                        );
+
+                    var transitionPreviousMeta =
+                        cellMeta[
+                            transitionPreviousKey
+                        ] || {
+                            label: 'Unknown',
+                            color: 'var(--text-secondary)',
+                            unknown: true,
+                            cell: {}
+                        };
+
+                    if (
+                        transitionPreviousKey !== key &&
+                        !transitionPreviousMeta.unknown &&
+                        !meta.unknown
+                    ) {
+                        var transitionTooltipLines = [
+                            'Between-Test Serving Cell Change',
+
+                            caTimelineHandoffCellText(
+                                transitionPreviousMeta.cell,
+                                transitionPreviousMeta.label
+                            ) +
+                            ' \\u2192 ' +
+                            caTimelineHandoffCellText(
+                                meta.cell,
+                                meta.label
+                            )
+                        ];
+
+                        if (
+                            transitionPreviousEvent.end
+                        ) {
+                            transitionTooltipLines.push(
+                                'Previous test: ' +
+                                caFormatLocalTimestamp(
+                                    transitionPreviousEvent.end
+                                )
+                            );
+                        }
+
+                        if (event.start) {
+                            transitionTooltipLines.push(
+                                'Next test: ' +
+                                caFormatLocalTimestamp(
+                                    event.start
+                                )
+                            );
+                        }
+
+                        transitionMarkers +=
+                            '<div class="ca-timeline-transition-marker" ' +
+                            'tabindex="0" ' +
+                            'role="button" ' +
+                            'aria-label="' +
+                            caEscapeHtml(
+                                transitionTooltipLines.join(
+                                    '. '
+                                )
+                            ) +
+                            '" ' +
+                            'data-ca-tooltip="' +
+                            caEscapeHtml(
+                                transitionTooltipLines.join(
+                                    '|'
+                                )
+                            ) +
+                            '" ' +
+                            'data-ca-timeline-focus="' +
+                            left +
+                            '" ' +
+                            'style="left:' +
+                            left +
+                            '%;"></div>';
+                    }
+                }
 
                 var tooltipLines = [
                     meta.unknown
@@ -9246,6 +9926,8 @@
                     '</div>';
             }
 
+            html += transitionMarkers;
+
             /*
              * Overlay proven in-test handoffs after the continuity blocks.
              * They are event markers only and therefore never affect segment
@@ -9327,6 +10009,7 @@
                 html +=
                     '<div class="ca-timeline-handoff-marker" ' +
                     'tabindex="0" ' +
+                    'role="button" ' +
                     'aria-label="' +
                     caEscapeHtml(
                         handoffTooltipLines.join('. ')
@@ -9336,6 +10019,9 @@
                     caEscapeHtml(
                         handoffTooltip
                     ) +
+                    '" ' +
+                    'data-ca-timeline-focus="' +
+                    handoffLeft +
                     '" ' +
                     'style="left:' +
                     handoffLeft +
@@ -9379,9 +10065,12 @@
                     '<span>' +
                         caEscapeHtml(footerRight) +
                     '</span>' +
+                '</div>' +
+                '</div>' +
                 '</div>';
 
             timeline.innerHTML = html;
+            caBindTimelineZoomControls();
         }
 
         function caChangeCard(
@@ -14679,6 +15368,9 @@
             var removeSelectors = [
                 '.ca-analysis-controls',
                 '.ca-serving-scope',
+                '.ca-timeline-controls',
+                '.ca-timeline-transition-marker',
+                '.ca-timeline-handoff-marker',
                 '#ca-geo-modal-backdrop',
                 '#btn-ca-configure-location'
             ];
@@ -14754,6 +15446,32 @@
                         reportGroupMap[g][1]
                     );
                 }
+            }
+
+            /*
+             * Timeline reports are always normalized to the complete
+             * proportional history regardless of the operator's live zoom.
+             */
+            var reportTimelineCanvas =
+                clone.querySelector(
+                    '.ca-timeline-canvas'
+                );
+
+            if (reportTimelineCanvas) {
+                reportTimelineCanvas.style.width =
+                    '100%';
+            }
+
+            var reportTimelineViewport =
+                clone.querySelector(
+                    '.ca-timeline-viewport'
+                );
+
+            if (reportTimelineViewport) {
+                reportTimelineViewport.style.overflow =
+                    'visible';
+                reportTimelineViewport.scrollLeft =
+                    0;
             }
 
             /*
@@ -16352,6 +17070,7 @@
                         this.value || '';
 
                     cellularAnalysisState.selectedCell = '';
+                    cellularAnalysisState.timelineZoom = 1;
 
                     loadCellularAnalysis();
                 }
@@ -16369,6 +17088,7 @@
                         this.value || 'all';
 
                     cellularAnalysisState.selectedCell = '';
+                    cellularAnalysisState.timelineZoom = 1;
 
                     loadCellularAnalysis();
                 }
