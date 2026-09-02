@@ -3850,6 +3850,11 @@
                                 <i class="fas fa-share-alt"></i> <span>Outputs</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="#" class="nav-item" data-section="settings" title="Settings">
+                                <i class="fas fa-cog"></i> <span>Settings</span>
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </aside>
@@ -4890,10 +4895,580 @@
                         <div id="outputs-status" style="margin-top:0.75rem; font-size:0.8rem; color:var(--text-secondary);"></div>
                     </section>
 
+                    <!-- SETTINGS SECTION (last nav item) -->
+                    <section class="element-section" id="settings">
+                        <h2 class="section-title">Settings</h2>
+                        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">
+                            Application-wide administration. Feature configuration (Scheduled Tasks, Servers, GeoView, Outputs) remains on its own page.
+                        </p>
+
+                        <!-- A. Configuration Management (two-layer v1.1.2) -->
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header"><h3>Configuration Management</h3></div>
+                            <div class="card-body">
+                                <!-- Configuration Upgrade Required notice (state=upgrade_required) -->
+                                <div id="config-upgrade-notice" style="display:none; margin-bottom:1rem; padding:0.9rem 1rem; border-left:4px solid var(--warning-color,#f0ad4e); background:var(--card-surface); border-radius:var(--radius-sm);">
+                                    <h4 style="margin:0 0 0.5rem; font-size:0.98rem;"><i class="fas fa-exclamation-triangle"></i> Configuration Upgrade Required</h4>
+                                    <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                                        Speedtest Analyzer found configuration created by an earlier version. Your existing settings are still active, but they must be converted to the current configuration format before configuration changes can be saved.
+                                    </p>
+                                    <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                                        You can continue running tests, viewing test history and reports, and using Cellular Analysis. Only configuration changes are temporarily locked.
+                                    </p>
+                                    <button type="button" class="btn btn-primary" id="btn-config-convert">
+                                        <i class="fas fa-sync-alt"></i> Convert Configuration
+                                    </button>
+                                    <div id="config-convert-status" style="margin-top:0.6rem; font-size:0.82rem; color:var(--text-secondary);"></div>
+                                </div>
+
+                                <!-- Derived state summary -->
+                                <div id="settings-config-status" style="font-size:0.9rem;">
+                                    <p style="color:var(--text-secondary);"><i class="fas fa-circle-notch fa-spin"></i> Loading configuration state…</p>
+                                </div>
+
+                                <!-- Effective Configuration Sources (informational) -->
+                                <div id="config-effective-sources" style="display:none; margin-top:1rem;">
+                                    <h4 style="font-size:0.9rem; margin:0 0 0.4rem;">Effective Configuration Sources</h4>
+                                    <table style="width:100%; border-collapse:collapse; font-size:0.83rem;">
+                                        <tbody id="config-effective-sources-body"></tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Device Overrides (group_with_device_overrides) -->
+                                <div id="config-override-list" style="display:none; margin-top:1.25rem;">
+                                    <h4 style="font-size:0.9rem; margin:0 0 0.25rem;">Device Overrides</h4>
+                                    <p style="font-size:0.8rem; color:var(--text-secondary); margin:0 0 0.6rem;">
+                                        These settings are configured locally on this device and take precedence over the corresponding NCM Group configuration.
+                                    </p>
+                                    <div id="config-override-items"></div>
+                                    <button type="button" class="btn btn-secondary" id="btn-reset-all-overrides" style="margin-top:0.75rem;">
+                                        <i class="fas fa-undo"></i> Reset All Device Overrides
+                                    </button>
+                                </div>
+
+                                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                                    <button type="button" class="btn btn-primary" id="btn-settings-migrate" style="display:none;">
+                                        <i class="fas fa-cloud-upload-alt"></i> Migrate to NCM Group
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="btn-settings-update-group" style="display:none;">
+                                        <i class="fas fa-cloud-upload-alt"></i> Update NCM Group Configuration
+                                    </button>
+                                </div>
+                                <div id="settings-config-action-status" style="margin-top:0.6rem; font-size:0.82rem; color:var(--text-secondary);"></div>
+                            </div>
+                        </div>
+
+                        <!-- B. Application Information -->
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header"><h3>Application Information</h3></div>
+                            <div class="card-body" id="settings-app-info" style="font-size:0.9rem; color:var(--text-secondary);">
+                                <p>Loading…</p>
+                            </div>
+                        </div>
+
+                        <!-- C. Data Management -->
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header"><h3>Data Management</h3></div>
+                            <div class="card-body">
+                                <div id="settings-data-info" style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:0.75rem;">
+                                    <p>Loading test history information…</p>
+                                </div>
+                                <button type="button" class="btn btn-secondary" id="btn-settings-clear-history">
+                                    <i class="fas fa-trash"></i> Clear Test History
+                                </button>
+                                <div id="settings-data-status" style="margin-top:0.5rem; font-size:0.8rem; color:var(--text-secondary);"></div>
+                            </div>
+                        </div>
+
+                        <!-- D. Factory Reset (separate danger section) -->
+                        <div class="card" style="margin-bottom:1rem; border:1px solid var(--danger-color,#dc2626);">
+                            <div class="card-header" style="color:var(--danger-color,#dc2626);"><h3><i class="fas fa-exclamation-triangle"></i> Factory Reset</h3></div>
+                            <div class="card-body">
+                                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.75rem;">
+                                    Factory Reset erases all Speedtest Analyzer-owned local data: canonical configuration (when device-managed), test history and history recovery files, saved reports, iPerf3 reliability statistics, and result output values. It leaves the application installed and never touches unrelated router configuration or NCM Group SDK Data.
+                                </p>
+                                <button type="button" class="btn btn-danger" id="btn-settings-factory-reset">
+                                    <i class="fas fa-radiation"></i> Factory Reset
+                                </button>
+                                <div id="settings-factory-status" style="margin-top:0.5rem; font-size:0.8rem; color:var(--text-secondary);"></div>
+                            </div>
+                        </div>
+                    </section>
+
                 </div>
             </div>
         </main>
     </div>
+
+    <!-- Styled "Configuration Upgrade Required" notice shown when an ordinary
+         Save is blocked (replaces the native alert). -->
+    <div id="upgrade-required-modal" style="display:none; position:fixed; inset:0; z-index:2100; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; padding:1rem;">
+        <div role="dialog" aria-modal="true" aria-labelledby="upgrade-required-title" style="width:min(520px,100%); background:var(--light-surface); color:var(--text-primary); border:1px solid var(--border-color); border-left:4px solid var(--warning-color,#f0ad4e); border-radius:var(--radius-md); padding:1.25rem; box-shadow:0 18px 45px rgba(0,0,0,0.28);">
+            <h3 id="upgrade-required-title" style="font-size:1.05rem; margin:0 0 0.6rem;"><i class="fas fa-exclamation-triangle"></i> Configuration Upgrade Required</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                Your existing configuration is still active, but it must be converted before configuration changes can be saved.
+            </p>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 1rem;">
+                You can still run tests and view history and reports. Only configuration changes are temporarily locked.
+            </p>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:flex-end;">
+                <button type="button" class="btn" id="upgrade-required-close">Close</button>
+                <button type="button" class="btn btn-primary" id="upgrade-required-goto"><i class="fas fa-cog"></i> Go to Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Styled "Reset All Device Overrides" confirmation (replaces native
+         confirm). Lists each override and its reset destination. -->
+    <div id="reset-all-modal" style="display:none; position:fixed; inset:0; z-index:2100; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; padding:1rem;">
+        <div role="dialog" aria-modal="true" aria-labelledby="reset-all-title" style="width:min(560px,100%); background:var(--light-surface); color:var(--text-primary); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1.25rem; box-shadow:0 18px 45px rgba(0,0,0,0.28); max-height:90vh; overflow:auto;">
+            <h3 id="reset-all-title" style="font-size:1.05rem; margin:0 0 0.6rem;">Reset All Device Overrides?</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                This removes every local Speedtest Analyzer configuration override from this device. Settings configured by the NCM Group will immediately use the Group value; settings not configured by the NCM Group will return to their built-in default.
+            </p>
+            <div style="font-size:0.83rem; margin:0.5rem 0 0.25rem; font-weight:600;">Overrides being removed:</div>
+            <ul id="reset-all-list" style="font-size:0.83rem; margin:0 0 1rem 1.1rem;"></ul>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:flex-end;">
+                <button type="button" class="btn" id="reset-all-cancel">Cancel</button>
+                <button type="button" class="btn btn-danger" id="reset-all-confirm"><i class="fas fa-undo"></i> Reset All Overrides</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Styled Factory Reset double-confirmation (replaces native confirm x2).
+         Preserves the two-step safety: Step 1 explains scope, Step 2 is the
+         final "Are you sure?" gate. -->
+    <div id="factory-reset-modal" style="display:none; position:fixed; inset:0; z-index:2100; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:1rem;">
+        <div role="dialog" aria-modal="true" aria-labelledby="factory-reset-title" style="width:min(560px,100%); background:var(--light-surface); color:var(--text-primary); border:1px solid var(--danger-color,#dc2626); border-radius:var(--radius-md); padding:1.25rem; box-shadow:0 18px 45px rgba(0,0,0,0.32); max-height:90vh; overflow:auto;">
+            <h3 id="factory-reset-title" style="font-size:1.05rem; margin:0 0 0.6rem; color:var(--danger-color,#dc2626);"><i class="fas fa-exclamation-triangle"></i> Factory Reset</h3>
+            <!-- Step 1 -->
+            <div id="factory-reset-step1">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                    Factory Reset erases all Speedtest Analyzer-owned local data: local Device configuration, legacy/obsolete Speedtest Analyzer configuration, test history and recovery files, saved reports, iPerf3 reliability statistics, and result output values.
+                </p>
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 1rem;">
+                    It leaves the application installed and does NOT touch unrelated router configuration or the NCM Group SDK Data. If an NCM Group configuration exists, the device will continue using it afterward.
+                </p>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:flex-end;">
+                    <button type="button" class="btn" id="factory-reset-cancel1">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="factory-reset-continue">Continue</button>
+                </div>
+            </div>
+            <!-- Step 2 -->
+            <div id="factory-reset-step2" style="display:none;">
+                <p style="font-size:0.9rem; margin:0 0 1rem; font-weight:600;">
+                    Are you sure? This is destructive and cannot be undone.
+                </p>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:flex-end;">
+                    <button type="button" class="btn" id="factory-reset-cancel2">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="factory-reset-confirm"><i class="fas fa-radiation"></i> Factory Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Non-blocking informational toast (redundant-override removal / no-op).
+         Never a modal; auto-hides. -->
+    <div id="override-removed-toast" role="status" aria-live="polite"
+         style="display:none; position:fixed; right:1rem; bottom:1rem; z-index:2200; max-width:360px; padding:0.7rem 0.9rem; background:var(--light-surface); color:var(--text-primary); border:1px solid var(--border-color); border-left:4px solid var(--success-color,#16a34a); border-radius:var(--radius-sm); box-shadow:0 10px 30px rgba(0,0,0,0.22); font-size:0.83rem;"></div>
+
+    <!-- Migrate to NCM Group wizard (selection-only placement wizard).
+         This wizard NEVER edits configuration values. Steps:
+         1 select -> 2 review -> 3 candidate JSON + NCM instructions ->
+         4 validate group present -> 5 device cleanup -> done. -->
+    <div id="migrate-wizard-modal" style="display:none; position:fixed; inset:0; z-index:2100; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; padding:1rem;">
+        <div role="dialog" aria-modal="true" aria-labelledby="migrate-wizard-title" style="width:min(720px,100%); background:var(--light-surface); color:var(--text-primary); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1.25rem; box-shadow:0 18px 45px rgba(0,0,0,0.28); max-height:92vh; overflow:auto;">
+            <h3 id="migrate-wizard-title" style="font-size:1.05rem; margin:0 0 0.75rem;">Migrate to NCM Group</h3>
+
+            <!-- STEP 1: select sections -->
+            <div id="migrate-step-select" class="migrate-step">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.75rem;">
+                    Choose which existing Device settings should become the NCM Group standard. This wizard only decides placement; it does not edit any configuration values. To change a value, cancel, edit it on its normal feature page, save, then restart migration.
+                </p>
+                <div id="migrate-sections-list"></div>
+                <div id="migrate-select-error" style="display:none; margin-top:0.6rem; padding:0.5rem 0.7rem; border-left:3px solid var(--danger-color,#dc2626); background:var(--card-surface); border-radius:var(--radius-sm); font-size:0.82rem;"></div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                    <button type="button" class="btn btn-primary" id="migrate-to-review"><i class="fas fa-arrow-right"></i> Continue to Review</button>
+                    <button type="button" class="btn" id="migrate-cancel-1">Cancel</button>
+                </div>
+            </div>
+
+            <!-- STEP 2: review -->
+            <div id="migrate-step-review" class="migrate-step" style="display:none;">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.75rem;">Review the placement. No values can be edited here.</p>
+                <h4 style="font-size:0.9rem; margin:0 0 0.3rem;">NCM Group Standard</h4>
+                <ul id="migrate-review-group" style="font-size:0.85rem; margin:0 0 0.75rem 1.1rem;"></ul>
+                <h4 style="font-size:0.9rem; margin:0 0 0.3rem;">Remaining on This Device</h4>
+                <ul id="migrate-review-device" style="font-size:0.85rem; margin:0 0 0.75rem 1.1rem;"></ul>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="migrate-back-select"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button type="button" class="btn btn-primary" id="migrate-generate"><i class="fas fa-file-code"></i> Generate NCM Group Configuration</button>
+                    <button type="button" class="btn" id="migrate-cancel-2">Cancel</button>
+                </div>
+            </div>
+
+            <!-- STEP 3: candidate JSON + NCM instructions -->
+            <div id="migrate-step-candidate" class="migrate-step" style="display:none;">
+                <div style="padding:0.6rem 0.8rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--card-surface); margin-bottom:0.75rem;">
+                    <div style="font-size:0.8rem; color:var(--text-secondary);">TARGET</div>
+                    <div style="font-size:0.9rem;">NCM Group &rarr; SDK Data / Application Data</div>
+                </div>
+                <div style="margin-bottom:0.5rem;">
+                    <div style="font-size:0.8rem; color:var(--text-secondary);">SDK DATA NAME</div>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <code id="migrate-sdk-name" style="font-size:0.9rem;">speedtest_analyzer_group</code>
+                        <button type="button" class="btn btn-secondary" id="migrate-copy-name" style="padding:0.2rem 0.55rem; font-size:0.78rem;"><i class="fas fa-copy"></i> Copy Name</button>
+                    </div>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                    <strong>speedtest_analyzer_group</strong> is the SDK Data entry NAME. It is not the NCM Group name.
+                </p>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">SDK DATA VALUE</div>
+                <textarea id="migrate-candidate-json" readonly style="width:100%; height:170px; font-family:monospace; font-size:0.78rem; padding:0.6rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--card-surface); color:var(--text-primary);"></textarea>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-secondary" id="migrate-copy-json"><i class="fas fa-copy"></i> Copy JSON</button>
+                    <span style="font-size:0.82rem; color:var(--text-secondary); align-self:center;">Expected Group Revision: <strong id="migrate-expected-rev">1</strong></span>
+                </div>
+                <div style="margin-top:0.75rem; padding:0.6rem 0.8rem; border-left:3px solid var(--warning-color,#f0ad4e); background:var(--card-surface); border-radius:var(--radius-sm); font-size:0.82rem;">
+                    Add <code>speedtest_analyzer_group</code> to the NCM <strong>GROUP</strong> configuration. Do not manually create this key at Device scope for normal production use.
+                </div>
+                <ol style="font-size:0.83rem; color:var(--text-secondary); margin:0.75rem 0 0.75rem 1.1rem;">
+                    <li>Open the intended Device Group in NCM.</li>
+                    <li>Open the Group's SDK Data / Application Data configuration.</li>
+                    <li>Create an entry named: <code>speedtest_analyzer_group</code></li>
+                    <li>Paste the generated JSON into the Value field.</li>
+                    <li>Save/apply the Group configuration.</li>
+                    <li>Wait for the Group configuration to synchronize to the device.</li>
+                    <li>Return here and click Validate.</li>
+                </ol>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-primary" id="migrate-validate"><i class="fas fa-check"></i> Validate</button>
+                    <button type="button" class="btn" id="migrate-cancel-3">Cancel</button>
+                </div>
+                <div id="migrate-validate-status" style="margin-top:0.6rem; font-size:0.82rem; color:var(--text-secondary);"></div>
+            </div>
+
+            <!-- STEP 4: cleanup / completion -->
+            <div id="migrate-step-done" class="migrate-step" style="display:none;">
+                <div id="migrate-done-body" style="font-size:0.85rem;"></div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="migrate-retry-cleanup" style="display:none;"><i class="fas fa-redo"></i> Retry Cleanup</button>
+                    <button type="button" class="btn btn-primary" id="migrate-finish">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- Update NCM Group Configuration wizard.                            -->
+    <!-- Promotes selected CURRENT Device overrides into the EXISTING NCM  -->
+    <!-- Group standard. Starts from a deep copy of the current Group and  -->
+    <!-- replaces/adds ONLY the selected sections; unselected overrides    -->
+    <!-- stay on the Device. Never rebuilds the Group, never copies        -->
+    <!-- defaults, never removes unrelated Group sections. Steps:          -->
+    <!-- 1 select -> 2 review -> 3 candidate JSON + NCM instructions ->    -->
+    <!-- 4 validate revised Group present -> device cleanup -> done.       -->
+    <!-- ================================================================= -->
+    <div id="ug-wizard-modal" style="display:none; position:fixed; inset:0; z-index:2100; background:rgba(0,0,0,0.45); align-items:center; justify-content:center; padding:1rem;">
+        <div role="dialog" aria-modal="true" aria-labelledby="ug-wizard-title" style="width:min(720px,100%); background:var(--light-surface); color:var(--text-primary); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:1.25rem; box-shadow:0 18px 45px rgba(0,0,0,0.28); max-height:92vh; overflow:auto;">
+            <h3 id="ug-wizard-title" style="font-size:1.05rem; margin:0 0 0.75rem;">Update NCM Group Configuration</h3>
+
+            <!-- STEP 1: select sections -->
+            <div id="ug-step-select" class="ug-step">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.75rem;">
+                    Choose which current Device overrides should be promoted into the existing NCM Group standard. Selected sections replace or add to the Group. Unselected sections stay as Device overrides and leave the current Group section unchanged. This wizard only decides placement; it does not edit any configuration values.
+                </p>
+                <div id="ug-sections-list"></div>
+                <div id="ug-select-error" style="display:none; margin-top:0.6rem; padding:0.5rem 0.7rem; border-left:3px solid var(--danger-color,#dc2626); background:var(--card-surface); border-radius:var(--radius-sm); font-size:0.82rem;"></div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                    <button type="button" class="btn btn-primary" id="ug-to-review"><i class="fas fa-arrow-right"></i> Continue to Review</button>
+                    <button type="button" class="btn" id="ug-cancel-1">Cancel</button>
+                </div>
+            </div>
+
+            <!-- STEP 2: review -->
+            <div id="ug-step-review" class="ug-step" style="display:none;">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin:0 0 0.75rem;">Review the update. No values can be edited here.</p>
+                <h4 style="font-size:0.9rem; margin:0 0 0.3rem;">Updates to NCM Group</h4>
+                <ul id="ug-review-updates" style="font-size:0.85rem; margin:0 0 0.75rem 1.1rem;"></ul>
+                <h4 style="font-size:0.9rem; margin:0 0 0.3rem;">Unchanged NCM Group Configuration</h4>
+                <ul id="ug-review-unchanged" style="font-size:0.85rem; margin:0 0 0.75rem 1.1rem;"></ul>
+                <h4 style="font-size:0.9rem; margin:0 0 0.3rem;">Remaining Device Overrides</h4>
+                <ul id="ug-review-device" style="font-size:0.85rem; margin:0 0 0.75rem 1.1rem;"></ul>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="ug-back-select"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button type="button" class="btn btn-primary" id="ug-generate"><i class="fas fa-file-code"></i> Generate Revised Group Configuration</button>
+                    <button type="button" class="btn" id="ug-cancel-2">Cancel</button>
+                </div>
+            </div>
+
+            <!-- STEP 3: candidate JSON + NCM instructions -->
+            <div id="ug-step-candidate" class="ug-step" style="display:none;">
+                <div style="padding:0.6rem 0.8rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--card-surface); margin-bottom:0.75rem;">
+                    <div style="font-size:0.8rem; color:var(--text-secondary);">TARGET</div>
+                    <div style="font-size:0.9rem;">NCM Group &rarr; SDK Data / Application Data (UPDATE existing value)</div>
+                </div>
+                <div style="margin-bottom:0.5rem;">
+                    <div style="font-size:0.8rem; color:var(--text-secondary);">SDK DATA NAME</div>
+                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                        <code id="ug-sdk-name" style="font-size:0.9rem;">speedtest_analyzer_group</code>
+                        <button type="button" class="btn btn-secondary" id="ug-copy-name" style="padding:0.2rem 0.55rem; font-size:0.78rem;"><i class="fas fa-copy"></i> Copy Name</button>
+                    </div>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin:0 0 0.5rem;">
+                    <strong>speedtest_analyzer_group</strong> is the SDK Data entry NAME. It is not the NCM Group name.
+                </p>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">SDK DATA VALUE (complete revised JSON)</div>
+                <textarea id="ug-candidate-json" readonly style="width:100%; height:170px; font-family:monospace; font-size:0.78rem; padding:0.6rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--card-surface); color:var(--text-primary);"></textarea>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-secondary" id="ug-copy-json"><i class="fas fa-copy"></i> Copy JSON</button>
+                    <span style="font-size:0.82rem; color:var(--text-secondary); align-self:center;">Current Group Revision: <strong id="ug-current-rev">1</strong> &rarr; New Group Revision: <strong id="ug-new-rev">2</strong></span>
+                </div>
+                <div style="margin-top:0.75rem; padding:0.6rem 0.8rem; border-left:3px solid var(--warning-color,#f0ad4e); background:var(--card-surface); border-radius:var(--radius-sm); font-size:0.82rem;">
+                    <strong>UPDATE</strong> the existing <code>speedtest_analyzer_group</code> SDK Data VALUE in the NCM GROUP configuration. Do not create a second/duplicate entry with the same name.
+                </div>
+                <ol style="font-size:0.83rem; color:var(--text-secondary); margin:0.75rem 0 0.75rem 1.1rem;">
+                    <li>Open the Device Group in NCM.</li>
+                    <li>Open the Group's SDK Data / Application Data configuration.</li>
+                    <li>Find the EXISTING entry named: <code>speedtest_analyzer_group</code></li>
+                    <li>Replace its Value field with the generated JSON above.</li>
+                    <li>Save/apply the Group configuration.</li>
+                    <li>Wait for the Group configuration to synchronize to the device.</li>
+                    <li>Return here and click Validate.</li>
+                </ol>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-primary" id="ug-validate"><i class="fas fa-check"></i> Validate</button>
+                    <button type="button" class="btn" id="ug-cancel-3">Cancel</button>
+                </div>
+                <div id="ug-validate-status" style="margin-top:0.6rem; font-size:0.82rem; color:var(--text-secondary);"></div>
+            </div>
+
+            <!-- STEP 4: cleanup / completion -->
+            <div id="ug-step-done" class="ug-step" style="display:none;">
+                <div id="ug-done-body" style="font-size:0.85rem;"></div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="ug-retry-cleanup" style="display:none;"><i class="fas fa-redo"></i> Retry Cleanup</button>
+                    <button type="button" class="btn btn-primary" id="ug-finish">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- Reusable application modal helper (STModal).                       -->
+    <!-- Promise-based alert/confirm/choose with severity theming and       -->
+    <!-- deterministic stacking. Replaces native alert()/confirm()/prompt() -->
+    <!-- in Speedtest Analyzer workflows. Exposed on window so every inline  -->
+    <!-- script block can use one consistent pattern.                        -->
+    <!-- ================================================================= -->
+    <script>
+    (function() {
+        'use strict';
+        // Each open modal gets its own backdrop; z-index climbs so a child
+        // (e.g. Upgrade Required over GeoView) always sits above its parent.
+        var _baseZ = 3000;
+        var _open = [];
+
+        function _theme(severity) {
+            // returns { accent, icon }
+            switch (severity) {
+                case 'warning':
+                    return { accent: 'var(--warning-color,#f0ad4e)',
+                             icon: 'fas fa-exclamation-triangle' };
+                case 'destructive':
+                    return { accent: 'var(--danger-color,#dc2626)',
+                             icon: 'fas fa-exclamation-triangle' };
+                case 'high-destructive':
+                    return { accent: 'var(--danger-color,#dc2626)',
+                             icon: 'fas fa-radiation' };
+                case 'success':
+                    return { accent: 'var(--success-color,#16a34a)',
+                             icon: 'fas fa-check-circle' };
+                default:
+                    return { accent: 'var(--primary-color,#6b4fbb)',
+                             icon: 'fas fa-info-circle' };
+            }
+        }
+
+        function esc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // opts: { title, message(html-safe text or {html}), severity,
+        //         buttons:[{label, value, kind}], dismissValue, allowEscape,
+        //         defaultValue (Enter target) }
+        // Returns a Promise resolving to the chosen button value.
+        function _openModal(opts) {
+            opts = opts || {};
+            var z = _baseZ + _open.length * 10;
+            var theme = _theme(opts.severity);
+            var prevFocus = document.activeElement;
+
+            var backdrop = document.createElement('div');
+            backdrop.className = 'stmodal-backdrop';
+            backdrop.style.cssText =
+                'position:fixed; inset:0; z-index:' + z + '; ' +
+                'background:rgba(0,0,0,0.45); display:flex; ' +
+                'align-items:center; justify-content:center; padding:1rem;';
+
+            var card = document.createElement('div');
+            card.setAttribute('role', 'dialog');
+            card.setAttribute('aria-modal', 'true');
+            card.style.cssText =
+                'width:min(560px,100%); background:var(--light-surface); ' +
+                'color:var(--text-primary); border:1px solid ' +
+                'var(--border-color); border-left:4px solid ' + theme.accent +
+                '; border-radius:var(--radius-md); padding:1.25rem; ' +
+                'box-shadow:0 18px 45px rgba(0,0,0,0.28); max-height:90vh; ' +
+                'overflow:auto;';
+
+            var bodyHtml = '';
+            if (opts.title) {
+                bodyHtml += '<h3 style="font-size:1.05rem; margin:0 0 0.6rem; ' +
+                    'color:' + (opts.severity === 'high-destructive' ||
+                                opts.severity === 'destructive'
+                                ? theme.accent : 'var(--text-primary)') +
+                    ';"><i class="' + theme.icon + '"></i> ' +
+                    esc(opts.title) + '</h3>';
+            }
+            if (opts.message && opts.message.html) {
+                bodyHtml += '<div style="font-size:0.85rem; ' +
+                    'color:var(--text-secondary); margin:0 0 1rem;">' +
+                    opts.message.html + '</div>';
+            } else if (opts.message) {
+                bodyHtml += '<p style="font-size:0.85rem; ' +
+                    'color:var(--text-secondary); margin:0 0 1rem; ' +
+                    'white-space:pre-line;">' + esc(opts.message) + '</p>';
+            }
+            bodyHtml += '<div class="stmodal-actions" style="display:flex; ' +
+                'gap:0.5rem; flex-wrap:wrap; justify-content:flex-end;"></div>';
+            card.innerHTML = bodyHtml;
+
+            var actions = card.querySelector('.stmodal-actions');
+            var buttons = opts.buttons || [{ label: 'OK', value: true,
+                                             kind: 'primary' }];
+
+            function cleanup(value) {
+                if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+                var idx = _open.indexOf(entry);
+                if (idx !== -1) _open.splice(idx, 1);
+                document.removeEventListener('keydown', onKey, true);
+                try { if (prevFocus && prevFocus.focus) prevFocus.focus(); }
+                catch (e) {}
+                entry.resolve(value);
+            }
+
+            var primaryBtn = null;
+            buttons.forEach(function(b) {
+                var el = document.createElement('button');
+                el.type = 'button';
+                var cls = 'btn';
+                if (b.kind === 'primary') cls += ' btn-primary';
+                else if (b.kind === 'danger') cls += ' btn-danger';
+                else if (b.kind === 'secondary') cls += ' btn-secondary';
+                el.className = cls;
+                el.innerHTML = (b.icon ? '<i class="' + b.icon + '"></i> ' : '') +
+                    esc(b.label);
+                el.addEventListener('click', function() { cleanup(b.value); });
+                actions.appendChild(el);
+                if (b.isDefault) primaryBtn = el;
+            });
+
+            function onKey(e) {
+                // Only the topmost modal responds.
+                if (_open.length && _open[_open.length - 1] !== entry) return;
+                if (e.key === 'Escape' && opts.allowEscape !== false) {
+                    e.preventDefault();
+                    cleanup(opts.dismissValue !== undefined
+                            ? opts.dismissValue : null);
+                } else if (e.key === 'Enter' && primaryBtn) {
+                    // Enter triggers ONLY an explicitly-marked default button
+                    // (destructive confirms never mark one, to avoid accidental
+                    // firing).
+                    e.preventDefault();
+                    primaryBtn.click();
+                }
+            }
+            document.addEventListener('keydown', onKey, true);
+
+            backdrop.appendChild(card);
+            document.body.appendChild(backdrop);
+
+            var entry = { backdrop: backdrop, resolve: null, cleanup: cleanup };
+            var p = new Promise(function(resolve) { entry.resolve = resolve; });
+            _open.push(entry);
+
+            // Focus management: focus the first non-destructive action, or the
+            // dialog, so keyboard users land inside the modal.
+            var firstBtn = actions.querySelector('button');
+            if (firstBtn) { try { firstBtn.focus(); } catch (e) {} }
+
+            return { promise: p, close: function(v) { cleanup(v); },
+                     entry: entry };
+        }
+
+        // Public API -------------------------------------------------------
+        window.STModal = {
+            // Informational alert. Resolves when dismissed.
+            alert: function(opts) {
+                opts = typeof opts === 'string' ? { message: opts } : (opts || {});
+                var handle = _openModal({
+                    title: opts.title || 'Notice',
+                    message: opts.message,
+                    severity: opts.severity || 'info',
+                    allowEscape: true,
+                    dismissValue: true,
+                    buttons: [{ label: opts.okLabel || 'OK', value: true,
+                                kind: 'primary', isDefault: true }]
+                });
+                return handle.promise;
+            },
+            // Confirmation. Resolves true (confirm) or false (cancel).
+            confirm: function(opts) {
+                opts = opts || {};
+                var destructive = opts.severity === 'destructive' ||
+                    opts.severity === 'high-destructive';
+                return _openModal({
+                    title: opts.title || 'Please confirm',
+                    message: opts.message,
+                    severity: opts.severity || 'info',
+                    allowEscape: true,
+                    dismissValue: false,
+                    buttons: [
+                        { label: opts.cancelLabel || 'Cancel', value: false,
+                          kind: 'secondary' },
+                        { label: opts.confirmLabel || 'Continue',
+                          value: true,
+                          kind: destructive ? 'danger' : 'primary',
+                          icon: opts.confirmIcon,
+                          // Non-destructive confirms allow Enter; destructive
+                          // ones require an explicit click.
+                          isDefault: !destructive }
+                    ]
+                }).promise;
+            },
+            // Multi-choice. buttons:[{label,value,kind}]. Resolves the value.
+            choose: function(opts) {
+                opts = opts || {};
+                return _openModal({
+                    title: opts.title || 'Choose',
+                    message: opts.message,
+                    severity: opts.severity || 'info',
+                    allowEscape: true,
+                    dismissValue: null,
+                    buttons: opts.buttons || []
+                }).promise;
+            },
+            // Low-level opener returning a handle {promise, close} for
+            // callers that need to programmatically close (e.g. a stacked
+            // warning that a parent flow dismisses).
+            open: _openModal
+        };
+    })();
+    </script>
 
     <script>
     (function() {
@@ -5117,8 +5692,13 @@
 
         function loadScheduleCountdown() {
             fetch('/api/schedule').then(function(r) { return r.json(); }).then(function(data) {
-                scheduleEnabled = data.enabled || false;
-                if (data.enabled && data.next_run_seconds) {
+                // Header countdown reflects the RUNTIME running state, not the
+                // persisted enabled intent (an enabled-but-not-autostart
+                // schedule is not running after a restart).
+                var isRunning = (typeof data.running === 'boolean')
+                    ? data.running : !!data.enabled;
+                scheduleEnabled = isRunning;
+                if (isRunning && data.next_run_seconds) {
                     headerNextSec = data.next_run_seconds;
                 } else {
                     headerNextSec = 0;
@@ -6464,10 +7044,12 @@
                 );
 
             if (restriction) {
-                alert(
-                    restriction.message ||
-                    'This test engine is disabled for the selected interface.'
-                );
+                window.STModal.alert({
+                    title: 'Test Engine Unavailable',
+                    message: restriction.message ||
+                        'This test engine is disabled for the selected interface.',
+                    severity: 'warning'
+                });
                 return;
             }
             var iface = document.getElementById('interface-select').value;
@@ -6498,9 +7080,11 @@
                         ).value.trim();
 
                     if (!custom) {
-                        alert(
-                            'Please enter an iPerf3 server address.'
-                        );
+                        window.STModal.alert({
+                            title: 'iPerf3 Server Required',
+                            message: 'Please enter an iPerf3 server address.',
+                            severity: 'info'
+                        });
 
                         return;
                     }
@@ -6532,9 +7116,11 @@
 
                 } else if (serverVal) {
                     if (!iperf3ServerState) {
-                        alert(
-                            'iPerf3 server state is not loaded yet.'
-                        );
+                        window.STModal.alert({
+                            title: 'Please Wait',
+                            message: 'iPerf3 server state is not loaded yet.',
+                            severity: 'info'
+                        });
 
                         return;
                     }
@@ -6546,9 +7132,11 @@
                         serverVal;
 
                 } else {
-                    alert(
-                        'Please select an iPerf3 server.'
-                    );
+                    window.STModal.alert({
+                        title: 'iPerf3 Server Required',
+                        message: 'Please select an iPerf3 server.',
+                        severity: 'info'
+                    });
 
                     return;
                 }
@@ -6579,7 +7167,11 @@
                 body: JSON.stringify(params)
             }).then(function(r) { return r.json(); }).then(function(data) {
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    window.STModal.alert({
+                        title: 'Unable to Start Test',
+                        message: data.error,
+                        severity: 'destructive'
+                    });
                     return;
                 }
                 testStartTime = Date.now();
@@ -11568,67 +12160,56 @@
         }
 
         function caGeoSiteLocationDisplay(location) {
-            location =
-                location &&
-                typeof location === 'object'
-                    ? location
-                    : {};
+            // Accepts the full geo object. Presentation-only: never persists.
+            var geo = (location && typeof location === 'object') ? location : {};
+            var loc = (geo.location && typeof geo.location === 'object')
+                ? geo.location : {};
+
+            // §9: When GeoView is not explicitly configured, Site Context must
+            // NOT imply Device GPS was configured. Show "Not Configured".
+            if (geo.configured !== true) {
+                return 'Not Configured';
+            }
 
             var source = String(
-                location.source ||
+                geo.active_location_source ||
+                loc.source ||
                 'device_gps'
             );
 
             if (source === 'site_address') {
-                return String(
-                    location.address ||
-                    'Not configured'
-                );
+                var addr = String(loc.address || '').trim();
+                return addr || 'Site Address (not set)';
             }
 
-            if (
-                source ===
-                'manual_coordinates'
-            ) {
-                if (
-                    location.latitude != null &&
-                    location.longitude != null
-                ) {
-                    return (
-                        Number(
-                            location.latitude
-                        ).toFixed(5) +
-                        ', ' +
-                        Number(
-                            location.longitude
-                        ).toFixed(5)
-                    );
+            if (source === 'manual_coordinates') {
+                if (loc.latitude != null && loc.longitude != null) {
+                    return Number(loc.latitude).toFixed(5) + ', ' +
+                        Number(loc.longitude).toFixed(5) +
+                        ' \u00b7 Manual Coordinates';
                 }
-
-                return (
-                    'Manual coordinates not configured'
-                );
+                return 'Manual Coordinates (not set)';
             }
 
-            if (
-                location.latitude != null &&
-                location.longitude != null
-            ) {
-                return (
-                    Number(
-                        location.latitude
-                    ).toFixed(5) +
-                    ', ' +
-                    Number(
-                        location.longitude
-                    ).toFixed(5) +
-                    ' · Device GPS'
-                );
+            // device_gps: coordinates are RUNTIME state (never persisted, so
+            // loc lat/lon are null). Prefer a usable runtime fix; otherwise
+            // report "No Lock" while remaining in Device GPS mode (§21).
+            var rtLat = null, rtLon = null;
+            if (typeof caGeoDraftGps === 'object' && caGeoDraftGps &&
+                    caGeoGpsCoordinatesUsable(caGeoDraftGps.latitude,
+                                              caGeoDraftGps.longitude) &&
+                    caGeoDraftGps.gps_lock) {
+                rtLat = caGeoDraftGps.latitude;
+                rtLon = caGeoDraftGps.longitude;
+            } else if (loc.latitude != null && loc.longitude != null) {
+                rtLat = loc.latitude;
+                rtLon = loc.longitude;
             }
-
-            return (
-                'Device GPS · Not captured'
-            );
+            if (rtLat != null && rtLon != null) {
+                return Number(rtLat).toFixed(5) + ', ' +
+                    Number(rtLon).toFixed(5) + ' \u00b7 Device GPS';
+            }
+            return 'Device GPS \u00b7 No Lock';
         }
 
         function caRenderGeo(data) {
@@ -11991,7 +12572,7 @@
 
             var siteLocationLabel =
                 caGeoSiteLocationDisplay(
-                    geo.location
+                    geo
                 );
 
             var estimatedCount =
@@ -12344,10 +12925,11 @@
                         caGeoRenderGpsDraft(
                             hasSavedCoordinates
                                 ? (
-                                    'No current GPS fix · ' +
+                                    'GPS Status: No Lock · ' +
                                     'saved coordinates retained'
                                 )
-                                : 'No GPS Fix Available'
+                                : ('GPS Status: No Lock · no GPS ' +
+                                   'coordinates are currently available')
                         );
                     }
                 })
@@ -12655,84 +13237,131 @@
             };
         }
 
+        // Persistent GeoView baseline captured when Configure GeoView opens.
+        // Used to distinguish a RUNTIME-only change (e.g. Refresh GPS) from a
+        // PERSISTENT configuration change. Runtime device-GPS coordinates are
+        // deliberately EXCLUDED from this snapshot.
+        var _geoPersistentBaseline = null;
+
+        function caGeoPersistentSnapshot() {
+            // Only persistent configuration policy fields. NEVER include
+            // runtime device-GPS lat/lon/sats/accuracy/lock/poll.
+            var lat = document.getElementById('ca-site-latitude');
+            var lon = document.getElementById('ca-site-longitude');
+            var addr = document.getElementById('ca-site-address');
+            return JSON.stringify({
+                provider: caGeoDraftProvider || 'none',
+                active_location_source: caGeoDraftLocationSource || 'device_gps',
+                manual_latitude: lat ? String(lat.value || '').trim() : '',
+                manual_longitude: lon ? String(lon.value || '').trim() : '',
+                site_address: addr ? String(addr.value || '').trim() : ''
+            });
+        }
+
+        function caGeoCaptureBaseline() {
+            _geoPersistentBaseline = caGeoPersistentSnapshot();
+            caGeoUpdateSaveButtonLabel();
+        }
+
+        function caGeoIsDirty() {
+            if (_geoPersistentBaseline === null) return true;
+            return caGeoPersistentSnapshot() !== _geoPersistentBaseline;
+        }
+
+        // When nothing persistent changed, the primary button reads "Done"
+        // (it will simply close the modal without a configuration Save).
+        function caGeoUpdateSaveButtonLabel() {
+            var saveButton = document.getElementById('btn-ca-save-location');
+            if (!saveButton || saveButton.disabled) return;
+            if (caGeoIsDirty()) {
+                saveButton.innerHTML = '<i class="fas fa-save"></i> Save GeoView';
+            } else {
+                saveButton.innerHTML = '<i class="fas fa-check"></i> Done';
+            }
+        }
+
         function caGeoSaveSettings() {
             var saveButton =
                 document.getElementById(
                     'btn-ca-save-location'
                 );
 
-            if (saveButton) {
-                saveButton.disabled = true;
-
-                saveButton.innerHTML =
-                    '<i class="fas fa-circle-notch fa-spin"></i> ' +
-                    'Saving…';
+            function restoreGeoSaveButton() {
+                if (saveButton) {
+                    saveButton.disabled = false;
+                }
+                caGeoUpdateSaveButtonLabel();
             }
 
-            fetch('/api/geo_settings', {
-                method: 'POST',
-
-                headers: {
-                    'Content-Type':
-                        'application/json'
-                },
-
-                body: JSON.stringify(
-                    caGeoBuildSettingsPayload()
-                )
-            })
-                .then(function(response) {
-                    return response
-                        .json()
-                        .then(function(payload) {
-                            if (!response.ok) {
-                                throw new Error(
-                                    payload.error ||
-                                    'Unable to save GeoView settings'
-                                );
-                            }
-
-                            return payload;
-                        });
-                })
-                .then(function(saved) {
-                    if (
-                        !window._cellularAnalysisData
-                    ) {
-                        window._cellularAnalysisData =
-                            {};
+            // CASE A: nothing PERSISTENT changed (e.g. user only clicked
+            // Refresh GPS). Do NOT POST a configuration mutation. Just close
+            // the modal and keep the refreshed runtime GPS fix. No Device/Group
+            // revision, no App Data write, no upgrade_required error.
+            if (!caGeoIsDirty()) {
+                caCloseLocationSettings();
+                // Redraw presentation so any refreshed runtime GPS shows.
+                try {
+                    if (window._cellularAnalysisData) {
+                        caRenderGeo(window._cellularAnalysisData);
                     }
+                } catch (e) {}
+                return;
+            }
 
-                    var data =
-                        window._cellularAnalysisData;
+            // CASE B: persistent configuration changed -> POST the Save.
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.innerHTML =
+                    '<i class="fas fa-circle-notch fa-spin"></i> Saving…';
+            }
 
-                    data.geo =
-                        data.geo ||
-                        {};
+            function refreshGeoFromBackend() {
+                return fetch('/api/geo_settings')
+                    .then(function(r) { return r.json(); })
+                    .then(function(saved) {
+                        if (!window._cellularAnalysisData) {
+                            window._cellularAnalysisData = {};
+                        }
+                        var data = window._cellularAnalysisData;
+                        data.geo = data.geo || {};
+                        caGeoApplySavedSettings(data.geo, saved);
+                        caRenderGeo(data);
+                    })
+                    .catch(function() {});
+            }
 
-                    caGeoApplySavedSettings(
-                        data.geo,
-                        saved
-                    );
-
-                    caRenderGeo(data);
+            window.SpeedtestConfig.saveConfig({
+                url: '/api/geo_settings',
+                body: caGeoBuildSettingsPayload(),
+                featureLabel: 'GeoView',
+                // The upgrade_required warning is stacked ABOVE GeoView by the
+                // shared modal helper. Close returns to GeoView; Go to Settings
+                // tears GeoView down (handled by the config layer). Provide a
+                // teardown hook so navigation closes this modal + backdrop.
+                onUpgradeBlockedGoSettings: function() {
                     caCloseLocationSettings();
-                })
-                .catch(function(error) {
-                    alert(
-                        error.message
-                    );
-                })
-                .finally(function() {
-                    if (saveButton) {
-                        saveButton.disabled =
-                            false;
-
-                        saveButton.innerHTML =
-                            '<i class="fas fa-save"></i> ' +
-                            'Save GeoView';
-                    }
-                });
+                },
+                refresh: refreshGeoFromBackend,
+                onAuthoritative: function() {
+                    caCloseLocationSettings();
+                    restoreGeoSaveButton();
+                },
+                onReconciled: function() {
+                    caCloseLocationSettings();
+                    restoreGeoSaveButton();
+                },
+                onError: function(msg) {
+                    window.STModal.alert({ title: 'GeoView Save Failed',
+                        message: msg, severity: 'destructive' });
+                    restoreGeoSaveButton();
+                }
+            }).then(function(res) {
+                // ALWAYS clear the Saving state, including the blocked
+                // (upgrade_required) outcome, so the button never sticks.
+                if (res && res.outcome === 'blocked') {
+                    restoreGeoSaveButton();
+                }
+            });
         }
 
         function caGeoApplySavedSettings(
@@ -12792,6 +13421,10 @@
 
         function caGeoShowLocationSettings() {
             caGeoSyncModalFromData();
+
+            // Capture the persistent-config baseline AFTER the form is synced,
+            // so a later Refresh GPS (runtime only) does not mark it dirty.
+            caGeoCaptureBaseline();
 
             var backdrop =
                 document.getElementById(
@@ -12895,6 +13528,10 @@
         function caGeoSelectLocationSource(source) {
             caGeoDraftLocationSource =
                 source;
+
+            // A location-source change is a persistent change; refresh the
+            // Save/Done button label to reflect dirty state.
+            caGeoUpdateSaveButtonLabel();
 
             var choices =
                 document.querySelectorAll(
@@ -13038,6 +13675,27 @@
                         }
                     }
                 );
+
+                // Any typing in the persistent manual/site inputs updates the
+                // Save/Done dirty label. Runtime GPS refresh does NOT go
+                // through these inputs, so it never flips the label.
+                backdrop.addEventListener('input', function() {
+                    caGeoUpdateSaveButtonLabel();
+                });
+                // Provider card selection is a persistent change too.
+                backdrop.addEventListener('click', function(event) {
+                    var t = event.target;
+                    while (t && t !== backdrop) {
+                        if (t.getAttribute &&
+                                t.getAttribute('data-ca-provider') != null) {
+                            // Let existing provider handler set the draft, then
+                            // update the label on the next tick.
+                            setTimeout(caGeoUpdateSaveButtonLabel, 0);
+                            break;
+                        }
+                        t = t.parentNode;
+                    }
+                });
             }
 
             var locationChoices =
@@ -19646,22 +20304,38 @@
         };
 
         window.deleteHistoryEntry = function(idx) {
-            if (!confirm('Delete this test result?')) return;
-            fetch('/api/history/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index: idx })
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.status === 'deleted') loadHistory();
+            window.STModal.confirm({
+                title: 'Delete Test Result?',
+                message: 'Delete this test result?',
+                severity: 'destructive',
+                confirmLabel: 'Delete',
+                confirmIcon: 'fas fa-trash'
+            }).then(function(ok) {
+                if (!ok) return;
+                fetch('/api/history/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: idx })
+                }).then(function(r) { return r.json(); }).then(function(data) {
+                    if (data.status === 'deleted') loadHistory();
+                });
             });
         };
 
         window.deleteAllHistory = function() {
-            if (!confirm('Delete ALL test results? This cannot be undone.')) return;
-            fetch('/api/clear_history', {
-                method: 'POST'
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.status === 'cleared') loadHistory();
+            window.STModal.confirm({
+                title: 'Delete All Test Results?',
+                message: 'Delete ALL test results? This cannot be undone.',
+                severity: 'destructive',
+                confirmLabel: 'Delete All',
+                confirmIcon: 'fas fa-trash'
+            }).then(function(ok) {
+                if (!ok) return;
+                fetch('/api/clear_history', {
+                    method: 'POST'
+                }).then(function(r) { return r.json(); }).then(function(data) {
+                    if (data.status === 'cleared') loadHistory();
+                });
             });
         };
 
@@ -20705,7 +21379,7 @@
 
         function exportCSV() {
             var data = window._historyData;
-            if (!data || data.length === 0) { alert('No data.'); return; }
+            if (!data || data.length === 0) { window.STModal.alert({ title: 'No Data', message: 'No data to export.', severity: 'info' }); return; }
 
             // Apply the "all" section interface filter if active
             var checks = document.querySelectorAll('input[data-filter-section="all"]');
@@ -20721,7 +21395,7 @@
                 }
             }
 
-            if (data.length === 0) { alert('No data matches current filters.'); return; }
+            if (data.length === 0) { window.STModal.alert({ title: 'No Data', message: 'No data matches current filters.', severity: 'info' }); return; }
                 function csvEscape(val) {
                     if (val == null) return '';
                     var s = String(val);
@@ -21280,10 +21954,10 @@
         }
 
         document.getElementById('btn-dl-html').addEventListener('click', function() {
-            if (!window._historyData || window._historyData.length === 0) { alert('No data. Load history first.'); return; }
+            if (!window._historyData || window._historyData.length === 0) { window.STModal.alert({ title: 'No Data', message: 'No data. Load history first.', severity: 'info' }); return; }
             // Fetch full history for the report
             fetch('/api/history').then(function(r) { return r.json(); }).then(function(data) {
-                if (!data || data.length === 0) { alert('No history data available.'); return; }
+                if (!data || data.length === 0) { window.STModal.alert({ title: 'No Data', message: 'No history data available.', severity: 'info' }); return; }
 
                 // Read interface filter state from the "all" section checkboxes
                 var allInterfaces = getUniqueInterfaces(data);
@@ -21301,7 +21975,7 @@
                 var filteredData = data.filter(function(r) {
                     return selectedInterfaces.indexOf(r.interface || 'auto') > -1;
                 });
-                if (filteredData.length === 0) { alert('No data matches current interface filters.'); return; }
+                if (filteredData.length === 0) { window.STModal.alert({ title: 'No Data', message: 'No data matches current interface filters.', severity: 'info' }); return; }
 
                 var rp = buildReportData(filteredData);
                 var name = 'Speedtest Analyzer Report';
@@ -21801,7 +22475,8 @@
             var autostart = document.getElementById('schedule-autostart').checked;
             var cron = getCronValue();
             if (enabled && !cron) {
-                alert('Configure a schedule first.');
+                window.STModal.alert({ title: 'Schedule Required',
+                    message: 'Configure a schedule first.', severity: 'info' });
                 return;
             }
             var engine = schedEngineSelect.value;
@@ -21813,10 +22488,12 @@
                 );
 
             if (enabled && restriction) {
-                alert(
-                    restriction.message ||
-                    'This test engine is disabled for the selected interface.'
-                );
+                window.STModal.alert({
+                    title: 'Test Engine Unavailable',
+                    message: restriction.message ||
+                        'This test engine is disabled for the selected interface.',
+                    severity: 'warning'
+                });
                 return;
             }
             var iface = document.getElementById('sched-interface-select').value;
@@ -21840,18 +22517,22 @@
                     ipSelect.value;
 
                 if (!ipVal) {
-                    alert(
-                        'Please select an iPerf3 server '
-                        + 'before saving the schedule.'
-                    );
+                    window.STModal.alert({
+                        title: 'iPerf3 Server Required',
+                        message: 'Please select an iPerf3 server before '
+                            + 'saving the schedule.',
+                        severity: 'info'
+                    });
 
                     return;
                 }
 
                 if (!iperf3ServerState) {
-                    alert(
-                        'iPerf3 server state is not loaded yet.'
-                    );
+                    window.STModal.alert({
+                        title: 'Please Wait',
+                        message: 'iPerf3 server state is not loaded yet.',
+                        severity: 'info'
+                    });
 
                     return;
                 }
@@ -21871,13 +22552,24 @@
                 }
             }
 
-            fetch('/api/schedule', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: enabled, autostart: autostart, cron: cron, engine: engine, params: params })
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                updateScheduleStatus(data.schedule || data);
+            // Always render Scheduled Tasks from authoritative backend state,
+            // whether saved to Device or validated as a Group config.
+            function refreshSchedule() {
+                loadScheduleConfig();
                 loadScheduleCountdown();
+                fetch('/api/schedule')
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { updateScheduleStatus(d.schedule || d); })
+                    .catch(function() {});
+            }
+            window.SpeedtestConfig.saveConfig({
+                url: '/api/schedule',
+                body: { enabled: enabled, autostart: autostart, cron: cron, engine: engine, params: params },
+                featureLabel: 'Scheduled Tasks',
+                // refresh re-renders from authoritative backend state and is
+                // awaited by the helper before onAuthoritative (success) and
+                // before onReconciled. No separate cosmetic step is needed.
+                refresh: refreshSchedule
             });
         });
 
@@ -21911,12 +22603,27 @@
                 if (p.duration) details += '<br>Duration: <strong>' + p.duration + 's</strong>';
                 if (p.include_latency) details += '<br>Latency/Jitter: <strong>Yes</strong>';
 
-                if (data.enabled) {
-                    el.innerHTML = '<span style="color:var(--success-color);font-weight:600;">Active</span> — ' + desc + details +
-                        (data.autostart ? '<br><i class="fas fa-check" style="color:var(--success-color);"></i> Starts on boot' : '');
+                // Three-state status: 'enabled'/'autostart' are the PERSISTED
+                // intent; 'running' is the RUNTIME state. After a restart an
+                // enabled-but-not-autostart schedule is enabled=true but
+                // running=false and must NOT be shown as Active.
+                //   running        -> Active
+                //   enabled,!running-> Enabled — Not Running (Auto-start off)
+                //   !enabled       -> Disabled
+                var isRunning = (typeof data.running === 'boolean')
+                    ? data.running : !!data.enabled;
+                var autoLine = data.autostart
+                    ? '<br><i class="fas fa-check" style="color:var(--success-color);"></i> Auto-start on boot: On'
+                    : '<br><i class="fas fa-times" style="color:var(--text-secondary);"></i> Auto-start on boot: Off';
+                if (isRunning) {
+                    el.innerHTML = '<span style="color:var(--success-color);font-weight:600;">Active</span> — ' + desc + details + autoLine;
+                } else if (data.enabled) {
+                    // Enabled but not currently running (e.g. after a restart
+                    // with Auto-start off). Click Save Schedule to start it now.
+                    el.innerHTML = '<span style="color:var(--warning-color);font-weight:600;">Enabled — Not Running</span> — ' + desc + details + autoLine +
+                        '<br><span style="color:var(--text-secondary);">Auto-start is off, so it did not start after the last restart. Click Save Schedule to start it now.</span>';
                 } else {
-                    el.innerHTML = '<span style="color:var(--warning-color);font-weight:600;">Disabled</span> — ' + desc + details +
-                        (data.autostart ? '<br><i class="fas fa-check" style="color:var(--text-secondary);"></i> Will start on boot' : '');
+                    el.innerHTML = '<span style="color:var(--warning-color);font-weight:600;">Disabled</span> — ' + desc + details + autoLine;
                 }
             } else {
                 el.textContent = 'Not configured';
@@ -21952,23 +22659,27 @@
         // ===== SERVER MANAGEMENT =====
         document.getElementById('btn-save-netperf').addEventListener('click', function() {
             var server = document.getElementById('add-netperf-server').value.trim();
-            if (!server) { alert('Enter a server address.'); return; }
+            if (!server) { window.STModal.alert({ title: 'Server Required', message: 'Enter a server address.', severity: 'info' }); return; }
             var label = document.getElementById('add-netperf-label').value.trim() || server;
-            fetch('/api/servers/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ engine: 'netperf', server: { server: server, label: label } })
-            }).then(function(r) { return r.json(); }).then(function() {
-                document.getElementById('add-netperf-server').value = '';
-                document.getElementById('add-netperf-label').value = '';
-                loadServerList();
+            window.SpeedtestConfig.saveConfig({
+                url: '/api/servers/save',
+                body: { engine: 'netperf', server: { server: server, label: label } },
+                featureLabel: 'Netperf Servers',
+                refresh: loadServerList,
+                onAuthoritative: function() {
+                    // Cosmetic only: clear input fields. refresh() already
+                    // re-rendered the list from backend.
+                    document.getElementById('add-netperf-server').value = '';
+                    document.getElementById('add-netperf-label').value = '';
+                }
             });
         });
 
         function postJsonWithScheduleReset(
             url,
             payload,
-            warning
+            warning,
+            options
         ) {
             function send(confirmReset) {
                 var body = {};
@@ -22018,49 +22729,54 @@
                             });
                     })
                     .then(function(result) {
+                        // Dependency confirmation (schedule reset). The backend
+                        // 409 result is authoritative; we only re-style the
+                        // confirmation and preserve the exact business rule.
                         if (
                             result.status === 409
                             && result.data
                             && result.data
                                 .schedule_reset_required
                         ) {
-                            if (
-                                !window.confirm(
-                                    warning
+                            return window.STModal.confirm({
+                                title: 'Scheduled Test Update Required',
+                                message: warning
                                     || result.data.error
-                                    || (
-                                        'This change will reset '
-                                        + 'the existing iPerf3 '
-                                        + 'scheduled job. Continue?'
-                                    )
-                                )
-                            ) {
-                                return {
-                                    cancelled:
-                                        true
-                                };
-                            }
-
-                            return send(true);
+                                    || ('The current Scheduled Test references '
+                                        + 'a server that will become invalid '
+                                        + 'with this change. Continuing will '
+                                        + 'reset the Scheduled Test to a safe '
+                                        + 'configuration.'),
+                                severity: 'warning',
+                                cancelLabel: 'Cancel',
+                                confirmLabel: 'Continue and Update'
+                            }).then(function(ok) {
+                                if (!ok) return { outcome: 'cancelled' };
+                                return send(true);
+                            });
                         }
 
-                        if (
-                            result.status >= 400
-                            || (
-                                result.data
-                                && result.data.error
-                            )
-                        ) {
-                            throw new Error(
-                                (
-                                    result.data
-                                    && result.data.error
-                                )
-                                || 'Request failed'
-                            );
-                        }
-
-                        return result.data;
+                        // After dependency confirmation, route the ordinary
+                        // Save result through the two-layer save handler
+                        // (saved / reconciled / upgrade_required / error).
+                        // There is NO scope prompt and NO Group candidate.
+                        return window.SpeedtestConfig.handleSaveResponse(
+                            result.status,
+                            result.data,
+                            {
+                                featureLabel:
+                                    (options && options.featureLabel)
+                                    || 'Configuration',
+                                onAuthoritative:
+                                    (options &&
+                                     (options.onAuthoritative
+                                      || options.onSaved)) || null,
+                                onReconciled:
+                                    (options && options.onReconciled)
+                                    || null,
+                                refresh:
+                                    (options && options.refresh) || null
+                            });
                     });
             }
 
@@ -22261,10 +22977,12 @@
             }
 
             if (!selected) {
-                alert(
-                    'This User iPerf3 server could not be found. '
-                    + 'Refresh the server list and try again.'
-                );
+                window.STModal.alert({
+                    title: 'Server Not Found',
+                    message: 'This User iPerf3 server could not be found. '
+                        + 'Refresh the server list and try again.',
+                    severity: 'warning'
+                });
                 return;
             }
 
@@ -22356,10 +23074,12 @@
                     || !city
                     || !country
                 ) {
-                    alert(
-                        'Server Name, DNS/IP Address, '
-                        + 'City, and Country are required.'
-                    );
+                    window.STModal.alert({
+                        title: 'Required Fields Missing',
+                        message: 'Server Name, DNS/IP Address, City, and '
+                            + 'Country are required.',
+                        severity: 'info'
+                    });
 
                     return;
                 }
@@ -22373,7 +23093,8 @@
                         );
 
                 } catch (err) {
-                    alert(err.message);
+                    window.STModal.alert({ title: 'Invalid Port',
+                        message: err.message, severity: 'warning' });
                     return;
                 }
 
@@ -22414,6 +23135,21 @@
                         userIperfEditingRef;
                 }
 
+                // Cosmetic only: clear the input fields + exit edit mode.
+                // refresh() (loadServerList) re-renders the list from backend.
+                function clearUserIperfFormFields() {
+                    document.getElementById('add-iperf3-name').value = '';
+                    document.getElementById('add-iperf3-server').value = '';
+                    document.getElementById('add-iperf3-port').value = '';
+                    document.getElementById('add-iperf3-city').value = '';
+                    document.getElementById('add-iperf3-country').value = '';
+                    setUserIperfEditMode('');
+                }
+
+                // The central helper owns success behavior (onAuthoritative
+                // fires exactly once, only when authoritative). The outer
+                // .then/.catch only surfaces errors; it must NOT re-run
+                // success on scope/group/reconciled/cancel.
                 postJsonWithScheduleReset(
                     requestPath,
                     requestPayload,
@@ -22422,42 +23158,16 @@
                         + 'used by the current scheduled iPerf3 '
                         + 'job. Continuing will reset that '
                         + 'schedule. Continue?'
-                    )
+                    ),
+                    {
+                        featureLabel: 'User iPerf3 Servers',
+                        refresh: loadServerList,
+                        onAuthoritative: clearUserIperfFormFields
+                    }
                 )
-                    .then(function(result) {
-                        if (
-                            !result
-                            || result.cancelled
-                        ) {
-                            return;
-                        }
-
-                        document.getElementById(
-                            'add-iperf3-name'
-                        ).value = '';
-
-                        document.getElementById(
-                            'add-iperf3-server'
-                        ).value = '';
-
-                        document.getElementById(
-                            'add-iperf3-port'
-                        ).value = '';
-
-                        document.getElementById(
-                            'add-iperf3-city'
-                        ).value = '';
-
-                        document.getElementById(
-                            'add-iperf3-country'
-                        ).value = '';
-
-                        setUserIperfEditMode('');
-
-                        loadServerList();
-                    })
                     .catch(function(err) {
-                        alert(err.message);
+                        window.STModal.alert({ title: 'Save Failed',
+                            message: err.message, severity: 'destructive' });
                     });
             }
         );
@@ -22667,16 +23377,20 @@
 
 
         function resetIperf3Reliability() {
-            if (
-                !window.confirm(
-                    'Reset reliability statistics for '
-                    + 'the currently active iPerf3 server '
-                    + 'source? This cannot be undone.'
-                )
-            ) {
-                return;
-            }
+            window.STModal.confirm({
+                title: 'Reset Reliability Statistics?',
+                message: 'Reset reliability statistics for the currently '
+                    + 'active iPerf3 server source? This cannot be undone.',
+                severity: 'destructive',
+                confirmLabel: 'Reset Statistics',
+                confirmIcon: 'fas fa-undo'
+            }).then(function(ok) {
+                if (!ok) return;
+                doResetIperf3Reliability();
+            });
+        }
 
+        function doResetIperf3Reliability() {
             fetch(
                 '/api/iperf3/reliability/reset',
                 {
@@ -22727,9 +23441,11 @@
                     );
                 })
                 .catch(function(err) {
-                    alert(
-                        err.message
-                    );
+                    window.STModal.alert({
+                        title: 'Reset Failed',
+                        message: err.message,
+                        severity: 'destructive'
+                    });
                 });
         }
 
@@ -23113,6 +23829,33 @@
                 var target =
                     select.value;
 
+                // Re-render the iPerf3 server UI from authoritative backend
+                // state (server_state endpoint), whether saved to Device or
+                // validated as a Group config. Never render from a candidate.
+                function refreshIperf3ServerState() {
+                    return fetch('/api/iperf3/server_state')
+                        .then(function(r) { return r.json(); })
+                        .then(function(state) {
+                            iperf3ServerState = state;
+                            manualIperfRegion = '';
+                            schedIperfRegion = '';
+                            schedIperfSelectedRef = '';
+                            serverPageIperfRegion = '';
+                            renderServerPageIperf3(state);
+                            loadIperf3Reliability();
+                            if (document.getElementById('engine-select')
+                                    .value === 'iperf3') {
+                                renderManualIperf3Servers(state);
+                            }
+                            if (document.getElementById('sched-engine-select')
+                                    .value === 'iperf3') {
+                                renderSchedIperf3Servers(state);
+                            }
+                            loadScheduleConfig();
+                        })
+                        .catch(function() {});
+                }
+
                 postJsonWithScheduleReset(
                     '/api/iperf3/server_mode',
                     {
@@ -23124,67 +23867,28 @@
                         + 'will remove the existing scheduled '
                         + 'iPerf3 job. You will need to create '
                         + 'the schedule again. Continue?'
-                    )
+                    ),
+                    {
+                        featureLabel: 'iPerf3 Server Mode',
+                        // refresh re-renders server UI + selector from backend
+                        // truth (awaited on both success and reconciled).
+                        refresh: refreshIperf3ServerState
+                    }
                 )
                     .then(function(result) {
-                        if (
-                            !result
-                            || result.cancelled
-                        ) {
-                            select.value =
-                                previous;
-
-                            return;
+                        // Revert the <select> to its previous value on any
+                        // non-authoritative outcome (cancel, close, scope
+                        // cancel, reconciled). onAuthoritative already
+                        // re-rendered on success.
+                        if (!result || result.outcome !== 'saved'
+                            && result.outcome !== 'validated') {
+                            select.value = previous;
                         }
-
-                        iperf3ServerState =
-                            result;
-
-                        manualIperfRegion =
-                            '';
-
-                        schedIperfRegion =
-                            '';
-
-                        schedIperfSelectedRef =
-                            '';
-
-                        serverPageIperfRegion =
-                            '';
-
-                        renderServerPageIperf3(
-                            result
-                        );
-
-                        loadIperf3Reliability();
-
-                        if (
-                            document.getElementById(
-                                'engine-select'
-                            ).value === 'iperf3'
-                        ) {
-                            renderManualIperf3Servers(
-                                result
-                            );
-                        }
-
-                        if (
-                            document.getElementById(
-                                'sched-engine-select'
-                            ).value === 'iperf3'
-                        ) {
-                            renderSchedIperf3Servers(
-                                result
-                            );
-                        }
-
-                        loadScheduleConfig();
                     })
                     .catch(function(err) {
-                        select.value =
-                            previous;
-
-                        alert(err.message);
+                        select.value = previous;
+                        window.STModal.alert({ title: 'Server Mode Change Failed',
+                            message: err.message, severity: 'destructive' });
                     });
             }
         );
@@ -23202,39 +23906,29 @@
                         'data-server-ref'
                     );
 
-                if (
-                    !window.confirm(
-                        'Delete this User iPerf3 server?'
-                    )
-                ) {
-                    return;
-                }
-
-                postJsonWithScheduleReset(
-                    '/api/iperf3/user/delete',
-                    {
-                        server_ref:
-                            serverRef
-                    },
-                    (
-                        'This server is used by the current '
-                        + 'scheduled iPerf3 job. Deleting it '
-                        + 'will reset that schedule. Continue?'
-                    )
-                )
-                    .then(function(result) {
-                        if (
-                            !result
-                            || result.cancelled
-                        ) {
-                            return;
+                window.STModal.confirm({
+                    title: 'Delete User iPerf3 Server?',
+                    message: 'Delete this User iPerf3 server?',
+                    severity: 'destructive',
+                    confirmLabel: 'Delete',
+                    confirmIcon: 'fas fa-trash'
+                }).then(function(ok) {
+                    if (!ok) return;
+                    postJsonWithScheduleReset(
+                        '/api/iperf3/user/delete',
+                        { server_ref: serverRef },
+                        ('This server is used by the current scheduled iPerf3 '
+                         + 'job. Deleting it will reset that schedule. '
+                         + 'Continue?'),
+                        {
+                            featureLabel: 'User iPerf3 Servers',
+                            refresh: loadServerList
                         }
-
-                        loadServerList();
-                    })
-                    .catch(function(err) {
-                        alert(err.message);
+                    ).catch(function(err) {
+                        window.STModal.alert({ title: 'Delete Failed',
+                            message: err.message, severity: 'destructive' });
                     });
+                });
 
                 return;
             }
@@ -23244,41 +23938,21 @@
                     'data-server'
                 );
 
-            if (
-                !window.confirm(
-                    'Delete this server?'
-                )
-            ) {
-                return;
-            }
-
-            fetch(
-                '/api/servers/delete',
-                {
-                    method:
-                        'POST',
-
-                    headers: {
-                        'Content-Type':
-                            'application/json'
-                    },
-
-                    body:
-                        JSON.stringify({
-                            engine:
-                                engine,
-
-                            server:
-                                server
-                        })
-                }
-            )
-                .then(function(r) {
-                    return r.json();
-                })
-                .then(function() {
-                    loadServerList();
+            window.STModal.confirm({
+                title: 'Delete Server?',
+                message: 'Delete this server?',
+                severity: 'destructive',
+                confirmLabel: 'Delete',
+                confirmIcon: 'fas fa-trash'
+            }).then(function(ok) {
+                if (!ok) return;
+                window.SpeedtestConfig.saveConfig({
+                    url: '/api/servers/delete',
+                    body: { engine: engine, server: server },
+                    featureLabel: 'Netperf Servers',
+                    refresh: loadServerList
                 });
+            });
         };
 
 
@@ -23531,25 +24205,18 @@
                         && result.data
                             .replace_confirmation_required
                     ) {
-                        if (
-                            !window.confirm(
-                                'Replace List will delete the '
-                                + 'existing User iPerf3 server '
-                                + 'list. Continue?'
-                            )
-                        ) {
-                            return {
-                                cancelled:
-                                    true
-                            };
-                        }
-
-                        return sendUserIperfImport(
-                            catalog,
-                            mode,
-                            true,
-                            confirmScheduleReset
-                        );
+                        return window.STModal.confirm({
+                            title: 'Replace User Server List?',
+                            message: 'Replace List will delete the existing '
+                                + 'User iPerf3 server list. Continue?',
+                            severity: 'destructive',
+                            confirmLabel: 'Replace List',
+                            confirmIcon: 'fas fa-exchange-alt'
+                        }).then(function(ok) {
+                            if (!ok) return { cancelled: true };
+                            return sendUserIperfImport(
+                                catalog, mode, true, confirmScheduleReset);
+                        });
                     }
 
                     if (
@@ -23558,45 +24225,50 @@
                         && result.data
                             .schedule_reset_required
                     ) {
-                        if (
-                            !window.confirm(
-                                'This import removes the server '
-                                + 'used by the scheduled iPerf3 '
-                                + 'job. Continuing will reset '
-                                + 'that schedule. Continue?'
-                            )
-                        ) {
-                            return {
-                                cancelled:
-                                    true
-                            };
-                        }
-
-                        return sendUserIperfImport(
-                            catalog,
-                            mode,
-                            confirmReplace,
-                            true
-                        );
+                        return window.STModal.confirm({
+                            title: 'Scheduled Test Update Required',
+                            message: 'This import removes the server used by '
+                                + 'the current scheduled iPerf3 job. '
+                                + 'Continuing will reset that schedule to a '
+                                + 'safe configuration. Continue?',
+                            severity: 'warning',
+                            confirmLabel: 'Continue and Update'
+                        }).then(function(ok) {
+                            if (!ok) return { cancelled: true };
+                            return sendUserIperfImport(
+                                catalog,
+                                mode,
+                                confirmReplace,
+                                true
+                            );
+                        });
                     }
 
-                    if (
-                        result.status >= 400
-                        || (
-                            result.data
-                            && result.data.error
-                        )
-                    ) {
-                        throw new Error(
-                            (
-                                result.data
-                                && result.data.error
-                            )
-                            || 'Import failed.'
-                        );
-                    }
-
-                    return result.data;
+                    // Feature + dependency confirmations resolved. Route the
+                    // ordinary Save result through the two-layer save handler
+                    // (saved / reconciled / upgrade_required / error). No
+                    // scope prompt and no Group candidate.
+                    return window.SpeedtestConfig.handleSaveResponse(
+                        result.status,
+                        result.data,
+                        {
+                            featureLabel: 'User iPerf3 Servers',
+                            refresh: loadServerList,
+                            onAuthoritative: function(saved) {
+                                var msg = 'User iPerf3 server list imported.';
+                                if (saved && saved.added != null) {
+                                    msg = 'Import complete. Added: ' + saved.added +
+                                          '. Total: ' + saved.total + '.';
+                                    if (saved.duplicates_skipped > 0) {
+                                        msg += ' Duplicates skipped: ' +
+                                               saved.duplicates_skipped + '.';
+                                    }
+                                }
+                                showImportStatus('iperf3', msg, false);
+                                document.getElementById(
+                                    'iperf3-import-mode').value = '';
+                            }
+                        });
                 });
         }
 
@@ -23691,51 +24363,16 @@
                         return;
                     }
 
+                    // The central helper owns success rendering + status
+                    // (via onAuthoritative) and list refresh (via refresh).
+                    // The outer chain only surfaces errors and re-enables
+                    // the import/export buttons.
                     sendUserIperfImport(
                         catalog,
                         mode,
                         false,
                         false
                     )
-                        .then(function(result) {
-                            if (
-                                !result
-                                || result.cancelled
-                            ) {
-                                return;
-                            }
-
-                            var msg =
-                                'Import complete. Added: '
-                                + result.added
-                                + '. Total: '
-                                + result.total
-                                + '.';
-
-                            if (
-                                result
-                                    .duplicates_skipped
-                                > 0
-                            ) {
-                                msg +=
-                                    ' Duplicates skipped: '
-                                    + result
-                                        .duplicates_skipped
-                                    + '.';
-                            }
-
-                            showImportStatus(
-                                'iperf3',
-                                msg,
-                                false
-                            );
-
-                            document.getElementById(
-                                'iperf3-import-mode'
-                            ).value = '';
-
-                            loadServerList();
-                        })
                         .catch(function(err) {
                             showImportStatus(
                                 'iperf3',
@@ -23779,57 +24416,38 @@
                 return;
             }
 
-            if (
-                !window.confirm(
-                    'Delete ALL User iPerf3 servers? '
-                    + 'This cannot be undone.'
-                )
-            ) {
-                return;
-            }
-
-            postJsonWithScheduleReset(
-                '/api/iperf3/user/delete_all',
-                {
-                    confirm_delete_all:
-                        true
-                },
-                (
-                    'Deleting all User servers will '
-                    + 'reset the current scheduled '
-                    + 'iPerf3 job. Continue?'
-                )
-            )
-                .then(function(result) {
-                    if (
-                        !result
-                        || result.cancelled
-                    ) {
-                        return;
+            window.STModal.confirm({
+                title: 'Delete All User iPerf3 Servers?',
+                message: 'Delete ALL User iPerf3 servers? This cannot be '
+                    + 'undone.',
+                severity: 'destructive',
+                confirmLabel: 'Delete All',
+                confirmIcon: 'fas fa-trash'
+            }).then(function(ok) {
+                if (!ok) return;
+                postJsonWithScheduleReset(
+                    '/api/iperf3/user/delete_all',
+                    { confirm_delete_all: true },
+                    ('Deleting all User servers will reset the current '
+                     + 'scheduled iPerf3 job. Continue?'),
+                    {
+                        featureLabel: 'User iPerf3 Servers',
+                        refresh: loadServerList,
+                        onAuthoritative: function() {
+                            showImportStatus(
+                                'iperf3',
+                                'All User iPerf3 servers deleted.',
+                                false
+                            );
+                            document.getElementById(
+                                'iperf3-import-mode'
+                            ).value = '';
+                        }
                     }
-
-                    showImportStatus(
-                        'iperf3',
-                        (
-                            'All User iPerf3 '
-                            + 'servers deleted.'
-                        ),
-                        false
-                    );
-
-                    document.getElementById(
-                        'iperf3-import-mode'
-                    ).value = '';
-
-                    loadServerList();
-                })
-                .catch(function(err) {
-                    showImportStatus(
-                        'iperf3',
-                        err.message,
-                        true
-                    );
+                ).catch(function(err) {
+                    showImportStatus('iperf3', err.message, true);
                 });
+            });
         }
 
 
@@ -24024,13 +24642,25 @@
                 showImportStatus(engine, 'File too large. Maximum size is 1 MB.', true);
                 return;
             }
-            var mode = prompt('Import mode:\n\n• Type "merge" to add to existing servers (updates matches)\n• Type "replace" to overwrite all existing servers\n• Press Cancel to abort', 'merge');
-            if (!mode) return; // User cancelled
-            mode = mode.trim().toLowerCase();
-            if (mode !== 'merge' && mode !== 'replace') {
-                showImportStatus(engine, 'Invalid mode. Use "merge" or "replace".', true);
-                return;
-            }
+            // Themed choice modal replaces the native prompt(). Same two modes
+            // (merge / replace) and same Cancel behavior.
+            window.STModal.choose({
+                title: 'Import Servers',
+                message: 'Choose how to import the server list:\n\n' +
+                    '• Merge — add to existing servers (updates matches)\n' +
+                    '• Replace — overwrite all existing servers',
+                severity: 'info',
+                buttons: [
+                    { label: 'Cancel', value: null, kind: 'secondary' },
+                    { label: 'Merge', value: 'merge', kind: 'primary' },
+                    { label: 'Replace', value: 'replace', kind: 'danger' }
+                ]
+            }).then(function(mode) {
+                if (!mode) return; // Cancelled
+                proceedImport(mode);
+            });
+
+            function proceedImport(mode) {
             setImportExportButtons(engine, true);
             var reader = new FileReader();
             reader.onload = function(e) {
@@ -24048,26 +24678,28 @@
                     setImportExportButtons(engine, false);
                     return;
                 }
-                fetch('/api/servers/import', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ engine: engine, mode: mode, servers: servers })
-                }).then(function(r) { return r.json(); }).then(function(result) {
-                    if (result.error) {
-                        showImportStatus(engine, result.error, true);
-                    } else {
-                        var msg = 'Imported ' + result.imported + ' server(s). Total: ' + result.total + '.';
-                        if (result.skipped > 0) msg += ' Skipped: ' + result.skipped + '.';
+                window.SpeedtestConfig.saveConfig({
+                    url: '/api/servers/import',
+                    body: { engine: engine, mode: mode, servers: servers },
+                    featureLabel: 'Netperf Servers',
+                    refresh: loadServerList,
+                    onAuthoritative: function(saved) {
+                        var msg = 'Imported ' + (saved && saved.imported) +
+                            ' server(s). Total: ' + (saved && saved.total) + '.';
+                        if (saved && saved.skipped > 0) {
+                            msg += ' Skipped: ' + saved.skipped + '.';
+                        }
                         showImportStatus(engine, msg, false);
-                        loadServerList();
+                    },
+                    onError: function(m) {
+                        showImportStatus(engine, 'Import failed: ' + m, true);
                     }
-                    setImportExportButtons(engine, false);
-                }).catch(function(err) {
-                    showImportStatus(engine, 'Import failed: ' + err.message, true);
+                }).then(function() {
                     setImportExportButtons(engine, false);
                 });
             };
             reader.readAsText(file);
+            }  // end proceedImport
         }
 
         document.getElementById('btn-export-netperf').addEventListener('click', function() { exportServers('netperf'); });
@@ -24285,12 +24917,11 @@
                 var custom = document.getElementById('output-custom-path').value.trim();
                 if (custom) outputs.push(custom);
             }
-            fetch('/api/outputs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ outputs: outputs })
-            }).then(function(r) { return r.json(); }).then(function() {
-                updateOutputsStatus(outputs);
+            window.SpeedtestConfig.saveConfig({
+                url: '/api/outputs',
+                body: { outputs: outputs },
+                featureLabel: 'Result Outputs',
+                refresh: loadOutputs
             });
         });
 
@@ -24299,6 +24930,1251 @@
         showSection = function(id) {
             origShowSection(id);
             if (id === 'outputs') loadOutputs();
+            if (id === 'settings' && window.SpeedtestConfig) window.SpeedtestConfig.loadSettings();
+        };
+    })();
+    </script>
+
+    <!-- ================================================================= -->
+    <!-- v1.1.2 TWO-LAYER Configuration Management (frontend).             -->
+    <!-- Ordinary Saves simply save (Device-only, no scope prompt).        -->
+    <!-- Settings renders directly from /api/config/state. Migration is a  -->
+    <!-- selection-only placement wizard that never edits values.          -->
+    <!-- ================================================================= -->
+    <script>
+    (function() {
+        'use strict';
+
+        function el(id) { return document.getElementById(id); }
+
+        function showModal(id) {
+            var m = el(id);
+            if (m) m.style.display = 'flex';
+        }
+        function hideModal(id) {
+            var m = el(id);
+            if (m) m.style.display = 'none';
+        }
+
+        function escapeHtml(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Friendly section labels for source/override displays.
+        var SECTION_LABELS = {
+            schedule: 'Scheduled Testing',
+            outputs: 'Outputs',
+            iperf3_server_settings: 'iPerf3 Server Mode',
+            iperf3_user_servers: 'User iPerf3 Servers',
+            netperf_servers: 'Netperf Servers',
+            geoview: 'GeoView'
+        };
+        var SECTION_ORDER = ['schedule', 'outputs', 'iperf3_server_settings',
+            'iperf3_user_servers', 'netperf_servers', 'geoview'];
+
+        function copyText(text, statusEl, okMsg) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text);
+                } else {
+                    var ta = document.createElement('textarea');
+                    ta.value = text; document.body.appendChild(ta);
+                    ta.select(); document.execCommand('copy');
+                    document.body.removeChild(ta);
+                }
+                if (statusEl) statusEl.textContent = okMsg || 'Copied.';
+            } catch (e) { /* ignore */ }
+        }
+
+        // =============================================================
+        // Ordinary Save contract (two-layer). Ordinary Saves simply save to
+        // the Device layer. The backend returns one of:
+        //   200 saved      -> success (may include override_removed_* notice)
+        //   409 reconciled  {status:'reconciled', error}
+        //   409 upgrade_required {status:'upgrade_required', error}
+        //   4xx/5xx error   -> feature/business error
+        // There is NO scope prompt and NO ordinary-save Group candidate.
+        // =============================================================
+        function showReconciledMessage(msg, featureLabel) {
+            var text = (featureLabel ? featureLabel + ': ' : '') +
+                (msg ||
+                 'The saved configuration changed since you last loaded it. ' +
+                 'Your edit was not applied. Review the current settings and ' +
+                 'reapply your change.');
+            var banner = el('override-removed-toast');
+            if (banner) {
+                banner.style.borderLeftColor = 'var(--warning-color,#f0ad4e)';
+                banner.textContent = text;
+                banner.style.display = '';
+                setTimeout(function() {
+                    banner.style.display = 'none';
+                    banner.style.borderLeftColor = 'var(--success-color,#16a34a)';
+                }, 12000);
+            }
+        }
+
+        function showOverrideRemovedNotice(data) {
+            // Non-blocking informational message (§14). NO confirmation modal.
+            var msg = data && data.override_removed_message;
+            if (!msg && data && data.override_removed_sections &&
+                    data.override_removed_sections.length) {
+                msg = 'A local override now matches the NCM Group ' +
+                      'configuration and was removed.';
+            }
+            if (msg) {
+                var banner = el('override-removed-toast');
+                if (banner) {
+                    banner.textContent = msg;
+                    banner.style.display = '';
+                    setTimeout(function() { banner.style.display = 'none'; },
+                              8000);
+                } else {
+                    // Fallback: transient console/status; never a modal.
+                    if (window.console) window.console.log(msg);
+                }
+            }
+        }
+
+        // saveConfig: the single entry point for ordinary feature Saves.
+        // opts: { url, body, featureLabel, refresh(), onAuthoritative(data),
+        //         onReconciled(data), onError(msg) }
+        function saveConfig(opts) {
+            var body = {};
+            for (var k in opts.body) {
+                if (Object.prototype.hasOwnProperty.call(opts.body, k)) {
+                    body[k] = opts.body[k];
+                }
+            }
+            return fetch(opts.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(function(r) {
+                return r.json().then(function(d) {
+                    return { status: r.status, data: d };
+                });
+            }).then(function(res) {
+                return handleSaveResponse(res.status, res.data, opts);
+            }).catch(function(err) {
+                if (opts.onError) opts.onError(err.message);
+                else window.STModal.alert({ title: 'Save Failed',
+                    message: err.message, severity: 'destructive' });
+            });
+        }
+
+        // Shared handler for an ordinary Save response. Also used by the
+        // dependency (schedule-reset) Save path so behavior is identical.
+        function handleSaveResponse(status, data, opts) {
+            data = data || {};
+            opts = opts || {};
+
+            // BLOCKED / upgrade_required -> styled warning modal. Uses the
+            // reusable STModal helper so it STACKS ABOVE any open feature modal
+            // (e.g. GeoView) with a climbing z-index. Close returns to the
+            // parent modal; Go to Settings tears the parent down (via the
+            // caller's teardown hook) and navigates to Settings.
+            if (data.status === 'upgrade_required') {
+                if (window.SpeedtestConfig &&
+                        window.SpeedtestConfig.loadSettings) {
+                    window.SpeedtestConfig.loadSettings();
+                }
+                window.STModal.choose({
+                    title: 'Configuration Upgrade Required',
+                    severity: 'warning',
+                    message: 'Your existing configuration is still active, but '
+                        + 'it must be converted before configuration changes '
+                        + 'can be saved. You can still run tests and view '
+                        + 'history and reports; only configuration changes are '
+                        + 'temporarily locked.',
+                    buttons: [
+                        { label: 'Close', value: 'close', kind: 'secondary' },
+                        { label: 'Go to Settings', value: 'settings',
+                          kind: 'primary', icon: 'fas fa-cog' }
+                    ]
+                }).then(function(choice) {
+                    if (choice === 'settings') {
+                        // Tear down the parent feature modal cleanly first.
+                        if (typeof opts.onUpgradeBlockedGoSettings === 'function') {
+                            try { opts.onUpgradeBlockedGoSettings(); } catch (e) {}
+                        }
+                        var navSettings = document.querySelector(
+                            '.nav-item[data-section="settings"]');
+                        if (navSettings) navSettings.click();
+                    }
+                    // 'close' -> just dismiss; parent modal remains usable.
+                });
+                return { outcome: 'blocked' };
+            }
+
+            // RECONCILED -> discard staged edit, refresh, tell user to reapply.
+            if (data.status === 'reconciled') {
+                showReconciledMessage(data.error, opts.featureLabel);
+                return Promise.resolve(opts.refresh && opts.refresh())
+                    .then(function() {
+                        if (opts.onReconciled) opts.onReconciled(data);
+                        return { outcome: 'reconciled' };
+                    });
+            }
+
+            // Hard feature/business error.
+            if (status >= 400 || data.error) {
+                throw new Error(data.error || 'Configuration save failed.');
+            }
+
+            // SAVED -> refresh authoritative state, run success, show any
+            // redundant-override-removed informational notice. A true no-op
+            // (no_change) shows a lightweight informational message; there is
+            // NO modal or extra workflow.
+            return Promise.resolve(opts.refresh && opts.refresh())
+                .then(function() {
+                    if (opts.onAuthoritative) opts.onAuthoritative(data);
+                    showOverrideRemovedNotice(data);
+                    if (data.no_change) {
+                        var banner = el('override-removed-toast');
+                        if (banner) {
+                            banner.textContent =
+                                'No configuration changes were needed.';
+                            banner.style.display = '';
+                            setTimeout(function() {
+                                banner.style.display = 'none';
+                            }, 6000);
+                        }
+                    }
+                    return { outcome: 'saved', data: data, no_change: !!data.no_change };
+                });
+        }
+
+        // =============================================================
+        // SETTINGS PAGE — renders directly from /api/config/state
+        // =============================================================
+        var _lastState = {};
+
+        function loadSettings() {
+            return fetch('/api/config/state')
+                .then(function(r) { return r.json(); })
+                .then(function(state) { _lastState = state || {}; renderSettings(_lastState); })
+                .catch(function() {
+                    var s = el('settings-config-status');
+                    if (s) s.innerHTML =
+                        '<p style="color:var(--danger-color,#dc2626);">' +
+                        'Unable to load configuration state.</p>';
+                });
+        }
+
+        function stateLabel(state) {
+            switch (state.state) {
+                case 'unconfigured': return 'Unconfigured';
+                case 'upgrade_required': return 'Configuration Upgrade Required';
+                case 'device': return 'Device Managed';
+                case 'group': return 'NCM Group';
+                case 'group_with_device_overrides':
+                    return 'NCM Group + Device Overrides';
+                case 'unsupported_schema':
+                    return 'Unsupported Newer Configuration Schema';
+                case 'error': return 'Configuration Error';
+                default: return 'Unknown';
+            }
+        }
+
+        function renderSettings(state) {
+            state = state || {};
+
+            // Configuration Upgrade Required notice.
+            var notice = el('config-upgrade-notice');
+            if (notice) {
+                notice.style.display =
+                    (state.state === 'upgrade_required') ? '' : 'none';
+            }
+
+            // Derived state summary.
+            var cs = el('settings-config-status');
+            if (cs) {
+                var html = '<p><strong>Configuration State:</strong> ' +
+                    escapeHtml(stateLabel(state)) + '</p>';
+                if (state.state === 'unconfigured') {
+                    html += '<p><strong>Effective Configuration:</strong> ' +
+                            'Built-in Defaults</p>';
+                }
+                if (state.group_present) {
+                    html += '<p><strong>Group Revision:</strong> ' +
+                            escapeHtml(String(state.group_revision)) + '</p>';
+                }
+                if (state.device_present) {
+                    html += '<p><strong>Device Revision:</strong> ' +
+                            escapeHtml(String(state.device_revision)) + '</p>';
+                }
+                if (state.state === 'group') {
+                    html += '<p><strong>Device Overrides:</strong> None</p>';
+                }
+                if ((state.state === 'unsupported_schema' ||
+                     state.state === 'error') && state.mutation_block_detail) {
+                    html += '<p style="color:var(--danger-color,#dc2626);">' +
+                            escapeHtml(state.mutation_block_detail) + '</p>';
+                }
+                cs.innerHTML = html;
+            }
+
+            renderEffectiveSources(state);
+            renderOverrides(state);
+
+            // Migrate visible ONLY for pure Device state (backend authority).
+            var migrateBtn = el('btn-settings-migrate');
+            if (migrateBtn) {
+                migrateBtn.style.display = state.can_migrate_to_group ? '' : 'none';
+            }
+            // Update NCM Group visible ONLY for group_with_device_overrides
+            // (backend authority via can_update_group). Never reappears as
+            // "Migrate to NCM Group".
+            var updateGroupBtn = el('btn-settings-update-group');
+            if (updateGroupBtn) {
+                updateGroupBtn.style.display =
+                    state.can_update_group ? '' : 'none';
+            }
+
+            // Application Information.
+            var ai = el('settings-app-info');
+            if (ai) {
+                ai.innerHTML =
+                    '<p><strong>Speedtest Analyzer version:</strong> ' +
+                    escapeHtml(String(state.app_version)) + '</p>' +
+                    '<p><strong>Configuration Schema Version:</strong> ' +
+                    escapeHtml(String(state.current_schema_version)) + '</p>';
+            }
+
+            // Data Management.
+            var dm = el('settings-data-info');
+            if (dm) {
+                var cnt = (state.history_count == null)
+                    ? 'unavailable' : String(state.history_count);
+                dm.innerHTML =
+                    '<p><strong>Retained tests:</strong> ' + escapeHtml(cnt) +
+                    ' of ' + escapeHtml(String(state.history_capacity)) +
+                    '</p>' +
+                    '<p style="font-size:0.8rem;">Clearing test history does ' +
+                    'not affect configuration.</p>';
+            }
+        }
+
+        // Effective Configuration Sources table (informational).
+        function renderEffectiveSources(state) {
+            var wrap = el('config-effective-sources');
+            var body = el('config-effective-sources-body');
+            if (!wrap || !body) return;
+            if (state.state === 'unconfigured' ||
+                    state.state === 'upgrade_required' ||
+                    state.state === 'unsupported_schema' ||
+                    state.state === 'error') {
+                wrap.style.display = 'none';
+                return;
+            }
+            // Source is BACKEND-DERIVED by section presence (device>group>
+            // default). The frontend never guesses this.
+            var srcMap = state.effective_section_sources || {};
+            var labelMap = {
+                device: 'This Device',
+                group: 'NCM Group',
+                'default': 'Built-in Default'
+            };
+            var rows = '';
+            SECTION_ORDER.forEach(function(sec) {
+                var raw = srcMap[sec] || 'default';
+                var src = labelMap[raw] || 'Built-in Default';
+                rows += '<tr><td style="padding:0.25rem 0.5rem 0.25rem 0;">' +
+                        escapeHtml(SECTION_LABELS[sec]) +
+                        '</td><td style="padding:0.25rem 0; color:var(--text-secondary);">' +
+                        escapeHtml(src) + '</td></tr>';
+            });
+            body.innerHTML = rows;
+            wrap.style.display = '';
+        }
+
+        // Local Device Overrides list + reset controls.
+        // Friendly reset-destination label from the backend reset_target.
+        function resetTargetLabel(t) {
+            return t === 'group' ? 'NCM Group' : 'Built-in Default';
+        }
+        function resetButtonLabel(t) {
+            return t === 'group' ? 'Reset to Group' : 'Reset to Built-in Default';
+        }
+
+        function renderOverrides(state) {
+            var wrap = el('config-override-list');
+            var items = el('config-override-items');
+            if (!wrap || !items) return;
+            // Use backend-derived override_details (label, safe summary,
+            // reset_target). Fall back to override_sections only if absent.
+            var details = state.override_details || [];
+            if (state.state !== 'group_with_device_overrides' ||
+                    !details.length) {
+                wrap.style.display = 'none';
+                items.innerHTML = '';
+                return;
+            }
+            var html = '';
+            details.forEach(function(od) {
+                var label = od.label || SECTION_LABELS[od.section] || od.section;
+                var summary = od.summary || '';
+                var dest = resetTargetLabel(od.reset_target);
+                // Full content-width card so its right edge lines up with the
+                // "This Device / NCM Group" source column above. Title on the
+                // left, Reset button pushed to the tile's right edge via
+                // space-between. min-width:0 + word-break let the text shrink
+                // instead of overflowing, and flex-wrap drops the button below
+                // the title at very narrow widths (small windows / 13" laptops)
+                // so nothing is clipped or overflows horizontally.
+                // Left-aligned, constrained-width tile. max-width:640px keeps
+                // the tile's right edge near the "This Device / NCM Group"
+                // source column above (NOT the far right of the card). width:
+                // 100% + min-width:0 let it shrink all the way down on narrow
+                // windows. The title/button row uses space-between so the reset
+                // button sits at the tile's right edge, and flex-wrap drops the
+                // button below the title when the tile gets too narrow.
+                // overflow-wrap:anywhere makes long summaries wrap instead of
+                // clipping or forcing horizontal overflow.
+                html += '<div style="padding:0.55rem 0.75rem; margin-bottom:0.5rem; border:1px solid var(--border-color); border-radius:var(--radius-sm); background:var(--card-surface); width:100%; max-width:640px; box-sizing:border-box;">' +
+                    '<div style="display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap;">' +
+                        '<div style="font-size:0.88rem; font-weight:600; min-width:0; overflow-wrap:anywhere;">' + escapeHtml(label) + '</div>' +
+                        '<button type="button" class="btn btn-secondary btn-reset-section" ' +
+                        'data-section="' + escapeHtml(od.section) + '" ' +
+                        'data-target="' + escapeHtml(od.reset_target) + '" ' +
+                        'style="flex:0 0 auto; padding:0.25rem 0.6rem; font-size:0.78rem; white-space:nowrap;">' +
+                        '<i class="fas fa-undo"></i> ' + escapeHtml(resetButtonLabel(od.reset_target)) + '</button>' +
+                    '</div>' +
+                    (summary ? '<div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.2rem; overflow-wrap:anywhere;">' + escapeHtml(summary) + '</div>' : '') +
+                    '<div style="font-size:0.76rem; color:var(--text-secondary); margin-top:0.2rem; overflow-wrap:anywhere;">Reset destination: ' + escapeHtml(dest) + '</div>' +
+                '</div>';
+            });
+            items.innerHTML = html;
+            wrap.style.display = '';
+            var btns = items.querySelectorAll('.btn-reset-section');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function() {
+                    resetSectionToGroup(this.getAttribute('data-section'),
+                                        this.getAttribute('data-target'));
+                });
+            }
+        }
+
+        function setActionStatus(msg, color) {
+            var s = el('settings-config-action-status');
+            if (s) { s.textContent = msg || ''; s.style.color = color || 'var(--text-secondary)'; }
+        }
+
+        // ---- Convert Configuration (upgrade_required) ----
+        (function wireConvert() {
+            var btn = el('btn-config-convert');
+            if (!btn) return;
+            btn.addEventListener('click', function() {
+                var s = el('config-convert-status');
+                if (s) { s.textContent = 'Converting…'; s.style.color = 'var(--text-secondary)'; }
+                fetch('/api/config/convert', { method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                    .then(function(r) { return r.json().then(function(d) {
+                        return { status: r.status, data: d }; }); })
+                    .then(function(res) {
+                        if (res.data.status === 'converted') {
+                            if (s) { s.textContent = 'Configuration converted. Device Managed.'; s.style.color = 'var(--success-color)'; }
+                            loadSettings();
+                        } else {
+                            if (s) { s.textContent = (res.data.error || 'Conversion failed.') + ' Existing configuration remains active. Retry.'; s.style.color = 'var(--warning-color)'; }
+                        }
+                    })
+                    .catch(function() {
+                        if (s) { s.textContent = 'Conversion request failed. Retry.'; s.style.color = 'var(--warning-color)'; }
+                    });
+            });
+        })();
+
+        // ---- Reset one Device override section (to Group or Default) ----
+        // The backend validates the PROPOSED effective config first. When
+        // resetting this section ALONE would create a dependency conflict (the
+        // confirmed iPerf3 schedule <-> server-mode defect) it returns 409
+        // dependency_reset_required with the coupled sections; we show a themed
+        // confirmation modal and, on confirm, re-POST with confirm_sections so
+        // the backend removes all coupled overrides in ONE atomic transaction.
+        function resetSectionToGroup(section, resetTarget, confirmSections) {
+            var label = SECTION_LABELS[section] || section;
+            var body = { section: section };
+            if (confirmSections) {
+                body.confirm_sections = confirmSections;
+            }
+            fetch('/api/config/reset_section', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body) })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    var data = res.data || {};
+                    if (data.status === 'reset') {
+                        // Use the backend-derived reset_target for wording so
+                        // the toast says the correct destination (NCM Group vs
+                        // Built-in Default), never a hardcoded "NCM Group".
+                        var dest = resetTargetLabel(
+                            data.reset_target || resetTarget);
+                        setActionStatus(data.message ||
+                            (label + ' reset to ' + dest + '.'),
+                            'var(--success-color)');
+                        loadSettings();
+                        refreshFeatureViews();
+                        return;
+                    }
+                    if (data.status === 'dependency_reset_required') {
+                        showDependencyResetModal(section, resetTarget, data);
+                        return;
+                    }
+                    setActionStatus(data.error || 'Reset failed.',
+                        'var(--warning-color)');
+                })
+                .catch(function() { setActionStatus('Reset failed.', 'var(--warning-color)'); });
+        }
+
+        // Themed confirmation for a coupled dependency reset. On confirm it
+        // re-invokes the reset with the full required_reset_sections set so the
+        // backend performs ONE atomic coupled reset (one device_revision).
+        function showDependencyResetModal(section, resetTarget, data) {
+            var required = data.required_reset_sections || [section];
+            var requiredLabels = data.required_reset_labels ||
+                required.map(function(s) { return SECTION_LABELS[s] || s; });
+            var confirmLabel = 'Reset ' + requiredLabels.join(' and ');
+            var reason = data.reason ||
+                ('Resetting ' + (data.requested_label ||
+                 SECTION_LABELS[section] || section) + ' alone would create an '
+                 + 'incompatible configuration.');
+            window.STModal.confirm({
+                title: 'Scheduled Test Dependency',
+                severity: 'warning',
+                message: reason + '\n\nResetting ' +
+                    (data.requested_label || SECTION_LABELS[section] || section)
+                    + ' alone would create an incompatible configuration.',
+                cancelLabel: 'Cancel',
+                confirmLabel: confirmLabel
+            }).then(function(ok) {
+                if (!ok) return;   // Cancel -> no state change.
+                resetSectionToGroup(section, resetTarget, required);
+            });
+        }
+
+        // ---- Reset ALL Device overrides (styled modal, no native confirm) ----
+        function openResetAllModal() {
+            var list = el('reset-all-list');
+            if (list) {
+                var details = (_lastState && _lastState.override_details) || [];
+                var html = '';
+                details.forEach(function(od) {
+                    var label = od.label || SECTION_LABELS[od.section] || od.section;
+                    html += '<li><strong>' + escapeHtml(label) + '</strong> &rarr; ' +
+                            escapeHtml(resetTargetLabel(od.reset_target)) + '</li>';
+                });
+                list.innerHTML = html ||
+                    '<li style="color:var(--text-secondary);">No overrides.</li>';
+            }
+            showModal('reset-all-modal');
+        }
+
+        function performResetAll() {
+            hideModal('reset-all-modal');
+            fetch('/api/config/reset', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    if (res.data.status === 'reset') {
+                        setActionStatus(res.data.message ||
+                            'All Device overrides removed.',
+                            'var(--success-color)');
+                        loadSettings();
+                        refreshFeatureViews();
+                    } else {
+                        setActionStatus(res.data.error || 'Reset failed.',
+                            'var(--warning-color)');
+                    }
+                })
+                .catch(function() { setActionStatus('Reset failed.', 'var(--warning-color)'); });
+        }
+
+        (function wireResetAll() {
+            var btn = el('btn-reset-all-overrides');
+            if (btn) btn.addEventListener('click', openResetAllModal);
+            var cancel = el('reset-all-cancel');
+            if (cancel) cancel.addEventListener('click', function() {
+                hideModal('reset-all-modal');
+            });
+            var confirmBtn = el('reset-all-confirm');
+            if (confirmBtn) confirmBtn.addEventListener('click', performResetAll);
+        })();
+
+        // ---- Styled "Configuration Upgrade Required" notice ----
+        function showUpgradeRequiredModal() {
+            showModal('upgrade-required-modal');
+        }
+        (function wireUpgradeRequiredModal() {
+            var closeBtn = el('upgrade-required-close');
+            if (closeBtn) closeBtn.addEventListener('click', function() {
+                hideModal('upgrade-required-modal');
+            });
+            var gotoBtn = el('upgrade-required-goto');
+            if (gotoBtn) gotoBtn.addEventListener('click', function() {
+                hideModal('upgrade-required-modal');
+                // Navigate to Settings via the existing nav item (showSection
+                // lives in the main script scope; clicking the nav link is the
+                // scope-safe way to switch and it triggers loadSettings()).
+                var navSettings = document.querySelector(
+                    '.nav-item[data-section="settings"]');
+                if (navSettings) navSettings.click();
+            });
+        })();
+
+        // Best-effort refresh of feature views after a reset changes effective.
+        function refreshFeatureViews() {
+            try { if (typeof loadServerList === 'function') loadServerList(); } catch (e) {}
+            try { if (typeof loadOutputs === 'function') loadOutputs(); } catch (e) {}
+            try { if (typeof loadSchedule === 'function') loadSchedule(); } catch (e) {}
+        }
+
+        // ---- Clear Test History (reuse existing endpoint) ----
+        (function wireClearHistory() {
+            var btn = el('btn-settings-clear-history');
+            if (!btn) return;
+            btn.addEventListener('click', function() {
+                window.STModal.confirm({
+                    title: 'Clear Test History?',
+                    message: 'Clear all retained test history? This cannot be '
+                        + 'undone. Configuration is not affected.',
+                    severity: 'destructive',
+                    confirmLabel: 'Clear History',
+                    confirmIcon: 'fas fa-trash'
+                }).then(function(ok) {
+                    if (!ok) return;
+                    fetch('/api/clear_history', { method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: '{}' })
+                        .then(function(r) { return r.json(); })
+                        .then(function() {
+                            var s = el('settings-data-status');
+                            if (s) s.textContent = 'Test history cleared.';
+                            loadSettings();
+                        })
+                        .catch(function() {
+                            var s = el('settings-data-status');
+                            if (s) s.textContent = 'Unable to clear history.';
+                        });
+                });
+            });
+        })();
+
+        // ---- Factory Reset (danger; styled double-confirm; not auto-invoked)
+        // Presentation-only change: preserves the existing two-step safety
+        // (scope explanation -> final "Are you sure?") via a styled modal
+        // instead of native confirm(). ----
+        (function wireFactoryReset() {
+            var btn = el('btn-settings-factory-reset');
+            function showStep(n) {
+                var s1 = el('factory-reset-step1');
+                var s2 = el('factory-reset-step2');
+                if (s1) s1.style.display = (n === 1) ? '' : 'none';
+                if (s2) s2.style.display = (n === 2) ? '' : 'none';
+            }
+            if (btn) btn.addEventListener('click', function() {
+                showStep(1);
+                showModal('factory-reset-modal');
+            });
+            var cancel1 = el('factory-reset-cancel1');
+            if (cancel1) cancel1.addEventListener('click', function() {
+                hideModal('factory-reset-modal');
+            });
+            var cont = el('factory-reset-continue');
+            if (cont) cont.addEventListener('click', function() { showStep(2); });
+            var cancel2 = el('factory-reset-cancel2');
+            if (cancel2) cancel2.addEventListener('click', function() {
+                hideModal('factory-reset-modal');
+            });
+            var confirmBtn = el('factory-reset-confirm');
+            if (confirmBtn) confirmBtn.addEventListener('click', function() {
+                hideModal('factory-reset-modal');
+                fetch('/api/config/factory_reset', { method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm: true }) })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var s = el('settings-factory-status');
+                        if (s) s.textContent = data.message || 'Factory reset complete.';
+                        loadSettings();
+                    })
+                    .catch(function() {
+                        var s = el('settings-factory-status');
+                        if (s) s.textContent = 'Factory reset failed.';
+                    });
+            });
+        })();
+
+        // =============================================================
+        // MIGRATE TO NCM GROUP — selection-only placement wizard.
+        // NEVER edits configuration values. Steps: select -> review ->
+        // candidate JSON + NCM instructions -> validate group present ->
+        // device cleanup. group-first, non-destructive.
+        // =============================================================
+        var _migrateSelected = {};   // section -> bool
+        var _migratePromotable = {};  // section -> bool
+        var _migrateExpectedRev = 1;
+        var _migratePromoted = [];
+
+        function migrateShowStep(step) {
+            ['select', 'review', 'candidate', 'done'].forEach(function(s) {
+                var d = el('migrate-step-' + s);
+                if (d) d.style.display = (s === step) ? '' : 'none';
+            });
+        }
+
+        function migrateOpen() {
+            _migrateSelected = {}; _migratePromotable = {};
+            fetch('/api/config/migrate/sections', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status !== 'ok') {
+                        setActionStatus(data.error ||
+                            'Unable to start migration.', 'var(--warning-color)');
+                        return;
+                    }
+                    var list = el('migrate-sections-list');
+                    var html = '';
+                    (data.sections || []).forEach(function(sec) {
+                        _migratePromotable[sec.section] = !!sec.promotable;
+                        _migrateSelected[sec.section] =
+                            sec.promotable && sec.default_selected;
+                        var disabled = sec.promotable ? '' : 'disabled';
+                        var checked = _migrateSelected[sec.section] ? 'checked' : '';
+                        html += '<label style="display:block; padding:0.4rem 0;">' +
+                            '<input type="checkbox" class="migrate-sec-cb" data-section="' +
+                            escapeHtml(sec.section) + '" ' + checked + ' ' + disabled + '> ' +
+                            escapeHtml(sec.label);
+                        if (sec.section === 'geoview' && sec.promotable) {
+                            html += '<div style="font-size:0.8rem; color:var(--text-secondary); margin-left:1.5rem;">' +
+                                'Location Source: Device GPS. Current GPS coordinates are device-specific and will NOT be copied into the NCM Group configuration. Only the policy to use Device GPS will be promoted.</div>';
+                        }
+                        if (!sec.promotable && sec.reason) {
+                            html += '<div style="font-size:0.8rem; color:var(--warning-color); margin-left:1.5rem;">' +
+                                escapeHtml(sec.reason) + '</div>';
+                        }
+                        html += '</label>';
+                    });
+                    if (!html) {
+                        html = '<p style="font-size:0.85rem; color:var(--text-secondary);">No configured Device sections are available to promote.</p>';
+                    }
+                    list.innerHTML = html;
+                    var cbs = list.querySelectorAll('.migrate-sec-cb');
+                    for (var i = 0; i < cbs.length; i++) {
+                        cbs[i].addEventListener('change', function() {
+                            _migrateSelected[this.getAttribute('data-section')] = this.checked;
+                        });
+                    }
+                    var err = el('migrate-select-error');
+                    if (err) err.style.display = 'none';
+                    migrateShowStep('select');
+                    showModal('migrate-wizard-modal');
+                })
+                .catch(function() {
+                    setActionStatus('Unable to start migration.',
+                                    'var(--warning-color)');
+                });
+        }
+
+        function migrateSelectedList() {
+            var out = [];
+            for (var s in _migrateSelected) {
+                if (_migrateSelected[s]) out.push(s);
+            }
+            return out;
+        }
+
+        function migrateToReview() {
+            var selected = migrateSelectedList();
+            var groupUl = el('migrate-review-group');
+            var devUl = el('migrate-review-device');
+            var gHtml = '', dHtml = '';
+            SECTION_ORDER.forEach(function(sec) {
+                if (!(sec in _migratePromotable)) return;
+                var label = SECTION_LABELS[sec] || sec;
+                if (selected.indexOf(sec) !== -1) {
+                    gHtml += '<li>' + escapeHtml(label) + '</li>';
+                } else {
+                    dHtml += '<li>' + escapeHtml(label) + '</li>';
+                }
+            });
+            groupUl.innerHTML = gHtml || '<li style="color:var(--text-secondary);">None</li>';
+            devUl.innerHTML = dHtml || '<li style="color:var(--text-secondary);">None</li>';
+            migrateShowStep('review');
+        }
+
+        function migrateGenerate() {
+            var selected = migrateSelectedList();
+            fetch('/api/config/migrate/candidate', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sections: selected }) })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    var data = res.data;
+                    if (data.status === 'invalid') {
+                        // Dependency error -> show backend explanation, return
+                        // to selection. Never edit values in JS.
+                        var err = el('migrate-select-error');
+                        if (err) { err.textContent = data.reason || 'Invalid selection.'; err.style.display = ''; }
+                        migrateShowStep('select');
+                        return;
+                    }
+                    if (data.status !== 'candidate') {
+                        var errEl = el('migrate-select-error');
+                        if (errEl) {
+                            errEl.textContent = data.error ||
+                                'Unable to generate candidate.';
+                            errEl.style.display = '';
+                        }
+                        migrateShowStep('select');
+                        return;
+                    }
+                    _migrateExpectedRev = data.group_revision;
+                    _migratePromoted = data.promoted_sections || selected;
+                    el('migrate-candidate-json').value = data.config_json || '';
+                    el('migrate-sdk-name').textContent = data.sdk_data_name || 'speedtest_analyzer_group';
+                    el('migrate-expected-rev').textContent = String(data.group_revision);
+                    var vs = el('migrate-validate-status');
+                    if (vs) vs.textContent = '';
+                    migrateShowStep('candidate');
+                })
+                .catch(function() {
+                    var errEl = el('migrate-select-error');
+                    if (errEl) {
+                        errEl.textContent = 'Unable to generate candidate.';
+                        errEl.style.display = '';
+                    }
+                    migrateShowStep('select');
+                });
+        }
+
+        function migrateValidate() {
+            var status = el('migrate-validate-status');
+            if (status) { status.textContent = 'Validating…'; status.style.color = 'var(--text-secondary)'; }
+            fetch('/api/config/migrate/validate', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_revision: _migrateExpectedRev }) })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'validated') {
+                        // Payload validated on device (NOT provenance).
+                        if (status) { status.textContent = data.message || 'Group configuration payload validated on device.'; status.style.color = 'var(--success-color)'; }
+                        migrateCleanup();
+                    } else {
+                        if (status) {
+                            status.textContent = (data.reason ||
+                                'Group configuration is not visible yet.') +
+                                ' The NCM change may still be synchronizing. Retry Validate.';
+                            status.style.color = 'var(--warning-color)';
+                        }
+                    }
+                })
+                .catch(function() {
+                    if (status) { status.textContent = 'Validation request failed. Retry Validate.'; status.style.color = 'var(--warning-color)'; }
+                });
+        }
+
+        function migrateCleanup() {
+            fetch('/api/config/migrate/cleanup', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ promoted_sections: _migratePromoted }) })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    var body = el('migrate-done-body');
+                    var retry = el('migrate-retry-cleanup');
+                    if (res.data.status === 'complete') {
+                        if (retry) retry.style.display = 'none';
+                        var remaining = (_lastState.override_sections || []);
+                        var extra = '';
+                        // Re-fetch state to report final override set.
+                        migrateShowStep('done');
+                        if (body) body.innerHTML =
+                            '<h4 style="margin:0 0 0.4rem;">Migration Complete</h4>' +
+                            '<p style="font-size:0.85rem;">Group configuration payload validated. Effective configuration has been reloaded.</p>';
+                        loadSettings().then(function() {
+                            var rem = (_lastState.override_sections || []);
+                            if (rem.length && body) {
+                                var names = rem.map(function(s) { return SECTION_LABELS[s] || s; });
+                                body.innerHTML +=
+                                    '<p style="font-size:0.85rem;">Sections still managed on this device: <strong>' +
+                                    escapeHtml(names.join(', ')) + '</strong></p>';
+                            }
+                            refreshFeatureViews();
+                        });
+                    } else {
+                        // cleanup_incomplete: Group validated, Device cleanup
+                        // did not finish. Device>Group still preserves behavior.
+                        migrateShowStep('done');
+                        if (body) body.innerHTML =
+                            '<h4 style="margin:0 0 0.4rem;">Cleanup Incomplete</h4>' +
+                            '<p style="font-size:0.85rem;">Group configuration was validated, but local Device override cleanup did not complete. Your existing behavior is preserved because Device settings take precedence over Group.</p>' +
+                            '<p style="font-size:0.82rem; color:var(--text-secondary);">' + escapeHtml(res.data.error || '') + '</p>';
+                        if (retry) retry.style.display = '';
+                        loadSettings();
+                    }
+                })
+                .catch(function() {
+                    var body = el('migrate-done-body');
+                    var retry = el('migrate-retry-cleanup');
+                    migrateShowStep('done');
+                    if (body) body.innerHTML =
+                        '<h4 style="margin:0 0 0.4rem;">Cleanup Incomplete</h4>' +
+                        '<p style="font-size:0.85rem;">The cleanup request failed. Retry Cleanup.</p>';
+                    if (retry) retry.style.display = '';
+                });
+        }
+
+        (function wireMigrateWizard() {
+            var b;
+            b = el('btn-settings-migrate'); if (b) b.addEventListener('click', migrateOpen);
+            b = el('migrate-to-review'); if (b) b.addEventListener('click', migrateToReview);
+            b = el('migrate-back-select'); if (b) b.addEventListener('click', function() { migrateShowStep('select'); });
+            b = el('migrate-generate'); if (b) b.addEventListener('click', migrateGenerate);
+            b = el('migrate-validate'); if (b) b.addEventListener('click', migrateValidate);
+            b = el('migrate-retry-cleanup'); if (b) b.addEventListener('click', migrateCleanup);
+            b = el('migrate-copy-name'); if (b) b.addEventListener('click', function() {
+                copyText(el('migrate-sdk-name').textContent, el('migrate-validate-status'), 'SDK Data name copied.');
+            });
+            b = el('migrate-copy-json'); if (b) b.addEventListener('click', function() {
+                copyText(el('migrate-candidate-json').value, el('migrate-validate-status'), 'JSON copied.');
+            });
+            ['migrate-cancel-1', 'migrate-cancel-2', 'migrate-cancel-3', 'migrate-finish'].forEach(function(id) {
+                var btn = el(id);
+                if (btn) btn.addEventListener('click', function() {
+                    hideModal('migrate-wizard-modal');
+                });
+            });
+        })();
+
+        // =============================================================
+        // UPDATE NCM GROUP CONFIGURATION — selection-only promotion of
+        // current Device overrides into the EXISTING NCM Group. Never edits
+        // configuration values. Steps: select -> review -> revised candidate
+        // JSON + NCM UPDATE instructions -> validate revised Group present ->
+        // device cleanup. group-first, non-destructive.
+        // =============================================================
+        var _ugSelected = {};      // section -> bool
+        var _ugPromotable = {};    // section -> bool
+        var _ugGroupSections = []; // sections already present in the Group
+        var _ugNewRev = 2;
+        var _ugPromoted = [];
+        var _ugToken = null;       // reconciliation token {group_revision, device_revision}
+
+        function ugShowStep(step) {
+            ['select', 'review', 'candidate', 'done'].forEach(function(s) {
+                var d = el('ug-step-' + s);
+                if (d) d.style.display = (s === step) ? '' : 'none';
+            });
+        }
+
+        // Fully reset every staged wizard variable so a reopened workflow can
+        // never reuse stale candidate/token/selection/section state from a
+        // previous (possibly reconciliation-aborted) attempt.
+        function ugResetState() {
+            _ugSelected = {};
+            _ugPromotable = {};
+            _ugGroupSections = [];
+            _ugNewRev = 2;
+            _ugPromoted = [];
+            _ugToken = null;
+        }
+
+        function ugOpen() {
+            // ALWAYS start from a clean staged state and authoritative config.
+            ugResetState();
+            // Refresh /api/config/state FIRST so _lastState (used for the
+            // "Unchanged NCM Group" review and current revisions) is never
+            // stale, then fetch the current Device override sections fresh.
+            loadSettings().then(function() {
+                var srcMap = (_lastState &&
+                              _lastState.effective_section_sources) || {};
+                SECTION_ORDER.forEach(function(sec) {
+                    if (srcMap[sec] === 'group') _ugGroupSections.push(sec);
+                });
+                return fetch('/api/config/update_group/sections',
+                    { method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: '{}' });
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status !== 'ok') {
+                        setActionStatus(data.error ||
+                            'Unable to start Group update.',
+                            'var(--warning-color)');
+                        return;
+                    }
+                    var list = el('ug-sections-list');
+                    var html = '';
+                    (data.sections || []).forEach(function(sec) {
+                        _ugPromotable[sec.section] = !!sec.promotable;
+                        _ugSelected[sec.section] =
+                            sec.promotable && sec.default_selected;
+                        var disabled = sec.promotable ? '' : 'disabled';
+                        var checked = _ugSelected[sec.section] ? 'checked' : '';
+                        html += '<label style="display:block; padding:0.4rem 0;">' +
+                            '<input type="checkbox" class="ug-sec-cb" data-section="' +
+                            escapeHtml(sec.section) + '" ' + checked + ' ' + disabled + '> ' +
+                            escapeHtml(sec.label);
+                        if (sec.section === 'geoview' && sec.promotable) {
+                            html += '<div style="font-size:0.8rem; color:var(--text-secondary); margin-left:1.5rem;">' +
+                                'Location Source: Device GPS. Current GPS coordinates are device-specific and will NOT be copied into the NCM Group configuration. Only the policy to use Device GPS will be promoted.</div>';
+                        }
+                        if (!sec.promotable && sec.reason) {
+                            html += '<div style="font-size:0.8rem; color:var(--warning-color); margin-left:1.5rem;">' +
+                                escapeHtml(sec.reason) + '</div>';
+                        }
+                        html += '</label>';
+                    });
+                    if (!html) {
+                        html = '<p style="font-size:0.85rem; color:var(--text-secondary);">No Device overrides are available to promote.</p>';
+                        // Keep Settings authoritative and in agreement with the
+                        // wizard: re-read /api/config/state so the Device
+                        // Overrides list and the button visibility reflect the
+                        // same source of truth the backend just reported.
+                        loadSettings();
+                    }
+                    list.innerHTML = html;
+                    var cbs = list.querySelectorAll('.ug-sec-cb');
+                    for (var i = 0; i < cbs.length; i++) {
+                        cbs[i].addEventListener('change', function() {
+                            _ugSelected[this.getAttribute('data-section')] = this.checked;
+                        });
+                    }
+                    var err = el('ug-select-error');
+                    if (err) err.style.display = 'none';
+                    ugShowStep('select');
+                    showModal('ug-wizard-modal');
+                })
+                .catch(function() {
+                    setActionStatus('Unable to start Group update.',
+                                    'var(--warning-color)');
+                });
+        }
+
+        function ugSelectedList() {
+            var out = [];
+            for (var s in _ugSelected) {
+                if (_ugSelected[s]) out.push(s);
+            }
+            return out;
+        }
+
+        function ugToReview() {
+            var selected = ugSelectedList();
+            var updUl = el('ug-review-updates');
+            var unchUl = el('ug-review-unchanged');
+            var devUl = el('ug-review-device');
+            var uHtml = '', unHtml = '', dHtml = '';
+            // Updates to NCM Group: selected Device overrides.
+            SECTION_ORDER.forEach(function(sec) {
+                if (!(sec in _ugPromotable)) return;
+                var label = SECTION_LABELS[sec] || sec;
+                if (selected.indexOf(sec) !== -1) {
+                    uHtml += '<li>' + escapeHtml(label) + '</li>';
+                } else {
+                    dHtml += '<li>' + escapeHtml(label) + '</li>';
+                }
+            });
+            // Unchanged NCM Group Configuration: existing Group sections that
+            // are NOT being replaced by a promoted section.
+            _ugGroupSections.forEach(function(sec) {
+                if (selected.indexOf(sec) !== -1) return;
+                unHtml += '<li>' + escapeHtml(SECTION_LABELS[sec] || sec) + '</li>';
+            });
+            updUl.innerHTML = uHtml || '<li style="color:var(--text-secondary);">None</li>';
+            unchUl.innerHTML = unHtml || '<li style="color:var(--text-secondary);">None</li>';
+            devUl.innerHTML = dHtml || '<li style="color:var(--text-secondary);">None</li>';
+            ugShowStep('review');
+        }
+
+        function ugGenerate() {
+            var selected = ugSelectedList();
+            fetch('/api/config/update_group/candidate', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sections: selected }) })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    var data = res.data;
+                    if (data.status === 'invalid') {
+                        var err = el('ug-select-error');
+                        if (err) { err.textContent = data.reason || 'Invalid selection.'; err.style.display = ''; }
+                        ugShowStep('select');
+                        return;
+                    }
+                    if (data.status !== 'candidate') {
+                        var errEl = el('ug-select-error');
+                        if (errEl) {
+                            errEl.textContent = data.error ||
+                                'Unable to generate revised Group configuration.';
+                            errEl.style.display = '';
+                        }
+                        ugShowStep('select');
+                        return;
+                    }
+                    _ugNewRev = data.new_group_revision;
+                    _ugPromoted = data.promoted_sections || selected;
+                    _ugToken = data.token || null;
+                    el('ug-candidate-json').value = data.config_json || '';
+                    el('ug-sdk-name').textContent = data.sdk_data_name || 'speedtest_analyzer_group';
+                    el('ug-current-rev').textContent = String(data.current_group_revision);
+                    el('ug-new-rev').textContent = String(data.new_group_revision);
+                    var vs = el('ug-validate-status');
+                    if (vs) vs.textContent = '';
+                    ugShowStep('candidate');
+                })
+                .catch(function() {
+                    var errEl = el('ug-select-error');
+                    if (errEl) {
+                        errEl.textContent = 'Unable to generate revised Group configuration.';
+                        errEl.style.display = '';
+                    }
+                    ugShowStep('select');
+                });
+        }
+
+        function ugValidate() {
+            var status = el('ug-validate-status');
+            if (status) { status.textContent = 'Validating…'; status.style.color = 'var(--text-secondary)'; }
+            fetch('/api/config/update_group/validate', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_group_revision: _ugNewRev,
+                                       token: _ugToken }) })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    var data = res.data || {};
+                    if (data.status === 'validated') {
+                        if (status) { status.textContent = data.message || 'Group configuration payload validated on device.'; status.style.color = 'var(--success-color)'; }
+                        ugCleanup();
+                    } else if (data.status === 'reconcile_aborted') {
+                        // Device changed during the staged workflow. Invalidate
+                        // the whole workflow: discard staged candidate/token,
+                        // refresh authoritative state, close the wizard, and
+                        // require starting Update NCM Group again.
+                        ugAbortWorkflow(data.reason);
+                    } else {
+                        if (status) {
+                            status.textContent = (data.reason ||
+                                'Revised Group configuration is not visible yet.') +
+                                ' The NCM change may still be synchronizing. Retry Validate.';
+                            status.style.color = 'var(--warning-color)';
+                        }
+                    }
+                })
+                .catch(function() {
+                    if (status) { status.textContent = 'Validation request failed. Retry Validate.'; status.style.color = 'var(--warning-color)'; }
+                });
+        }
+
+        // Invalidate a staged Update-NCM-Group workflow after a reconciliation
+        // abort: discard all staged candidate/token/selection state, close the
+        // wizard, refresh authoritative /api/config/state (so Settings and the
+        // Device Overrides list reflect the current truth), and tell the user
+        // to start the workflow again.
+        function ugAbortWorkflow(reason) {
+            ugResetState();
+            hideModal('ug-wizard-modal');
+            loadSettings().then(function() { refreshFeatureViews(); });
+            window.STModal.alert({
+                title: 'Group Update Restart Required',
+                severity: 'warning',
+                message: (reason || 'The Device configuration changed during '
+                    + 'this workflow.') + '\n\nThe staged Group update was '
+                    + 'discarded so stale changes are not merged. Open Update '
+                    + 'NCM Group Configuration again to start fresh.'
+            });
+        }
+
+        function ugCleanup() {
+            fetch('/api/config/update_group/cleanup', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ promoted_sections: _ugPromoted,
+                                       token: _ugToken }) })
+                .then(function(r) { return r.json().then(function(d) {
+                    return { status: r.status, data: d }; }); })
+                .then(function(res) {
+                    var body = el('ug-done-body');
+                    var retry = el('ug-retry-cleanup');
+                    if (res.data.status === 'reconcile_aborted') {
+                        // Device changed mid-workflow: invalidate + restart.
+                        ugAbortWorkflow(res.data.error);
+                        return;
+                    }
+                    if (res.data.status === 'complete') {
+                        if (retry) retry.style.display = 'none';
+                        ugShowStep('done');
+                        if (body) body.innerHTML =
+                            '<h4 style="margin:0 0 0.4rem;">Group Update Complete</h4>' +
+                            '<p style="font-size:0.85rem;">The revised NCM Group configuration was validated and the promoted Device overrides were removed. Effective configuration has been reloaded.</p>';
+                        loadSettings().then(function() {
+                            var rem = (_lastState.override_sections || []);
+                            if (rem.length && body) {
+                                var names = rem.map(function(s) { return SECTION_LABELS[s] || s; });
+                                body.innerHTML +=
+                                    '<p style="font-size:0.85rem;">Sections still managed on this device: <strong>' +
+                                    escapeHtml(names.join(', ')) + '</strong></p>';
+                            }
+                            refreshFeatureViews();
+                        });
+                    } else {
+                        ugShowStep('done');
+                        if (body) body.innerHTML =
+                            '<h4 style="margin:0 0 0.4rem;">Cleanup Incomplete</h4>' +
+                            '<p style="font-size:0.85rem;">The revised Group configuration was validated, but local Device override cleanup did not complete. Your existing behavior is preserved because Device settings take precedence over Group.</p>' +
+                            '<p style="font-size:0.82rem; color:var(--text-secondary);">' + escapeHtml(res.data.error || '') + '</p>';
+                        if (retry) retry.style.display = '';
+                        loadSettings();
+                    }
+                })
+                .catch(function() {
+                    var body = el('ug-done-body');
+                    var retry = el('ug-retry-cleanup');
+                    ugShowStep('done');
+                    if (body) body.innerHTML =
+                        '<h4 style="margin:0 0 0.4rem;">Cleanup Incomplete</h4>' +
+                        '<p style="font-size:0.85rem;">The cleanup request failed. Retry Cleanup.</p>';
+                    if (retry) retry.style.display = '';
+                });
+        }
+
+        (function wireUpdateGroupWizard() {
+            var b;
+            b = el('btn-settings-update-group'); if (b) b.addEventListener('click', ugOpen);
+            b = el('ug-to-review'); if (b) b.addEventListener('click', ugToReview);
+            b = el('ug-back-select'); if (b) b.addEventListener('click', function() { ugShowStep('select'); });
+            b = el('ug-generate'); if (b) b.addEventListener('click', ugGenerate);
+            b = el('ug-validate'); if (b) b.addEventListener('click', ugValidate);
+            b = el('ug-retry-cleanup'); if (b) b.addEventListener('click', ugCleanup);
+            b = el('ug-copy-name'); if (b) b.addEventListener('click', function() {
+                copyText(el('ug-sdk-name').textContent, el('ug-validate-status'), 'SDK Data name copied.');
+            });
+            b = el('ug-copy-json'); if (b) b.addEventListener('click', function() {
+                copyText(el('ug-candidate-json').value, el('ug-validate-status'), 'JSON copied.');
+            });
+            ['ug-cancel-1', 'ug-cancel-2', 'ug-cancel-3', 'ug-finish'].forEach(function(id) {
+                var btn = el(id);
+                if (btn) btn.addEventListener('click', function() {
+                    hideModal('ug-wizard-modal');
+                });
+            });
+        })();
+
+        // Public surface (two-layer). Ordinary Saves use saveConfig; the
+        // schedule-reset dependency path uses handleSaveResponse.
+        window.SpeedtestConfig = {
+            saveConfig: saveConfig,
+            handleSaveResponse: handleSaveResponse,
+            loadSettings: loadSettings
         };
     })();
     </script>

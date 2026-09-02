@@ -24,8 +24,9 @@ from cellular_geo import (
     apply_geo_settings,
     gps_fix_is_usable,
     load_geo_settings,
-    save_geo_settings,
 )
+
+import configuration_manager as config_mgr
 
 # Constants
 PORT = 8000
@@ -105,11 +106,12 @@ _active_carrier_collector = None
 
 # Schedule state
 schedule_config = {
-    'enabled': False,
-    'autostart': False,
+    'enabled': False,       # PERSISTED intent
+    'autostart': False,     # PERSISTED intent (independent of enabled)
     'cron': '',
     'engine': 'netperf',
-    'params': {}
+    'params': {},
+    'running': False,       # RUNTIME-ONLY: does the scheduler actually fire?
 }
 schedule_lock = threading.Lock()
 
@@ -4261,17 +4263,6 @@ def _default_iperf3_server_settings():
     }
 
 
-def _persist_iperf3_server_settings(settings):
-    """Persist iPerf3 server preferences using one SDK appdata write."""
-    cp.put_appdata(
-        _IPERF3_SERVER_SETTINGS_KEY,
-        json.dumps(
-            settings,
-            separators=(',', ':')
-        )
-    )
-
-
 def _load_iperf3_server_settings():
     """Load the small server-mode settings object once."""
     global _iperf3_server_settings
@@ -4489,19 +4480,14 @@ def _load_public_iperf3_server_source():
 
 
 def _load_user_iperf3_server_source():
-    """Read the existing User Server List from SDK appdata once."""
-    value = cp.get_appdata('iperf3_servers')
-
-    if not value:
-        servers = []
-
-    else:
-        servers = json.loads(value)
-
-        if not isinstance(servers, list):
-            raise ValueError(
-                'iperf3_servers appdata must contain a JSON list'
-            )
+    """Read the User Server List from canonical RAM (or legacy on Day-1)."""
+    # Effective (Device>Group>Default) User Server list from the two-layer
+    # manager. Legacy App Data is NEVER a fallback here: once either canonical
+    # key exists it is outside the source-of-truth chain, and the manager's
+    # upgrade-required compatibility view already surfaces legacy through the
+    # effective config (§16).
+    effective_users = config_mgr.active_section('iperf3_user_servers')
+    servers = effective_users if isinstance(effective_users, list) else []
 
     # Preserve existing 2.6.5 User Server entries exactly as stored.
     # Schema modernization belongs to the later User Server feature patch.
@@ -4547,27 +4533,19 @@ def _load_active_iperf3_server_cache(force=False):
                         valid_regions[0]
                     )
 
+                    # last_public_region is RAM-only runtime state. Correcting
+                    # an invalid remembered region updates RAM only and never
+                    # persists to canonical or legacy App Data.
                     with _iperf3_server_settings_lock:
                         _iperf3_server_settings = dict(
                             settings
                         )
 
-                    try:
-                        _persist_iperf3_server_settings(
-                            settings
-                        )
-
-                        cp.log(
-                            'Initialized iPerf3 server settings: '
-                            f'{settings["server_mode"]}, '
-                            f'{settings["last_public_region"]}'
-                        )
-
-                    except Exception as e:
-                        cp.log(
-                            'Unable to persist iPerf3 '
-                            f'server settings: {e}'
-                        )
+                    cp.log(
+                        'Initialized iPerf3 server settings (RAM): '
+                        f'{settings["server_mode"]}, '
+                        f'{settings.get("last_public_region", "")}'
+                    )
 
             else:
                 new_cache = (
@@ -5821,9 +5799,9 @@ def _iperf3_schedule_is_configured(config=None):
     )
 
 
-def _reset_iperf3_schedule(reason):
-    """Persist the known-safe empty scheduler state."""
-    config = {
+def _safe_empty_schedule():
+    """Return the known-safe disabled schedule section value."""
+    return {
         'enabled': False,
         'autostart': False,
         'cron': '',
@@ -5831,13 +5809,28 @@ def _reset_iperf3_schedule(reason):
         'params': {}
     }
 
-    save_schedule(config)
 
-    cp.log(
-        f'iPerf3 schedule reset: {reason}'
-    )
+def _apply_safe_schedule_to_ram():
+    """Apply the known-safe disabled schedule to RAM only (no persistence).
 
-    return config
+    Used by the startup validator so an unsafe saved iPerf3 schedule cannot
+    run, without writing canonical or legacy App Data merely because the app
+    started (and never creating a Device override).
+    """
+    global schedule_config
+    with schedule_lock:
+        schedule_config.update(_safe_empty_schedule())
+
+
+def _disable_unsafe_schedule_at_startup(reason):
+    """Startup safety: prevent an unsafe saved iPerf3 schedule from running.
+
+    Applies the safe disabled schedule to RAM and logs the reason. Does NOT
+    write canonical or legacy App Data (the app must not persist merely
+    because it started, and must not create a Device override).
+    """
+    _apply_safe_schedule_to_ram()
+    cp.log(f'iPerf3 schedule disabled at startup: {reason}')
 
 
 def _validate_loaded_iperf3_schedule():
@@ -5865,13 +5858,13 @@ def _validate_loaded_iperf3_schedule():
     # intentionally defaults to Public mode, an old User-server schedule
     # must never silently resume after upgrade.
     if saved_source not in ('public', 'user'):
-        _reset_iperf3_schedule(
+        _disable_unsafe_schedule_at_startup(
             'legacy schedule has no 2.7 server-source metadata'
         )
         return
 
     if saved_source != active_mode:
-        _reset_iperf3_schedule(
+        _disable_unsafe_schedule_at_startup(
             f'saved source {saved_source} does not match '
             f'active mode {active_mode}'
         )
@@ -5892,7 +5885,7 @@ def _validate_loaded_iperf3_schedule():
                 cache
             )
         ):
-            _reset_iperf3_schedule(
+            _disable_unsafe_schedule_at_startup(
                 'saved Public server no longer exists '
                 'in the active catalog'
             )
@@ -5905,7 +5898,7 @@ def _validate_loaded_iperf3_schedule():
                 cache
             )
         ):
-            _reset_iperf3_schedule(
+            _disable_unsafe_schedule_at_startup(
                 'saved User server no longer exists '
                 'in the User Server List'
             )
@@ -5915,7 +5908,11 @@ def _switch_iperf3_server_mode(
     mode,
     confirm_schedule_reset=False
 ):
-    """Safely replace the single active iPerf3 server source."""
+    """Safely replace the single active iPerf3 server source.
+
+    Persistence is routed through the canonical Configuration Manager as an
+    ordinary Device-only Save. There is no management-scope prompt.
+    """
     global _iperf3_server_settings
     global _active_iperf3_server_cache
 
@@ -5970,6 +5967,8 @@ def _switch_iperf3_server_mode(
             schedule_config
         )
 
+    schedule_reset_needed = False
+
     if _iperf3_schedule_is_configured(
         schedule_snapshot
     ):
@@ -5981,51 +5980,52 @@ def _switch_iperf3_server_mode(
                 'schedule_reset_required': True
             }, 409
 
-        # Safety-first ordering: remove the automated job before changing
-        # its server-source configuration.
-        _reset_iperf3_schedule(
-            'iPerf3 server mode changed'
-        )
+        # The schedule reset is folded into the SAME canonical transaction as
+        # the server-mode change (one revision / one Group JSON). It is not
+        # persisted separately.
+        schedule_reset_needed = True
 
-    updated = dict(settings)
-    updated['server_mode'] = mode
+    # Canonical value carries ONLY server_mode. last_public_region is RAM-only
+    # runtime state and is corrected in RAM below, never persisted.
+    section_updates = {
+        'iperf3_server_settings': {'server_mode': mode},
+    }
+    if schedule_reset_needed:
+        section_updates['schedule'] = _safe_empty_schedule()
 
+    # Compute the corrected remembered region for RAM only.
+    remembered_region = settings.get('last_public_region', '')
     if mode == 'public':
-        valid_regions = candidate.get(
-            'regions',
-            []
-        )
+        valid_regions = candidate.get('regions', [])
+        if valid_regions and remembered_region not in valid_regions:
+            remembered_region = valid_regions[0]
 
-        if (
-            valid_regions
-            and updated.get('last_public_region')
-            not in valid_regions
-        ):
-            updated['last_public_region'] = (
-                valid_regions[0]
-            )
+    # Persist the change(s) as ONE Device-only transaction. The manager handles
+    # mutation gating, revision-pair reconciliation, sparse Device section
+    # update, and read-back verified writes. Runtime RAM/cache is updated by the
+    # hot-reload callback ONLY after a successful write.
+    apply = persist_config_section(None, None, updates=section_updates)
 
-    # Persist the new mode before making it the active runtime cache.
-    # If this write fails, the current source remains authoritative.
-    try:
-        _persist_iperf3_server_settings(
-            updated
-        )
+    if apply.action == 'reconciled':
+        return {'status': 'reconciled', 'error': apply.message}, 409
 
-    except Exception as e:
+    if apply.action == 'blocked':
+        return {'status': 'upgrade_required', 'error': apply.message,
+                'block_reason': apply.block_reason}, 409
+
+    if apply.action != 'saved':
         return {
-            'error':
-                'Unable to persist iPerf3 server mode: '
-                f'{e}'
+            'error': apply.message or 'Unable to persist iPerf3 server mode.'
         }, 500
 
+    # Local write succeeded; hot-reload refreshed server_mode in RAM. Set the
+    # RAM-only last_public_region to the corrected remembered value (runtime
+    # state, never persisted).
     with _iperf3_server_settings_lock:
-        _iperf3_server_settings = dict(
-            updated
-        )
+        if isinstance(_iperf3_server_settings, dict):
+            _iperf3_server_settings['last_public_region'] = remembered_region
 
-    # Atomic reference replacement. The previous source is no longer
-    # retained as the active server cache.
+    # Replace the active server-source cache with the validated candidate.
     with _active_iperf3_server_cache_lock:
         _active_iperf3_server_cache = (
             candidate
@@ -6086,17 +6086,10 @@ def _read_user_iperf3_servers_for_edit():
                 if isinstance(server, dict)
             ]
 
-    value = cp.get_appdata('iperf3_servers')
-
-    if not value:
-        return []
-
-    servers = json.loads(value)
-
-    if not isinstance(servers, list):
-        raise ValueError(
-            'iperf3_servers appdata must contain a JSON list'
-        )
+    # Effective User Server list from the two-layer manager; legacy is never a
+    # fallback once a canonical key exists (§16).
+    effective_users = config_mgr.active_section('iperf3_user_servers')
+    servers = effective_users if isinstance(effective_users, list) else []
 
     return [
         dict(server)
@@ -6174,11 +6167,24 @@ def _user_server_refs(servers):
     return refs
 
 
+# Sentinel returned by _guard_user_server_list_change when the caller must
+# fold a schedule reset into the same canonical persistence transaction.
+SCHEDULE_RESET_REQUIRED = 'schedule_reset_required'
+
+
 def _guard_user_server_list_change(
     final_servers,
     confirm_schedule_reset=False
 ):
-    """Protect a scheduled User endpoint from destructive changes."""
+    """Protect a scheduled User endpoint from destructive changes.
+
+    Returns:
+      - None: no scheduled dependency affected; persist the list normally.
+      - dict (409 body): confirmation required before the change.
+      - SCHEDULE_RESET_REQUIRED: confirmed; the caller MUST persist the safe
+        empty schedule together with the server-list change as ONE canonical
+        transaction (do not persist the schedule separately here).
+    """
     scheduled_ref = _user_schedule_server_ref()
 
     if not scheduled_ref:
@@ -6198,11 +6204,7 @@ def _guard_user_server_list_change(
             'schedule_reset_required': True
         }
 
-    _reset_iperf3_schedule(
-        'scheduled User iPerf3 server was removed or changed'
-    )
-
-    return None
+    return SCHEDULE_RESET_REQUIRED
 
 
 def _persist_last_public_region_after_test(region):
@@ -6238,17 +6240,15 @@ def _persist_last_public_region_after_test(region):
     updated['last_public_region'] = region
 
     try:
-        _persist_iperf3_server_settings(
-            updated
-        )
-
+        # last_public_region is last-used RUNTIME state: update RAM only.
+        # Never persist to canonical (no config_revision bump) or legacy.
         with _iperf3_server_settings_lock:
             _iperf3_server_settings = dict(
                 updated
             )
 
         cp.log(
-            f'Updated last Public iPerf3 region after test: {region}'
+            f'Updated last Public iPerf3 region after test (RAM): {region}'
         )
 
     except Exception as e:
@@ -11349,11 +11349,10 @@ def run_ookla(interface=''):
 def write_outputs(entry):
     """Write test results to configured output paths."""
     try:
-        val = cp.get_appdata('speedtest_outputs')
-        if not val:
-            return
-        outputs = json.loads(val)
-        if not outputs:
+        # Configured output targets: EFFECTIVE (Device>Group>Default) from the
+        # two-layer manager. Legacy App Data is never a fallback (§16).
+        outputs = config_mgr.active_section('outputs')
+        if not isinstance(outputs, list) or not outputs:
             return
 
         # Format result text with datetime and interface/carrier
@@ -12103,7 +12102,7 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
 
         elif self.path == '/api/geo_settings':
             self.send_json(
-                load_geo_settings()
+                _effective_geo_settings()
             )
 
         elif (
@@ -12174,7 +12173,7 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             analysis['geo'] = (
                 apply_geo_settings(
                     geo,
-                    load_geo_settings(),
+                    _effective_geo_settings(),
                 )
             )
 
@@ -12199,12 +12198,16 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         elif self.path == '/api/schedule':
             with schedule_lock:
                 data = dict(schedule_config)
-            # Compute seconds until next cron match
-            if data.get('enabled') and data.get('cron'):
+            # 'enabled'/'autostart' are the persisted intent; 'running' is the
+            # runtime state (may be false after a restart when autostart is off
+            # even though enabled=true). Countdown reflects the RUNTIME state.
+            if data.get('running') and data.get('cron'):
                 data['next_run_seconds'] = self._seconds_to_next_cron(data['cron'])
             self.send_json(data)
         elif self.path == '/api/outputs':
             self.send_json(self.get_outputs())
+        elif self.path == '/api/config/state':
+            self.handle_config_state()
         elif self.path == '/api/iperf3/server_state':
             self.send_json(
                 _get_active_iperf3_server_state()
@@ -12272,6 +12275,35 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_save_outputs()
         elif self.path == '/api/geo_settings':
             self.handle_save_geo_settings()
+        # --- Two-layer Configuration Management endpoints (v1.1.2) ----------
+        elif self.path == '/api/config/state':
+            self.handle_config_state()
+        elif self.path == '/api/config/convert':
+            self.handle_config_convert()
+        elif self.path == '/api/config/group_upgrade_candidate':
+            self.handle_config_group_upgrade_candidate()
+        elif self.path == '/api/config/migrate/sections':
+            self.handle_config_migrate_sections()
+        elif self.path == '/api/config/migrate/candidate':
+            self.handle_config_migrate_candidate()
+        elif self.path == '/api/config/migrate/validate':
+            self.handle_config_migrate_validate()
+        elif self.path == '/api/config/migrate/cleanup':
+            self.handle_config_migrate_cleanup()
+        elif self.path == '/api/config/update_group/sections':
+            self.handle_config_update_group_sections()
+        elif self.path == '/api/config/update_group/candidate':
+            self.handle_config_update_group_candidate()
+        elif self.path == '/api/config/update_group/validate':
+            self.handle_config_update_group_validate()
+        elif self.path == '/api/config/update_group/cleanup':
+            self.handle_config_update_group_cleanup()
+        elif self.path == '/api/config/reset_section':
+            self.handle_config_reset_section()
+        elif self.path == '/api/config/reset':
+            self.handle_config_reset()
+        elif self.path == '/api/config/factory_reset':
+            self.handle_config_factory_reset()
         else:
             self.send_error(404)
 
@@ -12281,6 +12313,327 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_delete_server()
         else:
             self.send_error(404)
+
+    # =====================================================================
+    # CANONICAL CONFIGURATION MANAGEMENT ENDPOINTS (v1.1.2)
+    # =====================================================================
+
+    def handle_config_state(self):
+        """Return the two-layer configuration state (§53).
+
+        Exposes the LOCKED new model: derived state, per-layer presence /
+        revision / schema_version, override sections, and mutation-block info.
+        Old origin/mode is NEVER exposed as the source of truth.
+        """
+        try:
+            report = config_mgr.state_report()
+
+            try:
+                report['history_count'] = len(load_history())
+            except Exception:
+                report['history_count'] = None
+            report['history_capacity'] = MAX_HISTORY
+            report['app_version'] = APP_VERSION
+
+            self.send_json(report)
+        except Exception as exc:
+            cp.log(f'Config state error: {exc}')
+            self.send_json({'error': 'Unable to read configuration state.'},
+                           500)
+
+    def handle_config_convert(self):
+        """Convert legacy/experimental OR older-schema Device config (§17-§21,
+        §49). This is the ONLY action that migrates data to
+        speedtest_analyzer_device."""
+        block = config_mgr.mutation_blocked()
+        device_load = config_mgr._load_layer('device')
+        if device_load.status == 'older':
+            result = config_mgr.convert_older_device_schema()
+        else:
+            result = config_mgr.convert_legacy_to_device()
+        if result.status == 'saved':
+            self.send_json({'status': 'converted', 'message': result.message})
+        else:
+            self.send_json({'status': 'error',
+                            'error': result.error or 'Conversion failed.'},
+                           409)
+
+    def handle_config_group_upgrade_candidate(self):
+        """Return an upgraded Group JSON candidate for an older Group schema
+        (§50). Never written locally."""
+        cand = config_mgr.build_group_upgrade_candidate()
+        if cand is None:
+            self.send_json({'error': 'No older-schema Group configuration to '
+                                     'upgrade.'}, 409)
+            return
+        self.send_json({
+            'status': 'candidate',
+            'sdk_data_name': config_mgr.GROUP_KEY,
+            'config_json': cand.to_json(),
+            'group_revision': cand.group_revision,
+        })
+
+    # --- Group Migration wizard (selection-only, group-first) ---------------
+
+    def handle_config_migrate_sections(self):
+        """Return the configured Device sections eligible for Group promotion
+        (§25). Selection only; no configuration values are editable here."""
+        try:
+            sections = config_mgr.migration_available_sections()
+            self.send_json({'status': 'ok', 'sections': sections})
+        except Exception as exc:
+            cp.log(f'Migration sections error: {exc}')
+            self.send_json({'error': 'Unable to read migration sections.'},
+                           500)
+
+    def handle_config_migrate_candidate(self):
+        """Validate the selection and build the Group candidate JSON (§27-§29).
+
+        Nothing is written locally. Returns the SDK Data NAME and the complete
+        Group JSON VALUE for the user to paste into the NCM Group.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        selected = data.get('sections')
+        if not isinstance(selected, list):
+            self.send_json({'error': 'sections list required.'}, 400)
+            return
+        cand, reason = config_mgr.build_group_migration_candidate(selected)
+        if cand is None:
+            self.send_json({'status': 'invalid', 'reason': reason}, 409)
+            return
+        self.send_json({
+            'status': 'candidate',
+            'sdk_data_name': config_mgr.GROUP_KEY,
+            'config_json': cand.to_json(),
+            'group_revision': cand.group_revision,
+            'promoted_sections': selected,
+        })
+
+    def handle_config_migrate_validate(self):
+        """Validate the expected Group payload is visible on device (§30).
+
+        Does NOT claim NCM provenance. Does NOT mutate the Device document.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        try:
+            revision = int(data.get('group_revision', 1))
+        except Exception:
+            revision = 1
+        result = config_mgr.validate_group_present(revision)
+        if result.ok:
+            self.send_json({'status': 'validated', 'message': result.reason})
+        else:
+            self.send_json({'status': 'not_yet', 'reason': result.reason})
+
+    def handle_config_migrate_cleanup(self):
+        """Trim promoted sections from the Device document AFTER Group
+        validation (§31, §32, §34). Supports cleanup retry on failure."""
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        promoted = data.get('promoted_sections')
+        if not isinstance(promoted, list):
+            self.send_json({'error': 'promoted_sections list required.'}, 400)
+            return
+        result = config_mgr.trim_promoted_device_sections(promoted)
+        if result.status == 'saved':
+            self.send_json({'status': 'complete', 'message': result.message})
+        else:
+            # Group stays intact; Device cleanup incomplete -> allow retry.
+            self.send_json({'status': 'cleanup_incomplete',
+                            'error': result.error}, 409)
+
+    # --- Update NCM Group Configuration (promote into an EXISTING Group) -----
+
+    def handle_config_update_group_sections(self):
+        """Return the current Device overrides eligible for Group update.
+
+        Same shape as the migrate wizard: {section, label, default_selected,
+        promotable, reason}. Shows ONLY current Device overrides.
+        """
+        try:
+            sections = config_mgr.update_group_available_sections()
+            self.send_json({'status': 'ok', 'sections': sections})
+        except Exception as exc:
+            cp.log(f'Update-group sections error: {exc}')
+            self.send_json({'error': 'Unable to read Device overrides.'}, 500)
+
+    def handle_config_update_group_candidate(self):
+        """Validate the selection and build the REVISED Group candidate JSON.
+
+        Starts from a deep copy of the current Group and promotes ONLY the
+        selected Device sections. group_revision = current + 1. Nothing is
+        written locally. Returns the SDK Data NAME, the complete revised Group
+        VALUE, the current + new group_revision, the promoted sections, and the
+        reconciliation token (group_revision, device_revision).
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        selected = data.get('sections')
+        if not isinstance(selected, list):
+            self.send_json({'error': 'sections list required.'}, 400)
+            return
+        cand, reason, token = config_mgr.build_group_update_candidate(selected)
+        if cand is None:
+            self.send_json({'status': 'invalid', 'reason': reason}, 409)
+            return
+        self.send_json({
+            'status': 'candidate',
+            'sdk_data_name': config_mgr.GROUP_KEY,
+            'config_json': cand.to_json(),
+            'new_group_revision': cand.group_revision,
+            'current_group_revision': cand.group_revision - 1,
+            'promoted_sections': selected,
+            'token': token,
+        })
+
+    def handle_config_update_group_validate(self):
+        """Validate the revised Group payload is visible at the new revision.
+
+        Honors the reconciliation token: if the Device changed during the
+        staged workflow the update is aborted and the user must restart. Does
+        NOT mutate the Device document; does NOT claim NCM provenance.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        try:
+            revision = int(data.get('new_group_revision'))
+        except Exception:
+            self.send_json({'error': 'new_group_revision required.'}, 400)
+            return
+        token = data.get('token')
+        if token is not None and not isinstance(token, dict):
+            self.send_json({'error': 'token must be an object.'}, 400)
+            return
+        result = config_mgr.validate_group_update(revision, token=token)
+        if result.ok:
+            self.send_json({'status': 'validated', 'message': result.reason})
+        elif getattr(result, 'reconcile_aborted', False):
+            # Device changed during the staged workflow: this is NOT a
+            # "retry validate" case -- the whole workflow must be restarted.
+            self.send_json({'status': 'reconcile_aborted',
+                            'reason': result.reason}, 409)
+        else:
+            self.send_json({'status': 'not_yet', 'reason': result.reason})
+
+    def handle_config_update_group_cleanup(self):
+        """Remove promoted Device sections AFTER the revised Group validated.
+
+        Honors the reconciliation token. On failure the Group is left intact
+        and cleanup_incomplete is returned (Device still wins); Retry allowed.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        promoted = data.get('promoted_sections')
+        if not isinstance(promoted, list):
+            self.send_json({'error': 'promoted_sections list required.'}, 400)
+            return
+        token = data.get('token')
+        if token is not None and not isinstance(token, dict):
+            self.send_json({'error': 'token must be an object.'}, 400)
+            return
+        result = config_mgr.cleanup_promoted_after_group_update(
+            promoted, token=token)
+        if result.status == 'saved':
+            self.send_json({'status': 'complete', 'message': result.message})
+        elif getattr(result, 'reconcile_aborted', False):
+            # Device changed during the staged workflow: restart required, NOT
+            # a cleanup retry (retrying with a stale token keeps failing).
+            self.send_json({'status': 'reconcile_aborted',
+                            'error': result.error}, 409)
+        else:
+            self.send_json({'status': 'cleanup_incomplete',
+                            'error': result.error}, 409)
+
+    # --- Device override reset (§36, §37) -----------------------------------
+
+    def handle_config_reset_section(self):
+        """Reset ONE Device override section (§36).
+
+        The manager validates the PROPOSED effective config first. When the
+        requested reset alone would create a dependency conflict (the confirmed
+        iPerf3 schedule <-> server-mode defect) it returns
+        dependency_reset_required with the coupled sections and NOTHING is
+        written; the frontend confirms a coupled reset by re-POSTing with
+        confirm_sections. On success reset_target says whether the section
+        inherited the NCM Group value or the Built-in Default (§ wording fix).
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        section = data.get('section')
+        if not section:
+            self.send_json({'error': 'section required.'}, 400)
+            return
+        confirm_sections = data.get('confirm_sections')
+        if confirm_sections is not None and \
+                not isinstance(confirm_sections, list):
+            self.send_json({'error': 'confirm_sections must be a list.'}, 400)
+            return
+        result = config_mgr.reset_section_to_group(
+            section, confirm_sections=confirm_sections)
+        if result.status == 'saved':
+            self.send_json({'status': 'reset', 'message': result.message,
+                            'reset_target': result.reset_target})
+        elif result.status == 'dependency_reset_required':
+            dep = result.dependency or {}
+            self.send_json({
+                'status': 'dependency_reset_required',
+                'requested_section': dep.get('requested_section'),
+                'requested_label': dep.get('requested_label'),
+                'required_reset_sections': dep.get('required_reset_sections',
+                                                   []),
+                'required_reset_labels': dep.get('required_reset_labels', []),
+                'reason': dep.get('reason', ''),
+                'reset_target': dep.get('reset_target'),
+            }, 409)
+        else:
+            self.send_json({'status': 'error',
+                            'error': result.error or 'Reset failed.'}, 409)
+
+    def handle_config_reset(self):
+        """Reset ALL Device overrides (§37) / Device-only reset (§38).
+
+        Never deletes speedtest_analyzer_group.
+        """
+        result = config_mgr.reset_all_device_overrides()
+        if result.status == 'saved':
+            self.send_json({'status': 'reset', 'message': result.message})
+        else:
+            self.send_json({'status': 'error',
+                            'error': result.error or 'Reset failed.'}, 409)
+
+    def handle_config_factory_reset(self):
+        """Factory Reset (explicit confirmation required in request body)."""
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        if not data.get('confirm'):
+            self.send_json({'error': 'Explicit confirmation required.'}, 400)
+            return
+        outcome = config_mgr.factory_reset(clear_history_fn=clear_history_storage)
+        self.send_json({
+            'status': 'factory_reset',
+            'removed_appdata': outcome.removed_appdata,
+            'removed_files': outcome.removed_files,
+            'kept_group_config': outcome.kept_group,
+            'message': outcome.message,
+        })
 
     def handle_save_geo_settings(self):
         """Persist explicit provider-independent GeoView configuration."""
@@ -12312,39 +12665,23 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             )
             return
 
+        # Validate/normalize the incoming GeoView settings WITHOUT persisting
+        # to the legacy geoview_settings key. Persistence is routed through the
+        # canonical Configuration Manager so it participates in the Device/
+        # NCM Group workflow like every other normal configuration section.
         try:
-            saved = save_geo_settings(
-                data
-            )
+            normalized = config_mgr.cellular_geo.normalize_geo_settings(
+                data, mark_configured=True)
+            geoview_value = config_mgr.cellular_geo._persisted_settings(
+                normalized)
 
         except ValueError as exc:
-            self.send_json(
-                {
-                    'error':
-                        str(exc)
-                },
-                400,
-            )
+            self.send_json({'error': str(exc)}, 400)
             return
 
-        except OSError as exc:
-            cp.log(
-                'Unable to save GeoView settings: %s'
-                % exc
-            )
-
-            self.send_json(
-                {
-                    'error':
-                        'Unable to save GeoView settings'
-                },
-                500,
-            )
-            return
-
-        self.send_json(
-            saved
-        )
+        self._respond_config_apply(
+            'geoview', geoview_value,
+            success_payload=normalized)
 
 
     def handle_set_iperf3_server_mode(self):
@@ -12610,15 +12947,16 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         Appdata format: [{"server":"host","port":"5201-5210","country":"US","city":"Seattle"}, ...]
         Port can be a single port ("5201") or a range ("5201-5210").
         """
-        # Try appdata first (allows NCM group config push)
+        # Effective (Device>Group>Default) User Server list from the two-layer
+        # manager. Legacy App Data is never a fallback once a canonical key
+        # exists (§16); the manager surfaces legacy through its effective
+        # config only while in upgrade-required compatibility mode.
         try:
-            servers_json = cp.get_appdata('iperf3_servers')
-            if servers_json:
-                servers = json.loads(servers_json)
-                if isinstance(servers, list) and len(servers) > 0:
-                    return servers
+            effective_users = config_mgr.active_section('iperf3_user_servers')
+            if isinstance(effective_users, list) and len(effective_users) > 0:
+                return effective_users
         except Exception as e:
-            cp.log(f'Error reading iperf3_servers appdata: {e}')
+            cp.log(f'Error reading iperf3 user servers: {e}')
 
         # Fall back to bundled JSON file
         servers = []
@@ -12934,41 +13272,21 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         })
 
     def get_netperf_servers(self):
-        """Return Netperf servers without touching iPerf3 appdata."""
-        try:
-            value = cp.get_appdata(
-                'netperf_servers'
-            )
+        """Return EFFECTIVE Netperf servers from the two-layer manager.
 
-            if value:
-                servers = json.loads(
-                    value
-                )
-
-                if isinstance(
-                    servers,
-                    list
-                ):
-                    return servers
-
-        except Exception as e:
-            cp.log(
-                f'Error reading netperf_servers appdata: {e}'
-            )
-
+        Legacy App Data is never a fallback once a canonical key exists (§16).
+        """
+        effective_netperf = config_mgr.active_section('netperf_servers')
+        if isinstance(effective_netperf, list):
+            return effective_netperf
         return []
 
 
     def get_all_servers(self):
         """Get all saved servers (netperf and iperf3) from appdata."""
         result = {'netperf': [], 'iperf3': []}
-        # Netperf servers
-        try:
-            val = cp.get_appdata('netperf_servers')
-            if val:
-                result['netperf'] = json.loads(val)
-        except Exception:
-            pass
+        # Netperf servers (canonical RAM once adopted; legacy on Day-1).
+        result['netperf'] = self.get_netperf_servers()
         # iPerf3 servers
         result['iperf3'] = self.get_iperf3_servers()
         return result
@@ -13121,32 +13439,19 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to save User Server List: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(final_servers)
-
-        self.send_json({
-            'status': 'saved',
-            'server_ref': new_ref,
-            'total': len(final_servers)
-        })
+        # Persist through the canonical Configuration Manager (no legacy
+        # write). If the change also requires a schedule reset, both are
+        # persisted as ONE transaction. Refresh the active User cache only
+        # after a successful local save.
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'saved',
+                'server_ref': new_ref,
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_user_iperf3_edit(self):
@@ -13268,39 +13573,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             )
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as error:
-            self.send_json({
-                'error': (
-                    'Unable to edit User server: {}'
-                ).format(error)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(
-            final_servers
-        )
-
-        self.send_json({
-            'status': 'edited',
-            'server_ref': new_ref,
-            'previous_server_ref': original_ref,
-            'endpoint_changed': (
-                new_ref != original_ref
-            ),
-            'total': len(final_servers)
-        })
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'edited',
+                'server_ref': new_ref,
+                'previous_server_ref': original_ref,
+                'endpoint_changed': (new_ref != original_ref),
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_user_iperf3_delete(self):
@@ -13351,31 +13634,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to delete User server: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(final_servers)
-
-        self.send_json({
-            'status': 'deleted',
-            'total': len(final_servers)
-        })
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'deleted',
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_user_iperf3_delete_all(self):
@@ -13405,28 +13671,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                '[]'
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to clear User Server List: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache([])
-
-        self.send_json({
-            'status': 'deleted_all',
-            'total': 0
-        })
+        result = respond_user_iperf3_list_apply(
+            self, [], guard,
+            success_payload={
+                'status': 'deleted_all',
+                'total': 0,
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache([])
 
 
     def handle_user_iperf3_import(self):
@@ -13586,34 +13838,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to save imported User Server List: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(final_servers)
-
-        self.send_json({
-            'status': 'imported',
-            'mode': mode,
-            'added': added,
-            'duplicates_skipped': duplicate_count,
-            'total': len(final_servers)
-        })
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'imported',
+                'mode': mode,
+                'added': added,
+                'duplicates_skipped': duplicate_count,
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_save_server(self):
@@ -13778,53 +14013,19 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
-            if guard:
-                self.send_json(
-                    guard,
-                    409
-                )
-                return
-
-            try:
-                cp.put_appdata(
-                    'iperf3_servers',
-                    json.dumps(
-                        final_servers,
-                        separators=(',', ':')
-                    )
-                )
-
-            except Exception as e:
-                self.send_json({
-                    'error':
-                        f'Unable to save User Server List: {e}'
-                }, 500)
-                return
-
-            _sync_active_user_iperf3_cache(
-                final_servers
-            )
-
-            self.send_json({
-                'status': 'saved',
-                'servers': final_servers
-            })
+            result = respond_user_iperf3_list_apply(
+                self, final_servers, guard,
+                success_payload={
+                    'status': 'saved',
+                    'servers': final_servers,
+                })
+            if result and result.action == 'saved':
+                _sync_active_user_iperf3_cache(final_servers)
             return
 
-        # Preserve existing Netperf storage behavior.
-        try:
-            existing = cp.get_appdata(
-                'netperf_servers'
-            )
-
-            servers = (
-                json.loads(existing)
-                if existing
-                else []
-            )
-
-        except Exception:
-            servers = []
+        # Netperf: read current list (canonical RAM once adopted), append,
+        # persist through the Configuration Manager (no legacy write).
+        servers = self.get_netperf_servers()
 
         server_host = server_entry.get(
             'server',
@@ -13843,15 +14044,12 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             server_entry
         )
 
-        cp.put_appdata(
-            'netperf_servers',
-            json.dumps(servers)
-        )
-
-        self.send_json({
-            'status': 'saved',
-            'servers': servers
-        })
+        respond_config_apply_on(
+            self, 'netperf_servers', servers,
+            success_payload={
+                'status': 'saved',
+                'servers': servers,
+            })
 
     def handle_delete_server(self):
         """Delete one server and protect dependent User schedules."""
@@ -13991,29 +14189,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
-            if guard:
-                self.send_json(
-                    guard,
-                    409
-                )
-                return
-
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-
-            _sync_active_user_iperf3_cache(
-                final_servers
-            )
-
-            self.send_json({
-                'status': 'deleted',
-                'servers': final_servers
-            })
+            result = respond_user_iperf3_list_apply(
+                self, final_servers, guard,
+                success_payload={
+                    'status': 'deleted',
+                    'servers': final_servers,
+                })
+            if result and result.action == 'saved':
+                _sync_active_user_iperf3_cache(final_servers)
             return
 
         if not engine or not server_host:
@@ -14023,19 +14206,9 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             }, 400)
             return
 
-        try:
-            existing = cp.get_appdata(
-                'netperf_servers'
-            )
-
-            servers = (
-                json.loads(existing)
-                if existing
-                else []
-            )
-
-        except Exception:
-            servers = []
+        # Netperf: read current list (canonical RAM once adopted), remove the
+        # host, persist through the Configuration Manager (no legacy write).
+        servers = self.get_netperf_servers()
 
         servers = [
             server
@@ -14045,15 +14218,12 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             ) != server_host
         ]
 
-        cp.put_appdata(
-            'netperf_servers',
-            json.dumps(servers)
-        )
-
-        self.send_json({
-            'status': 'deleted',
-            'servers': servers
-        })
+        respond_config_apply_on(
+            self, 'netperf_servers', servers,
+            success_payload={
+                'status': 'deleted',
+                'servers': servers,
+            })
 
     def handle_delete_all_servers(self):
         """Clear the complete User iPerf3 Server List safely."""
@@ -14131,29 +14301,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             )
         )
 
-        if guard:
-            self.send_json(
-                guard,
-                409
-            )
-            return
-
-        # Keep the SDK appdata key but clear its value to a valid
-        # empty JSON list. This is one deterministic SDK write and
-        # avoids a delete/read/recreate lifecycle.
-        cp.put_appdata(
-            'iperf3_servers',
-            '[]'
-        )
-
-        _sync_active_user_iperf3_cache(
-            []
-        )
-
-        self.send_json({
-            'status': 'deleted_all',
-            'servers': []
-        })
+        # Clear the User iPerf3 list through the canonical Configuration
+        # Manager (no legacy write), folding any required schedule reset into
+        # the same transaction.
+        result = respond_user_iperf3_list_apply(
+            self, [], guard,
+            success_payload={
+                'status': 'deleted_all',
+                'servers': [],
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache([])
 
 
     def handle_import_servers(self):
@@ -14451,46 +14609,21 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
-            if guard:
-                self.send_json(
-                    guard,
-                    409
-                )
-                return
-
-            try:
-                cp.put_appdata(
-                    'iperf3_servers',
-                    json.dumps(
-                        final_servers,
-                        separators=(',', ':')
-                    )
-                )
-
-            except Exception as e:
-                self.send_json({
-                    'error':
-                        f'Unable to save imported User Server List: {e}'
-                }, 500)
-                return
-
-            _sync_active_user_iperf3_cache(
-                final_servers
-            )
-
-            self.send_json({
-                'status': 'imported',
-                'mode': mode,
-                'added': added,
-                'duplicates_skipped':
-                    duplicate_count,
-                'total':
-                    len(final_servers)
-            })
+            result = respond_user_iperf3_list_apply(
+                self, final_servers, guard,
+                success_payload={
+                    'status': 'imported',
+                    'mode': mode,
+                    'added': added,
+                    'duplicates_skipped': duplicate_count,
+                    'total': len(final_servers),
+                })
+            if result and result.action == 'saved':
+                _sync_active_user_iperf3_cache(final_servers)
             return
 
         # -------------------------------------------------------------
-        # Existing Netperf import behavior
+        # Netperf import behavior (routed through Configuration Manager)
         # -------------------------------------------------------------
         mode = data.get(
             'mode',
@@ -14592,19 +14725,7 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
 
         if mode == 'merge':
             try:
-                existing_json = (
-                    cp.get_appdata(
-                        'netperf_servers'
-                    )
-                )
-
-                existing = (
-                    json.loads(
-                        existing_json
-                    )
-                    if existing_json
-                    else []
-                )
+                existing = self.get_netperf_servers()
 
             except Exception:
                 existing = []
@@ -14633,22 +14754,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 valid_entries
             )
 
-        cp.put_appdata(
-            'netperf_servers',
-            json.dumps(
-                final_servers
-            )
-        )
-
-        self.send_json({
-            'status': 'imported',
-            'imported':
-                len(valid_entries),
-            'skipped':
-                skipped,
-            'total':
-                len(final_servers)
-        })
+        respond_config_apply_on(
+            self, 'netperf_servers', final_servers,
+            success_payload={
+                'status': 'imported',
+                'imported': len(valid_entries),
+                'skipped': skipped,
+                'total': len(final_servers),
+            })
 
     def get_cell_diagnostics(self):
         """Return raw modem diagnostics for every cellular WAN device.
@@ -15068,19 +15181,51 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             'engine': schedule_engine,
             'params': schedule_params
         }
-        save_schedule(config)
-        status = 'enabled' if config['enabled'] else 'disabled'
-        cp.log(f'Schedule {status}: {config["cron"]}')
-        self.send_json({'status': status, 'schedule': config})
+
+        # Persist through the canonical Configuration Manager. All schedule
+        # feature validation above has already passed; the manager handles
+        # mutation gating, revision reconciliation, and read-back writes.
+        apply_result = self._respond_config_apply(
+            'schedule', config,
+            success_payload={
+                'status': ('enabled' if config['enabled'] else 'disabled'),
+                'schedule': config,
+            })
+
+        # Explicit Schedule Save is an APPLY/RUNTIME action: the schedule must
+        # run now when enabled=true, INDEPENDENT of autostart. When the save
+        # was a persistence NO-OP (e.g. after a restart the persisted schedule
+        # is enabled=true/autostart=false so runtime was not running, and the
+        # user re-saves the unchanged schedule), the manager does not hot-reload
+        # -- so we set the runtime running flag here without forcing any write
+        # or device_revision increment. Only on a successful save/no-op-save
+        # (never on reconciled/blocked/error).
+        if apply_result is not None and apply_result.action == 'saved':
+            with schedule_lock:
+                schedule_config['running'] = bool(config['enabled'])
+                schedule_config['enabled'] = bool(config['enabled'])
+                schedule_config['autostart'] = bool(config['autostart'])
+
+    def _respond_config_apply(self, section, value,
+                              success_payload=None):
+        """Route an ordinary section save through the manager + reply.
+
+        Thin method wrapper around the module-level respond_config_apply_on so
+        every Save surface shares one contract. Returns the ConfigApplyResult.
+        """
+        return respond_config_apply_on(
+            self, section, value,
+            success_payload or {'status': 'saved'})
 
     def get_outputs(self):
-        """Get configured output paths."""
-        try:
-            val = cp.get_appdata('speedtest_outputs')
-            if val:
-                return {'outputs': json.loads(val)}
-        except Exception:
-            pass
+        """Get EFFECTIVE configured output paths from the two-layer manager.
+
+        Legacy App Data is never a fallback once a canonical key exists (§16);
+        the manager's effective config already reflects the correct layer.
+        """
+        effective_outputs = config_mgr.active_section('outputs')
+        if isinstance(effective_outputs, list):
+            return {'outputs': effective_outputs}
         return {'outputs': []}
 
     def handle_save_outputs(self):
@@ -15093,9 +15238,10 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.send_json({'error': 'Invalid JSON'}, 400)
             return
         outputs = data.get('outputs', [])
-        cp.put_appdata('speedtest_outputs', json.dumps(outputs))
         cp.log(f'Outputs configured: {outputs}')
-        self.send_json({'status': 'saved', 'outputs': outputs})
+        self._respond_config_apply(
+            'outputs', outputs,
+            success_payload={'status': 'saved', 'outputs': outputs})
 
     def send_json(self, data, code=200):
         """Send a JSON response."""
@@ -15196,34 +15342,376 @@ def cron_matches(cron_expr, dt):
 
 
 def load_schedule():
-    """Load saved schedule; runtime enablement follows autostart."""
-    global schedule_config
+    """DEPRECATED (v1.1.2 two-layer): schedule is loaded from the EFFECTIVE
+    configuration by config_mgr.initialize() -> _apply_config_to_runtime().
+
+    This no longer reads the fragmented legacy ``speedtest_schedule`` key
+    directly: once either canonical key exists, legacy is never a fallback
+    (§16), and while upgrade_required the manager surfaces legacy through its
+    effective compatibility view. Kept as a safe no-op so any residual caller
+    does not reintroduce a legacy read.
+    """
+    return
+
+
+# =============================================================================
+# TWO-LAYER CONFIGURATION INTEGRATION (v1.1.2)
+# =============================================================================
+#
+# Effective configuration is the section-level merge of the two canonical
+# layers (speedtest_analyzer_device > speedtest_analyzer_group > built-in
+# defaults). Ordinary user changes are persisted ONLY to
+# speedtest_analyzer_device through the Configuration Manager. The Group key is
+# never written locally. Runtime readers consult the EFFECTIVE config (via
+# config_mgr.active_section); fragmented legacy App Data is NEVER a fallback
+# once either canonical key exists (§16). The hot-reload callback below
+# repopulates RAM globals/caches from the effective config. No legacy or Group
+# App Data is written by any of this.
+
+# Runtime-only Device GPS fix, refreshed when the effective GeoView policy is
+# device_gps becomes authoritative (save/convert/validate/reset/startup) and on
+# explicit Refresh GPS. This is RUNTIME STATE ONLY: it is never persisted into
+# either canonical key and never triggers a revision increment (§39-§41).
+_device_gps_runtime = {
+    'polled': False,
+    'gps_lock': False,
+    'latitude': None,
+    'longitude': None,
+    'polled_at': None,
+    'status': 'unknown',   # 'lock' | 'no_lock' | 'unavailable' | 'unknown'
+}
+_device_gps_runtime_lock = threading.Lock()
+
+
+def _poll_device_gps_runtime(reason=''):
+    """Perform ONE fresh Device GPS acquisition and store it in RUNTIME only.
+
+    Uses the existing safe, non-blocking status read (cp.get_gps_status), the
+    same call the on-demand Refresh GPS path uses. No background thread is
+    started. No App Data is written; no revision changes. "No Lock" is a valid
+    outcome: the app stays in Device GPS mode and does NOT fall back to
+    manual/default/fake coordinates. Never raises.
+    """
+    global _device_gps_runtime
     try:
-        val = cp.get_appdata('speedtest_schedule')
-        if val:
-            data = json.loads(val)
-            with schedule_lock:
-                schedule_config.update(data)
+        gps = cp.get_gps_status() or {}
+    except Exception as exc:
+        cp.log('GeoView: Device GPS poll unavailable (%s): %s'
+               % (reason, exc))
+        with _device_gps_runtime_lock:
+            _device_gps_runtime = {
+                'polled': True, 'gps_lock': False, 'latitude': None,
+                'longitude': None, 'polled_at': time.time(),
+                'status': 'unavailable',
+            }
+        return
 
-                # Preserve the saved job configuration, but only
-                # resume execution after restart when Auto-start
-                # on boot was explicitly enabled.
-                schedule_config['enabled'] = bool(
-                    schedule_config.get(
-                        'autostart',
-                        False
-                    )
-                )
-    except Exception:
-        pass
+    lock_val = gps.get('gps_lock')
+    if lock_val is None:
+        lock_val = gps.get('lock')
+    gps_lock = bool(lock_val)
+    latitude = gps.get('latitude')
+    longitude = gps.get('longitude')
+
+    usable = gps_fix_is_usable({
+        'gps_lock': gps_lock, 'latitude': latitude, 'longitude': longitude,
+    })
+
+    with _device_gps_runtime_lock:
+        if usable:
+            _device_gps_runtime = {
+                'polled': True, 'gps_lock': True, 'latitude': latitude,
+                'longitude': longitude, 'polled_at': time.time(),
+                'status': 'lock',
+            }
+        else:
+            # No Lock is valid. Stay in Device GPS mode; do NOT fabricate or
+            # fall back to any other coordinates.
+            _device_gps_runtime = {
+                'polled': True, 'gps_lock': False, 'latitude': None,
+                'longitude': None, 'polled_at': time.time(),
+                'status': 'no_lock',
+            }
+    cp.log('GeoView: Device GPS poll (%s) -> %s'
+           % (reason, 'lock' if usable else 'no_lock'))
 
 
-def save_schedule(config):
-    """Save schedule to appdata."""
+def get_device_gps_runtime():
+    """Return a copy of the current runtime Device GPS fix (never persisted)."""
+    with _device_gps_runtime_lock:
+        return dict(_device_gps_runtime)
+
+
+def _apply_config_to_runtime(effective):
+    """Reinitialize affected runtime subsystems from the EFFECTIVE config.
+
+    Called by the Configuration Manager after any successful save/convert/
+    reload with the EFFECTIVE (merged Device>Group>Default) config body. This
+    updates ONLY in-RAM structures and caches. It NEVER writes configuration
+    back into any App Data key: a group-managed configuration must not cause
+    the device to create or update device-level App Data.
+
+    Architecture:
+        (group,device) layers -> effective RAM body -> runtime globals/caches.
+
+    When the effective GeoView policy is device_gps, ONE fresh GPS acquisition
+    is triggered here (runtime-only). Never raises.
+    """
     global schedule_config
-    with schedule_lock:
-        schedule_config.update(config)
-    cp.put_appdata('speedtest_schedule', json.dumps(config))
+    global _iperf3_server_settings
+
+    # True only while the startup initialize() apply runs. Used to suppress
+    # runtime auto-start of an enabled-but-not-autostart schedule after a
+    # restart, WITHOUT writing enabled=false back to App Data. Module-scope
+    # default set below.
+    global _config_startup_apply
+
+    # The hot-reload callback receives the effective config body directly
+    # (already section-merged). Tolerate a wrapped {'config': {...}} shape too.
+    if isinstance(effective, dict) and 'config' in effective and \
+            isinstance(effective.get('config'), dict):
+        body = effective['config']
+    else:
+        body = effective if isinstance(effective, dict) else {}
+
+    # --- Scheduled Tasks -----------------------------------------------------
+    schedule = body.get('schedule')
+    if isinstance(schedule, dict):
+        try:
+            with schedule_lock:
+                # enabled and autostart are INDEPENDENT PERSISTED fields and
+                # are mirrored into runtime EXACTLY as persisted -- we never
+                # mutate persisted/effective 'enabled' here. The separate
+                # RUNTIME flag schedule_config['running'] controls whether the
+                # scheduler thread actually fires.
+                schedule_config.update({
+                    'enabled': bool(schedule.get('enabled', False)),
+                    'autostart': bool(schedule.get('autostart', False)),
+                    'cron': schedule.get('cron', ''),
+                    'engine': schedule.get('engine', 'netperf'),
+                    'params': dict(schedule.get('params', {})),
+                })
+                # Derive the runtime running state via the single shared helper
+                # (config_mgr.compute_schedule_running) so the web layer and the
+                # regression tests use ONE source of truth:
+                #   - startup/boot apply: running = enabled AND autostart
+                #   - interactive save/apply: running = enabled
+                enabled = schedule_config['enabled']
+                autostart = schedule_config['autostart']
+                schedule_config['running'] = config_mgr.compute_schedule_running(
+                    enabled, autostart, is_startup=_config_startup_apply)
+                if _config_startup_apply and enabled and not autostart:
+                    cp.log('Schedule: enabled but autostart=false -> not '
+                           'auto-starting after restart (persisted enabled '
+                           'preserved; runtime not running)')
+        except Exception as e:
+            cp.log(f'Config apply (schedule) error: {e}')
+
+    # --- iPerf3 server settings ---------------------------------------------
+    # Only server_mode is canonical. last_public_region is RAM-only runtime
+    # state and is preserved across a canonical apply (never sourced from or
+    # written to canonical).
+    iperf3_settings = body.get('iperf3_server_settings')
+    if isinstance(iperf3_settings, dict):
+        try:
+            mode = iperf3_settings.get('server_mode', 'public')
+            with _iperf3_server_settings_lock:
+                remembered_region = ''
+                if isinstance(_iperf3_server_settings, dict):
+                    remembered_region = _iperf3_server_settings.get(
+                        'last_public_region', '')
+                _iperf3_server_settings = {
+                    'server_mode': mode,
+                    'last_public_region': remembered_region,
+                }
+            # Rebuild the active server-source RAM cache from the new settings.
+            # (Reads the bundled public catalog / canonical user list; no
+            # legacy App Data write.)
+            _load_active_iperf3_server_cache(force=True)
+        except Exception as e:
+            cp.log(f'Config apply (iperf3 settings) error: {e}')
+
+    # --- GeoView authoritative Device-GPS poll ------------------------------
+    # When the newly authoritative effective GeoView policy is device_gps,
+    # trigger ONE fresh runtime GPS acquisition (§40, §41). This covers every
+    # activation path because the manager calls this callback after Device
+    # save, legacy/experimental conversion, Group validation, Device-override
+    # removal, and startup. Runtime-only; no writes; no revision change.
+    geoview = body.get('geoview')
+    if isinstance(geoview, dict) and \
+            geoview.get('active_location_source') == 'device_gps':
+        try:
+            _poll_device_gps_runtime(reason='effective device_gps authoritative')
+        except Exception as e:
+            cp.log(f'Config apply (geoview device_gps poll) error: {e}')
+
+
+def _effective_geo_settings():
+    """Return the EFFECTIVE GeoView settings (Device>Group>Default merge).
+
+    The effective ``geoview`` section stores the GeoView persisted sub-object
+    (schema 2); run it through the GeoView normalizer so callers receive the
+    same fully normalized structure that load_geo_settings() returns. No
+    legacy App Data is written or consulted here once the manager is loaded.
+    """
+    effective_geo = config_mgr.active_section('geoview')
+    if effective_geo is not None:
+        try:
+            return config_mgr.cellular_geo.normalize_geo_settings(effective_geo)
+        except Exception as exc:
+            cp.log(f'Config apply (geoview normalize) error: {exc}')
+    return load_geo_settings()
+
+
+class ConfigApplyResult(object):
+    """Result of an ordinary Device Save routed through the manager.
+
+    action (LOCKED two-layer model -- NO scope / NO group candidate):
+      'saved'       -> Device configuration written (or emptied+deleted)
+      'reconciled'  -> a canonical layer changed; staged edit discarded (409)
+      'blocked'     -> configuration mutation is blocked (upgrade/error) (409)
+      'error'       -> failure with message
+
+    ``removed_override_sections`` carries the sections whose redundant Device
+    override was auto-removed because it matched the Group value (§14). The UI
+    shows a non-blocking informational message; there is NO confirmation modal.
+    """
+
+    def __init__(self, action, message='', config=None,
+                 removed_override_sections=None, block_reason=None,
+                 no_change=False):
+        self.action = action
+        self.message = message
+        self.config = config
+        self.removed_override_sections = removed_override_sections or []
+        self.block_reason = block_reason
+        self.no_change = no_change
+
+
+def persist_config_section(section, value, updates=None):
+    """Persist ordinary configuration change(s) as a Device-only save.
+
+    Always writes speedtest_analyzer_device (never Group, never the old
+    experimental key, never fragmented legacy keys). The manager performs, in
+    order: mutation-block gating -> revision-pair reconciliation -> sparse
+    Device section update (with redundant-override removal when Group matches)
+    -> read-back verified write (or delete when emptied) -> effective recompute
+    -> hot apply.
+
+    Pass a single ``section``/``value`` for one section, or an ``updates`` dict
+    of {section: value} for a multi-section transaction (ONE device_revision
+    increment). Callers invoke this only AFTER their own feature validation.
+    """
+    if updates is not None:
+        kw = {'updates': updates}
+    else:
+        kw = {'section': section, 'value': value}
+
+    result = config_mgr.save_device(**kw)
+
+    if result.status == 'saved':
+        return ConfigApplyResult(
+            'saved', config=result.config,
+            removed_override_sections=result.removed_override_sections,
+            message=result.message,
+            no_change=getattr(result, 'no_change', False))
+    if result.status == 'reconciled':
+        return ConfigApplyResult('reconciled', message=result.message,
+                                 config=result.config)
+    if result.status == 'blocked':
+        block = config_mgr.mutation_blocked()
+        return ConfigApplyResult(
+            'blocked',
+            message=(block.detail if block else result.message),
+            block_reason=(block.reason if block else 'upgrade_required'))
+    return ConfigApplyResult('error', message=(result.error or 'save failed'))
+
+
+def respond_user_iperf3_list_apply(handler, final_servers, guard,
+                                   success_payload):
+    """Persist a User iPerf3 list change (optionally + schedule reset).
+
+    ``guard`` is the result of _guard_user_server_list_change:
+      - dict  -> confirmation required; sent as 409 (no persistence).
+      - SCHEDULE_RESET_REQUIRED -> fold a safe schedule reset into the SAME
+        Device transaction as the list change (one device_revision increment).
+      - None -> persist the list change alone.
+
+    Returns the ConfigApplyResult (or None when a 409 confirmation was sent).
+    """
+    if isinstance(guard, dict):
+        handler.send_json(guard, 409)
+        return None
+
+    if guard == SCHEDULE_RESET_REQUIRED:
+        updates = {
+            'iperf3_user_servers': final_servers,
+            'schedule': _safe_empty_schedule(),
+        }
+        result = persist_config_section(None, None, updates=updates)
+        _emit_apply_contract(handler, result, success_payload)
+        return result
+
+    return respond_config_apply_on(
+        handler, 'iperf3_user_servers', final_servers, success_payload)
+
+
+def _emit_apply_contract(handler, result, success_payload):
+    """Send the uniform ordinary-Save response for a ConfigApplyResult.
+
+    Ordinary saves NEVER return scope_required or group_candidate. On success
+    the caller's success_payload is augmented with any redundant-override
+    removal notice so the UI can show a non-blocking informational message.
+    """
+    if result.action == 'reconciled':
+        handler.send_json({'status': 'reconciled', 'error': result.message},
+                          409)
+    elif result.action == 'blocked':
+        handler.send_json({
+            'status': 'upgrade_required',
+            'error': result.message,
+            'block_reason': result.block_reason,
+        }, 409)
+    elif result.action == 'saved':
+        payload = dict(success_payload) if isinstance(success_payload, dict) \
+            else {'status': 'saved'}
+        if result.removed_override_sections:
+            payload['override_removed_sections'] = \
+                result.removed_override_sections
+            if result.message:
+                payload['override_removed_message'] = result.message
+        if getattr(result, 'no_change', False):
+            # True normalized no-op: persistent + effective config unchanged.
+            payload['no_change'] = True
+        handler.send_json(payload)
+    else:
+        handler.send_json({'error': result.message or 'Save failed.'}, 500)
+
+
+def respond_config_apply_on(handler, section, value, success_payload):
+    """Route an ordinary section Save through the manager and send the reply.
+
+    Module-level twin of SpeedtestHandler._respond_config_apply so non-method
+    persistence paths (server-list handlers, iPerf3 mode switch) share one
+    contract:
+
+      reconciled        -> 409 {"status":"reconciled","error":...}
+      upgrade_required  -> 409 {"status":"upgrade_required","error":...}
+      saved             -> 200 success_payload (+ override_removed_* if any)
+      error             -> 500 {"error":...}
+
+    Returns the ConfigApplyResult so the caller can perform success-side RAM
+    cache/runtime updates ONLY after persistence actually succeeded.
+    """
+    try:
+        result = persist_config_section(section, value)
+    except Exception as exc:
+        cp.log(f'Config apply error ({section}): {exc}')
+        handler.send_json({'error': 'Configuration save failed.'}, 500)
+        return ConfigApplyResult('error', message=str(exc))
+
+    _emit_apply_contract(handler, result, success_payload)
+    return result
 
 
 def scheduler_thread():
@@ -15237,12 +15725,18 @@ def scheduler_thread():
             _checkpoint_iperf3_stats_if_due()
 
             with schedule_lock:
-                enabled = schedule_config.get('enabled', False)
+                # The scheduler fires on the RUNTIME running flag, not the
+                # persisted 'enabled' intent. 'running' is derived by the
+                # config-apply callback (boot: enabled AND autostart; save:
+                # enabled). Fall back to 'enabled' only if 'running' has not
+                # been set yet (defensive; the callback always sets it).
+                running = schedule_config.get(
+                    'running', schedule_config.get('enabled', False))
                 cron = schedule_config.get('cron', '')
                 engine = schedule_config.get('engine', 'netperf')
                 params = schedule_config.get('params', {})
 
-            if enabled and cron:
+            if running and cron:
                 now = datetime.utcnow()
                 current_minute = (now.year, now.month, now.day, now.hour, now.minute)
                 if current_minute != last_fired and cron_matches(cron, now):
@@ -15278,17 +15772,57 @@ if has_ookla():
 else:
     cp.log('No Ookla binary - using Netperf (built-in) as default')
 
-# Load iPerf3 settings first, then load only the configured server
-# source into the single active RAM cache.
+# Register the runtime reinitialization callback so the Configuration Manager
+# can hot-reload affected subsystems after adopt/save/validate/reload.
+# _config_startup_apply is True ONLY during the startup initialize() apply so
+# an enabled-but-not-autostart schedule does not auto-start after a restart
+# (runtime-only suppression; persisted enabled is never changed).
+_config_startup_apply = False
+config_mgr.register_hot_reload(_apply_config_to_runtime)
+
+# Load iPerf3 runtime server settings + active server-source RAM cache. These
+# establish baseline RAM state; the manager's effective config corrects them
+# via the hot-reload callback below.
 _load_iperf3_server_settings()
 _load_active_iperf3_server_cache()
 
-# Load saved schedule and validate iPerf3 server-source metadata
-# before the scheduler thread can execute anything.
-load_schedule()
-_validate_loaded_iperf3_schedule()
-if schedule_config.get('enabled'):
-    cp.log(f'Schedule active: {schedule_config.get("cron", "")}')
+# Load the two-layer configuration. The manager computes the EFFECTIVE config
+# (Device>Group>Default), or the legacy compatibility view while
+# upgrade_required, and hot-applies it into the runtime RAM surfaces above
+# (including the schedule) WITHOUT writing any App Data on startup. The
+# schedule is therefore established here, not by a direct legacy-key read.
+try:
+    # Startup apply: gate the boot-only no-autostart suppression for THIS apply.
+    _config_startup_apply = True
+    try:
+        _config_state = config_mgr.initialize()
+    finally:
+        _config_startup_apply = False
+    cp.log('Configuration: state=%s (group_present=%s device_present=%s)'
+           % (_config_state.state, _config_state.group_present,
+              _config_state.device_present))
+    if _config_state.mutation_block is not None:
+        cp.log('Configuration: mutation blocked (%s)'
+               % _config_state.mutation_block.reason)
+    # The effective config has been hot-applied by initialize(); re-validate
+    # iPerf3 schedule metadata against the (possibly updated) runtime schedule
+    # for the normal operating states.
+    if _config_state.state in (config_mgr.STATE_DEVICE,
+                               config_mgr.STATE_GROUP,
+                               config_mgr.STATE_GROUP_WITH_DEVICE_OVERRIDES,
+                               config_mgr.STATE_UPGRADE_REQUIRED):
+        _validate_loaded_iperf3_schedule()
+except Exception as _cfg_exc:
+    cp.log('Configuration: initialize error: %s' % _cfg_exc)
+
+# Log the RUNTIME running state (not just persisted enabled) so the boot log is
+# honest: an enabled-but-not-autostart schedule is preserved as enabled but is
+# NOT running after a restart.
+if schedule_config.get('running'):
+    cp.log(f'Schedule active (running): {schedule_config.get("cron", "")}')
+elif schedule_config.get('enabled') and not schedule_config.get('autostart'):
+    cp.log('Schedule enabled but NOT running after restart '
+           '(Auto-start off): %s' % schedule_config.get('cron', ''))
 
 # Start scheduler thread
 sched_thread = Thread(target=scheduler_thread, daemon=True)

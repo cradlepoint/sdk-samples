@@ -2,7 +2,7 @@
 
 Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, historical Cellular Analysis, site-wide GeoView context, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.1.1
+**Version:** 1.1.2
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -246,12 +246,27 @@ A Custom iPerf3 server cannot be scheduled.
 
 The same device and engine compatibility rules used for manual testing apply to Scheduled Tests. A hard-disabled combination cannot be saved as a scheduled job.
 
-### Auto-start on boot
+### Enable Schedule and Auto-start on boot
 
-Schedule configuration remains saved across application and router restarts.
+**Enable Schedule** and **Auto-start on boot** are independent settings, and both are saved
+across application and router restarts.
 
-- **Auto-start enabled:** the saved schedule resumes after restart.
-- **Auto-start disabled:** the schedule remains saved, but scheduled execution starts disabled.
+- **Enable Schedule** controls whether the schedule is enabled. Saving an enabled schedule
+  starts it immediately, whether or not Auto-start is selected.
+- **Auto-start on boot** controls whether an enabled schedule starts automatically when the
+  application starts.
+
+Because they are independent, the Scheduled Tests status can show three states:
+
+- **Active** — the schedule is enabled and currently running.
+- **Enabled — Not Running** — the schedule is enabled but is not currently running. This is
+  expected after an application or router restart when Auto-start is off: the configuration is
+  preserved and **Enable Schedule** stays checked, but the schedule does not resume on its own.
+  Click **Save Schedule** to start it now.
+- **Disabled** — the schedule is not enabled.
+
+Turning Auto-start off while a schedule is enabled does not stop the current session; the
+schedule keeps running until the next restart, at which point it will not start automatically.
 
 ## Test Engines
 
@@ -654,13 +669,9 @@ The router does not generate or store the PDF. HTML report generation occurs in 
 
 GeoView configuration is stored in the router's persistent **NCOS SDK appdata** rather than in the application package filesystem. This allows the saved GeoView configuration to remain available when the Speedtest Analyzer SDK package is upgraded or replaced.
 
-The GeoView appdata entry is:
+As of v1.1.2, GeoView configuration is stored as the **GeoView section of the application's configuration** (see **Settings and Configuration Management**) rather than as a separate appdata entry, so it participates in the same NCM Group and Device configuration behavior as the other settings areas. Installations that still have a standalone `geoview_settings` entry from an earlier version have it converted during the configuration upgrade.
 
-| Appdata | Purpose |
-|---|---|
-| `geoview_settings` | Provider-independent GeoView configuration, active Site Location source, and saved Device GPS, Manual Coordinates, and Site Address values. |
-
-The v1.1.1 configuration stores:
+The GeoView configuration stores:
 
 - The selected Geo Provider mode.
 - The active Site Location source.
@@ -867,6 +878,116 @@ Writing results to fields such as **System Description** or **Asset ID** changes
 
 ---
 
+# Settings and Configuration Management
+
+The **Settings** page is the application-wide administration area. Feature configuration
+(Scheduled Tests, Servers, GeoView, Outputs) remains on its own page; Settings is where you
+review how the application is configured and manage the relationship between this device and
+its NCM Group.
+
+## How configuration works
+
+Speedtest Analyzer configuration can come from two places:
+
+- **NCM Group configuration** provides a shared baseline for every device in the Group.
+- **Device configuration** is set locally on an individual device.
+
+The application combines them one setting-area at a time. For each area — Scheduled Testing,
+Outputs, iPerf3 Server Mode, User iPerf3 Servers, Netperf Servers, and GeoView — a local
+Device value takes precedence over the Group value, and the Group value takes precedence over
+the built-in default. Areas you have not configured locally simply inherit the Group value,
+or the built-in default when the Group does not configure them either.
+
+The **Configuration State** shown on the Settings page reflects this relationship:
+
+- **Unconfigured** — no saved configuration; built-in defaults are in effect.
+- **Device Managed** — configured locally on this device.
+- **NCM Group** — managed by the NCM Group with no local overrides.
+- **NCM Group + Device Overrides** — managed by the Group, with one or more areas overridden
+  locally on this device.
+
+The **Effective Configuration Sources** list shows, for each area, whether the value currently
+comes from **This Device**, the **NCM Group**, or the **Built-in Default**.
+
+## Device Overrides
+
+When a device is Group-managed, any area you configure locally appears under **Device
+Overrides**. Each override shows a short summary and where it will return to if you reset it —
+either the **NCM Group** value or the **Built-in Default**.
+
+- **Reset to Group** / **Reset to Built-in Default** returns a single area to the inherited
+  value.
+- **Reset All Device Overrides** returns every locally overridden area at once.
+
+Some settings depend on each other. For example, a scheduled iPerf3 test depends on the iPerf3
+Server Mode. If resetting one area by itself would leave an incompatible combination — such as
+inheriting a Group schedule that expects a different server mode than the device is using —
+Speedtest Analyzer shows a confirmation explaining the dependency and offers to reset the
+related areas together so the result stays consistent. You can cancel without changing
+anything.
+
+## Update NCM Group Configuration
+
+Once a device is Group-managed and has local overrides, administrators can promote selected
+overrides into the existing NCM Group standard using **Update NCM Group Configuration**.
+
+The wizard lets you choose which current Device overrides to promote. Selected areas are added
+to (or replace) the corresponding areas in the Group; areas you do not select stay as Device
+overrides and leave the current Group configuration unchanged. The wizard does not let you edit
+values — it only decides placement.
+
+Because the application never writes the Group configuration itself, the wizard generates the
+complete revised Group JSON for you to update in NCM:
+
+1. Select the Device overrides to promote and review the summary of what will change, what
+   stays unchanged in the Group, and what remains a Device override.
+2. Generate the revised Group configuration. The wizard shows the SDK Data name
+   (`speedtest_analyzer_group`), the current and new Group revision, and the complete JSON.
+3. **Update the existing `speedtest_analyzer_group` value** in the NCM Group configuration with
+   the generated JSON. Do not create a second entry with the same name.
+4. Return to the wizard and **Validate**. Once the revised Group configuration is confirmed on
+   the device, the promoted local overrides are removed automatically, so the promoted settings
+   are then served from the Group.
+
+GeoView has a safety rule: a Device GPS location *policy* can be promoted, but a device's actual
+GPS coordinates and any manually entered coordinates or site address remain device-specific and
+are not copied into the shared Group configuration.
+
+If the device configuration changes while the wizard is open, the workflow is cancelled and asks
+you to start again, so stale changes are never merged.
+
+## Migrate to NCM Group
+
+For a device that is Device Managed (no Group configuration yet), **Migrate to NCM Group**
+provides the first-time conversion of the device's configuration into a new Group standard. This
+action is offered only in the Device Managed state; a device that is already Group-managed uses
+**Update NCM Group Configuration** instead.
+
+## Configuration from an earlier version
+
+If a device still has configuration created by an earlier version of the application, Settings
+shows a **Configuration Upgrade Required** notice. Testing, history, and reports continue to
+work; only configuration changes are paused until you convert the existing settings to the
+current format using **Convert Configuration**. Your existing settings remain active during this
+step.
+
+## Factory Reset
+
+**Factory Reset** is a separate, clearly marked destructive action. It removes Speedtest
+Analyzer's locally stored configuration, overrides, and local test history, but leaves the
+application installed and never removes the NCM Group configuration. On a Group-managed device,
+the Group configuration is used again after the local data is cleared.
+
+## Developer Mode note
+
+In Developer Mode, reinstalling or reloading the SDK package can clear the application's local
+retained test history, and a device reboot can remove a manually installed development build. A
+normal router reboot on a production-installed application preserves both the app and its
+configuration. Saved configuration in NCM Group or Device SDK appdata is not affected by a
+reboot.
+
+---
+
 # Basic Troubleshooting
 
 ## Web interface does not open
@@ -952,6 +1073,18 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 # Changelog — 1.x
 
 The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.1.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.1.2
+
+- Added the **Settings** page for application-wide administration, including Configuration State, per-area Effective Configuration Sources, Device Overrides, and configuration actions.
+- Introduced **NCM Group + Device** configuration: each setting area uses the local Device value when set, otherwise the NCM Group value, otherwise the built-in default.
+- Added **Update NCM Group Configuration** to promote selected Device overrides into an existing NCM Group standard, with a guided wizard that generates the revised Group JSON to apply in NCM and then removes the promoted local overrides after the Group is validated.
+- Added dependency-aware **Reset**: resetting a setting area that would create an incompatible combination (such as a scheduled iPerf3 test versus the iPerf3 Server Mode) now asks to reset the related areas together, and reset messages name the correct destination (**NCM Group** or **Built-in Default**).
+- Preserved the GeoView safety boundary during promotion: a Device GPS *policy* can be promoted, but actual GPS coordinates, manual coordinates, and site address remain device-specific.
+- Clarified scheduler behavior: **Enable Schedule** and **Auto-start on boot** are independent. Saving an enabled schedule starts it immediately; after a restart with Auto-start off, the schedule stays configured and enabled but shows **Enabled — Not Running** until saved again. The status now distinguishes **Active**, **Enabled — Not Running**, and **Disabled**.
+- Added **Factory Reset** as a separate destructive action that clears local Speedtest Analyzer data and history without removing the NCM Group configuration.
+- Adjusted the Settings Device Overrides layout to be left-aligned and responsive, with the reset action beside each override title.
+- This release was validated on a real E400 across User and Public iPerf3 server modes and Group- and Device-managed states.
 
 ## v1.1.1
 

@@ -1,0 +1,2 @@
+# Files excluded from the deployed SDK package (development-only content).
+# make.py reads this file (named 'buildignore') to prune the package.

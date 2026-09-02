@@ -496,6 +496,124 @@ def normalize_geo_settings(
     }
 
 
+def is_group_safe_source(source):
+    """True when a GeoView active location source is a Group-safe POLICY.
+
+    Group-safe means the policy does not carry device-specific physical
+    location data. Only ``device_gps`` qualifies for v1.1.2 (§40/§42):
+    ``manual_coordinates`` and ``site_address`` are device-specific.
+    """
+    return source == 'device_gps'
+
+
+def strip_runtime_gps_for_persistence(persisted):
+    """Return a persisted GeoView section with RUNTIME device GPS coordinates
+    cleared, regardless of the active source (§39, §40).
+
+    Current device GPS latitude/longitude are RUNTIME state and must never be
+    written into canonical configuration (device or group). This clears the
+    ``locations.device_gps`` coordinates before persistence. Manual coordinates
+    and site address are device-specific PERSISTENT configuration and are kept.
+    The active_location_source policy and provider/configured flags are kept.
+    """
+    if not isinstance(
+        persisted,
+        dict,
+    ):
+        return persisted
+
+    result = json.loads(
+        json.dumps(
+            persisted
+        )
+    )
+
+    locations = result.get(
+        'locations'
+    )
+
+    if isinstance(
+        locations,
+        dict,
+    ) and isinstance(
+        locations.get(
+            'device_gps'
+        ),
+        dict,
+    ):
+        # Clear runtime fix; keep the key so the section stays well-formed.
+        locations['device_gps'] = {
+            'latitude': None,
+            'longitude': None,
+        }
+
+    return result
+
+
+def group_sanitized_geoview(persisted):
+    """Return a Group-safe copy of a persisted GeoView section (§40, §42).
+
+    Strips device-specific physical location data so a Group standard never
+    carries one router's coordinates/address:
+
+    - device_gps: the POLICY is promoted, but current lat/lon are cleared.
+      Authoritative Group Device-GPS triggers a fresh runtime poll later.
+    - manual_coordinates / site_address: these are device-specific and are
+      never promoted; the sanitized section falls back to the device_gps
+      policy with empty coordinates. Callers must block promotion of a
+      non-Group-safe source before reaching here (this is a defensive floor).
+
+    The returned object stays schema_version 2 and remains a valid persisted
+    GeoView section.
+    """
+    if not isinstance(
+        persisted,
+        dict,
+    ):
+        base = default_geo_settings()
+
+        return _persisted_settings(
+            base
+        )
+
+    source = persisted.get(
+        'active_location_source'
+    )
+
+    # Non-Group-safe sources collapse to the Device GPS policy with no coords.
+    if not is_group_safe_source(
+        source
+    ):
+        source = 'device_gps'
+
+    empty = _empty_locations()
+
+    sanitized = {
+        'schema_version':
+            _GEO_SCHEMA_VERSION,
+        'configured':
+            bool(
+                persisted.get(
+                    'configured'
+                )
+            ),
+        'provider':
+            str(
+                persisted.get(
+                    'provider'
+                )
+                or 'none'
+            ),
+        'active_location_source':
+            source,
+        # Device-specific physical location data is intentionally cleared.
+        'locations':
+            empty,
+    }
+
+    return sanitized
+
+
 def _persisted_settings(
     normalized,
 ):
@@ -566,83 +684,11 @@ def load_geo_settings():
             return default_geo_settings()
 
 
-def save_geo_settings(value):
-    """Persist an explicit GeoView Save action into NCOS SDK appdata."""
-    normalized = normalize_geo_settings(
-        value,
-        mark_configured=True,
-    )
-
-    persisted = _persisted_settings(
-        normalized
-    )
-
-    serialized = json.dumps(
-        persisted,
-        separators=(
-            ',',
-            ':',
-        ),
-        sort_keys=True,
-    )
-
-    with _geo_lock:
-        cp.put_appdata(
-            GEO_APPDATA_KEY,
-            serialized,
-        )
-
-        # cp.put_appdata() intentionally has no success return value.
-        # Read back the appdata entry so the HTTP Save operation can
-        # fail closed instead of falsely reporting success.
-        raw = cp.get_appdata(
-            GEO_APPDATA_KEY
-        )
-
-        if raw in (
-            None,
-            '',
-        ):
-            raise OSError(
-                'Unable to verify GeoView appdata write'
-            )
-
-        try:
-            verified_value = (
-                raw
-                if isinstance(
-                    raw,
-                    dict,
-                )
-                else json.loads(
-                    raw
-                )
-            )
-
-            verified = normalize_geo_settings(
-                verified_value
-            )
-
-        except (
-            ValueError,
-            TypeError,
-            json.JSONDecodeError,
-        ) as exc:
-            raise OSError(
-                'GeoView appdata verification failed'
-            ) from exc
-
-        if (
-            _persisted_settings(
-                verified
-            )
-            != persisted
-        ):
-            raise OSError(
-                'GeoView appdata verification mismatch'
-            )
-
-    return normalized
+# NOTE (v1.1.2): the former save_geo_settings() writer was removed. GeoView
+# configuration is persisted exclusively through the canonical Configuration
+# Manager (speedtest_analyzer) via the Device/NCM Group workflow. This module
+# now only NORMALIZES and LOADS GeoView settings (for legacy reads and
+# canonical operation) and never writes the legacy geoview_settings key.
 
 
 def apply_geo_settings(
