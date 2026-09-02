@@ -540,11 +540,26 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
         cp.log(format % args)
 
 
+class SettingsServer(http.server.HTTPServer):
+    """HTTPServer that survives a router hostname the idna codec rejects
+    (e.g. one with spaces). Falls back to the plain bind host if so.
+    """
+
+    allow_reuse_address = True
+
+    def server_bind(self):
+        try:
+            super().server_bind()
+        except UnicodeError:
+            host, port = self.server_address[:2]
+            self.server_name = host
+            self.server_port = port
+
+
 def start_web_server():
     """Start the settings web UI. Runs forever; call in a daemon thread."""
     try:
-        server = http.server.HTTPServer(('0.0.0.0', WEB_PORT), SettingsHandler)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server = SettingsServer(('0.0.0.0', WEB_PORT), SettingsHandler)
         cp.log('Web UI started on port %d' % WEB_PORT)
         server.serve_forever()
     except Exception as e:
