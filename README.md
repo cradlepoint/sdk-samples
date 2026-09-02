@@ -30,7 +30,7 @@ These are compiled from the sample apps in this repository and can be installed 
 ## Repository Structure
 
 ```
-├── apps/                   # Sample applications (flat, tagged via package.ini)
+├── apps/                   # Sample applications, and where your new apps are created
 │   ├── 5GSpeed/            # Each app is a self-contained folder
 │   ├── hello_world/        # with package.ini, start.sh, readme.md, etc.
 │   ├── mqtt_app/
@@ -54,25 +54,25 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 - Git (optional, for cloning the repository)
 - A router with **Developer Mode** enabled in NetCloud Manager (Tools > Developer Mode Devices)
 
-### 1. Fork and clone the repo
+### 1. Clone the repo
 
-Work happens on your own fork so you can experiment freely and, if you'd like, contribute
-your apps back upstream later.
+Clone this repo directly — no fork needed. `git pull` then always brings you the latest
+samples, with no fork to keep in sync first. If you later decide to contribute an app back,
+you create the fork at that point: see
+[Contributing back upstream](#contributing-back-upstream-optional).
 
-1. Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) and
-   click **Fork** (top right) to create your own copy under your GitHub account.
-2. **Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then
-   paste your fork's URL:
+1. **Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then
+   paste this repo's URL:
 
    ```
-   https://github.com/YOUR-USERNAME/sdk-samples.git
+   https://github.com/cradlepoint/sdk-samples.git
    ```
 
-   Kiro clones your fork and opens it for you.
+   Kiro clones the repo and opens it for you.
 
-   **No Git?** Download your fork as a ZIP instead:
+   **No Git?** Download a ZIP instead:
 
-   1. On your fork's GitHub page, click the green **Code** button, then **Download ZIP**
+   1. On this repo's GitHub page, click the green **Code** button, then **Download ZIP**
    2. Extract the ZIP to a folder on your computer
    3. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and
       select the extracted `sdk-samples` folder
@@ -84,11 +84,10 @@ see [docs/SETUP.md](docs/SETUP.md).
 
 #### Manual setup (terminal)
 
-If you'd rather set things up from a terminal instead of letting Kiro do it, clone your fork
-(replace `YOUR-USERNAME` with your GitHub username):
+If you'd rather set things up from a terminal instead of letting Kiro do it:
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/sdk-samples.git
+git clone https://github.com/cradlepoint/sdk-samples.git
 cd sdk-samples
 ```
 
@@ -151,7 +150,7 @@ git rm --cached sdk_settings.ini
 ## Quick Start — make.py
 
 ```bash
-# Create a new app
+# Create a new app (created in apps/, path printed when done)
 python3 make.py create my_app
 
 # Build a single app (searches apps/ recursively)
@@ -169,35 +168,77 @@ python3 make.py status my_app
 
 | Action | Description |
 |--------|-------------|
-| **create** | Scaffold a new app from `app_template` |
+| **create** | Scaffold a new app from `app_template` into `apps/<name>/` |
 | **build** | Package an app as `.tar.gz` for deployment |
 | **deploy** | Full lifecycle: purge → build → install → verify |
 | **status** | Show app state on the connected router |
 | **start / stop** | Control a running app |
 | **uninstall** | Remove app from router |
 | **clean** | Remove local build artifacts |
+| **contribute** | Fork, branch, commit, push, and open a PR for one app |
 
 ---
 
 ## Contributing back upstream (optional)
 
-Built something worth sharing? You can submit it back to the main repo:
+Built something worth sharing? You fork only when you reach this point, and you add the fork
+as a *second* remote so `origin` keeps pointing at this repo. That way `git pull` still works
+exactly as before.
 
-1. Commit your changes and push them to your fork:
+One command does all of it:
 
-   ```bash
-   git add apps/your_app
-   git commit -m "Add your_app"
-   git push
-   ```
+```bash
+# macOS / Linux
+.venv/bin/python3 make.py contribute my_app
 
-2. Go to your fork on GitHub and click **Contribute > Open pull request** (or go to
-   [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples) and click
-   **New pull request**).
-3. Fill in a description of what your app does and submit the PR for review.
+# Windows
+.venv\Scripts\python make.py contribute my_app
+```
 
-This step is optional — your fork works completely on its own for building and deploying
-apps to your router.
+It walks through the whole flow and stops for confirmation before anything is committed:
+
+1. Checks your app the way CI does — it needs a `readme.md`, and its `package.ini` needs a
+   `[section]` header matching the folder name.
+2. Creates a branch from the current upstream `master`.
+3. Shows exactly which files it is about to commit and asks you to confirm. Only your app's
+   folder is staged. Build artifacts, `METADATA/`, and `sdk_settings.ini` are git-ignored and
+   never included.
+4. Asks for a commit message, then commits.
+5. Creates your fork if you don't have one, adds it as a remote named `fork`, and pushes the
+   branch there. `origin` is left pointing at this repo, so `git pull` keeps working.
+6. Asks for a pull request title and description, then opens the PR.
+
+Nothing touches your GitHub account until after you've approved the commit. If you stop
+partway, your work is committed on the branch and the command tells you how to finish by hand.
+
+**First run only:** contributing needs the [GitHub CLI](https://cli.github.com) to create the
+fork, authenticate the push, and open the PR. If you don't have it, `contribute` offers to
+download it into `.gh/` — about 10 MB, no admin rights needed, and it stays inside the repo
+folder. You then sign in to GitHub once with a one-time code in your browser. Later runs skip
+both steps. Decline the download and `contribute` falls back to doing the fork and PR through
+your browser instead.
+
+### Doing it by hand
+
+If you'd rather run the git commands yourself:
+
+```bash
+# 1. Fork on github.com, then add it as a second remote
+git remote add fork https://github.com/YOUR-USERNAME/sdk-samples.git
+
+# 2. Branch, commit just your app, and push to your fork
+git fetch origin
+git checkout -b add-your_app origin/master
+git add apps/your_app
+git commit -m "Add your_app"
+git push -u fork add-your_app
+```
+
+Then open the pull request from the link in the `git push` output. Check the two CI
+requirements above before you submit.
+
+This whole section is optional — your clone works completely on its own for building and
+deploying apps to your router.
 
 ---
 

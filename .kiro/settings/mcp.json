@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ncos": {
+      "command": "/Users/eareelt/repos/sdk-samples/ncos_mcp/.venv/bin/python",
+      "args": ["/Users/eareelt/repos/sdk-samples/ncos_mcp/server.py"]
+    }
+  }
+}

@@ -115,7 +115,8 @@ results = cp.get('status/wan/devices/mdm-xxx/status/perf_results')
 - **REST config PUT of a STRING leaf needs JSON quoting** — `-d 'data="ttyUSB0"'` works, `-d 'data=ttyUSB0'` returns `{"exception": "server", "reason": "Expecting value: line 1 column 1 (char 0)"}`. Numbers and booleans are bare. `cp.put()` serializes for you, so this only affects raw curl
 - **`config/system/serial/byte_parity` is 0=None, 1=Even, 2=Odd, 3=Mark, 4=Space** — Even is 1, NOT 2. Mapping it to pyserial with Even/Odd swapped silently misconfigures the line. `stop_bits` is 0=1, 1=1.5, 2=2. See `docs/ncos-api/config/serial.md`
 - Firewall filter policies require full rules array put — cannot update individual rules
-- Log entry format: `[timestamp, facility, level, message]` — filter by recency after deploys
+- Log entry format: `[timestamp, level, facility, message, extra]` — level (`INFO`, `ERR`) is index 1, facility (`client_monitor`, `kernel`) is index 2, message is index 3. Filtering on index 1 for an app name silently matches nothing. Filter by recency after deploys
+- **`status/dhcpd` is `null`, not `{'leases': []}`, when the router's LAN DHCP server is disabled** (`config/lan/0/dhcpd/enabled = false`). `cp.get('status/dhcpd') or {}` handles it, but code that treats "no leases" as evidence about client devices needs to know the router may not be serving DHCP at all. There is no `dtd` for it (`/api/dtd/status/dhcpd` returns a `key` exception)
 - Cert creation is async — wait ~5 seconds after `cp.put('control/certmgmt/ca', {...})`
 - IP Verify identity names only allow `[a-zA-Z0-9_-]` — no dots. Replace dots with underscores: `target_ip.replace('.', '_')`
 - `cp.register` callback receives 3 args: `(path, value, args)` where `args` is a single tuple — do NOT use `*args` unpacking in the callback signature

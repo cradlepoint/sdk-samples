@@ -93,7 +93,7 @@ Default/placeholder values that indicate unconfigured settings:
 ## Project Structure
 
 ```text
-{app_name}/
+apps/{app_name}/
 ├── package.ini          # Metadata with uuid, version, vendor, tags
 ├── cp.py               # CP module copy
 ├── {app_name}.py       # Main logic
@@ -103,7 +103,7 @@ Default/placeholder values that indicate unconfigured settings:
 └── mylib/              # Subdirectories with Python modules work fine
 ```
 
-Apps live at the repo root (where `make.py create` puts them). **NEVER move apps** — not to `apps/`, not anywhere else. Leave them where they are. Only the user decides when and where to move an app.
+Apps live in `apps/`, where `make.py create` puts them. That is also where the CI checks look, so an app is ready to contribute without being relocated first. **Do not move apps** — leave them where `create` put them. Only the user decides when and where to move an app.
 
 Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio, vehicle, security, web, tools, examples, speedtest, mqtt, etc.
 
@@ -120,7 +120,7 @@ Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio,
 .venv/bin/python3 make.py create {app_name}
 ```
 
-This generates all required files from `apps/templates/app_template/` into `./{app_name}/` at the repo root. **NEVER move apps after creation** — not to `apps/`, not to any other directory. The app stays at the repo root unless the user explicitly moves it themselves. The `make.py` commands (`build`, `deploy`, etc.) find apps at both the repo root and `apps/`, so location doesn't affect functionality.
+This generates all required files from `apps/templates/app_template/` into `./apps/{app_name}/`, and prints that path when it finishes. **Do not move the app after creation** — it is already where the repo keeps apps and where CI expects it. The `make.py` commands (`build`, `deploy`, etc.) find apps by name at both the repo root and `apps/`, so older apps still sitting at the root keep working.
 
 **CRITICAL: Before writing ANY app code:**
 1. **Follow the API Verification Workflow** in `api-reference.md` — search docs, read, check DTD, test endpoint, verify fields, THEN code
@@ -182,6 +182,29 @@ Rules:
 7. **Character-by-character echo is cosmetic noise** — the terminal replays typed characters in the output. Ignore the garbled repeated text before the actual output.
 
 If the output shows success messages but `Exit Code: 1`, the operation succeeded. Do NOT retry, diagnose, or report failure based solely on exit code. **Move forward.**
+
+## Contribute an App Upstream
+
+```bash
+# Windows:
+.venv\Scripts\python make.py contribute {app_name}
+# Mac/Linux:
+.venv/bin/python3 make.py contribute {app_name}
+```
+
+Submits one app to `cradlepoint/sdk-samples` as a pull request: CI preflight, branch off
+upstream, staged-file confirmation, commit, fork, push, PR.
+
+- **Clone the canonical repo directly, do not fork first** — `origin` stays pointed at
+  `cradlepoint/sdk-samples` so `git pull` never needs a fork sync. `contribute` creates the
+  fork on demand and adds it as a *second* remote named `fork`
+- **`contribute` is interactive** — it prompts for confirmation, a commit message, and PR
+  text. Do not run it unattended or from a hook
+- **Never suggest committing an app by hand unless the user asks** — `contribute` stages only
+  the app folder. A manual `git add -A` would sweep in unrelated working-tree changes
+- **It needs the GitHub CLI** — offers to download it into `.gh/` (git-ignored) on first run,
+  then `gh auth login --web` for a one-time browser code. Falls back to a browser-driven fork
+  and PR if the user declines
 
 ## Other Commands
 

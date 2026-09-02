@@ -19,6 +19,10 @@ import re
 import tarfile
 import gzip
 import time
+import zipfile
+import platform
+import webbrowser
+from urllib.parse import quote
 
 try:
     import requests
@@ -659,7 +663,10 @@ def clean(app=None):
     except OSError as e:
         print('Clean Error 1 for file {}: {}'.format(app_pack_name, e))
 
-    meta_dir = '{}/{}/METADATA'.format(os.getcwd(), app_name)
+    # Apps live in apps/ but older ones may still be at the repo root, so
+    # resolve the real directory instead of assuming either location.
+    app_dir = find_app_dir(app_name) or app_name
+    meta_dir = os.path.join(os.getcwd(), app_dir, META_DATA_FOLDER)
     try:
         if os.path.isdir(meta_dir):
             shutil.rmtree(meta_dir)
@@ -1066,17 +1073,19 @@ def create(app_name=None):
         print('ERROR: No app name provided. Please provide a name. If you are using Cursor AI, it will generate a name for you based on your requested functionality.')
         return
 
-    # Create at repo root for easy dev iteration — move to apps/ when done
-    target_dir = app_name
+    # Create in apps/ — the same place the repo keeps its apps and where the
+    # CI checks look. Every make.py command finds apps by name, so the path
+    # only matters when you open the folder yourself.
+    target_dir = os.path.join('apps', app_name)
+    display_dir = 'apps/{}'.format(app_name)
 
     if os.path.exists(target_dir):
-        print('App already exists.  Please choose a different name.')
+        print(f'App already exists at ./{display_dir}/. Please choose a different name.')
         return
 
-    # Check if an app with this name already exists under apps/
-    candidate = os.path.join('apps', app_name)
-    if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, 'package.ini')):
-        print(f'App already exists at {candidate}. Please choose a different name.')
+    # An app created before apps/ became the default may still be at the repo root.
+    if os.path.isdir(app_name) and os.path.isfile(os.path.join(app_name, 'package.ini')):
+        print(f'App already exists at ./{app_name}/. Please choose a different name.')
         return
 
     # Find app_template
@@ -1102,7 +1111,7 @@ def create(app_name=None):
                 filedata = filedata.replace('app_template', app_name)
                 with open(path, 'w') as out_file:
                     out_file.write(filedata)
-        print(f'App {app_name} created at ./{app_name}/')
+        print(f'App {app_name} created at ./{display_dir}/')
     except Exception as e:
         print(f'Error creating app: {e}')
 
@@ -1286,6 +1295,552 @@ def setup():
     subprocess.run([sys.executable, setup_script], check=True)
 
 
+# ---------------------------------------------------------------------------
+# contribute: fork, branch, commit, push, and open a pull request for one app.
+#
+# The clone is expected to point at the canonical repo, so `git pull` always
+# tracks upstream. The fork is created on demand and added as a *second*
+# remote, which leaves `origin` alone.
+# ---------------------------------------------------------------------------
+
+UPSTREAM_REPO = 'cradlepoint/sdk-samples'
+UPSTREAM_URL = 'https://github.com/{}.git'.format(UPSTREAM_REPO)
+GH_VENDOR_DIR = '.gh'
+GH_RELEASE_API = 'https://api.github.com/repos/cli/cli/releases/latest'
+
+# Packaging leftovers that should never be copied or committed.
+CONTRIB_IGNORE = shutil.ignore_patterns(
+    META_DATA_FOLDER, '__pycache__', '*.pyc', '*.pyo', '*.pyd',
+    '*.tar.gz', '*.tar', '.DS_Store')
+
+
+def _run(cmd):
+    """Run a command and capture its output. Returns (returncode, output)."""
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, universal_newlines=True)
+        return proc.returncode, (proc.stdout or '').strip()
+    except Exception as e:
+        return 1, str(e)
+
+
+def _run_stream(cmd):
+    """Run a command with its output (and input) attached to the terminal."""
+    try:
+        return subprocess.run(cmd).returncode
+    except Exception as e:
+        print('Error running {}: {}'.format(cmd[0], e))
+        return 1
+
+
+def _ask(question, default=''):
+    """Prompt for a line of text. Returns default when the user just hits Enter."""
+    prompt = '{} [{}]: '.format(question, default) if default else '{}: '.format(question)
+    try:
+        answer = input(prompt).strip()
+    except EOFError:
+        return default
+    return answer or default
+
+
+def _confirm(question, default=False):
+    """Prompt for yes/no. Returns default on a bare Enter or no terminal."""
+    suffix = '[Y/n]' if default else '[y/N]'
+    try:
+        answer = input('{} {} '.format(question, suffix)).strip().lower()
+    except EOFError:
+        return default
+    if not answer:
+        return default
+    return answer in ('y', 'yes')
+
+
+def _gh_vendor_exe():
+    """Path where a downloaded gh binary is kept."""
+    exe = 'gh.exe' if sys.platform.startswith('win') else 'gh'
+    return os.path.join(GH_VENDOR_DIR, 'bin', exe)
+
+
+def _find_gh():
+    """Return a path to a usable gh, or None if it is not present."""
+    on_path = shutil.which('gh')
+    if on_path:
+        return on_path
+    vendored = _gh_vendor_exe()
+    if os.path.isfile(vendored):
+        return vendored
+    return None
+
+
+def _gh_asset_name(version):
+    """Release asset name for this OS and CPU, or None if unsupported."""
+    machine = platform.machine().lower()
+    arch = 'arm64' if machine in ('arm64', 'aarch64') else 'amd64'
+    if sys.platform.startswith('win'):
+        return 'gh_{}_windows_{}.zip'.format(version, arch)
+    if sys.platform == 'darwin':
+        return 'gh_{}_macOS_{}.zip'.format(version, arch)
+    if sys.platform.startswith('linux'):
+        return 'gh_{}_linux_{}.tar.gz'.format(version, arch)
+    return None
+
+
+def _safe_members(archive_names):
+    """True when no archive entry tries to escape the extraction directory."""
+    for name in archive_names:
+        if os.path.isabs(name) or name.startswith('/') or '..' in name.replace('\\', '/').split('/'):
+            return False
+    return True
+
+
+def _extract_gh(archive_path, dest_dir):
+    """Pull the gh binary out of a release archive. Returns its path or None."""
+    tmp_dir = os.path.join(dest_dir, '_extract')
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+    os.makedirs(tmp_dir, exist_ok=True)
+    try:
+        if archive_path.lower().endswith('.zip'):
+            with zipfile.ZipFile(archive_path) as zf:
+                if not _safe_members(zf.namelist()):
+                    print('Refusing to extract: the archive contains unsafe paths.')
+                    return None
+                zf.extractall(tmp_dir)
+        else:
+            with tarfile.open(archive_path) as tf:
+                if not _safe_members(tf.getnames()):
+                    print('Refusing to extract: the archive contains unsafe paths.')
+                    return None
+                tf.extractall(tmp_dir)
+
+        exe = 'gh.exe' if sys.platform.startswith('win') else 'gh'
+        for root, _dirs, files in os.walk(tmp_dir):
+            if exe in files and os.path.basename(root) == 'bin':
+                bin_dir = os.path.join(dest_dir, 'bin')
+                os.makedirs(bin_dir, exist_ok=True)
+                target = os.path.join(bin_dir, exe)
+                shutil.copy2(os.path.join(root, exe), target)
+                os.chmod(target, 0o755)
+                return target
+        print('Could not find the gh binary inside the downloaded archive.')
+        return None
+    except Exception as e:
+        print('Error unpacking the GitHub CLI: {}'.format(e))
+        return None
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _download_gh():
+    """Download the GitHub CLI into .gh/. Returns the binary path or None."""
+    if requests is None:
+        print("Error: the 'requests' library is needed to download the GitHub CLI.")
+        print('Run "{} setup_env.py" first, or install gh yourself: https://cli.github.com'.format(g_python_cmd))
+        return None
+
+    print('Looking up the latest GitHub CLI release...')
+    try:
+        resp = requests.get(GH_RELEASE_API, timeout=30)
+        resp.raise_for_status()
+        release = resp.json()
+    except Exception as e:
+        print('Could not reach the GitHub releases API: {}'.format(e))
+        return None
+
+    version = str(release.get('tag_name') or '').lstrip('v')
+    if not version:
+        print('The releases API did not report a version.')
+        return None
+
+    asset_name = _gh_asset_name(version)
+    if not asset_name:
+        print('No GitHub CLI build is available for this platform ({}).'.format(sys.platform))
+        print('Install it manually instead: https://cli.github.com')
+        return None
+
+    url = None
+    for asset in release.get('assets') or []:
+        if asset.get('name') == asset_name:
+            url = asset.get('browser_download_url')
+            break
+    if not url:
+        print('Could not find {} in the latest release.'.format(asset_name))
+        return None
+
+    os.makedirs(GH_VENDOR_DIR, exist_ok=True)
+    archive_path = os.path.join(GH_VENDOR_DIR, asset_name)
+    print('Downloading {}...'.format(asset_name))
+    try:
+        with requests.get(url, timeout=180, stream=True) as stream:
+            stream.raise_for_status()
+            with open(archive_path, 'wb') as out_file:
+                for chunk in stream.iter_content(chunk_size=65536):
+                    if chunk:
+                        out_file.write(chunk)
+    except Exception as e:
+        print('Download failed: {}'.format(e))
+        return None
+
+    gh_path = _extract_gh(archive_path, GH_VENDOR_DIR)
+    try:
+        os.remove(archive_path)
+    except OSError:
+        pass
+
+    if gh_path:
+        print('GitHub CLI {} ready at ./{}'.format(version, gh_path.replace('\\', '/')))
+    return gh_path
+
+
+def _ensure_gh():
+    """Find gh, offering to download it. Returns a path or None."""
+    gh = _find_gh()
+    if gh:
+        return gh
+
+    print('')
+    print('The GitHub CLI (gh) is not installed. It handles the fork, the push')
+    print('credentials, and the pull request in one step.')
+    if not _confirm('Download it into ./{}/ (about 10 MB, no admin needed)?'.format(GH_VENDOR_DIR)):
+        return None
+    return _download_gh()
+
+
+def _ensure_gh_auth(gh):
+    """Make sure gh is logged in. Returns True when authenticated."""
+    code, _ = _run([gh, 'auth', 'status'])
+    if code == 0:
+        return True
+
+    print('')
+    print('You need to sign in to GitHub once on this machine.')
+    print('gh will show a one-time code and open your browser.')
+    if not _confirm('Sign in now?', default=True):
+        return False
+
+    # Streamed, not captured: the user has to read the code and answer prompts.
+    _run_stream([gh, 'auth', 'login', '--hostname', 'github.com',
+                 '--git-protocol', 'https', '--web'])
+    code, _ = _run([gh, 'auth', 'status'])
+    return code == 0
+
+
+def _remote_url(name):
+    """URL for a git remote, or None if the remote does not exist."""
+    code, out = _run(['git', 'remote', 'get-url', name])
+    return out if code == 0 and out else None
+
+
+def _is_upstream_url(url):
+    return bool(url) and UPSTREAM_REPO in url.lower()
+
+
+def _repo_owner(url):
+    """GitHub account name from a remote URL, or None."""
+    if not url:
+        return None
+    url = url.strip()
+    if url.endswith('.git'):
+        url = url[:-4]
+    if url.startswith('git@'):
+        path = url.split(':', 1)[-1]
+    elif 'github.com' in url:
+        path = url.split('github.com', 1)[-1].lstrip('/:')
+    else:
+        return None
+    parts = [part for part in path.split('/') if part]
+    return parts[0] if parts else None
+
+
+def _resolve_upstream_remote():
+    """Return the remote name that points at the canonical repo, adding it if needed."""
+    if _is_upstream_url(_remote_url('origin')):
+        return 'origin'
+    for name in ('upstream', 'canonical'):
+        if _is_upstream_url(_remote_url(name)):
+            return name
+    print('No remote points at {}. Adding one named "upstream".'.format(UPSTREAM_REPO))
+    code, out = _run(['git', 'remote', 'add', 'upstream', UPSTREAM_URL])
+    if code != 0:
+        print('Could not add the upstream remote: {}'.format(out))
+        return None
+    return 'upstream'
+
+
+def _find_fork_remote(upstream_remote):
+    """Return the name of a remote that is a fork, or None."""
+    code, out = _run(['git', 'remote'])
+    if code != 0:
+        return None
+    for name in out.split():
+        if name == upstream_remote:
+            continue
+        if not _is_upstream_url(_remote_url(name)):
+            return name
+    return None
+
+
+def _upstream_branch(upstream_remote):
+    """Default branch on the canonical repo."""
+    for branch in ('master', 'main'):
+        code, _ = _run(['git', 'rev-parse', '--verify', '--quiet',
+                        '{}/{}'.format(upstream_remote, branch)])
+        if code == 0:
+            return branch
+    return 'master'
+
+
+def _create_fork(gh, upstream_remote):
+    """Create the user's fork and wire it up as a remote. Returns its name or None."""
+    print('Creating your fork of {} (skipped if you already have one)...'.format(UPSTREAM_REPO))
+    args = [gh, 'repo', 'fork', UPSTREAM_REPO, '--remote', '--remote-name', 'fork']
+    if _run_stream(args) != 0:
+        print('gh could not create or wire up the fork.')
+        return None
+    if _remote_url('fork'):
+        return 'fork'
+    return _find_fork_remote(upstream_remote)
+
+
+def _fork_by_hand(upstream_remote):
+    """Browser fallback: user forks on github.com, we add the remote."""
+    fork_url = 'https://github.com/{}/fork'.format(UPSTREAM_REPO)
+    print('')
+    print('Open this page and click "Create fork":')
+    print('  {}'.format(fork_url))
+    if _confirm('Open it in your browser now?', default=True):
+        try:
+            webbrowser.open(fork_url)
+        except Exception as e:
+            print('Could not open a browser: {}'.format(e))
+    username = _ask('Your GitHub username (blank to stop)')
+    if not username:
+        return None
+    url = 'https://github.com/{}/sdk-samples.git'.format(username)
+    code, out = _run(['git', 'remote', 'add', 'fork', url])
+    if code != 0:
+        print('Could not add the fork remote: {}'.format(out))
+        return None
+    print('Added remote "fork" -> {}'.format(url))
+    return 'fork'
+
+
+def _check_contribution(app_dir):
+    """Mirror the repo's CI checks. Returns a list of problem descriptions."""
+    problems = []
+    names = [name.lower() for name in _listdir(app_dir)]
+    if 'readme.md' not in names and 'readme.txt' not in names:
+        problems.append('No readme. Add {}/readme.md describing what the app does.'.format(app_dir))
+
+    ini_path = os.path.join(app_dir, CONFIG_FILE)
+    folder = os.path.basename(app_dir.rstrip('/\\'))
+    if not os.path.isfile(ini_path):
+        problems.append('No {} in {}.'.format(CONFIG_FILE, app_dir))
+    else:
+        try:
+            with open(ini_path, 'r') as ini_file:
+                body = ini_file.read()
+            if '[{}]'.format(folder) not in body:
+                problems.append('{} has no [{}] section matching the folder name.'.format(ini_path, folder))
+        except Exception as e:
+            problems.append('Could not read {}: {}'.format(ini_path, e))
+    return problems
+
+
+def contribute(app_name=None):
+    """Fork, branch, commit, push, and open a pull request for one app."""
+    if not app_name:
+        print('ERROR: No app name provided. Example: make.py contribute my_app')
+        return
+
+    code, _ = _run(['git', 'rev-parse', '--git-dir'])
+    if code != 0:
+        print('ERROR: this folder is not a git repository.')
+        print('Contributing needs a clone. If you downloaded a ZIP, clone instead:')
+        print('  git clone {}'.format(UPSTREAM_URL))
+        return
+
+    if not shutil.which('git'):
+        print('ERROR: git is not installed or not on PATH.')
+        return
+
+    app_dir = find_app_dir(app_name)
+    if not app_dir:
+        print('ERROR: could not find an app named "{}".'.format(app_name))
+        return
+    app_name = os.path.basename(app_dir.rstrip('/\\'))
+
+    # Contributed apps live in apps/. Older apps at the repo root get copied
+    # there, leaving the original alone so nothing disappears on a checkout.
+    parent = os.path.dirname(app_dir).replace('\\', '/')
+    if parent != 'apps':
+        dest = os.path.join('apps', app_name)
+        print('')
+        print('./{} is at the repo root. Contributed apps live in apps/.'.format(app_dir))
+        if os.path.exists(dest):
+            print('ERROR: {} already exists. Sort that out first.'.format(dest))
+            return
+        if not _confirm('Copy it to {}/ for the pull request? Your original stays put.'.format(dest.replace('\\', '/'))):
+            print('Nothing changed.')
+            return
+        try:
+            shutil.copytree(app_dir, dest, ignore=CONTRIB_IGNORE)
+        except Exception as e:
+            print('Could not copy the app: {}'.format(e))
+            return
+        print('Copied to {}/'.format(dest.replace('\\', '/')))
+        app_dir = dest
+
+    app_dir = app_dir.replace('\\', '/')
+
+    print('')
+    print('Contributing ./{}/ to {}.'.format(app_dir, UPSTREAM_REPO))
+
+    # Drop packaging leftovers before anything gets staged.
+    clean(app_name)
+
+    problems = _check_contribution(app_dir)
+    if problems:
+        print('')
+        print('This app is not ready to contribute yet. CI checks the same things:')
+        for problem in problems:
+            print('  - {}'.format(problem))
+        return
+
+    upstream_remote = _resolve_upstream_remote()
+    if not upstream_remote:
+        return
+
+    # Everything local first — branch and commit — so nothing touches your
+    # GitHub account until you have seen and approved the commit.
+    print('')
+    print('Fetching {}...'.format(upstream_remote))
+    if _run_stream(['git', 'fetch', upstream_remote]) != 0:
+        print('Could not fetch {}.'.format(upstream_remote))
+        return
+
+    base = _upstream_branch(upstream_remote)
+    branch = 'add-{}'.format(re.sub(r'[^A-Za-z0-9._-]', '-', app_name))
+
+    code, staged = _run(['git', 'diff', '--cached', '--name-only'])
+    if code == 0 and staged:
+        print('')
+        print('Note: you have staged changes elsewhere. Only {}/ will be committed.'.format(app_dir))
+
+    code, current = _run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])
+    if code == 0 and current == branch:
+        print('Already on branch {}.'.format(branch))
+    else:
+        code, _ = _run(['git', 'rev-parse', '--verify', '--quiet', 'refs/heads/' + branch])
+        if code == 0:
+            if not _confirm('Branch {} already exists. Switch to it and add to it?'.format(branch), default=True):
+                print('Nothing changed.')
+                return
+            switch = ['git', 'checkout', branch]
+        else:
+            switch = ['git', 'checkout', '-b', branch,
+                      '{}/{}'.format(upstream_remote, base)]
+        if _run_stream(switch) != 0:
+            print('')
+            print('Could not switch branches. Commit or stash your other changes first.')
+            return
+
+    code, to_add = _run(['git', 'add', '--dry-run', '--', app_dir])
+    if code != 0:
+        print('git could not stage {}: {}'.format(app_dir, to_add))
+        return
+    if not to_add:
+        print('')
+        print('Nothing to commit for {}/ — it already matches {}.'.format(app_dir, base))
+        print('If you already pushed this app, open the pull request on GitHub.')
+        return
+
+    lines = to_add.splitlines()
+    print('')
+    print('These {} file(s) will be committed:'.format(len(lines)))
+    for line in lines[:40]:
+        print('  {}'.format(line.strip()))
+    if len(lines) > 40:
+        print('  ... and {} more'.format(len(lines) - 40))
+    print('')
+    print('Build artifacts, METADATA/, and sdk_settings.ini are git-ignored and excluded.')
+    if not _confirm('Stage and commit these?', default=True):
+        print('Nothing changed.')
+        return
+
+    if _run_stream(['git', 'add', '--', app_dir]) != 0:
+        print('Could not stage {}.'.format(app_dir))
+        return
+
+    default_message = 'Add {} SDK sample app'.format(app_name)
+    message = _ask('Commit message', default_message)
+    if _run_stream(['git', 'commit', '-m', message, '--', app_dir]) != 0:
+        print('Commit failed.')
+        return
+
+    # Committed locally. Now the GitHub side: fork, push, pull request.
+    gh = _ensure_gh()
+    if gh and not _ensure_gh_auth(gh):
+        print('Not signed in to GitHub, falling back to the browser.')
+        gh = None
+
+    fork_remote = _find_fork_remote(upstream_remote)
+    if not fork_remote:
+        fork_remote = _create_fork(gh, upstream_remote) if gh else _fork_by_hand(upstream_remote)
+    if not fork_remote:
+        print('')
+        print('No fork remote, so there is nowhere to push.')
+        print('Your commit is safe on branch {}. Add a fork remote and push when ready:'.format(branch))
+        print('  git remote add fork https://github.com/YOUR-USERNAME/sdk-samples.git')
+        print('  git push -u fork {}'.format(branch))
+        return
+
+    fork_owner = _repo_owner(_remote_url(fork_remote))
+    if not fork_owner:
+        print('Could not work out the GitHub account behind remote "{}".'.format(fork_remote))
+        return
+
+    print('')
+    print('Pulling from "{}", pushing to "{}" ({}).'.format(
+        upstream_remote, fork_remote, fork_owner))
+    print('Pushing {} to "{}"...'.format(branch, fork_remote))
+    if _run_stream(['git', 'push', '-u', fork_remote, branch]) != 0:
+        print('')
+        print('Push failed. The usual cause is missing GitHub credentials for git.')
+        if gh:
+            print('Try "{} auth setup-git" and run contribute again.'.format(gh))
+        else:
+            print('On macOS, git asks for a password here and it must be a personal')
+            print('access token, not your GitHub password. Installing the GitHub CLI')
+            print('avoids this entirely: https://cli.github.com')
+        return
+
+    title = _ask('Pull request title', message)
+    body = _ask('Short description for the pull request (optional)') or title
+
+    if gh:
+        print('')
+        print('Opening the pull request...')
+        pr_cmd = [gh, 'pr', 'create', '--repo', UPSTREAM_REPO,
+                  '--base', base, '--head', '{}:{}'.format(fork_owner, branch),
+                  '--title', title, '--body', body]
+        if _run_stream(pr_cmd) == 0:
+            print('')
+            print('Done. Your app is up for review.')
+            return
+        print('gh could not create the pull request. Falling back to the browser.')
+
+    compare_url = 'https://github.com/{}/compare/{}...{}:{}?expand=1&title={}&body={}'.format(
+        UPSTREAM_REPO, base, fork_owner, branch, quote(title), quote(body))
+    print('')
+    print('Your branch is pushed. Open the pull request here:')
+    print('  {}'.format(compare_url))
+    if _confirm('Open it in your browser now?', default=True):
+        try:
+            webbrowser.open(compare_url)
+        except Exception as e:
+            print('Could not open a browser: {}'.format(e))
+
+
 
 
 # Prints the help information
@@ -1294,6 +1849,7 @@ def output_help():
     print('Actions include:')
     print('================')
     print('create: Create a new app from the app_template folder.')
+    print('\tThe app is created in the apps/ folder and the path is printed when it is done.')
     print(f'\tYou must provide a new app name. Example: {g_python_cmd} make.py create my_new_app')
     print(f'\tIf you do not provide a name, Cursor AI will generate one for you based on your requested functionality.\n')
     print('clean: Clean all project artifacts.')
@@ -1317,6 +1873,12 @@ def output_help():
     print('purge: Purge all apps from the locally connected NCOS device.\n')
     print('deploy: Purge, build, install, and show logs in one step.\n')
     print('setup: Create .venv and install requirements.txt.\n')
+    print('contribute: Submit one of your apps to cradlepoint/sdk-samples as a pull request.')
+    print(f'\tExample: {g_python_cmd} make.py contribute my_app')
+    print('\tForks the repo for you the first time, puts the app on a branch, pushes it')
+    print('\tto your fork, and opens the pull request. Your "origin" remote is left')
+    print('\tpointing at the upstream repo, so "git pull" keeps working as before.')
+    print('\tUses the GitHub CLI when available and offers to download it if not.\n')
     print('uuid: Create a UUID for the app and save it to the package.ini file.\n')
     print('update: Check and update core SDK files from GitHub repository.\n')
     print('\tUpdates: make.py and apps/templates/app_template/cp.py\n')
@@ -1566,6 +2128,9 @@ if __name__ == "__main__":
 
     elif utility_name == 'setup':
         setup()
+
+    elif utility_name == 'contribute':
+        contribute(option)
 
     elif utility_name == 'uuid':
         # This is handled in init()
