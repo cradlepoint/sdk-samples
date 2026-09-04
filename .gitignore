@@ -15,3 +15,6 @@ docs/ratings.json
 # Local router connection settings — holds credentials, never commit.
 # Created automatically from sdk_settings.ini.example by setup_env.py / make.py.
 sdk_settings.ini
+
+# Kiro MCP settings — may hold credentials, keep local only.
+.kiro/settings/mcp.json

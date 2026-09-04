@@ -157,7 +157,7 @@ qos = cp.get('config/qos')  # {'enabled': bool, 'queues': [...], 'rules': [...]}
 - ALWAYS include timestamps when reading logs
 - Convert timestamps to human-readable with `datetime.fromtimestamp(ts)`
 - Filter by recency — after deploying, only look at logs with timestamps AFTER the deploy started
-- Log entry format: `[timestamp, facility, level, message]` — index 0 = epoch, index 3 = message text
+- Log entry format: `[timestamp, level, facility, message, extra]` — index 0 = epoch, index 1 = level (`INFO`, `ERR`), index 2 = facility/source (app name, `kernel`, ...), index 3 = message text. Level comes BEFORE facility; filtering index 1 for an app name matches nothing
 
 ## Certificate Management
 
