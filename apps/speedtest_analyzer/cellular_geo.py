@@ -4,8 +4,8 @@ GeoView user configuration is persisted in NCOS SDK appdata so it survives
 SDK application package upgrades. This module intentionally contains no
 external Geo Provider integrations.
 
-Google/Unwired-style network calls belong in later provider adapters after
-those APIs are researched and their current contracts are confirmed.
+External provider network calls (e.g. Google) live in the provider adapters
+(``geo_providers.py``), not here.
 """
 
 import json
@@ -32,6 +32,11 @@ def _empty_locations():
         },
         'site_address': {
             'address': '',
+            # Derived, NON-SECRET coordinates resolved by forward-geocoding
+            # the address on Save/Apply (never on every page load). Null until
+            # a successful geocode; re-derived only when the address changes.
+            'latitude': None,
+            'longitude': None,
         },
     }
 
@@ -67,8 +72,12 @@ def _active_location(
 
     return {
         'source': 'site_address',
-        'latitude': None,
-        'longitude': None,
+        # Derived coordinates from forward-geocoding the address (may be null
+        # if not yet geocoded). Exposing them here gives Site Context and the
+        # export SVG the same effective SITE coordinate pair the other two
+        # modes provide.
+        'latitude': value.get('latitude'),
+        'longitude': value.get('longitude'),
         'address': value['address'],
     }
 
@@ -81,7 +90,15 @@ def default_geo_settings():
     return {
         'schema_version': _GEO_SCHEMA_VERSION,
         'configured': False,
+        # GeoView mode selector (restored v1.1.3):
+        #   'none'       -> Local Only (non-geographic local Cellular Analysis;
+        #                   no Google map, no OpenCellID enrichment displayed).
+        #   'opencellid' -> Geolocation Services (Google Maps + OpenCellID).
+        # A missing/absent provider defaults to 'none' (Local Only).
         'provider': 'none',
+        # Contribution opt-in (non-secret). OFF by default. Shares the observed
+        # geographic position of eligible serving cells with OpenCellID.
+        'contribution_enabled': False,
         'active_location_source': source,
         'locations': locations,
         'location': _active_location(
@@ -269,6 +286,14 @@ def _legacy_locations(
                     'address'
                 )
                 or '',
+            'latitude':
+                legacy.get(
+                    'latitude'
+                ),
+            'longitude':
+                legacy.get(
+                    'longitude'
+                ),
         }
 
     return locations
@@ -289,14 +314,28 @@ def normalize_geo_settings(
         value.get(
             'provider'
         )
-        or 'none'
+        or ''
     ).strip().lower()
 
-    if provider not in (
-        'none',
-        'google',
-        'unwired',
-    ):
+    # v1.1.3 (restored): GeoView mode selector persists as:
+    #   * 'none'       -> Local Only (non-geographic; no Google map, no
+    #                     OpenCellID enrichment displayed).
+    #   * 'opencellid' -> Geolocation Services (Google Maps + OpenCellID).
+    # Migration:
+    #   * missing / ''            -> 'none'      (default Local Only)
+    #   * legacy 'google'         -> 'opencellid'
+    #   * legacy 'unwired'        -> 'opencellid'
+    #   * 'none'                  -> 'none'       (NEVER normalized up)
+    #   * 'opencellid'            -> 'opencellid'
+    #
+    # 'opencellid' NEVER triggers an automatic OpenCellID request on startup,
+    # page load, history change, or settings load -- resolution runs
+    # exclusively via the explicit Resolve Cell Locations action.
+    if provider in ('', 'none'):
+        provider = 'none'
+    elif provider in ('google', 'unwired', 'opencellid'):
+        provider = 'opencellid'
+    else:
         raise ValueError(
             'Unsupported Geo Provider'
         )
@@ -424,10 +463,12 @@ def normalize_geo_settings(
         )
     )
 
+    site = locations[
+        'site_address'
+    ]
+
     address = str(
-        locations[
-            'site_address'
-        ].get(
+        site.get(
             'address'
         )
         or ''
@@ -446,6 +487,25 @@ def normalize_geo_settings(
             'Site Address cannot be empty'
         )
 
+    # Derived site-address coordinates (from forward-geocoding on Save/Apply).
+    # These are OPTIONAL here: the geocode itself happens in the save endpoint,
+    # which populates them before this normalizer persists the section. When
+    # present they are validated like any coordinate pair; when absent they
+    # stay null (address saved, geocode pending/failed handled by the caller).
+    site_latitude, site_longitude = (
+        _validate_coordinates(
+            site.get(
+                'latitude'
+            ),
+            site.get(
+                'longitude'
+            ),
+            'Site address coordinates',
+            required=False,
+            reject_zero_pair=True,
+        )
+    )
+
     normalized_locations = {
         'device_gps': {
             'latitude':
@@ -462,6 +522,10 @@ def normalize_geo_settings(
         'site_address': {
             'address':
                 address,
+            'latitude':
+                site_latitude,
+            'longitude':
+                site_longitude,
         },
     }
 
@@ -476,13 +540,26 @@ def normalize_geo_settings(
             mark_configured
         )
 
-    return {
+    # Contribution opt-in (non-secret). Absent -> False (migrated OFF).
+    contribution_enabled = bool(
+        value.get(
+            'contribution_enabled'
+        )
+    )
+
+    tuning = _normalize_provider_tuning(
+        value
+    )
+
+    result = {
         'schema_version':
             _GEO_SCHEMA_VERSION,
         'configured':
             configured,
         'provider':
             provider,
+        'contribution_enabled':
+            contribution_enabled,
         'active_location_source':
             source,
         'locations':
@@ -494,6 +571,51 @@ def normalize_geo_settings(
                 normalized_locations,
             ),
     }
+
+    # Optional, NON-SECRET provider tuning knobs (v1.1.3). Absent by default so
+    # normal Device>Group>Default inheritance and no-op semantics are intact.
+    # Credentials are NEVER stored here (they live in certmgmt via
+    # geo_secrets.py).
+    result.update(tuning)
+
+    return result
+
+
+# Optional non-secret GeoView provider tuning fields (v1.1.3). Each is bounded
+# and only included when explicitly present. These are pure configuration and
+# contain NO credential material.
+_PROVIDER_TUNING_BOUNDS = {
+    'provider_timeout_s': (2.0, 30.0, float),
+    'cache_positive_ttl_s': (60, 90 * 24 * 3600, int),
+    'cache_negative_ttl_s': (60, 30 * 24 * 3600, int),
+    'provider_max_attempts': (1, 5, int),
+}
+
+
+def _normalize_provider_tuning(value):
+    """Return only the present, in-bounds non-secret tuning fields."""
+    tuning = {}
+
+    if not isinstance(value, dict):
+        return tuning
+
+    for field, (low, high, caster) in _PROVIDER_TUNING_BOUNDS.items():
+        raw = value.get(field)
+        if raw in (None, ''):
+            continue
+        try:
+            number = caster(raw)
+        except (TypeError, ValueError):
+            raise ValueError(
+                'Invalid GeoView tuning value for %s' % field
+            )
+        if number < low or number > high:
+            raise ValueError(
+                '%s must be between %s and %s' % (field, low, high)
+            )
+        tuning[field] = number
+
+    return tuning
 
 
 def is_group_safe_source(source):
@@ -588,6 +710,15 @@ def group_sanitized_geoview(persisted):
 
     empty = _empty_locations()
 
+    # Preserve the persisted GeoView mode selector (none/opencellid). It is a
+    # non-device-specific policy; migrate any legacy value the same way the
+    # normalizer does.
+    prov = str(persisted.get('provider') or '').strip().lower()
+    if prov in ('google', 'unwired', 'opencellid'):
+        prov = 'opencellid'
+    else:
+        prov = 'none'
+
     sanitized = {
         'schema_version':
             _GEO_SCHEMA_VERSION,
@@ -597,12 +728,15 @@ def group_sanitized_geoview(persisted):
                     'configured'
                 )
             ),
+        # GeoView mode selector policy (none/opencellid); never coerced up.
         'provider':
-            str(
+            prov,
+        # Contribution opt-in is a non-secret policy; promote as-is.
+        'contribution_enabled':
+            bool(
                 persisted.get(
-                    'provider'
+                    'contribution_enabled'
                 )
-                or 'none'
             ),
         'active_location_source':
             source,
@@ -618,7 +752,7 @@ def _persisted_settings(
     normalized,
 ):
     """Return only canonical v2 values written to SDK appdata."""
-    return {
+    persisted = {
         'schema_version':
             _GEO_SCHEMA_VERSION,
         'configured':
@@ -631,6 +765,12 @@ def _persisted_settings(
             normalized[
                 'provider'
             ],
+        'contribution_enabled':
+            bool(
+                normalized.get(
+                    'contribution_enabled'
+                )
+            ),
         'active_location_source':
             normalized[
                 'active_location_source'
@@ -640,6 +780,14 @@ def _persisted_settings(
                 'locations'
             ],
     }
+
+    # Persist optional non-secret tuning fields only when present, so a sparse
+    # section stays sparse and inheritance/no-op semantics are preserved.
+    for field in _PROVIDER_TUNING_BOUNDS:
+        if field in normalized:
+            persisted[field] = normalized[field]
+
+    return persisted
 
 
 def load_geo_settings():
@@ -722,6 +870,14 @@ def apply_geo_settings(
     ] = normalized[
         'provider'
     ]
+
+    result[
+        'contribution_enabled'
+    ] = bool(
+        normalized.get(
+            'contribution_enabled'
+        )
+    )
 
     result[
         'configured'

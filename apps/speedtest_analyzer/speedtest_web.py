@@ -28,8 +28,23 @@ from cellular_geo import (
 
 import configuration_manager as config_mgr
 
+# GeoView v1.1.3: Device-scoped provider credentials + bounded resolution job.
+# These modules own all provider/credential handling. speedtest_web only
+# performs thin HTTP orchestration and never holds a plaintext credential.
+import geo_secrets
+import geo_providers
+import geo_resolver
+import geo_cache
+import geo_contributions
+
 # Constants
 PORT = 8000
+# GeoView has no user-facing provider selector: the cellular serving-location
+# service is fixed to OpenCellID. Enrichment reads, the resolve job, status,
+# and cache invalidation all key on this provider. The browser Maps JS map and
+# Google Site-Address geocoding are INDEPENDENT services that do not depend on
+# it.
+GEO_CELL_PROVIDER = 'opencellid'
 HISTORY_FILE = 'tmp/speedtest_history.json'
 HISTORY_BACKUP_FILE = HISTORY_FILE + '.bak'
 HISTORY_TEMP_FILE = HISTORY_FILE + '.tmp'
@@ -11793,6 +11808,15 @@ def run_test_thread(engine, params):
             # Write to configured outputs (only for successful tests)
             if status_val == 'complete':
                 write_outputs(entry)
+                # v1.1.3: silent automatic OpenCellID contribution hook. Runs
+                # ONLY after a completed cellular test/history result, never
+                # from polling/page load/reboot/history selection/rendering.
+                # Fully gated + contained; never affects the test result.
+                try:
+                    _maybe_auto_contribute_after_test(entry)
+                except Exception as _auto_exc:
+                    cp.log('GeoView auto-contribution (non-fatal): %s'
+                           % geo_secrets.scrub(_auto_exc))
             with test_lock:
                 current_test['progress'] = {
                     'stage': 'complete',
@@ -12177,9 +12201,43 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
+            # v1.1.3: attach already-cached Geo enrichment (metadata only).
+            # This is a READ of the resolve job's cache; it must NEVER initiate
+            # a provider request (HLD §2, LLD §5, J7).
+            #
+            # Local Only (provider=none) SUPPRESSES enrichment/estimated
+            # locations from the active presentation but does NOT delete the
+            # on-disk cache. Geolocation Services (provider=opencellid) surfaces
+            # any valid cached enrichment immediately.
+            try:
+                enrichment = (
+                    geo_resolver.job().enrichment(GEO_CELL_PROVIDER)
+                    if _effective_geo_provider() == 'opencellid'
+                    else {})
+                if enrichment:
+                    analysis['geo']['enrichment'] = enrichment
+                    analysis['geo']['estimated_locations'] = sum(
+                        1 for item in enrichment.values()
+                        if item.get('location')
+                    )
+            except Exception as exc:
+                # Enrichment is best-effort; never break Cellular Analysis.
+                cp.log('GeoView enrichment read skipped: %s'
+                       % geo_secrets.scrub(exc))
+
             self.send_json(
                 analysis
             )
+
+        elif self.path == '/api/geo/status':
+            self.send_json(self.get_geo_status())
+        elif self.path == '/api/geo/creds/status':
+            self.send_json(self.get_geo_creds_status())
+        elif self.path == '/api/geo/mapjs':
+            # Browser Maps JavaScript key + resolved SITE/A/B/C markers. The
+            # interactive Google Maps JavaScript map is the only live GeoView
+            # map (Static Maps removed in v1.1.3 cleanup).
+            self.handle_geo_map_js()
 
         elif self.path == '/api/version':
             self.send_json({'version': APP_VERSION})
@@ -12275,6 +12333,21 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_save_outputs()
         elif self.path == '/api/geo_settings':
             self.handle_save_geo_settings()
+        # --- GeoView v1.1.3: resolution job + Device credential endpoints ---
+        elif self.path == '/api/geo/resolve':
+            self.handle_geo_resolve()
+        elif self.path == '/api/geo/creds/update':
+            self.handle_geo_creds_update()
+        elif self.path == '/api/geo/creds/clear':
+            self.handle_geo_creds_clear()
+        elif self.path == '/api/geo/creds/record/update':
+            self.handle_geo_creds_record_update()
+        elif self.path == '/api/geo/creds/record/clear':
+            self.handle_geo_creds_record_clear()
+        elif self.path == '/api/geo/creds/reset':
+            self.handle_geo_creds_reset()
+        elif self.path == '/api/geo/contribute':
+            self.handle_geo_contribute()
         # --- Two-layer Configuration Management endpoints (v1.1.2) ----------
         elif self.path == '/api/config/state':
             self.handle_config_state()
@@ -12669,6 +12742,20 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         # to the legacy geoview_settings key. Persistence is routed through the
         # canonical Configuration Manager so it participates in the Device/
         # NCM Group workflow like every other normal configuration section.
+        # Site Address forward-geocoding (v1.1.3 Pass 2). When the active
+        # location source is site_address, the address must resolve to real
+        # SITE coordinates so the live map, Site Context, and the export SVG
+        # all share the same effective SITE point. Geocoding happens HERE on
+        # Save/Apply only (never on every page load): reuse already-resolved
+        # coordinates when the address is unchanged, re-geocode when it
+        # changes, and fail closed with a clear error rather than persisting
+        # fake coordinates. The private SERVER key stays on the router.
+        try:
+            data = self._geocode_site_address_on_save(data)
+        except _SiteAddressGeocodeError as exc:
+            self.send_json({'error': str(exc)}, 400)
+            return
+
         try:
             normalized = config_mgr.cellular_geo.normalize_geo_settings(
                 data, mark_configured=True)
@@ -12682,6 +12769,431 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         self._respond_config_apply(
             'geoview', geoview_value,
             success_payload=normalized)
+
+    def _geocode_site_address_on_save(self, data):
+        """Ensure a site_address payload carries derived lat/lon.
+
+        Returns the (possibly augmented) incoming settings dict. Raises
+        ``_SiteAddressGeocodeError`` with a user-facing message when the
+        address cannot be resolved, so nothing fake is ever persisted. Only
+        touches the site_address case; device_gps and manual_coordinates are
+        returned unchanged.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        source = str(
+            data.get('active_location_source')
+            or (data.get('location') or {}).get('source')
+            or 'device_gps').strip().lower()
+        if source != 'site_address':
+            return data
+
+        locations = data.get('locations')
+        if not isinstance(locations, dict):
+            locations = {}
+            data['locations'] = locations
+        site = locations.get('site_address')
+        if not isinstance(site, dict):
+            site = {}
+            locations['site_address'] = site
+
+        address = str(site.get('address') or '').strip()
+        if not address:
+            # normalize_geo_settings raises the empty-address error later.
+            return data
+
+        # Reuse already-resolved coordinates when the address is unchanged.
+        prev = {}
+        try:
+            prev = (((_effective_geo_settings() or {}).get('locations')
+                     or {}).get('site_address') or {})
+        except Exception:
+            prev = {}
+        prev_address = str(prev.get('address') or '').strip()
+        prev_lat = prev.get('latitude')
+        prev_lon = prev.get('longitude')
+        if (address == prev_address and prev_lat is not None
+                and prev_lon is not None):
+            site['latitude'] = prev_lat
+            site['longitude'] = prev_lon
+            return data
+
+        # Forward-geocode with the private Google SERVER key (Geocoding API).
+        # The key never leaves the router and never enters a log/exception
+        # body. This is the Google GEOCODING service ONLY -- independent of the
+        # OpenCellID cellular resolver.
+        cred = geo_secrets.resolve_device('google')
+        if not cred.is_configured:
+            raise _SiteAddressGeocodeError(
+                'Site Address requires a configured Google Server API Key. '
+                'Add the credential, or switch to Manual Coordinates.')
+
+        try:
+            adapter = geo_providers.build_geocoder(cred.bundle)
+            lat, lon, _formatted = adapter.forward_geocode(address)
+        except geo_providers.ProviderError as exc:
+            raise _SiteAddressGeocodeError(
+                _site_address_error_message(exc.status))
+        except Exception as exc:
+            cp.log('GeoView site-address geocode error: %s'
+                   % geo_secrets.scrub(exc))
+            raise _SiteAddressGeocodeError(
+                'Could not resolve the site address. Verify the address, or '
+                'switch to Manual Coordinates.')
+
+        site['latitude'] = lat
+        site['longitude'] = lon
+        return data
+
+
+    # -- GeoView v1.1.3 resolution job + Device credential endpoints --------
+    def _read_json_body(self):
+        """Read and parse a JSON request body. Returns dict or None (replied)."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = (self.rfile.read(content_length).decode('utf-8')
+                if content_length else '{}')
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError:
+            self.send_json({'error': 'Invalid JSON'}, 400)
+            return None
+
+    def get_geo_status(self):
+        """Return the metadata-only GeoView resolve-job status for the fixed
+        OpenCellID cellular-location provider (state/counts)."""
+        try:
+            return geo_resolver.job().status(GEO_CELL_PROVIDER)
+        except Exception as exc:
+            cp.log('GeoView status error: %s' % geo_secrets.scrub(exc))
+            return {'state': geo_resolver.STATE_IDLE, 'error': 'status_error'}
+
+    def get_geo_creds_status(self):
+        """Return metadata-only Device credential status per provider.
+
+        Never returns secret values (write-only credential model, L8).
+        """
+        try:
+            # Logical-provider metadata (compat) + per-record metadata for the
+            # split-key GeoView config UX (server keys vs browser Maps JS key).
+            # Never returns secret values -- per-field presence booleans only.
+            return {
+                'credentials': geo_secrets.status_all(),
+                'records': geo_secrets.record_status_all(),
+            }
+        except Exception as exc:
+            cp.log('GeoView creds status error: %s' % geo_secrets.scrub(exc))
+            return {'credentials': {}, 'records': {}, 'error': 'status_error'}
+
+    def handle_geo_resolve(self):
+        """Start (or reuse) the single bounded GeoView resolution job.
+
+        This is the ONLY place cellular resolution is initiated, and only in
+        response to the explicit Resolve Cell Locations action. Uses the fixed
+        OpenCellID cellular-location provider. Reads the site-wide cell
+        inventory locally; the job gates on the OpenCellID credential and
+        contains all provider failures.
+        """
+        _ = self._read_json_body()
+        if _ is None:
+            return
+        try:
+            # Local Only (provider=none): resolution is disabled entirely.
+            if _effective_geo_provider() != 'opencellid':
+                self.send_json(geo_resolver.job().status('none'))
+                return
+
+            inventory = build_site_cell_inventory(load_history())
+            cells = inventory.get('cells', [])
+
+            timeout = _geo_provider_timeout()
+            _apply_geo_cache_policy()
+
+            status = geo_resolver.job().resolve(
+                GEO_CELL_PROVIDER, cells, timeout=timeout)
+            self.send_json(status)
+        except Exception as exc:
+            # Never let a GeoView failure break the request path.
+            cp.log('GeoView resolve error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'state': geo_resolver.STATE_FAILED,
+                            'reason': 'resolve_error'}, 200)
+
+    def handle_geo_creds_update(self):
+        """Write-only Device credential update for a provider.
+
+        Body: {"provider": "google", "fields": {...}}. Responds with
+        metadata-only status. The credential value is never echoed back.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+        provider = data.get('provider')
+        fields = data.get('fields') or {}
+        try:
+            status = geo_secrets.update_device(provider, fields)
+            self.send_json({'status': 'saved', 'credential': status})
+        except ValueError as exc:
+            # Message is provider-safe (no secrets); still avoid logging input.
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds update error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_write_failed'}, 500)
+
+    def handle_geo_creds_clear(self):
+        """Explicitly clear a provider's Device credential (delete cert)."""
+        data = self._read_json_body()
+        if data is None:
+            return
+        provider = data.get('provider')
+        try:
+            status = geo_secrets.clear_device(provider)
+            # Invalidate cached cellular results (keyed by the OpenCellID
+            # cell-location provider). A key change can change resolution.
+            geo_cache.shared_cache().invalidate('opencellid')
+            self.send_json({'status': 'cleared', 'credential': status})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds clear error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_clear_failed'}, 500)
+
+    def handle_geo_creds_record_update(self):
+        """Write-only update for a single credential RECORD (split-key UX).
+
+        Body: {"record": "server"|"mapjs", "fields": {...}}. The server record
+        holds the Google server geocoding key and the OpenCellID key; the mapjs
+        record holds the browser Maps JS key. Values are never echoed back.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+        record = data.get('record')
+        fields = data.get('fields') or {}
+        try:
+            status = geo_secrets.update_record(record, fields)
+            # Independent-service invalidation: ONLY an OpenCellID key change
+            # affects cached cell-location results. Replacing the Google server
+            # geocoding key or the Maps JS key must NOT drop existing safe cell
+            # enrichment/cache.
+            if isinstance(fields, dict) and isinstance(
+                    fields.get('opencellid_key'), str) and fields[
+                        'opencellid_key'].strip():
+                geo_cache.shared_cache().invalidate('opencellid')
+            self.send_json({'status': 'saved', 'record': status})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds record update error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_write_failed'}, 500)
+
+    def handle_geo_creds_record_clear(self):
+        """Clear one credential RECORD, or one FIELD within a record (Remove).
+
+        Body: {"record": "server"|"mapjs", "field": "opencellid_key"?}. Omit
+        ``field`` to remove the whole record.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+        record = data.get('record')
+        field = data.get('field')
+        try:
+            rec = str(record or '').strip().lower()
+            fld = field.strip() if isinstance(field, str) else ''
+            if fld:
+                status = geo_secrets.clear_single_field(record, fld)
+            else:
+                status = geo_secrets.clear_record(record)
+            # Independent-service invalidation: ONLY OpenCellID credential
+            # changes drop cached cell-location results. That is either the
+            # explicit opencellid_key field, or clearing the whole server
+            # record (which removes the OpenCellID key). Removing the Google
+            # geocoding key or the Maps JS record leaves cell enrichment/cache
+            # intact.
+            opencellid_affected = (
+                fld == 'opencellid_key'
+                or (not fld and rec == geo_secrets.RECORD_SERVER)
+            )
+            if opencellid_affected:
+                geo_cache.shared_cache().invalidate('opencellid')
+            self.send_json({'status': 'cleared', 'record': status})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds record clear error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_clear_failed'}, 500)
+
+    def handle_geo_creds_reset(self):
+        """Reset GeoView credentials + downgrade to Local Only.
+
+        Confirmation is enforced client-side. This:
+          * clears all THREE protected keys (Google server, Maps JS,
+            OpenCellID) via the credential store,
+          * sets contribution_enabled=false and provider=none in the
+            persisted geoview section, and
+          * PRESERVES Site Location, history, and the OpenCellID cache.
+        """
+        _ = self._read_json_body()
+        if _ is None:
+            return
+        try:
+            # 1) Clear all protected credential records (both records + legacy).
+            # Resetting credentials intentionally preserves the OpenCellID
+            # cell-location cache so switching back to Geolocation Services
+            # can immediately reuse previously resolved serving locations.
+            geo_secrets.clear_device()
+        except Exception as exc:
+            cp.log('GeoView creds reset (clear) error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_clear_failed'}, 500)
+            return
+
+        # 2) Downgrade the geoview policy to Local Only + contribution OFF,
+        #    preserving Site Location (locations) exactly as configured.
+        try:
+            current = _effective_geo_settings() or {}
+            proposed = {
+                'provider': 'none',
+                'contribution_enabled': False,
+                'active_location_source': current.get(
+                    'active_location_source', 'device_gps'),
+                'locations': current.get('locations') or {},
+            }
+            normalized = config_mgr.cellular_geo.normalize_geo_settings(
+                proposed, mark_configured=bool(current.get('configured')))
+            geoview_value = config_mgr.cellular_geo._persisted_settings(
+                normalized)
+            self._respond_config_apply(
+                'geoview', geoview_value,
+                success_payload={'status': 'reset',
+                                 'geoview': normalized})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds reset (policy) error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'reset_failed'}, 500)
+
+    def handle_geo_contribute(self):
+        """Manual OpenCellID contribution (Manual Site Location only).
+
+        Gated: provider=opencellid AND contribution_enabled AND the active
+        location source is a manual site point (site_address / manual
+        coordinates) AND a configured OpenCellID key. Scans retained history
+        hard-filtered to Internal/Captive cellular observations, dedupes via
+        the ledger + 20 m rule, and submits using the CURRENT validated manual
+        Site coordinates. Returns counts; never runs a resolve or lookup.
+        """
+        _ = self._read_json_body()
+        if _ is None:
+            return
+        try:
+            settings = _effective_geo_settings() or {}
+            provider = 'opencellid' if settings.get(
+                'provider') == 'opencellid' else 'none'
+            source = str(settings.get('active_location_source')
+                         or 'device_gps')
+
+            if provider != 'opencellid':
+                self.send_json({'error': 'geoview_disabled'}, 409)
+                return
+            if not settings.get('contribution_enabled'):
+                self.send_json({'error': 'contribution_disabled'}, 409)
+                return
+            if source not in ('site_address', 'manual_coordinates'):
+                # Device GPS contributes automatically; manual is hidden.
+                self.send_json({'error': 'manual_location_required'}, 409)
+                return
+
+            # Current validated manual Site coordinates.
+            loc = settings.get('location') or {}
+            lat = loc.get('latitude')
+            lon = loc.get('longitude')
+            if lat is None or lon is None:
+                self.send_json({'error': 'site_coordinates_invalid'}, 409)
+                return
+
+            cred = geo_secrets.resolve_device('opencellid')
+            if not cred.is_configured:
+                self.send_json({'error': 'credentials_required'}, 409)
+                return
+
+            # Hard-filter site inventory to Internal/Captive cellular cells.
+            inventory = build_site_cell_inventory(load_history())
+            cells = _eligible_contribution_cells(inventory.get('cells', []))
+            if not cells:
+                self.send_json({'status': 'complete', 'counts': {
+                    'submitted': 0, 'duplicates': 0, 'failed': 0,
+                    'eligible': 0}})
+                return
+
+            counts = geo_contributions.contribute_manual(
+                cred.bundle, cells, lat, lon,
+                timeout=_geo_provider_timeout())
+            self.send_json({'status': 'complete', 'counts': counts})
+        except Exception as exc:
+            cp.log('GeoView contribute error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'contribute_failed'}, 500)
+
+    def handle_geo_map_js(self):
+        """Return the browser Maps JavaScript key + resolved markers.
+
+        This is the ONLY live GeoView map data endpoint. It returns ONLY:
+
+            * ``maps_js_api_key`` -- the browser-restricted Google Maps
+              JavaScript API key (a DISTINCT key from the server-side
+              ``api_key``), and only when the effective provider is google and
+              that field exists in the configured bundle.
+            * ``markers`` -- the SITE + resolved A/B/C cell set, read from
+              ALREADY-cached enrichment (never resolving), so the JavaScript
+              map plots current known geography.
+
+        It NEVER returns the private server ``api_key`` / OpenCellID key or the
+        full decrypted bundle, and it NEVER initiates cellular geolocation. The
+        map depends ONLY on the browser Maps JS record, independent of the
+        server-key record. Failure modes degrade gracefully with JSON reasons:
+        geoview_disabled | maps_js_key_missing.
+        """
+        try:
+            settings = _effective_geo_settings()
+
+            # Local Only (provider=none): no Google map is presented. Degrade
+            # to the local schematic; the on-disk cache is untouched.
+            if str((settings or {}).get('provider')) != 'opencellid':
+                self.send_json({'error': 'geoview_disabled'}, 409)
+                return
+
+            # The browser map is INDEPENDENT of the cellular-location service:
+            # it needs only the Maps JS key + already-cached markers. It does
+            # NOT require OpenCellID (or any server key) to be configured.
+            # Bootstrap returns the browser Maps JS key ONLY -- server-side
+            # keys (Google server / OpenCellID) are never part of this payload.
+            js_key = geo_secrets.maps_js_api_key()
+            if not js_key:
+                # No browser Maps JS key configured yet.
+                self.send_json({'error': 'maps_js_key_missing'}, 409)
+                return
+
+            # Read cached cellular enrichment ONLY (never resolve); join to the
+            # inventory for stable A/B/C labels. Enrichment is keyed on the
+            # fixed OpenCellID provider and is simply empty when nothing has
+            # been resolved yet, which still yields a SITE-only map.
+            enrichment = geo_resolver.job().enrichment(GEO_CELL_PROVIDER)
+            inventory = build_site_cell_inventory(load_history())
+            cells = inventory.get('cells', [])
+            markers = _compose_map_markers(settings, enrichment, cells)
+
+            # markers is browser-safe (role/label/lat/lon only; no secrets).
+            self.send_json({
+                'maps_js_api_key': js_key,
+                'markers': markers,
+            })
+        except Exception as exc:
+            # No secret/key leaks into the error body.
+            cp.log('GeoView map-js error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'map_unavailable'}, 502)
 
 
     def handle_set_iperf3_server_mode(self):
@@ -15561,6 +16073,331 @@ def _effective_geo_settings():
         except Exception as exc:
             cp.log(f'Config apply (geoview normalize) error: {exc}')
     return load_geo_settings()
+
+
+def _effective_geo_provider():
+    """Return the effective GeoView mode: 'none' (Local Only) or 'opencellid'.
+
+    Missing/legacy values are migrated by the normalizer. 'none' disables
+    geographic GeoView (no Google map, no OpenCellID enrichment displayed);
+    cached results on disk are preserved regardless.
+    """
+    try:
+        settings = _effective_geo_settings() or {}
+        return 'opencellid' if settings.get('provider') == 'opencellid' \
+            else 'none'
+    except Exception:
+        return 'none'
+
+
+def _contribution_enabled():
+    """Return True when the non-secret contribution opt-in is enabled."""
+    try:
+        return bool((_effective_geo_settings() or {}).get(
+            'contribution_enabled'))
+    except Exception:
+        return False
+
+
+def _eligible_contribution_cells(cells):
+    """Filter inventory cells using authoritative NCOS WAN classification.
+
+    Each inventory row carries the raw NCOS interface identifier separately
+    from its display label. Contribution eligibility is therefore determined
+    from the live WAN/device identity, never from friendly-label text or rmnet
+    naming.
+    """
+    eligible = []
+    for cell in (cells or []):
+        if not isinstance(cell, dict):
+            continue
+
+        rows = cell.get('interfaces') or []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+
+            raw_interface = str(row.get('interface') or '').strip()
+            if raw_interface and _interface_is_cellular_wan(raw_interface):
+                eligible.append(cell)
+                break
+
+    return eligible
+
+
+def _maybe_auto_contribute_after_test(entry):
+    """Automatic OpenCellID contribution hook for ONE completed cellular test.
+
+    Silent (no toast/popup; diagnostic logging only). Contributes ONLY when
+    ALL are true:
+      * provider=opencellid AND contribution_enabled AND OpenCellID key set,
+      * active location source is Device GPS with a valid, nonzero GPS lock,
+      * the completed test is on an Internal/Captive cellular modem,
+      * a complete primary serving identity exists for the cell(s).
+    Uses the router's OBSERVED GPS position (never provider coordinates), and
+    applies the same 20 m ledger dedupe. Never raises; never affects the test.
+    """
+    try:
+        if not isinstance(entry, dict):
+            return
+        settings = _effective_geo_settings() or {}
+        if settings.get('provider') != 'opencellid':
+            return
+        if not settings.get('contribution_enabled'):
+            return
+        if str(settings.get('active_location_source')
+               or 'device_gps') != 'device_gps':
+            return
+
+        # Only cellular WAN tests are eligible. Use the raw NCOS interface/WAN
+        # identity and the app's existing authoritative cellular classifier;
+        # never infer contribution eligibility from display-label text.
+        raw_interface = str(entry.get('interface') or '').strip()
+        if not _interface_is_cellular_wan(raw_interface):
+            return
+
+        # Require a valid, nonzero GPS lock (queried once, on demand).
+        try:
+            gps = cp.get_gps_status() or {}
+        except Exception:
+            return
+        if not gps_fix_is_usable(gps):
+            return
+        lat = gps.get('latitude')
+        lon = gps.get('longitude')
+
+        cred = geo_secrets.resolve_device('opencellid')
+        if not cred.is_configured:
+            return
+
+        # Serving cell(s) for THIS completed test. Build a one-record inventory
+        # so identity normalization matches Cellular Analysis semantics, then
+        # keep only Internal/Captive-eligible cells.
+        inventory = build_site_cell_inventory([entry])
+        cells = _eligible_contribution_cells(inventory.get('cells', []))
+        if not cells:
+            return
+
+        counts = geo_contributions.contribute_from_completed_test(
+            cred.bundle, cells, lat, lon, interface_eligible=True,
+            measured_at_ms=int(time.time() * 1000),
+            timeout=_geo_provider_timeout())
+        if counts.get('submitted') or counts.get('failed'):
+            cp.log('GeoView auto-contribution: %s submitted, %s skipped, '
+                   '%s failed' % (counts.get('submitted', 0),
+                                  counts.get('skipped', 0),
+                                  counts.get('failed', 0)))
+    except Exception as exc:
+        cp.log('GeoView auto-contribution hook skipped: %s'
+               % geo_secrets.scrub(exc))
+
+
+def _geo_provider_timeout():
+    """Return the non-secret per-provider request timeout (seconds).
+
+    Sourced from the effective GeoView section when present, else a safe
+    default. Bounded so a misconfigured value can never stall the worker.
+    """
+    default = geo_providers._DEFAULT_TIMEOUT
+    try:
+        settings = _effective_geo_settings()
+        value = (settings or {}).get('provider_timeout_s')
+        if value is None:
+            return default
+        value = float(value)
+        return min(max(value, 2.0), 30.0)
+    except Exception:
+        return default
+
+
+def _apply_geo_cache_policy():
+    """Apply non-secret cache TTL/retry policy from effective GeoView config.
+
+    Credentials are never involved here; only cache tuning knobs. Missing keys
+    fall back to the cache defaults.
+    """
+    try:
+        settings = _effective_geo_settings() or {}
+        geo_cache.shared_cache().configure(
+            positive_ttl=settings.get('cache_positive_ttl_s'),
+            negative_ttl=settings.get('cache_negative_ttl_s'),
+            max_attempts=settings.get('provider_max_attempts'),
+        )
+    except Exception as exc:
+        cp.log('GeoView cache policy skipped: %s' % geo_secrets.scrub(exc))
+
+
+# Upper bound on markers composed for one map. Caps an unbounded retained
+# history from producing an absurd marker set. Site marker is additional to
+# this cell cap.
+_GEO_MAP_MAX_CELLS = 12
+
+
+def _coord_pair(latitude, longitude):
+    """Return (lat, lon) floats if both parse to a usable pair, else None."""
+    try:
+        lat = float(latitude)
+        lon = float(longitude)
+    except (TypeError, ValueError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    # 0,0 is the GPS no-fix sentinel; never treat it as a real point.
+    if lat == 0.0 and lon == 0.0:
+        return None
+    return lat, lon
+
+
+class _SiteAddressGeocodeError(Exception):
+    """User-facing Save/Apply error when a site address cannot be geocoded.
+
+    The message is safe to show and never contains credentials.
+    """
+
+
+def _site_address_error_message(status):
+    """Map a provider status to a clear, user-facing Save/Apply message."""
+    if status == geo_providers.STATUS_NOT_FOUND:
+        return ('That site address could not be found. Check the address, '
+                'or switch to Manual Coordinates.')
+    if status == geo_providers.STATUS_AUTH_ERROR:
+        return ('The Google Server API Key was rejected for Geocoding. '
+                'Verify the key, or switch to Manual Coordinates.')
+    if status == geo_providers.STATUS_QUOTA:
+        return ('Google Geocoding quota was exceeded. Try again later, or '
+                'switch to Manual Coordinates.')
+    if status in (geo_providers.STATUS_TIMEOUT,
+                  geo_providers.STATUS_NO_INTERNET):
+        return ('Could not reach Google Geocoding (network/timeout). Try '
+                'again, or switch to Manual Coordinates.')
+    return ('Could not resolve the site address. Verify the address, or '
+            'switch to Manual Coordinates.')
+
+
+def _resolve_site_point(settings, gps_sample=None):
+    """Resolve the active site coordinate for map composition (runtime only).
+
+    device_gps        -> a FRESH runtime GPS query (never the persisted null).
+    manual_coordinates-> effective config coordinates.
+    site_address      -> derived coordinates persisted at Save/Apply time by
+                         forward-geocoding the address (v1.1.3 Pass 2).
+    Returns (lat, lon) or None. Never persists anything and never geocodes
+    here (geocoding is a Save/Apply-time action, not a read-path action).
+    """
+    source = str((settings or {}).get('active_location_source')
+                 or 'device_gps').lower()
+    locations = (settings or {}).get('locations') or {}
+
+    if source == 'device_gps':
+        # Fresh runtime fix; the persisted device_gps coords are always null.
+        sample = gps_sample if gps_sample is not None else _live_gps_sample()
+        if sample and sample.get('fix_available'):
+            return _coord_pair(sample.get('latitude'),
+                               sample.get('longitude'))
+        return None
+
+    if source == 'manual_coordinates':
+        manual = locations.get('manual_coordinates') or {}
+        return _coord_pair(manual.get('latitude'), manual.get('longitude'))
+
+    # site_address: use the derived coordinates resolved on Save/Apply. Null
+    # until a successful geocode (no SITE marker until then).
+    site = locations.get('site_address') or {}
+    return _coord_pair(site.get('latitude'), site.get('longitude'))
+
+
+def _live_gps_sample():
+    """Return one fresh runtime GPS sample dict, or None. Runtime only."""
+    try:
+        gps = cp.get_gps_status() or {}
+    except Exception as exc:
+        cp.log('GeoView map GPS query failed: %s' % geo_secrets.scrub(exc))
+        return None
+    latitude = gps.get('latitude')
+    longitude = gps.get('longitude')
+    gps_lock = gps.get('gps_lock')
+    if gps_lock is None:
+        gps_lock = gps.get('lock')
+    fix = gps_fix_is_usable({
+        'gps_lock': bool(gps_lock),
+        'latitude': latitude,
+        'longitude': longitude,
+    })
+    return {
+        'fix_available': fix,
+        'latitude': latitude,
+        'longitude': longitude,
+    }
+
+
+def _compose_map_markers(settings, enrichment, inventory_cells,
+                         gps_sample=None):
+    """Compose the normalized marker set from current backend state.
+
+    Site marker (if a site point resolves) plus one marker per resolved cell,
+    joined enrichment[cell_key] <-> inventory cell for an A/B/C label. Returns
+    a list of normalized marker dicts (possibly empty). Reads cached
+    enrichment only; never initiates resolution.
+    """
+    markers = []
+
+    site = _resolve_site_point(settings, gps_sample=gps_sample)
+    if site is not None:
+        markers.append(geo_providers.make_marker(
+            geo_providers.MARKER_ROLE_SITE, 'SITE', site[0], site[1]))
+    # (Marker set is consumed by the /api/geo/mapjs JavaScript-map endpoint.)
+
+    # Stable A/B/C labels follow the site inventory order (same order the UI
+    # lists serving cells). Build a key->label map first.
+    labels = {}
+    idx = 0
+    for cell in (inventory_cells or []):
+        key = cell.get('key') if isinstance(cell, dict) else None
+        if not key or key in labels:
+            continue
+        labels[key] = _index_label(idx)
+        idx += 1
+
+    cell_count = 0
+    enrichment = enrichment or {}
+    # Iterate in inventory order so labels and markers agree.
+    for cell in (inventory_cells or []):
+        if cell_count >= _GEO_MAP_MAX_CELLS:
+            break
+        key = cell.get('key') if isinstance(cell, dict) else None
+        if not key:
+            continue
+        record = enrichment.get(key)
+        if not isinstance(record, dict):
+            continue
+        loc = record.get('location')
+        if not isinstance(loc, dict):
+            continue
+        pair = _coord_pair(loc.get('lat'), loc.get('lon'))
+        if pair is None:
+            continue
+        markers.append(geo_providers.make_marker(
+            geo_providers.MARKER_ROLE_CELL, labels.get(key, '?'),
+            pair[0], pair[1], accuracy_m=loc.get('accuracy_m'),
+            cell_key=key,
+            # Browser-safe carrier string used only to color the live-map
+            # accuracy circle per carrier (no secret material).
+            carrier=(cell.get('carrier') if isinstance(cell, dict) else None)))
+        cell_count += 1
+
+    return markers
+
+
+def _index_label(index):
+    """0->A, 1->B, ... 25->Z, 26->AA (spreadsheet-style)."""
+    label = ''
+    index = int(index)
+    while True:
+        label = chr(ord('A') + (index % 26)) + label
+        index = index // 26 - 1
+        if index < 0:
+            break
+    return label
 
 
 class ConfigApplyResult(object):

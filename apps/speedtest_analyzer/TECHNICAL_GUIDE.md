@@ -2,7 +2,7 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.1.2
+**Documentation version:** 1.1.3
 **Application release family:** 1.1.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
@@ -37,7 +37,7 @@ The documented application behavior uses several persistent or packaged data sou
 
 Application version information is carried in `package.ini`.
 
-The current branded application release is `1.1.2`. Speedtest Analyzer 1.1.2 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline.
+The current branded application release is `1.1.3`. Speedtest Analyzer 1.1.3 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline. Release `1.1.3` adds optional, Device-scoped GeoView provider enrichment (see [Section 19](#19-geoview-provider-enrichment-113)); all other `1.1.2` behavior is preserved.
 
 ## 2.2 Device validation catalog
 
@@ -122,35 +122,66 @@ written by the device.
 
 ## 2.6 Cellular Analysis and GeoView modules
 
-The v1.1.x Cellular Analysis architecture is intentionally split so retained-history analysis, local GeoView settings, HTTP transport, and presentation remain independently maintainable.
+The v1.1.x architecture separates retained-history analysis, configuration, serving-location enrichment, protected credentials, contribution, HTTP orchestration, and presentation.
 
 Primary components are:
 
 - `cellular_analysis.py`
   - Normalizes retained serving-cell telemetry.
   - Builds interface/history-scoped Cellular Analysis.
-  - Builds the site-wide serving-cell inventory used by GeoView.
-  - Preserves traffic-time handoffs and serving cells that may not be present in the final post-test snapshot.
+  - Builds the site-wide serving-cell inventory consumed by GeoView.
+  - Preserves traffic-time handoffs and identifiable serving cells that may not be present in the final post-test snapshot.
+
 - `cellular_geo.py`
-  - Owns provider-independent local GeoView settings.
-  - Validates provider and Site Location selections.
-  - Persists settings using temporary-file write, flush/fsync, and atomic replacement.
-  - Contains no Google, Unwired, mapping, geocoding, or other external-provider adapter.
+  - Owns the non-secret GeoView configuration schema.
+  - Normalizes `provider` (`none` / `opencellid`), `contribution_enabled`, Site Location sources/values, and optional provider/cache tuning.
+  - Integrates with the canonical v1.1.2 Configuration Manager.
+  - Contains no protected credential values and makes no external network calls.
+
+- `geo_identity.py`
+  - Converts site-inventory cells into provider-ready primary serving identities.
+  - LTE-only resolves the LTE primary ECI; NSA resolves the LTE anchor ECI; SA resolves the NR primary NCI.
+  - Requires MCC/MNC/TAC plus ECI/NCI and never substitutes PCI, band, or channel for Cell ID.
+
+- `geo_providers.py`
+  - Implements OpenCellID serving-cell lookup (`/cell/get`).
+  - Implements OpenCellID observation submission (`/measure/add`).
+  - Implements Google Geocoding for Site Address forward geocoding.
+
+- `geo_secrets.py`
+  - The only module permitted to access `config/certmgmt/certs` or call `cp.decrypt()`.
+  - Stores server-side Google/OpenCellID keys separately from the browser Maps JavaScript key.
+  - Exposes metadata-only credential status and write-only mutation paths.
+
+- `geo_cache.py`
+  - Maintains persistent `tmp/geoview_cell_cache.json`.
+  - Uses provider + full normalized serving identity as the cache key.
+  - Defaults to 30-day positive and 6-hour `not_found` TTLs.
+
+- `geo_contributions.py`
+  - Implements optional OpenCellID observation contribution.
+  - Enforces Internal/Captive cellular eligibility, primary-identity-only submission, observed-position semantics, and persistent 20-meter same-cell dedupe in `tmp/geoview_contribution_ledger.json`.
+
+- `geo_resolver.py`
+  - Owns the single bounded OpenCellID resolution job and all lookup failure containment.
+
 - `speedtest_web.py`
   - Serves Cellular Analysis and GeoView data.
-  - Exposes local GeoView settings endpoints.
-  - Performs the explicit on-demand NCOS GPS request.
+  - Performs Site Address geocoding on Save.
+  - Exposes resolve/status, credential, map-bootstrap, reset, and manual-contribution endpoints.
+  - Invokes the completed-test Device-GPS contribution hook after eligible cellular tests.
+  - Keeps `GET /api/cellular_analysis` local-only; it never initiates a serving-location lookup.
+
 - `index.html`
-  - Renders the local site schematic.
-  - Implements carrier filtering, serving-cell details, Site Context, and the Configure GeoView modal using vanilla HTML/CSS/JavaScript.
+  - Renders Local Only and Geolocation Services modes.
+  - Loads Google Maps JavaScript only for the interactive geographic view.
+  - Renders Site and resolved serving-cell markers, popups, Site Context, Configure GeoView, contributions, and the self-contained SVG report replacement.
 
 GeoView does not introduce a second continuous cellular telemetry collector. It reuses retained Speedtest Analyzer history and the Cellular Analysis normalization model.
 
-Local GeoView configuration is stored in NCOS SDK appdata under the application-owned key:
+Non-secret GeoView configuration is persisted inside the canonical configuration documents as the `geoview` section. The old standalone `geoview_settings` key is migration input only.
 
-    geoview_settings
-
-The appdata entry is persistent device configuration and is separate from Speedtest Analyzer rolling test history. Code defaults are not written to appdata automatically; the entry is created or updated only after an explicit **Save GeoView** action.
+Protected provider credentials are stored separately in NCOS certificate management. The cell-location cache and contribution ledger are local runtime files under `tmp/`.
 
 # 3. Platform Validation and Known Defects
 
@@ -1336,7 +1367,7 @@ Graph tooltips also identify the friendly WAN interface associated with each plo
 
 ## 11.3 Cellular Analysis scope versus GeoView scope
 
-The lower Cellular Analysis workspace and the Site Cellular GeoView intentionally use different scopes.
+The lower Cellular Analysis workspace and Site Cellular GeoView intentionally use different scopes.
 
 Lower Cellular Analysis:
 
@@ -1351,113 +1382,93 @@ Site Cellular GeoView:
 - Includes all retained cellular interfaces.
 - Excludes plain Ethernet/non-cellular records.
 - Ignores the lower page Interface and History Range selectors.
-- Answers: **What identifiable cellular resources have been observed at this site?**
+- Shows which identifiable serving cells have been observed at the Site and, when enabled, where those serving cells are estimated to be located relative to the configured Site.
 
-The HTTP layer loads history once and builds both views from that retained dataset. GeoView does not trigger an additional modem-telemetry collection pass.
+GeoView does not trigger a second modem-telemetry collection pass.
 
-## 11.4 Site-wide serving-cell inventory
+## 11.4 Site-wide serving-cell inventory and identity
 
-`build_site_cell_inventory(history)` constructs the provider-independent GeoView inventory.
+`build_site_cell_inventory(history)` constructs the site-wide GeoView inventory.
 
 The builder:
 
 1. Filters retained history to cellular records.
 2. Sorts cellular records chronologically.
 3. Reuses the traffic-aware serving-cell normalization/distribution engine.
-4. Excludes the aggregate Unknown serving-cell identity from map/schematic markers.
+4. Excludes the aggregate Unknown identity from GeoView markers.
 5. Preserves identifiable cells observed only during an in-test handoff.
-6. Deduplicates each serving cell once per test for interface observation counts.
+6. Deduplicates each serving cell once per test for observation counts.
 7. Aggregates the same normalized serving-cell identity across cellular interfaces.
-8. Supplements missing display metadata only from matching same-cell traffic/final observations.
-9. Returns site-wide tests, identifiable cells, and observed cellular interfaces.
+8. Returns site-wide tests, identifiable cells, and observed cellular interfaces.
 
-A serving cell is not made interface-specific merely because multiple modems observed it. The normalized serving-cell key remains the identity boundary, while `interfaces[]` records how the cell was observed.
+Geographic lookup is primary-serving-cell only:
 
-Each per-cell interface entry includes:
+- LTE-only -> LTE primary ECI.
+- NSA -> LTE anchor ECI.
+- SA -> NR primary NCI.
 
-- Interface identifier
-- Friendly interface label
-- Number of retained tests on that interface that observed the cell
+Lookup requires MCC, MNC, TAC, and the complete ECI/NCI.
 
-This information drives the **Observed Via** section in the UI.
+PCI, band, channel, EARFCN, and NR-ARFCN are descriptive radio fields and are never substituted for Cell ID.
 
-## 11.5 Local GeoView presentation
+NCOS remains authoritative for the observed serving identity and radio mode. OpenCellID enriches that identity with an estimated geographic position.
 
-The v1.1.1 default visualization is deliberately a non-geographic schematic.
+## 11.5 GeoView presentation modes
 
-The site marker is centered and identifiable serving cells are distributed radially for readability.
+GeoView has two user-facing modes.
 
-The positions:
+### 11.5.1 Local Only
 
-- Are not latitude/longitude.
-- Do not represent tower direction.
-- Do not represent distance.
-- Do not represent antenna azimuth.
-- Do not represent RF dominance.
-- Do not represent physical network topology.
+`provider = none` is **Local Only** and remains the default.
 
-The UI explicitly labels the view as a local observation schematic so users are not encouraged to infer geographic meaning from marker placement.
+Local Only:
 
-The frontend remains vanilla HTML/CSS/JavaScript and does not add Leaflet, Google Maps JavaScript, React, Vue, or another map/runtime framework.
+- Performs no OpenCellID serving-location lookup.
+- Does not load the Google geographic map.
+- Keeps local Cellular Analysis and the retained site-wide serving-cell inventory functional.
+- Hides cached geographic enrichment without deleting the cache.
 
-Carrier presentation uses simple color accents only. No carrier logos or carrier-owned artwork are embedded.
+### 11.5.2 Geolocation Services
 
-### 11.5.1 Carrier focus behavior
+`provider = opencellid` is **Geolocation Services**.
 
-Carrier filter state is maintained only in the browser view.
+The final v1.1.3 service roles are separate:
 
-Rules are:
+- **OpenCellID** -> Estimated Serving Cell Location lookup and optional contribution.
+- **Google Geocoding API** -> Site Address forward geocoding only.
+- **Google Maps JavaScript API** -> browser-side interactive map only.
 
-- Every observed carrier starts selected.
-- More than one carrier may remain selected.
-- The final selected carrier cannot be deselected.
-- Deselected-carrier markers are visually dimmed.
-- Deselected-carrier serving-cell markers are disabled and cannot open a popup.
-- Reselecting a carrier restores marker interaction.
+When the Maps JavaScript key is available, the browser map renders the configured Site plus already-resolved serving-cell markers.
 
-There is no synthetic **All Carriers** option.
+The compact marker popup emphasizes:
 
-### 11.5.2 Serving-cell popup
+- Stable A/B/C label and carrier.
+- Primary role and band.
+- **Estimated Serving Cell Location**.
+- Distance and compass direction from the configured Site.
+- Retained test usage count.
 
-An active serving-cell marker can display:
+Detailed PLMN/TAC/PCI/Cell ID/RF history remains in the lower Cellular Analysis workspace.
 
-- Stable view label
-- Carrier
-- Technology/service role
-- Band
-- Cell ID
-- PLMN
-- TAC
-- PCI
-- Observed Via interface/test counts
+The right-side Estimated Serving Cell Location panel shows carrier/label, primary role/band, coordinates, Copy, and Site distance/direction.
 
-First Seen and Last Seen are intentionally omitted from the compact GeoView popup because the lower Cellular Analysis workspace provides the historical analysis context.
+Provider metadata such as OpenCellID range/sample/changeable values is not repeated in the operator-focused presentation.
 
-Clicking the currently open serving-cell marker a second time closes its popup. The explicit popup close control remains available.
+## 11.6 GeoView configuration, Site Location, and persistence
 
-## 11.6 GeoView settings persistence
+`cellular_geo.py` owns the schema-v2 non-secret GeoView configuration.
 
-`cellular_geo.py` owns the provider-independent GeoView settings schema and its schema-2
-validation.
+GeoView is persisted as the `geoview` section inside the canonical v1.1.2 configuration documents (`speedtest_analyzer_device` / `speedtest_analyzer_group`).
 
-As of `1.1.2`, GeoView configuration is persisted as the `geoview` **section inside the
-canonical two-key documents** (`speedtest_analyzer_device` / `speedtest_analyzer_group`),
-not as a standalone key. The canonical layer delegates GeoView validation to `cellular_geo.py`
-and strips runtime device-GPS coordinates before persistence, so a saved or promoted GeoView
-policy never carries one device's live fix (see [Section 18](#18-two-layer-configuration-management-112)).
-The standalone `geoview_settings` key remains a **migration input only** and is read once, if
-present, to seed the Device document.
+The old standalone `geoview_settings` key is migration input only.
 
-The GeoView settings schema itself is unchanged. The historical standalone key was:
-
-    geoview_settings
-
-Current schema:
+Current normalized fields include:
 
     {
       "schema_version": 2,
       "configured": false,
       "provider": "none",
+      "contribution_enabled": false,
       "active_location_source": "device_gps",
       "locations": {
         "device_gps": {
@@ -1469,177 +1480,114 @@ Current schema:
           "longitude": null
         },
         "site_address": {
-          "address": ""
+          "address": "",
+          "latitude": null,
+          "longitude": null
         }
       }
     }
 
-The public HTTP response also includes a compatibility `location` object representing only the currently active Site Location. That compatibility object is derived from the canonical schema-v2 `locations` structure and is not separately persisted.
+Supported mode values are:
 
-Supported provider values in the settings model are:
-
-- `none`
-- `google`
-- `unwired`
-
-The v1.1.1 UI enables only `none`. Google and Unwired are visible as Research Pending and have no external adapter in this release.
-
-Supported Site Location sources are:
-
-- `device_gps`
-- `manual_coordinates`
-- `site_address`
-
-`active_location_source` determines which saved location method GeoView currently treats as the site location.
+- `none` — Local Only
+- `opencellid` — Geolocation Services
 
 The three Site Location methods are stored independently:
 
-- `device_gps` retains the last explicitly saved valid GPS coordinate pair.
-- `manual_coordinates` retains the user-entered latitude and longitude.
-- `site_address` retains the literal user-entered address.
+- `device_gps` — last explicitly saved valid Device GPS coordinates.
+- `manual_coordinates` — fixed user-entered latitude/longitude.
+- `site_address` — literal address plus coordinates derived by Google forward geocoding when saved.
 
-Changing the active Site Location source does not delete or overwrite the other saved values. A user may therefore switch between Site Address, Manual Coordinates, and Device GPS without re-entering previously saved configuration.
+Site Address geocoding occurs on Save/Apply using the private Google Server API key. It does not run on every page load.
 
-A later GPS lock does not automatically replace Manual Coordinates or Site Address. GeoView performs no background GPS refresh. Device GPS coordinates change only after the user explicitly selects **Refresh GPS**, receives a usable fix, and then saves the GeoView configuration.
+Device GPS remains explicit/on-demand. NCOS `0.0, 0.0`, no-lock, or invalid coordinate states are not accepted as a usable current fix.
 
-GPS lock, satellite count, accuracy, and similar current-fix telemetry are intentionally transient and are not persisted in appdata.
+Protected provider credentials are not stored in canonical GeoView configuration.
 
-Validation includes:
+## 11.7 GeoView HTTP API
 
-- Device GPS persisted coordinates must be a valid coordinate pair and cannot use the NCOS `0.0, 0.0` no-fix sentinel.
-- Manual Coordinates require both latitude and longitude when selected as the active source.
-- Latitude must be between -90 and 90.
-- Longitude must be between -180 and 180.
-- Site Address must be non-empty when selected as the active source.
-- Site Address is length-limited and stored literally.
+The current v1.1.3 UI uses:
 
-The schema-v2 normalizer can accept the earlier schema-v1 single-location structure and migrate it in memory into the independent location stores. Newly saved configuration is always written using schema v2.
+| Method / Path | Purpose |
+|---|---|
+| `GET /api/cellular_analysis` | Returns local Cellular Analysis plus site-wide GeoView inventory and cached enrichment. Never initiates a serving-location lookup. |
+| `GET /api/geo_settings` | Returns normalized effective GeoView settings. |
+| `POST /api/geo_settings` | Validates and persists GeoView settings and performs Site Address forward geocoding when required. |
+| `GET /api/geo_gps` | Performs one explicit NCOS GPS-status request. |
+| `GET /api/geo/status` | Returns metadata-only OpenCellID resolve-job state/counts. |
+| `POST /api/geo/resolve` | Starts or reuses the single bounded OpenCellID resolution job. |
+| `GET /api/geo/creds/status` | Returns metadata-only protected-credential status. |
+| `POST /api/geo/creds/record/update` | Write-only update of a server or browser-key certmgmt record. |
+| `POST /api/geo/creds/record/clear` | Clears one protected field or record. |
+| `POST /api/geo/creds/reset` | Clears all three credentials, disables contribution, switches to Local Only, and preserves Site Location/history/cache. |
+| `GET /api/geo/mapjs` | Returns only the browser-restricted Maps JavaScript key plus Site/cached serving-cell marker data. |
+| `POST /api/geo/contribute` | Manual OpenCellID contribution for a validated Manual Site Location. |
 
-Saving settings marks the GeoView configuration as configured even when the selected provider remains `none`.
+`GET /api/geo/mapjs` never returns the Google Server key or OpenCellID key and never initiates serving-cell resolution.
 
-As of `1.1.2`, an explicit GeoView Save persists the normalized GeoView settings as the
-`geoview` section of the `speedtest_analyzer_device` document through the two-layer
-Configuration Manager (see [Section 18](#18-two-layer-configuration-management-112)), not as a
-standalone `geoview_settings` key. The manager performs the read-back verified Device write and
-the effective-config recompute; `cellular_geo.py` supplies the normalized/validated section body
-and strips runtime device-GPS coordinates before persistence.
+## 11.8 Credential, cache, contribution, and export boundaries
 
-The read-back verification prevents the application from reporting a successful save when the
-written configuration cannot be read back or does not match the intended settings.
+### Protected credentials
 
-Missing, empty, malformed, or invalid configuration safely falls back to the default
-unconfigured GeoView state without automatically writing defaults to the router configuration.
+`geo_secrets.py` splits credentials across two stable NCOS certmgmt records:
 
-GeoView settings are stored as configuration (not runtime state) so they survive SDK application
-package replacement and participate in NCM Group / Device inheritance. The rolling Speedtest
-Analyzer test-history files remain separate local runtime data and continue to follow their
-existing retention lifecycle.
+- `speedtest_analyzer_geo_server`
+  - `api_key` -> private Google Server API key for Site Address geocoding.
+  - `opencellid_key` -> OpenCellID lookup/contribution key.
 
-## 11.7 GeoView HTTP API and GPS behavior
+- `speedtest_analyzer_geo_mapjs`
+  - `maps_js_api_key` -> browser-restricted Google Maps JavaScript key.
 
-The relevant local endpoints are:
+NCOS stores the certmgmt `key` field encrypted at rest and `cp.decrypt()` recovers the bundle on-router only when needed.
 
-### `GET /api/cellular_analysis`
+Server/OpenCellID keys are never returned to the browser.
 
-Returns normal interface/history-scoped Cellular Analysis plus a site-wide `geo` object.
+The separate browser Maps JavaScript key is intentionally returned only by `/api/geo/mapjs` when rendering the map.
 
-The GeoView portion is rebuilt from the full retained history independently from the lower page selectors.
+### OpenCellID lookup cache
 
-The `geo` object includes site inventory, interfaces, settings state, Site Location, and the current estimated-location count.
+`geo_cache.py` persists safe results in:
 
-In v1.1.1, `estimated_locations` remains zero because no external provider adapter exists.
+    tmp/geoview_cell_cache.json
 
-### `GET /api/geo_settings`
+Default TTLs:
 
-Returns normalized local GeoView settings.
+- Resolved location: 30 days.
+- `not_found`: 6 hours.
 
-Opening **Configure GeoView** performs an explicit request to this endpoint before the modal is populated. Persisted NCOS SDK appdata is therefore the configuration source of truth rather than potentially stale Cellular Analysis page state. If the settings request fails, the existing in-memory GeoView state remains available as a non-destructive fallback.
+Authentication, quota, timeout, no-Internet, and provider errors are not persisted as reusable locations.
 
-### `POST /api/geo_settings`
+Reset Credentials intentionally preserves this cache.
 
-Validates and persists provider-independent GeoView configuration through NCOS SDK appdata with immediate readback verification.
+### OpenCellID contribution
 
-After a successful Save response, the frontend synchronizes its complete schema-v2 GeoView state, including:
+Contribution is `false` by default.
 
-- `schema_version`
-- `provider`
-- `configured`
-- `active_location_source`
-- `locations`
-- the derived compatibility `location` object
+`geo_contributions.py` sends where the router observed an eligible primary serving cell. It never submits the provider-estimated serving-cell coordinates.
 
-This ensures the main GeoView immediately reflects the newly active Site Location and that reopening Configure GeoView preserves all independently saved Device GPS, Manual Coordinates, and Site Address values.
+Eligibility is restricted to Internal/Captive cellular observations with complete LTE-primary, NSA-anchor, or SA-NR-primary identity.
 
-Invalid user input returns a client error rather than writing partially valid settings.
+With Device GPS, the completed-test hook can submit automatically after an eligible completed cellular test when the required conditions are met.
 
-### `GET /api/geo_gps`
+With Manual Site Location, `/api/geo/contribute` scans retained history and submits the most recent eligible observation for each unique primary serving cell using the current validated manual Site coordinates.
 
-Performs one explicit GPS status request through:
+The persistent ledger:
 
-    cp.get_gps_status()
+    tmp/geoview_contribution_ledger.json
 
-The endpoint is called only when the user selects **Refresh GPS**.
+stores identity plus last successful latitude/longitude/timestamp.
 
-GeoView does not:
+The same identity within 20 meters is skipped. Movement of 20 meters or more makes it eligible again. A different identity is eligible immediately.
 
-- Continuously poll GPS.
-- Start a GPS background worker.
-- Add GPS collection to every speed test.
-- Persist a stream of GPS samples.
+### Static report/export
 
-Returned GPS context can include:
+The live Google Maps DOM is never copied into the standalone report.
 
-- GPS lock
-- Fix availability
-- Latitude
-- Longitude
-- Satellite count
-- Accuracy
-- Last-fix age
+Export replaces it with a deterministic self-contained SVG showing Site and resolved serving-cell locations, relative vectors, carrier-aware labels, scale, and location details.
 
-A Device GPS location is considered usable only when all of the following are true:
+Google Maps runtime CSS referencing external Google assets is excluded from the exported CSS.
 
-- NCOS reports an active GPS lock.
-- Latitude and longitude are present and numeric.
-- Latitude is within -90 through 90.
-- Longitude is within -180 through 180.
-- The coordinate pair is not `0.0, 0.0`.
-
-NCOS can expose numeric `0.0, 0.0` coordinates while the GPS subsystem is enabled and running but no satellite fix has been acquired. GeoView treats that pair as a no-fix sentinel rather than a usable site location.
-
-The GPS endpoint therefore distinguishes the GPS subsystem being available from a valid current fix. A successful local GPS query can return `available: true` while also returning `fix_available: false`.
-
-The frontend presents **GPS Fix Available** only when a current GPS lock and valid coordinates are both present. Previously saved valid Device GPS coordinates are treated separately from the current-fix state.
-
-GPS failure is nonfatal to Speedtest Analyzer and GeoView.
-
-If saved valid Device GPS coordinates already exist and a later refresh loses GPS lock or the GPS query fails, the saved coordinates are retained. A no-fix response cannot replace those coordinates with `0.0, 0.0`, and an invalid `0.0, 0.0` Device GPS value is not persisted as a valid site location.
-
-This behavior was validated against an E400-5GE-AM on NCOS 7.26.60 where the router GPS subsystem was enabled and running while NCOS repeatedly reported `lock: false` with latitude and longitude `0.0, 0.0`. The application mirrors NCOS by treating that state as **GPS available, no usable fix** rather than as a geographic position.
-
-## 11.8 v1.1.1 Geo Provider trust boundary
-
-v1.1.1 intentionally stops before external Geo Provider integration.
-
-There are no provider API keys, secrets, or authentication tokens in the v1.1.1 implementation.
-
-There are no external cellular-location or mapping requests.
-
-There is no automatic Site Address geocoding.
-
-The provider-independent GeoView does not need to transmit:
-
-- ICCID
-- IMEI
-- APN
-- Router serial number
-- Other modem identity values
-
-The local site inventory is generated entirely from retained Speedtest Analyzer history.
-
-Future provider integration must maintain an explicit outbound-data allowlist and preserve the principle that only the minimum cell/site information required for an approved lookup is sent externally.
-
-External provider integration must also preserve failure isolation: provider unavailability must never prevent local Cellular Analysis, local GeoView, or speed testing from operating.
+The integrity validator remains strict. The report contains no provider credential and requires no Google Maps runtime asset or network access.
 
 # 12. Error Handling Principles
 
@@ -1752,7 +1700,7 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
-| **1.1.x — Cellular Analysis, GeoView, and two-layer configuration** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready Cellular Analysis reporting, History & Reports integration, hardened local history persistence, the site-wide provider-independent GeoView framework, and the two-key NCM Group / Device configuration model with dependency-validated reset, Update NCM Group promotion, and the persisted `enabled`/`autostart` versus runtime `running` scheduler model. |
+| **1.1.x — Cellular Analysis, GeoView, and two-layer configuration** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, site-wide GeoView with Local Only and Geolocation Services modes, OpenCellID estimated serving-cell locations/contribution, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, and the two-key NCM Group / Device configuration model introduced in v1.1.2. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1766,6 +1714,26 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.1.3
+
+Completed the geographic GeoView feature on top of the v1.1.2 configuration foundation. v1.1.3 resolves **cellular serving infrastructure** through OpenCellID and keeps router/Site location as an independent reference point. See [Section 19](#19-geoview-geolocation-services-and-opencellid-contributions-113).
+
+- Added **Local Only** (`provider=none`) and **Geolocation Services** (`provider=opencellid`) modes.
+- Added OpenCellID `/cell/get` serving-location resolution for eligible primary serving identities.
+- Locked the primary identity model: LTE -> LTE primary ECI; NSA -> LTE anchor ECI; SA -> NR primary NCI.
+- Split GeoView secrets into `speedtest_analyzer_geo_server` and `speedtest_analyzer_geo_mapjs`.
+- Added Site Address forward geocoding using Google Geocoding.
+- Added the interactive Google Maps JavaScript GeoView with Site plus cached/resolved serving-cell markers, carrier-aware labels, distance/direction, and operator-focused popups.
+- Added persistent OpenCellID cache `tmp/geoview_cell_cache.json` with 30-day resolved and 6-hour `not_found` defaults.
+- Added `geo_contributions.py` and optional OpenCellID observation contribution, Off by default.
+- Added Device-GPS automatic contribution after eligible completed cellular tests and Manual Site Location contribution from retained history.
+- Added persistent 20-meter same-cell dedupe in `tmp/geoview_contribution_ledger.json`.
+- Restricted contribution to Internal/Captive cellular observations and primary serving identity only.
+- Added **Reset Credentials** while preserving Site Location, history, and cached serving-cell locations.
+- Hardened standalone Cellular Analysis export by replacing the live Google map with an inline SVG and excluding Google Maps runtime resources.
+- Live E400 validation confirmed multi-cell geographic rendering and OpenCellID contribution, including `2 submitted · 0 duplicates skipped`.
+- Preserved v1.1.2 configuration inheritance/migration behavior and non-GeoView Speedtest functionality.
 
 ## v1.1.2
 
@@ -2461,3 +2429,265 @@ again after local data is cleared.
 GeoView is persisted as the `geoview` section inside the canonical documents. Runtime device-GPS
 coordinates are stripped before persistence and before Group promotion, so canonical
 configuration never carries one device's live fix.
+
+---
+
+# 19. GeoView Geolocation Services and OpenCellID Contributions (1.1.3)
+
+Release `1.1.3` completes the geographic GeoView feature.
+
+The architectural distinction is fundamental:
+
+- **Site location** is the router/site reference point supplied by Device GPS, Site Address geocoding, or Manual Coordinates.
+- **Estimated Serving Cell Location** is the geographic enrichment of the cellular serving identity observed by NCOS.
+
+The feature estimates serving-cell locations. It does not use the cellular network to estimate where the router is located.
+
+## 19.1 Final service responsibilities
+
+| Service | v1.1.3 responsibility |
+|---|---|
+| OpenCellID `/cell/get` | Estimate the geographic location of an eligible primary serving cell. |
+| OpenCellID `/measure/add` | Optional contribution of where an eligible serving cell was observed. |
+| Google Geocoding API | Forward-geocode a manually entered Site Address on Save. |
+| Google Maps JavaScript API | Render the interactive browser map. |
+
+The final UI exposes **Local Only** and **Geolocation Services**, not a menu of interchangeable cellular-location providers.
+
+## 19.2 Serving identity and OpenCellID lookup
+
+NCOS observation is authoritative.
+
+Provider data enriches the observed identity with coordinates; it does not redefine PLMN, TAC, Cell ID, or RAT.
+
+| Network mode | Identity resolved | OpenCellID radio |
+|---|---|---|
+| LTE Only | LTE primary MCC/MNC/TAC/ECI | `LTE` |
+| 5G NSA | LTE anchor MCC/MNC/TAC/ECI | `LTE` |
+| 5G SA | NR primary MCC/MNC/TAC/NCI | `NR` |
+
+The full ECI/NCI is required.
+
+PCI, band, channel, EARFCN, and NR-ARFCN are not unique geographic cell identities and are never substituted.
+
+Secondary/component carriers remain RF/configuration observations unless they independently carry a complete serving identity.
+
+OpenCellID response identity is validated against the requested MCC/MNC/TAC/cell ID.
+
+Provider-returned range/sample/changeable metadata is not interpreted as Site distance or a location-accuracy radius.
+
+## 19.3 Protected credential architecture
+
+`geo_secrets.py` is the only module permitted to access:
+
+    config/certmgmt/certs
+
+or call:
+
+    cp.decrypt()
+
+Two stable app-owned records separate server credentials from the browser key:
+
+    speedtest_analyzer_geo_server
+      schema_version: 1
+      api_key:          Google Server API key
+      opencellid_key:   OpenCellID lookup/contribution key
+
+    speedtest_analyzer_geo_mapjs
+      schema_version: 1
+      maps_js_api_key:  Google Maps JavaScript browser key
+
+NCOS stores the certmgmt `key` field encrypted at rest.
+
+Security rules:
+
+- Google Server and OpenCellID keys never leave the router through normal API responses.
+- Credential-status APIs return metadata/presence only.
+- Credential forms are write-only.
+- The browser Maps JavaScript key is intentionally separate and returned only through `/api/geo/mapjs`.
+- Credentials are never stored in canonical App Data, test history, GeoView cache, contribution ledger, reports, or exports.
+- Credentials remain Device-scoped in v1.1.3.
+
+The historical `speedtest_analyzer_geo_google` record is migration input only.
+
+## 19.4 Site Location
+
+GeoView stores three Site Location methods independently:
+
+- Device GPS.
+- Manual Coordinates.
+- Site Address plus derived coordinates.
+
+Device GPS must have a valid lock and nonzero coordinate pair.
+
+Site Address is forward-geocoded on Save/Apply through Google Geocoding using the private Google Server key.
+
+The resulting Site coordinates are stored with the address.
+
+The configured Site is used as the reference point for:
+
+- Map placement.
+- Site-to-cell distance/bearing.
+- Static SVG export.
+- Contribution position when Manual Site Location is active.
+
+## 19.5 Resolution job and persistent cache
+
+`POST /api/geo/resolve` is the explicit cellular serving-location resolution trigger.
+
+Resolution flow:
+
+1. Build the site-wide retained serving-cell inventory locally.
+2. Normalize and validate each primary identity.
+3. Check `tmp/geoview_cell_cache.json`.
+4. Call OpenCellID `/cell/get` only on an eligible cache miss.
+5. Validate and normalize the response.
+6. Persist only safe resolved or `not_found` outcomes.
+7. Aggregate metadata-only status/counts.
+
+Only one resolution job runs at a time.
+
+Default cache policy:
+
+- Resolved location — 30 days.
+- `not_found` — 6 hours.
+- Auth/quota/timeout/no-Internet/provider-error — not persisted as reusable locations.
+
+The cache is atomic, schema-guarded, and contains no credentials.
+
+`GET /api/cellular_analysis` and `/api/geo/mapjs` may read cached enrichment but never initiate serving-cell lookup.
+
+## 19.6 Interactive map
+
+The live geographic map is browser-side Google Maps JavaScript.
+
+`GET /api/geo/mapjs` returns only:
+
+- The separate browser-restricted Maps JavaScript key.
+- Browser-safe Site and cached/resolved A/B/C marker data.
+
+It does not return the Google Server key, OpenCellID key, or decrypted cert bundle.
+
+Map behavior includes:
+
+- Site and serving-cell markers.
+- Carrier-aware colors.
+- Site-to-cell relationship lines.
+- Reset View.
+- Google pan/zoom/fullscreen controls.
+- Marker popup toggle.
+- Compact role/band, estimated-location, distance/direction, and test-usage presentation.
+
+Site-to-cell distance/bearing is calculated from the configured Site coordinates and OpenCellID estimated serving-cell coordinates.
+
+OpenCellID `range` is not used as that distance and is not treated as positional accuracy.
+
+## 19.7 OpenCellID observation contribution
+
+Contribution is independent from lookup and is Off by default:
+
+    contribution_enabled = false
+
+The submitted position is **where the router observed the serving cell**, not the provider-estimated serving-cell location.
+
+Eligibility:
+
+- Internal or captive cellular WAN only.
+- LTE primary, NSA LTE anchor, or SA NR primary identity only.
+- Complete identity required.
+- No Ethernet, Wi-Fi, Satellite, external/generic modem, or SCell-only submission.
+
+### Device GPS automatic contribution
+
+After a completed eligible cellular test, contribution can run automatically only when:
+
+- Geolocation Services is active.
+- Contribution is enabled.
+- Device GPS is the active Site Location source.
+- NCOS reports a usable current GPS fix.
+- The OpenCellID key is configured.
+- The test WAN is authoritatively classified as cellular.
+
+The hook is best-effort and never changes the result of the speed test.
+
+### Manual Site Location contribution
+
+With Site Address or Manual Coordinates active, **Contribute Observations** is available when contribution is enabled.
+
+The handler scans retained history, hard-filters eligible Internal/Captive observations, and submits the most recent observation for each unique primary serving identity using the current validated manual Site coordinates.
+
+### Persistent dedupe ledger
+
+The ledger is:
+
+    tmp/geoview_contribution_ledger.json
+
+It stores no credentials.
+
+Rules:
+
+- Same identity less than 20 meters from the last successful position -> skip.
+- Same identity 20 meters or more away -> eligible again.
+- Different identity -> immediately eligible.
+- Ledger update occurs only after OpenCellID acknowledges successful insertion.
+
+## 19.8 Reset Credentials and mode transition
+
+Reset Credentials:
+
+- Clears all three protected keys.
+- Sets `contribution_enabled=false`.
+- Sets `provider=none`.
+- Returns GeoView to Local Only.
+
+It preserves:
+
+- Site Location configuration.
+- Speedtest history.
+- `tmp/geoview_cell_cache.json`.
+
+Preserving the cache allows a later return to Geolocation Services to reuse valid OpenCellID locations.
+
+## 19.9 Standalone HTML/PDF export
+
+The standalone report never clones the live Google Maps runtime into the artifact.
+
+Export builds a deterministic inline SVG from frozen Site and resolved serving-cell data.
+
+The SVG includes:
+
+- Site marker.
+- A/B/C serving-cell markers.
+- Carrier colors.
+- Relative vectors.
+- Distance/direction labels.
+- Scale.
+- Location Summary.
+- Serving Cell Details.
+
+The report CSS collector excludes Google Maps-injected runtime styles referencing external Google assets.
+
+The integrity validator remains strict.
+
+No Google Maps runtime asset, provider credential, or credentialed provider URL is required by the saved HTML or PDF-ready report.
+
+## 19.10 Validation status
+
+Final v1.1.3 validation included:
+
+- Python compile checks for GeoView backend modules.
+- Browser JavaScript/runtime validation during iterative deployment.
+- E400 live application startup and HTTP validation on NCOS 7.26.60.
+- Encrypted certmgmt proof with masked at-rest reads and successful on-router `cp.decrypt()` recovery.
+- OpenCellID serving-location lookup.
+- Google Maps JavaScript rendering of Site plus multiple resolved serving-cell markers.
+- Correct Site-to-cell distance/bearing.
+- Local Only / Geolocation Services switching and cache reuse.
+- Credential status/update/remove/reset behavior.
+- Site Address geocoding and Manual Coordinates.
+- Standalone HTML export and browser Save-as-PDF rendering with Google runtime assets excluded.
+- OpenCellID manual contribution for one serving cell and later two unique serving cells.
+- Confirmed multi-cell contribution result: `2 submitted · 0 duplicates skipped`.
+- Contribution Opt Out and Manual Contribution button behavior.
+
+The E400 GPS subsystem was also observed in a legitimate **No Lock** state during validation. That NCOS state is handled safely and does not represent a GeoView code failure.
