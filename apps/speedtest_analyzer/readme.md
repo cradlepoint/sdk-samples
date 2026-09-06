@@ -186,8 +186,9 @@ During and after a test, the Test Center can display:
 - Uplink throughput
 - Data downloaded
 - Data uploaded
-- Latency
+- Latency or iPerf3 TCP RTT
 - Jitter
+- TCP retransmissions for iPerf3
 - Cellular Health
 - Service Type
 - Active Carriers
@@ -246,6 +247,8 @@ A Custom iPerf3 server cannot be scheduled.
 
 The same device and engine compatibility rules used for manual testing apply to Scheduled Tests. A hard-disabled combination cannot be saved as a scheduled job.
 
+iPerf3 Scheduled Tests can optionally capture **Jitter**. TCP RTT is collected automatically for iPerf3 whether Jitter is enabled or disabled. Netperf continues to use the **Latency/Jitter** option.
+
 ### Enable Schedule and Auto-start on boot
 
 **Enable Schedule** and **Auto-start on boot** are independent settings, and both are saved
@@ -282,12 +285,17 @@ User-facing capabilities include:
 - Port-range support.
 - Automatic retry for eligible listener failures.
 - Public same-Region backup behavior when the selected Public server cannot start Downlink after eligible listener failures.
+- Automatic TCP RTT reporting.
+- Optional Jitter capture for Manual and Scheduled Tests.
+- TCP retransmission reporting.
 - Actual server and port information recorded in History and CSV.
 - Stop/cancellation support.
 
 iPerf3 requires access to an iPerf3 server.
 
-iPerf3 does not provide the same latency and jitter measurements available from Netperf.
+**TCP RTT** is measured while the Uplink throughput test is actively using the connection. Because this is a loaded measurement, it can be higher than idle or pre-test latency reported by other speed-test engines, particularly on cellular WANs.
+
+Enable **Jitter** when you want the iPerf3 test to capture Jitter in addition to its normal throughput and TCP RTT results.
 
 ### Netperf
 
@@ -744,8 +752,9 @@ Depending on the engine and WAN, information can include:
 
 - Downlink throughput
 - Uplink throughput
-- Latency
+- Latency or iPerf3 TCP RTT
 - Jitter
+- iPerf3 TCP retransmissions
 - Data transferred
 - WAN/interface used
 - Test engine
@@ -1131,6 +1140,9 @@ The README keeps a concise, user-facing changelog for the current Speedtest Anal
 - Added **Reset Credentials** to clear all three GeoView credentials, turn contribution Off, and return to Local Only while preserving Site Location, history, and cached serving-cell locations.
 - Updated Cellular Analysis HTML/PDF export to replace the live Google map with a self-contained SVG Site/serving-cell schematic containing no provider credentials or external Google runtime assets.
 - Validated live multi-cell resolution and contribution behavior on the E400, including two distinct T-Mobile serving-cell locations and successful multi-cell OpenCellID contribution.
+- Added automatic iPerf3 **TCP RTT** and TCP retransmission reporting.
+- Added the ability to capture **Jitter** for Manual and Scheduled iPerf3 tests.
+- Updated live results, History, and CSV reporting for the new iPerf3 measurements.
 
 ## v1.1.2
 

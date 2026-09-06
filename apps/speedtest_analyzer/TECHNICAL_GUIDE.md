@@ -270,7 +270,13 @@ iPerf3 is bundled with the application and is the recommended general-purpose th
 
 The application supports TCP Downlink and Uplink, per-WAN source selection, primary and validated non-primary WAN testing, bounded listener retry, live port-attempt status, and controlled cancellation.
 
-The detailed source-routing behavior is documented later in this guide.
+Beginning with v1.1.3, the existing iPerf3 JSON result is also used to retain additional TCP measurement telemetry. The Uplink phase provides automatic TCP RTT average/minimum/maximum and device-side retransmission counts. The Downlink phase retains remote sender retransmission totals where iPerf3 reports them.
+
+An optional supplemental jitter probe can run after a successful TCP test. This measurement does not replace or alter the validated TCP throughput, retry, server-selection, source-routing, or WAN-guard architecture.
+
+TCP RTT is observed while the TCP Uplink is actively transferring data and is therefore a loaded measurement rather than an idle or pre-transfer latency sample.
+
+The detailed source-routing behavior is documented later in this guide. The v1.1.3 RTT, retransmission, jitter, and compact telemetry architecture is documented in Section 20.
 
 ## 5.2 Netperf
 
@@ -1075,6 +1081,19 @@ This is especially important when a test uses a randomized listener port or a Pu
 
 The recorded Downlink and Uplink ports show the actual ports used by that execution.
 
+Beginning with v1.1.3, completed iPerf3 results can additionally persist:
+
+- `latency_ms` — average device-side Uplink TCP RTT.
+- `latency_min_ms` — minimum sampled TCP smoothed RTT during Uplink.
+- `latency_max_ms` — maximum sampled TCP smoothed RTT during Uplink.
+- `jitter_ms` — jitter when the optional supplemental probe succeeds.
+- `retransmissions` — device-side TCP Uplink sender retransmission count.
+- `iperf3_tcp` — compact engineering telemetry for Downlink and Uplink.
+
+CSV continues to use the existing `Latency_ms` and `Jitter_ms` columns and adds `TCP_Retransmissions`.
+
+The compact `iperf3_tcp` object is intentionally not flattened into the normal CSV export. It remains available as engineering evidence for future correlation, KPI, and event-analysis features.
+
 Public/User source mode, Region, and backup metadata are not added as additional History fields.
 
 Netperf results continue to use the existing Netperf reporting behavior.
@@ -1163,6 +1182,13 @@ Manual and Scheduled iPerf3 selections are intentionally independent.
 A saved scheduled job stores its own iPerf3 server reference.
 
 Changing or deleting server configuration that makes the scheduled endpoint invalid requires the schedule to be reset before the incompatible change is completed.
+
+Beginning with v1.1.3, the persisted `include_latency` field has engine-specific meaning while retaining the existing configuration schema:
+
+- For **iPerf3**, `include_latency=true` requests the supplemental Jitter measurement. TCP RTT is automatic and does not depend on this field.
+- For **Netperf**, `include_latency=true` retains the existing Latency/Jitter behavior.
+
+The Scheduled Tests UI therefore labels the same persisted control **Jitter** for iPerf3 and **Latency/Jitter** for Netperf.
 
 ### 10.5.1 Persisted `enabled` / `autostart` versus runtime `running`
 
@@ -1700,7 +1726,7 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
-| **1.1.x — Cellular Analysis, GeoView, and two-layer configuration** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, site-wide GeoView with Local Only and Geolocation Services modes, OpenCellID estimated serving-cell locations/contribution, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, and the two-key NCM Group / Device configuration model introduced in v1.1.2. |
+| **1.1.x — Cellular Analysis, GeoView, configuration, and measurement telemetry** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, site-wide GeoView with Local Only and Geolocation Services modes, OpenCellID estimated serving-cell locations/contribution, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, the two-key NCM Group / Device configuration model introduced in v1.1.2, and v1.1.3 iPerf3 TCP RTT, retransmission, Jitter, and compact interval telemetry. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1734,6 +1760,15 @@ Completed the geographic GeoView feature on top of the v1.1.2 configuration foun
 - Hardened standalone Cellular Analysis export by replacing the live Google map with an inline SVG and excluding Google Maps runtime resources.
 - Live E400 validation confirmed multi-cell geographic rendering and OpenCellID contribution, including `2 submitted · 0 duplicates skipped`.
 - Preserved v1.1.2 configuration inheritance/migration behavior and non-GeoView Speedtest functionality.
+- Added automatic iPerf3 TCP RTT reporting from the device-side Uplink sender, including average, minimum, and maximum smoothed RTT.
+- Added device-side Uplink TCP retransmission reporting and retained remote Downlink sender retransmissions inside the compact engineering telemetry block.
+- Added compact per-interval iPerf3 telemetry for future correlation, including throughput, RTT, RTT variation, retransmissions, congestion window, and send-window observations.
+- Added an optional one-shot jitter measurement after successful TCP throughput using the same selected server, successful port, source IP, and bind device.
+- Kept the supplemental jitter phase outside the existing TCP listener retry/failover budget and non-fatal to the already-completed TCP test.
+- Added pre-measurement and post-measurement WAN-path validation so a path change causes supplemental Jitter to be skipped or discarded without invalidating the completed TCP test.
+- Added engine-aware Manual and Scheduled controls: **Jitter** for iPerf3 and **Latency/Jitter** for Netperf.
+- Updated iPerf3 live results to identify loaded RTT as **TCP RTT**, History to show average/minimum/maximum TCP RTT and retransmissions, and CSV to populate `Latency_ms`, `Jitter_ms`, and `TCP_Retransmissions`.
+- Validated Manual iPerf3 operation with Jitter disabled and enabled on Ethernet and cellular WANs, Scheduled iPerf3 Jitter execution, History persistence, compact hidden telemetry, and CSV export.
 
 ## v1.1.2
 
@@ -2691,3 +2726,180 @@ Final v1.1.3 validation included:
 - Contribution Opt Out and Manual Contribution button behavior.
 
 The E400 GPS subsystem was also observed in a legitimate **No Lock** state during validation. That NCOS state is handled safely and does not represent a GeoView code failure.
+
+# 20. iPerf3 TCP RTT, Jitter, and Compact Telemetry (1.1.3)
+
+v1.1.3 extends the existing iPerf3 execution path with additional measurement telemetry without redesigning the validated throughput engine.
+
+The existing TCP behavior remains authoritative for throughput:
+
+- The router is the iPerf3 client.
+- Downlink uses iPerf3 reverse mode (`-R`), so the remote server is the TCP payload sender.
+- Uplink uses normal client-send mode, so the router is the TCP payload sender.
+- Existing listener retry, Public backup-server behavior, shared port budgets, source routing, WAN guards, and cancellation remain unchanged.
+
+The additional telemetry is extracted from the JSON already returned by the bundled iPerf3 binary.
+
+## 20.1 TCP RTT measurement
+
+For Uplink, iPerf3 exposes TCP sender RTT through Linux `TCP_INFO`.
+
+Speedtest Analyzer converts the iPerf3 microsecond values to milliseconds and records:
+
+- `latency_ms` — average TCP RTT.
+- `latency_min_ms` — minimum sampled TCP RTT.
+- `latency_max_ms` — maximum sampled TCP RTT.
+
+The user interface labels this measurement **TCP RTT** for iPerf3.
+
+This is a loaded TCP RTT measurement. The values are observed while the router is actively transmitting the Uplink throughput test. They are not equivalent to an idle ping or a pre-transfer latency sample.
+
+Loaded TCP RTT can be significantly higher than idle latency because the access network and path are carrying sustained test traffic. Cellular uplinks can show particularly large increases due to radio scheduling, buffering, congestion, RF conditions, and limited upstream capacity. Ethernet or other higher-capacity WANs often show less inflation because the throughput test consumes a smaller fraction of the available path capacity.
+
+History presents:
+
+`TCP RTT: <average> ms avg (<minimum> - <maximum> ms)`
+
+The minimum and maximum values are the minimum and maximum sampled TCP smoothed-RTT observations reported during Uplink. They are not individual packet-latency extrema.
+
+iPerf3 also reports TCP RTT variation (`rttvar`). Speedtest Analyzer can retain that value inside compact engineering telemetry, but **TCP `rttvar` is never presented as Jitter**.
+
+## 20.2 TCP retransmissions
+
+Retransmission ownership follows the TCP sender.
+
+For Uplink:
+
+- The router is the sender.
+- `end.sum_sent.retransmits` represents device-side TCP sender retransmissions.
+- This value is promoted to the top-level `retransmissions` result field.
+- History presents the value as **Retransmissions**.
+- CSV exports the value as `TCP_Retransmissions`.
+
+For Downlink:
+
+- `-R` makes the remote iPerf3 server the TCP sender.
+- The remote sender retransmission total is retained in `iperf3_tcp.download.retransmissions`.
+- It is not substituted for the top-level device-side Uplink retransmission value.
+
+A retransmission count is a TCP event count. It is **not a packet-loss percentage**.
+
+## 20.3 Compact TCP telemetry
+
+The persisted `iperf3_tcp` object retains engineering evidence for future analysis while keeping normal History concise.
+
+The Downlink object can contain:
+
+- `direction`
+- `sender_scope=remote`
+- total remote sender retransmissions
+- stream count
+- per-interval start/end time
+- per-interval throughput
+
+The Uplink object can contain:
+
+- `direction`
+- `sender_scope=device`
+- total device sender retransmissions
+- stream count
+- TCP MSS
+- RTT minimum/average/maximum
+- maximum congestion window
+- maximum send window
+- per-interval throughput
+- per-interval retransmissions
+- per-interval RTT
+- per-interval RTT variation
+- per-interval congestion window
+- per-interval send window
+
+This object is deliberately hidden from normal History detail and CSV export. It is retained as source evidence for future correlation, event detection, KPI development, and engineering analysis.
+
+A zero-throughput interval is retained as an observation when reported by iPerf3. It is not automatically classified as a disconnect or failure; future analysis must correlate it with RTT, retransmissions, congestion-window behavior, WAN state, and cellular observations.
+
+## 20.4 Optional Jitter measurement
+
+The iPerf3 **Jitter** control does not enable TCP RTT. TCP RTT is automatic.
+
+When Jitter is enabled and the normal TCP Downlink and Uplink test completes successfully, Speedtest Analyzer appends one lightweight UDP iPerf3 probe to the same successful server and port.
+
+The probe uses the equivalent of:
+
+`iperf3 -c <server> -p <port> -u -b 1M -t 5 -J -4`
+
+The same selected source IP and bind device are reused when required by the WAN-selection architecture.
+
+The Jitter probe:
+
+- runs once;
+- has no listener retry loop;
+- does not consume or modify the TCP server retry budget;
+- honors Stop/cancellation;
+- validates the selected WAN path before the probe;
+- validates the selected WAN path again before accepting the result;
+- is non-fatal to the already-completed TCP test.
+
+If UDP is unsupported, times out, returns an error, or the selected WAN changes, the TCP result remains successful and `jitter_ms` remains unset.
+
+Only the true iPerf3 UDP `jitter_ms` value is promoted to normal result/history reporting.
+
+UDP packet-loss counters and loss percentages are intentionally not exposed by this feature so they are not confused with TCP retransmission counts.
+
+## 20.5 Manual and Scheduled control semantics
+
+The Manual Test control is engine-aware:
+
+- **iPerf3** — `Jitter`
+- **Netperf** — `Latency/Jitter`
+
+The Scheduled Test editor uses the same presentation.
+
+The underlying `include_latency` field is preserved for configuration compatibility:
+
+- iPerf3 `include_latency=true` requests the supplemental Jitter probe.
+- Netperf `include_latency=true` retains the existing Netperf Latency/Jitter behavior.
+
+For iPerf3, TCP RTT is collected regardless of the `include_latency` value.
+
+No new configuration key or schema migration is required.
+
+## 20.6 User-interface and reporting behavior
+
+For iPerf3:
+
+- The live result card is labeled **TCP RTT ms**.
+- The optional control is labeled **Jitter**.
+- Jitter remains `--` when the supplemental measurement is not requested or does not produce a valid result.
+- History labels the measurement **TCP RTT** and shows average plus minimum/maximum range.
+- History shows the device-side Uplink **Retransmissions** count.
+- History shows Jitter when collected.
+
+Netperf retains the existing Latency/Jitter terminology and measurement behavior.
+
+CSV uses:
+
+- `Latency_ms`
+- `Jitter_ms`
+- `TCP_Retransmissions`
+
+The first two column names are retained for compatibility even though the iPerf3 `Latency_ms` value specifically represents loaded TCP RTT.
+
+## 20.7 Validation
+
+v1.1.3 iPerf3 telemetry validation included:
+
+- Python syntax validation after telemetry integration.
+- Confirmation that temporary raw-JSON instrumentation was removed before release.
+- Manual iPerf3 TCP-only testing with Jitter disabled.
+- Automatic TCP RTT population with Jitter disabled.
+- Manual iPerf3 testing with Jitter enabled.
+- Successful Jitter collection on Ethernet WAN.
+- Successful Jitter collection on cellular WAN.
+- History validation of TCP RTT average/minimum/maximum.
+- History validation of device-side Uplink retransmissions.
+- Validation that the compact `iperf3_tcp` block persisted 10-second Downlink and Uplink interval data.
+- Scheduled iPerf3 Jitter configuration persistence.
+- Scheduled iPerf3 Jitter execution.
+- CSV validation of `Latency_ms`, `Jitter_ms`, and `TCP_Retransmissions`.
+- Confirmation that successful TCP results remain successful independently of the supplemental Jitter phase.
