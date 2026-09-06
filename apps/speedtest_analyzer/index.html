@@ -215,6 +215,98 @@
         }
         .btn-secondary:hover { background: #9ca3af; color: #fff; }
 
+        /* Manual Test measurement toggle.
+           Keep the native checkbox for existing application behavior,
+           but present it as a modern compact switch. */
+        .measurement-toggle {
+            width: 140px;
+            height: 36px;
+            box-sizing: border-box;
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.4rem;
+            padding: 0 0.65rem;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: var(--light-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        .measurement-toggle:hover {
+            border-color: var(--primary-color);
+        }
+
+        .measurement-toggle-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        .measurement-toggle-label {
+            min-width: 0;
+            font-size: 0.76rem;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .measurement-toggle-track {
+            position: relative;
+            flex: 0 0 auto;
+            width: 30px;
+            height: 18px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: var(--border-color);
+            transition: var(--transition);
+        }
+
+        .measurement-toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+            transition: transform 0.18s ease;
+        }
+
+        .measurement-toggle-input:checked
+        ~ .measurement-toggle-track {
+            background: var(--success-color);
+            border-color: var(--success-color);
+        }
+
+        .measurement-toggle-input:checked
+        ~ .measurement-toggle-track
+        .measurement-toggle-thumb {
+            transform: translateX(12px);
+        }
+
+        .measurement-toggle-input:focus-visible
+        ~ .measurement-toggle-track {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        #btn-start,
+        #btn-stop {
+            width: 140px;
+            height: 36px;
+            box-sizing: border-box;
+            justify-content: center;
+            padding: 0 1rem;
+        }
+
         .hidden { display: none; }
 
         /* Fix double scrollbar from template CSS */
@@ -4114,8 +4206,22 @@
                             </div>
                             <div>
                                 <label style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary); margin-bottom:0.25rem;">&nbsp;</label>
-                                <label style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.85rem; cursor:pointer; padding:0.5rem 0;">
-                                    <input type="checkbox" id="latency-checkbox"> TCP Latency/Jitter
+                                <label class="measurement-toggle">
+                                    <input
+                                        type="checkbox"
+                                        id="latency-checkbox"
+                                        class="measurement-toggle-input"
+                                    >
+                                    <span
+                                        class="measurement-toggle-label"
+                                        id="latency-option-text"
+                                    >Jitter</span>
+                                    <span
+                                        class="measurement-toggle-track"
+                                        aria-hidden="true"
+                                    >
+                                        <span class="measurement-toggle-thumb"></span>
+                                    </span>
                                 </label>
                             </div>
                             <div>
@@ -4203,11 +4309,11 @@
                                     </div>
                                     <!-- Row 2: Latency/Jitter + Cellular stats -->
                                     <div class="speed-results">
-                                        <div class="speed-card ping" id="latency-card" title="Not collected by iPerf3 — use Netperf for latency stats">
+                                        <div class="speed-card ping" id="latency-card" title="Latency reported by the selected test engine">
                                             <div class="value" id="result-latency">--</div>
-                                            <div class="label">Latency ms</div>
+                                            <div class="label" id="latency-result-label">Latency ms</div>
                                         </div>
-                                        <div class="speed-card ping" id="jitter-card" title="Not collected by iPerf3 — use Netperf for jitter stats">
+                                        <div class="speed-card ping" id="jitter-card" title="Jitter shown when collected by the selected test engine">
                                             <div class="value" id="result-jitter">--</div>
                                             <div class="label">Jitter ms</div>
                                         </div>
@@ -4286,8 +4392,25 @@
                                     </div>
                                     <div>
                                         <label style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary); margin-bottom:0.25rem;">&nbsp;</label>
-                                        <label id="sched-latency-label" style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.85rem; cursor:pointer; padding:0.5rem 0;">
-                                            <input type="checkbox" id="sched-latency-checkbox"> TCP Latency/Jitter
+                                        <label
+                                            id="sched-latency-label"
+                                            class="measurement-toggle"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                id="sched-latency-checkbox"
+                                                class="measurement-toggle-input"
+                                            >
+                                            <span
+                                                class="measurement-toggle-label"
+                                                id="sched-latency-option-text"
+                                            >Jitter</span>
+                                            <span
+                                                class="measurement-toggle-track"
+                                                aria-hidden="true"
+                                            >
+                                                <span class="measurement-toggle-thumb"></span>
+                                            </span>
                                         </label>
                                     </div>
                                 </div>
@@ -6049,6 +6172,8 @@
                         if (p.bandwidth_bps) info += ' ' + (p.bandwidth_bps / 1e6).toFixed(1) + ' Mbps';
                     } else if (stage === 'latency') {
                         info = '<i class="fas fa-stopwatch" style="color:var(--warning-color);"></i> Measuring latency';
+                    } else if (stage === 'jitter') {
+                        info = '<i class="fas fa-wave-square" style="color:var(--warning-color);"></i> Measuring jitter';
                     } else if (stage === 'complete') {
                         var r = p.result;
                         if (r) info = '<i class="fas fa-check" style="color:var(--success-color);"></i> ' + r.download_mbps + ' / ' + r.upload_mbps + ' Mbps';
@@ -6114,6 +6239,8 @@
         var netperfRow = document.getElementById('netperf-server-row');
         var durationSelect = document.getElementById('duration-select');
         var latencyCheckbox = document.getElementById('latency-checkbox');
+        var latencyOptionText = document.getElementById('latency-option-text');
+        var latencyResultLabel = document.getElementById('latency-result-label');
 
         engineSelect.addEventListener('change', function() {
             var val = this.value;
@@ -6129,19 +6256,25 @@
                 iperfRow.classList.remove('visible');
                 netperfRow.classList.remove('visible');
             }
-            // Hide duration for ookla (it manages its own timing)
+            // Ookla manages its own timing and does not use this option.
+            // iPerf3 always provides TCP RTT; its optional control therefore
+            // requests only the supplemental UDP Jitter probe.
             if (val === 'ookla') {
                 durationSelect.style.display = 'none';
                 latencyCheckbox.parentElement.style.display = 'none';
+                latencyCheckbox.checked = false;
+                latencyResultLabel.textContent = 'Latency ms';
             } else {
                 durationSelect.style.display = '';
-            }
-            // Latency/Jitter only works with netperf, hide for iperf3
-            if (val === 'iperf3' || val === 'ookla') {
-                latencyCheckbox.parentElement.style.display = 'none';
-                latencyCheckbox.checked = false;
-            } else {
                 latencyCheckbox.parentElement.style.display = '';
+
+                if (val === 'iperf3') {
+                    latencyOptionText.textContent = 'Jitter';
+                    latencyResultLabel.textContent = 'TCP RTT ms';
+                } else {
+                    latencyOptionText.textContent = 'Latency/Jitter';
+                    latencyResultLabel.textContent = 'Latency ms';
+                }
             }
             updateCapabilityAlerts();
         });
@@ -6697,6 +6830,11 @@
                 'sched-latency-label'
             );
 
+        var schedLatencyOptionText =
+            document.getElementById(
+                'sched-latency-option-text'
+            );
+
         var schedNetperfServerRow =
             document.getElementById(
                 'sched-netperf-server-row'
@@ -6735,10 +6873,10 @@
                         'none';
 
                     schedLatencyLabel.style.display =
-                        'none';
+                        '';
 
-                    schedLatencyCheckbox.checked =
-                        false;
+                    schedLatencyOptionText.textContent =
+                        'Jitter';
 
                     schedIperfSelectedRef = '';
 
@@ -6756,6 +6894,9 @@
 
                     schedLatencyLabel.style.display =
                         '';
+
+                    schedLatencyOptionText.textContent =
+                        'Latency/Jitter';
 
                     loadSchedNetperfServers();
                 }
@@ -7549,7 +7690,9 @@
             // Set up stages for progress tracking
             testDuration = duration;
             testStages = ['download', 'upload'];
-            if (includeLatency && engine !== 'ookla') {
+            if (includeLatency && engine === 'iperf3') {
+                testStages.push('jitter');
+            } else if (includeLatency && engine !== 'ookla') {
                 testStages.push('latency');
             }
 
@@ -7760,6 +7903,11 @@
                     var overall = getOverallProgress('latency', pct);
                     statusEl.textContent = 'Measuring latency/jitter...';
                     bar.style.width = overall + '%';
+                    bar.style.background = 'var(--warning-color)';
+                } else if (stage === 'jitter') {
+                    var jitterOverall = getOverallProgress('jitter', 50);
+                    statusEl.textContent = progress.message || 'Measuring jitter...';
+                    bar.style.width = jitterOverall + '%';
                     bar.style.background = 'var(--warning-color)';
                 } else if (stage === 'ping') {
                     statusEl.textContent = 'Measuring latency...';
@@ -21670,8 +21818,67 @@
                     }
 
                     html += '<span><strong>Duration:</strong> ' + (r.duration ? r.duration + 's' : '--') + '</span>';
-                    html += '<span><strong>Latency:</strong> ' + (r.latency_ms != null ? r.latency_ms + ' ms' : (r.ping_ms != null ? r.ping_ms + ' ms' : '--')) + '</span>';
+
+                    var historyLatencyText =
+                        r.latency_ms != null
+                            ? r.latency_ms + ' ms'
+                            : (
+                                r.ping_ms != null
+                                    ? r.ping_ms + ' ms'
+                                    : '--'
+                            );
+
+                    if (
+                        r.engine === 'iperf3'
+                        && r.latency_ms != null
+                    ) {
+                        var iperfRttAvg = Number(r.latency_ms);
+                        var iperfRttMin = Number(r.latency_min_ms);
+                        var iperfRttMax = Number(r.latency_max_ms);
+
+                        historyLatencyText =
+                            iperfRttAvg.toFixed(2)
+                            + ' ms avg';
+
+                        if (
+                            r.latency_min_ms != null
+                            && r.latency_max_ms != null
+                            && isFinite(iperfRttMin)
+                            && isFinite(iperfRttMax)
+                        ) {
+                            historyLatencyText +=
+                                ' ('
+                                + iperfRttMin.toFixed(2)
+                                + ' - '
+                                + iperfRttMax.toFixed(2)
+                                + ' ms)';
+                        }
+                    }
+
+                    var historyLatencyLabel =
+                        r.engine === 'iperf3'
+                            ? 'TCP RTT'
+                            : 'Latency';
+
+                    html += '<span><strong>'
+                        + historyLatencyLabel
+                        + ':</strong> '
+                        + historyLatencyText
+                        + '</span>';
+
                     html += '<span><strong>Jitter:</strong> ' + (r.jitter_ms != null ? r.jitter_ms + ' ms' : '--') + '</span>';
+
+                    if (
+                        r.engine === 'iperf3'
+                        && r.retransmissions != null
+                    ) {
+                        html += '<span><strong>Retransmissions:</strong> '
+                            + historyDetailText(
+                                r.retransmissions
+                            )
+                            + '</span>';
+                    }
+
                     html += '<span><strong>Data Downloaded:</strong> ' + formatDataMB(r.data_download_mb) + '</span>';
                     html += '<span><strong>Data Uploaded:</strong> ' + formatDataMB(r.data_upload_mb) + '</span>';
                     html += '<span><strong>Total Test Data:</strong> ' + formatDataMB(r.data_transferred_mb) + '</span>';
@@ -25302,7 +25509,7 @@
                 // Build headers
                 var headers = [
                     'Date','Time','Engine','Server Name','Hostname/IP','Downlink Port','Uplink Port','Duration_s',
-                    'Latency_ms','Jitter_ms','Data_Transferred_MB','Status',
+                    'Latency_ms','Jitter_ms','TCP_Retransmissions','Data_Transferred_MB','Status',
                     'Download_Mbps','Upload_Mbps',
                     'Cellular Health','Interface','Band Change','Tower Change',
                     'CA Peak Carrier Count',
@@ -25452,6 +25659,12 @@
                         r.duration || '',
                         r.latency_ms != null ? r.latency_ms : (r.ping_ms != null ? r.ping_ms : ''),
                         r.jitter_ms != null ? r.jitter_ms : '',
+                        (
+                            r.engine === 'iperf3'
+                            && r.retransmissions != null
+                                ? r.retransmissions
+                                : ''
+                        ),
                         r.data_transferred_mb != null ? r.data_transferred_mb : '',
                         r.status || 'complete',
                         r.download_mbps,
@@ -25965,12 +26178,14 @@
                 if (data.engine === 'iperf3') {
                     schedIperfServerRow.style.display = '';
                     schedNetperfServerRow.style.display = 'none';
-                    schedLatencyLabel.style.display = 'none';
+                    schedLatencyLabel.style.display = '';
+                    schedLatencyOptionText.textContent = 'Jitter';
                     // Server source/Region is restored below after params are read.
                 } else {
                     schedIperfServerRow.style.display = 'none';
                     schedNetperfServerRow.style.display = '';
                     schedLatencyLabel.style.display = '';
+                    schedLatencyOptionText.textContent = 'Latency/Jitter';
                 }
             }
             var p = data.params || {};
@@ -25987,7 +26202,7 @@
                 }, 500);
             }
             if (p.duration) document.getElementById('sched-duration-select').value = String(p.duration);
-            if (p.include_latency) schedLatencyCheckbox.checked = true;
+            schedLatencyCheckbox.checked = !!p.include_latency;
             // Restore server selection after servers load
             if (p.host) {
                 setTimeout(function() {
@@ -26170,7 +26385,17 @@
                 if (p.host) details += '<br>Server: <strong>' + p.host + '</strong>';
                 if (p.server) details += '<br>Server: <strong>' + p.server + (p.port ? ':' + p.port : '') + '</strong>';
                 if (p.duration) details += '<br>Duration: <strong>' + p.duration + 's</strong>';
-                if (p.include_latency) details += '<br>Latency/Jitter: <strong>Yes</strong>';
+
+                var scheduledMeasurementLabel =
+                    data.engine === 'iperf3'
+                        ? 'Jitter'
+                        : 'Latency/Jitter';
+
+                details += '<br>'
+                    + scheduledMeasurementLabel
+                    + ': <strong>'
+                    + (p.include_latency ? 'Enabled' : 'Disabled')
+                    + '</strong>';
 
                 // Three-state status: 'enabled'/'autostart' are the PERSISTED
                 // intent; 'running' is the RUNTIME state. After a restart an

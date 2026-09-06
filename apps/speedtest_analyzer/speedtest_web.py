@@ -142,7 +142,6 @@ _iperf3_stats_generation = 0
 _iperf3_stats_last_checkpoint = 0.0
 _iperf3_stats_lock = threading.Lock()
 
-
 OOKLA_BINARIES = ('ookla', 'speedtest', 'speedtest-cli')
 IPERF3_BINARIES = ('iperf3', 'iperf3-arm64v8', 'iperf3-aarch64')
 
@@ -9423,6 +9422,311 @@ def _get_public_iperf3_backup_server(
     return None
 
 
+def _iperf3_us_to_ms(value):
+    """Convert iPerf3 TCP microsecond telemetry to milliseconds."""
+    try:
+        return round(
+            float(value) / 1000.0,
+            3
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_iperf3_tcp_telemetry(data, direction):
+    """Extract compact TCP telemetry for history and future Insights."""
+    if not isinstance(
+        data,
+        dict
+    ):
+        return {}
+
+    start = data.get(
+        'start',
+        {}
+    )
+
+    end = data.get(
+        'end',
+        {}
+    )
+
+    sum_sent = end.get(
+        'sum_sent',
+        {}
+    )
+
+    stream_sender = {}
+
+    end_streams = end.get(
+        'streams',
+        []
+    )
+
+    if (
+        isinstance(
+            end_streams,
+            list
+        )
+        and end_streams
+    ):
+        first_end_stream = end_streams[0]
+
+        if isinstance(
+            first_end_stream,
+            dict
+        ):
+            stream_sender = (
+                first_end_stream.get(
+                    'sender',
+                    {}
+                )
+                or {}
+            )
+
+    telemetry = {
+        'direction':
+            direction,
+        'sender_scope':
+            (
+                'device'
+                if direction == 'upload'
+                else 'remote'
+            ),
+        'retransmissions':
+            int(
+                sum_sent.get(
+                    'retransmits',
+                    0
+                )
+                or 0
+            ),
+        'intervals':
+            []
+    }
+
+    test_start = start.get(
+        'test_start',
+        {}
+    )
+
+    if isinstance(
+        test_start,
+        dict
+    ):
+        telemetry[
+            'num_streams'
+        ] = int(
+            test_start.get(
+                'num_streams',
+                1
+            )
+            or 1
+        )
+
+    # Rich sender-side TCP telemetry is available when the E400 is the
+    # sender during the normal upload phase.
+    if direction == 'upload':
+        tcp_mss = start.get(
+            'tcp_mss_default'
+        )
+
+        if tcp_mss is not None:
+            telemetry[
+                'tcp_mss_bytes'
+            ] = tcp_mss
+
+        min_rtt = _iperf3_us_to_ms(
+            stream_sender.get(
+                'min_rtt'
+            )
+        )
+
+        mean_rtt = _iperf3_us_to_ms(
+            stream_sender.get(
+                'mean_rtt'
+            )
+        )
+
+        max_rtt = _iperf3_us_to_ms(
+            stream_sender.get(
+                'max_rtt'
+            )
+        )
+
+        if any(
+            value not in (
+                None,
+                0
+            )
+            for value in (
+                min_rtt,
+                mean_rtt,
+                max_rtt
+            )
+        ):
+            telemetry[
+                'rtt_ms'
+            ] = {
+                'min':
+                    min_rtt,
+                'avg':
+                    mean_rtt,
+                'max':
+                    max_rtt
+            }
+
+        max_cwnd = stream_sender.get(
+            'max_snd_cwnd'
+        )
+
+        if max_cwnd is not None:
+            telemetry[
+                'max_cwnd_bytes'
+            ] = max_cwnd
+
+        max_snd_wnd = stream_sender.get(
+            'max_snd_wnd'
+        )
+
+        if max_snd_wnd is not None:
+            telemetry[
+                'max_snd_wnd_bytes'
+            ] = max_snd_wnd
+
+    intervals = data.get(
+        'intervals',
+        []
+    )
+
+    if not isinstance(
+        intervals,
+        list
+    ):
+        intervals = []
+
+    for interval in intervals:
+        if not isinstance(
+            interval,
+            dict
+        ):
+            continue
+
+        interval_sum = interval.get(
+            'sum',
+            {}
+        )
+
+        if not isinstance(
+            interval_sum,
+            dict
+        ):
+            interval_sum = {}
+
+        item = {
+            'start_s':
+                interval_sum.get(
+                    'start'
+                ),
+            'end_s':
+                interval_sum.get(
+                    'end'
+                ),
+            'mbps':
+                round(
+                    float(
+                        interval_sum.get(
+                            'bits_per_second',
+                            0
+                        )
+                        or 0
+                    )
+                    / 1000000.0,
+                    3
+                )
+        }
+
+        interval_streams = interval.get(
+            'streams',
+            []
+        )
+
+        stream = (
+            interval_streams[0]
+            if (
+                isinstance(
+                    interval_streams,
+                    list
+                )
+                and interval_streams
+                and isinstance(
+                    interval_streams[0],
+                    dict
+                )
+            )
+            else {}
+        )
+
+        if direction == 'upload':
+            item[
+                'retransmissions'
+            ] = int(
+                stream.get(
+                    'retransmits',
+                    0
+                )
+                or 0
+            )
+
+            rtt_ms = _iperf3_us_to_ms(
+                stream.get(
+                    'rtt'
+                )
+            )
+
+            if rtt_ms is not None:
+                item[
+                    'rtt_ms'
+                ] = rtt_ms
+
+            rttvar_ms = _iperf3_us_to_ms(
+                stream.get(
+                    'rttvar'
+                )
+            )
+
+            if rttvar_ms is not None:
+                item[
+                    'rttvar_ms'
+                ] = rttvar_ms
+
+            if stream.get(
+                'snd_cwnd'
+            ) is not None:
+                item[
+                    'cwnd_bytes'
+                ] = stream.get(
+                    'snd_cwnd'
+                )
+
+            if stream.get(
+                'snd_wnd'
+            ) is not None:
+                item[
+                    'snd_wnd_bytes'
+                ] = stream.get(
+                    'snd_wnd'
+                )
+
+        telemetry[
+            'intervals'
+        ].append(
+            item
+        )
+
+    return telemetry
+
+
 def _run_iperf3_phase(
     iperf3_bin,
     server,
@@ -9808,6 +10112,11 @@ def _run_iperf3_phase(
                 )
         }
 
+    tcp_telemetry = _extract_iperf3_tcp_telemetry(
+        data,
+        stage
+    )
+
     summary_key = (
         'sum_received'
         if is_download
@@ -9882,6 +10191,8 @@ def _run_iperf3_phase(
             byte_count,
         'port':
             port,
+        'tcp_telemetry':
+            tcp_telemetry,
         'error':
             ''
     }
@@ -9985,6 +10296,11 @@ def _iperf3_search_download_ports(
                 'bytes':
                     phase.get(
                         'bytes'
+                    ),
+                'tcp_telemetry':
+                    phase.get(
+                        'tcp_telemetry',
+                        {}
                     ),
                 'error':
                     ''
@@ -10133,6 +10449,11 @@ def _iperf3_run_upload_with_retries(
             'bytes':
                 phase.get(
                     'bytes'
+                ),
+            'tcp_telemetry':
+                phase.get(
+                    'tcp_telemetry',
+                    {}
                 ),
             'error':
                 ''
@@ -10293,6 +10614,11 @@ def _iperf3_run_upload_with_retries(
                     phase.get(
                         'bytes'
                     ),
+                'tcp_telemetry':
+                    phase.get(
+                        'tcp_telemetry',
+                        {}
+                    ),
                 'error':
                     ''
             }
@@ -10333,6 +10659,316 @@ def _iperf3_run_upload_with_retries(
                 'iPerf3 upload failed'
             )
     }
+
+
+def _run_iperf3_udp_jitter_probe(
+    iperf3_bin,
+    server,
+    port,
+    bind_ip,
+    bind_dev=''
+):
+    """Run one non-fatal UDP probe and return iPerf3 jitter in ms."""
+    global current_test
+    global _active_iperf3_process
+
+    probe_duration = 5
+
+    if not current_test.get(
+        'running'
+    ):
+        return None
+
+    healthy, detail = (
+        _iperf3_validate_active_wan_path()
+    )
+
+    if not healthy:
+        cp.log(
+            'iPerf3 jitter probe skipped because selected WAN '
+            'path changed or became unavailable: {}'.format(
+                detail
+            )
+        )
+
+        return None
+
+    with test_lock:
+        current_test[
+            'progress'
+        ] = {
+            'stage':
+                'jitter',
+            'percent':
+                0,
+            'message':
+                'Measuring jitter...'
+        }
+
+    command = [
+        iperf3_bin,
+        '-c',
+        server,
+        '-p',
+        str(port),
+        '-u',
+        '-b',
+        '1M',
+        '-t',
+        str(probe_duration),
+        '-J',
+        '-4'
+    ]
+
+    if bind_ip:
+        command.extend([
+            '-B',
+            bind_ip
+        ])
+
+    if bind_dev:
+        command.extend([
+            '--bind-dev',
+            bind_dev
+        ])
+
+    cp.log(
+        'iPerf3 jitter cmd: {}'.format(
+            ' '.join(
+                command
+            )
+        )
+    )
+
+    proc = None
+
+    try:
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        with _iperf3_process_lock:
+            _active_iperf3_process = proc
+
+        # Preserve Stop-button behavior if cancellation happened while
+        # the subprocess was being registered.
+        with test_lock:
+            cancel_requested = not current_test.get(
+                'running'
+            )
+
+        if cancel_requested:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+        try:
+            stdout, stderr = proc.communicate(
+                timeout=probe_duration + 15
+            )
+
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+            try:
+                proc.communicate()
+            except Exception:
+                pass
+
+            cp.log(
+                'iPerf3 jitter probe timed out; jitter unavailable'
+            )
+
+            return None
+
+        with test_lock:
+            cancel_requested = not current_test.get(
+                'running'
+            )
+
+        if cancel_requested:
+            return None
+
+        if proc.returncode != 0:
+            try:
+                error = _parse_iperf3_error(
+                    stdout,
+                    stderr
+                )
+            except Exception:
+                error = (
+                    stderr.decode(
+                        'utf-8',
+                        errors='replace'
+                    ).strip()
+                    if stderr
+                    else 'unknown error'
+                )
+
+            cp.log(
+                'iPerf3 jitter probe unavailable: {}'.format(
+                    error
+                )
+            )
+
+            return None
+
+        healthy, detail = (
+            _iperf3_validate_active_wan_path()
+        )
+
+        if not healthy:
+            cp.log(
+                'iPerf3 jitter result discarded because selected WAN '
+                'path changed during the probe: {}'.format(
+                    detail
+                )
+            )
+
+            return None
+
+        try:
+            data = json.loads(
+                stdout.decode(
+                    'utf-8'
+                )
+            )
+
+        except Exception as exc:
+            cp.log(
+                'iPerf3 jitter JSON unavailable: {}'.format(
+                    exc
+                )
+            )
+
+            return None
+
+        end = data.get(
+            'end',
+            {}
+        )
+
+        candidates = []
+
+        # iPerf3 UDP JSON structure can expose receiver jitter through
+        # the aggregate result and/or the per-stream UDP object.
+        for key in (
+            'sum',
+            'sum_received',
+            'sum_sent'
+        ):
+            obj = end.get(
+                key,
+                {}
+            )
+
+            if isinstance(
+                obj,
+                dict
+            ):
+                candidates.append(
+                    obj.get(
+                        'jitter_ms'
+                    )
+                )
+
+        streams = end.get(
+            'streams',
+            []
+        )
+
+        if (
+            isinstance(
+                streams,
+                list
+            )
+            and streams
+            and isinstance(
+                streams[0],
+                dict
+            )
+        ):
+            first_stream = streams[0]
+
+            for key in (
+                'udp',
+                'receiver',
+                'sender'
+            ):
+                obj = first_stream.get(
+                    key,
+                    {}
+                )
+
+                if isinstance(
+                    obj,
+                    dict
+                ):
+                    candidates.append(
+                        obj.get(
+                            'jitter_ms'
+                        )
+                    )
+
+        jitter_ms = None
+
+        for value in candidates:
+            if value is None:
+                continue
+
+            try:
+                parsed = float(
+                    value
+                )
+            except (
+                TypeError,
+                ValueError
+            ):
+                continue
+
+            if parsed >= 0:
+                jitter_ms = round(
+                    parsed,
+                    3
+                )
+                break
+
+        if jitter_ms is None:
+            cp.log(
+                'iPerf3 jitter probe completed but returned no jitter value'
+            )
+
+            return None
+
+        cp.log(
+            'iPerf3 UDP jitter: {:.3f} ms'.format(
+                jitter_ms
+            )
+        )
+
+        return jitter_ms
+
+    except Exception as exc:
+        # Jitter is supplemental. It must never change TCP test status.
+        cp.log(
+            'iPerf3 jitter probe failed non-fatally: {}'.format(
+                exc
+            )
+        )
+
+        return None
+
+    finally:
+        if proc is not None:
+            with _iperf3_process_lock:
+                if _active_iperf3_process is proc:
+                    _active_iperf3_process = None
 
 
 def run_iperf3(
@@ -11108,8 +11744,90 @@ def run_iperf3(
             'upload_port':
                 upload.get(
                     'port'
-                )
+                ),
+            'iperf3_tcp': {
+                'download':
+                    download.get(
+                        'tcp_telemetry',
+                        {}
+                    ),
+                'upload':
+                    upload.get(
+                        'tcp_telemetry',
+                        {}
+                    )
+            }
         }
+
+        upload_tcp = result[
+            'iperf3_tcp'
+        ].get(
+            'upload',
+            {}
+        )
+
+        upload_rtt = upload_tcp.get(
+            'rtt_ms',
+            {}
+        )
+
+        if upload_rtt.get(
+            'avg'
+        ) not in (
+            None,
+            0
+        ):
+            result[
+                'latency_ms'
+            ] = upload_rtt.get(
+                'avg'
+            )
+
+            result[
+                'latency_min_ms'
+            ] = upload_rtt.get(
+                'min'
+            )
+
+            result[
+                'latency_max_ms'
+            ] = upload_rtt.get(
+                'max'
+            )
+
+        result[
+            'retransmissions'
+        ] = upload_tcp.get(
+            'retransmissions',
+            0
+        )
+
+        if (
+            upload.get(
+                'success'
+            )
+            and context.get(
+                'include_latency',
+                False
+            )
+            and current_test.get(
+                'running'
+            )
+        ):
+            jitter_ms = _run_iperf3_udp_jitter_probe(
+                iperf3_bin,
+                locked_server,
+                upload.get(
+                    'port'
+                ),
+                bind_ip,
+                effective_bind_dev
+            )
+
+            if jitter_ms is not None:
+                result[
+                    'jitter_ms'
+                ] = jitter_ms
 
         if not upload.get(
             'success'
@@ -11743,6 +12461,35 @@ def run_test_thread(engine, params):
                     'upload_port'
                 ] = result.get(
                     'upload_port'
+                )
+
+                entry[
+                    'latency_min_ms'
+                ] = result.get(
+                    'latency_min_ms'
+                )
+
+                entry[
+                    'latency_max_ms'
+                ] = result.get(
+                    'latency_max_ms'
+                )
+
+                entry[
+                    'retransmissions'
+                ] = int(
+                    result.get(
+                        'retransmissions',
+                        0
+                    )
+                    or 0
+                )
+
+                entry[
+                    'iperf3_tcp'
+                ] = result.get(
+                    'iperf3_tcp',
+                    {}
                 )
             if status_val == 'failed':
                 entry['error'] = result.get('error', 'Test returned zero results')
