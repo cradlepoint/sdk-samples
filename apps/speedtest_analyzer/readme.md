@@ -114,7 +114,7 @@ http://192.168.0.1:8000
 6. Start the test.
 7. Review Downlink, Uplink, data transferred, latency/jitter when available, and cellular information when testing a cellular WAN.
 
-<img width="1414" height="489" alt="Speedtest Analyzer Test Center configured for a Public iPerf3 test" src="https://github.com/user-attachments/assets/075c505c-7003-416e-bedb-d97891c2ce37" />
+<img width="1134" height="608" alt="Speedtest Analyzer Test Center configured for a Public iPerf3 test" src="https://github.com/user-attachments/assets/2bca8ddb-dd22-474f-9adf-b67b243af867" />
 
 *Screenshots in this guide use example lab device names and private IP addressing. Device names, WAN labels, addresses, and available interfaces will vary by deployment.*
 
@@ -193,7 +193,7 @@ During and after a test, the Test Center can display:
 - Service Type
 - Active Carriers
 
-<img width="1331" height="229" alt="Speedtest Analyzer live cellular results showing throughput, cellular health, service type, and Active Carriers" src="https://github.com/user-attachments/assets/2b4a476d-3b38-4249-ba73-fc64ce127b05" />
+<img width="1260" height="226" alt="Speedtest Analyzer live cellular results showing throughput, cellular health, service type, and Active Carriers" src="https://github.com/user-attachments/assets/1bac67aa-75f1-4043-b3f8-f41ac9a171fe" />
 
 **Data downloaded** and **Data uploaded** represent data reported by the active test engine. They are not general WAN-interface byte-counter changes, so unrelated production/user traffic sharing the selected WAN is not counted as speed-test data.
 
@@ -239,7 +239,7 @@ Typical presets include:
 - Weekly
 - Weekdays
 
-<img width="1317" height="726" alt="Speedtest Analyzer Scheduled Tests configured for hourly Public iPerf3 testing on the Active Primary WAN" src="https://github.com/user-attachments/assets/c55e65ab-f9eb-45e1-a441-f31b91e9f3d4" />
+<img width="1259" height="706" alt="Speedtest Analyzer Scheduled Tests configured for hourly Public iPerf3 testing on the Active Primary WAN" src="https://github.com/user-attachments/assets/d281524a-8191-4a19-aa07-97f5044f6440" />
 
 For Public iPerf3 schedules, select the Scheduled Region and server independently from the manual test configuration in Test Center.
 
@@ -506,269 +506,268 @@ Resetting Reliability statistics affects only the currently active Public or Use
 
 # Cellular Analysis
 
-**Cellular Analysis** uses cellular telemetry retained with Speedtest Analyzer test history to show which cellular network resources the router has been using over time.
+**Cellular Analysis** turns retained cellular test history into a view of how the router has actually been using the cellular network over time.
 
-The page is designed for historical radio-resource analysis rather than throughput-correlation conclusions. Throughput can also be influenced by the selected test server, WAN path, internet congestion, server load, and other non-radio conditions.
+Instead of looking at one final modem snapshot from one speed test, the page combines retained serving-cell identity, network mode, RF conditions, carrier activity, and radio configuration so you can see:
 
-The lower Cellular Analysis workspace can be scoped by:
+- Which serving cells the device has used.
+- How often each serving cell was observed.
+- How much active test traffic occurred on each cell.
+- When the device changed between serving cells.
+- Whether radio configuration, available bandwidth, or network mode changed.
+- The RF conditions associated with a selected serving cell.
+- The strongest radio configurations observed while traffic was active.
 
-- Cellular interface
-- Available retained history
-- Selected serving cell
+Cellular Analysis uses data already retained by Speedtest Analyzer. It does not continuously poll the modem outside normal test activity.
 
-Analysis includes:
+The page is divided into two scopes:
 
-- Tests Analyzed
-- Serving Cells Observed
-- LTE / 5G NSA / 5G SA technology usage
-- Serving Cell Distribution
-- Active Traffic percentage when timed telemetry is available
-- Long-term Serving Cell Timeline
-- In-test serving-cell handoff markers
-- Serving Cell Changes
-- Peak Radio Configuration Changes
-- Observed Bandwidth Changes
-- Network Mode Changes
-- Selected-cell identity
-- RSRP, RSRQ, and SINR summaries
-- Cellular Health observations
-- Peak Observed Radio Configurations
-
-A serving cell may appear in more than one test or on more than one cellular interface. **Tests Seen** therefore is not a mutually exclusive percentage. When timed in-test telemetry exists, **Active Traffic** represents the mutually exclusive share of measured Download/Upload traffic time associated with each identifiable serving cell.
-
-Unknown serving-cell observations are preserved when NCOS does not expose enough identity data. The application does not invent a handoff through an unidentified observation.
+- **Site Cellular GeoView** provides site-wide context across all retained cellular interfaces and history.
+- The lower **Cellular Analysis workspace** lets you select a specific cellular interface and history range for detailed analysis.
 
 ## Site Cellular GeoView
 
-The top of Cellular Analysis contains **Site Cellular GeoView**. GeoView is intentionally **site-wide**: it uses identifiable serving cells observed across **all retained cellular interfaces and retained history**, independently from the Interface and History Range selections used by the lower Cellular Analysis workspace.
+**Site Cellular GeoView** appears at the top of the Cellular Analysis page and summarizes the identifiable serving cells observed across all retained cellular interfaces.
 
-GeoView has two operating modes:
+The default **Local Only** mode requires no external geolocation service.
 
-- **Local Only** — keeps Cellular Analysis fully local. No OpenCellID cell-location lookup is performed and no Google map is loaded. The local observation view remains available for the retained serving-cell inventory.
-- **Geolocation Services** — adds geographic Site context, OpenCellID **Estimated Serving Cell Locations**, and an interactive Google map when the required credentials are configured.
+In Local Only mode, GeoView shows:
 
-Serving cells are aggregated by normalized serving-cell identity. If the same serving cell is observed through multiple cellular interfaces, GeoView represents it once while retaining the interfaces that observed it. Cells observed only during a retained in-test handoff remain eligible for the site inventory. Plain Ethernet and other non-cellular history are excluded.
+- The Site.
+- Each identifiable serving cell observed in retained history.
+- The number of serving cells, carriers, and cellular interfaces observed.
+- Which interfaces have seen the same serving cell.
+- Carrier-aware serving-cell markers.
+- A local serving-cell schematic.
 
-> **GeoView estimates serving-cell locations, not the router location.** The router/Site location is a separate reference point supplied by Device GPS, a manually entered Site Address, or Manual Coordinates.
+The local schematic is intentionally **not geographic**. Marker placement shows the observed serving-cell inventory and Site relationship without claiming that the displayed marker position represents the physical tower location.
 
-### Site Context
+<img width="1277" height="680" alt="Local GeoView with observed serving cells]" src="https://github.com/user-attachments/assets/3f005b48-29d0-4a43-a1e6-f594b3486902" />
 
-The **Site Context** panel summarizes:
+GeoView is site-wide. It does not change when you select a different Interface or History Range in the lower Cellular Analysis workspace.
 
-- Serving Cells
-- Carriers
-- Cellular Interfaces
-- Cell Location Source
-- Active Site Location
-- Carrier-level cell counts
-- Resolved serving-cell details when Geolocation Services is enabled
+### Configure GeoView
 
-When estimated locations are available, each resolved cell can show its carrier, primary service role and band, estimated coordinates, and the distance/direction from the configured Site.
+Select **Configure** to choose how Site context is maintained.
 
-### Serving-cell location identity
+**Local Only** remains fully functional without Google Maps or OpenCellID.
 
-GeoView resolves only the primary serving identity observed by NCOS:
+A Site Location can still be configured in Local Only mode using:
 
-- **LTE Only** — LTE primary serving cell
-- **5G NSA** — LTE anchor
-- **5G SA** — NR primary serving cell
+- **Device GPS** — queries the router GPS only when requested.
+- **Manual Site Location** — enter a Site Address, or use latitude/longitude through Advanced coordinates.
 
-A complete MCC/MNC/TAC plus ECI or NCI is required. PCI, band, channel, EARFCN, and NR-ARFCN are never substituted for a missing Cell ID. Secondary/component carriers are not assigned geographic locations unless a complete independent serving identity is available.
+Saved Site Location information is retained independently from the optional Geolocation Services feature.
 
-## Configure GeoView
+Device GPS is not continuously polled. Selecting **Refresh GPS** performs one explicit request to the router.
 
-Select **Configure** in Site Cellular GeoView to manage GeoView mode, credentials, contribution preference, and Site Location.
+<img width="872" height="712" alt="Configure GeoView with Site Location options" src="https://github.com/user-attachments/assets/4a032eb7-9bbf-4cdb-8197-8797c1bb1da7" />
 
-### Geolocation mode
+## Cellular Overview
 
-- **Local Only** is the default and performs no external serving-cell lookup.
-- **Geolocation Services** enables the final v1.1.3 service combination:
-  - **OpenCellID** — Estimated Serving Cell Location lookup and optional observation contribution.
-  - **Google Maps JavaScript API** — interactive browser map.
-  - **Google Geocoding API** — converts a manually entered Site Address into Site coordinates when saved.
+The lower Cellular Analysis workspace begins with an **Interface** and **History Range** selector.
 
-Cellular serving-location estimates come from **OpenCellID**.
+Use these controls to decide which retained cellular tests should be analyzed.
 
-### Protected credentials
+The **Cellular Overview** summarizes the selected scope with:
 
-GeoView uses three independent credentials:
+- **Tests Analyzed** — the number of retained tests included in the analysis.
+- **Serving Cells Observed** — the number of identifiable serving cells used during those tests.
+- **Network Mode** — the technology mix observed, such as LTE, 5G NSA, or 5G SA.
 
-- **Google Server API Key** — Site Address geocoding only.
-- **Google Maps JavaScript API Key** — interactive browser map only.
-- **OpenCellID API Key** — serving-cell lookup and optional contribution.
+This provides a quick indication of whether the selected cellular connection has remained on one network resource or has moved between multiple serving cells or technologies.
 
-Credentials are **Device-scoped** in v1.1.3 and are stored in NCOS encrypted certificate-management records rather than normal Speedtest Analyzer App Data.
+## Serving Cell Distribution and Timeline
 
-The Google Server key and OpenCellID key remain server-side. The browser-restricted Maps JavaScript key is returned only through the dedicated map bootstrap path when the map is rendered.
+**Serving Cell Distribution** shows how the selected cellular interface used each identifiable serving cell.
 
-Credential status is shown as Configured or Not Configured; existing secret values are never read back into the form.
+Each cell receives a simple label such as **A**, **B**, or **C** while the underlying Cell ID, PCI, TAC, serving role, and band remain visible.
 
-For safest credential entry, access Speedtest Analyzer through **NCM LAN Manager** so the device-management session uses the NCM encrypted tunnel.
+Two measurements help describe how each cell was used:
+
+- **Tests Seen** — how many retained tests observed that serving cell.
+- **Active Traffic** — the percentage of measured Download/Upload traffic time associated with that cell when timed in-test telemetry is available.
+
+A single test can observe more than one serving cell, so **Tests Seen** is not intended to total 100%.
+
+**Active Traffic** is mutually exclusive and better represents where the device spent its measured test traffic time.
+
+The **Serving Cell Timeline** shows the chronological serving-cell history across the selected time range. Changes between A, B, C, and later cells make long-term attachment behavior easy to identify.
+
+In-test handoff markers can also appear when Speedtest Analyzer observed a serving-cell transition while traffic was actively running.
+
+<img width="1264" height="560" alt="Cellular Overview with serving-cell distribution and timeline" src="https://github.com/user-attachments/assets/64c1b617-a930-4e83-993f-32e492fc55f8" />
+
+## Cellular Change Activity
+
+**Cellular Change Activity** summarizes how dynamic the selected cellular connection has been.
+
+The page tracks:
+
+- **Serving Cell Changes** — changes between identifiable serving cells.
+- **Peak Config Changes** — changes in the strongest radio configuration observed during active traffic.
+- **Bandwidth Changes** — changes in observed serving-carrier bandwidth.
+- **Network Mode Changes** — transitions between LTE, 5G NSA, and 5G SA.
+
+These measurements help distinguish a connection that stays on a stable radio environment from one that frequently changes serving resources or radio configuration.
+
+A change does not automatically indicate a problem. Cellular networks routinely change cells, bands, and carrier combinations based on mobility, RF conditions, traffic demand, and network decisions.
+
+## Serving Cell Details
+
+Use the **Serving Cell** selector to inspect one identified serving cell at a time.
+
+**Serving Cell Details** can include:
+
+- Carrier.
+- Serving role and primary band.
+- Cell ID.
+- PLMN.
+- TAC.
+- PCI.
+- Channel.
+- First Seen and Last Seen.
+- Tests Seen.
+- Active Traffic percentage.
+
+This lets an operator move from the high-level distribution and timeline into the specific network identity behind Cell A, B, C, and later observations.
+
+## RF Conditions
+
+**RF Conditions** summarizes retained radio measurements associated with the selected serving cell.
+
+Available values can include:
+
+- Average RSRP.
+- Average RSRQ.
+- Average SINR.
+- Best and worst retained measurements.
+- Cellular Health observations.
+
+RF values are associated with the selected serving cell rather than simply using the final modem state from the most recent test.
+
+This is useful when comparing whether different serving cells were observed under meaningfully different radio conditions.
+
+## Radio Resource Summary
+
+**Radio Resource Summary** shows how the modem was configured while active test traffic was running.
+
+The section includes:
+
+- **Technology Usage** — the network modes observed for the selected serving cell.
+- **Peak Observed Radio Configurations** — the strongest valid component-carrier combinations observed during active test traffic.
+- Total observed Downlink bandwidth.
+- Number of tests where each configuration was observed.
+- Relative usage of each configuration.
+
+For example, two tests can use the same LTE anchor serving cell while activating different LTE or 5G NR secondary carriers.
+
+Peak Observed Radio Configuration describes what the modem reported during active traffic. It does not claim that every displayed carrier carried an equal portion of the speed-test traffic.
+
+<img width="1262" height="782" alt="Cellular Analysis details with RF and radio resource summary" src="https://github.com/user-attachments/assets/d3ed30ff-b57e-476f-a858-0dfc299bf841" />
+
+## Optional Geolocation Services
+
+Cellular Analysis does not require an external geolocation service.
+
+When **Geolocation Services** is enabled, GeoView can add geographic context to the serving-cell inventory using:
+
+- **OpenCellID** — estimated serving-cell locations.
+- **Google Maps JavaScript API** — interactive geographic map.
+- **Google Geocoding API** — converts a manually entered Site Address into Site coordinates.
+
+GeoView estimates the location of the **serving cellular infrastructure** observed by the router. The Site location remains a separate reference point supplied by Device GPS, Site Address, or Manual Coordinates.
+
+Speedtest Analyzer resolves only the independently identifiable primary serving radio:
+
+- **LTE Only** — LTE primary serving cell.
+- **5G NSA** — LTE anchor.
+- **5G SA** — NR primary serving cell.
+
+A complete serving-cell identity is required. PCI, band, and channel values are not used as substitutes for a missing Cell ID.
 
 ### Google API Key Setup
 
-GeoView uses two separate Google Maps Platform API keys so the server-side and browser-side credentials can be restricted independently. Use a Google Cloud project with Google Maps Platform enabled and billing configured.
+GeoView uses **two separate Google Maps Platform API keys** so the server-side Site Address lookup and browser-based interactive map can be restricted independently.
+
+A Google Cloud project with **billing enabled** is required for Google Maps Platform. Google recommends restricting API keys to only the applications and APIs that require them.
 
 **Google Server API Key**
 
-1. Enable the **Geocoding API** in the Google Cloud project.
-2. Create an API key for Speedtest Analyzer Site Address geocoding.
-3. Restrict the key to the **Geocoding API** and apply server-side application restrictions appropriate to the deployment when practical.
-4. Enter the key in **Google Server API Key** in Configure GeoView.
+Used only when Speedtest Analyzer converts a manually entered **Site Address** into coordinates.
 
-[Google: Set up the Geocoding API](https://developers.google.com/maps/documentation/geocoding/get-api-key)
+1. Enable the **Geocoding API** in your Google Cloud project.
+2. Create an API key.
+3. Restrict the key to the **Geocoding API**.
+4. When the deployment has predictable public egress, consider an appropriate server-side IP restriction.
+5. Enter the key in **Google Server API Key** under Configure GeoView.
+
+[Google: Set up the Geocoding API](https://developers.google.com/maps/documentation/geocoding/get-api-key-v4)
 
 **Google Maps JavaScript API Key**
 
-1. Enable the **Maps JavaScript API** in the Google Cloud project.
-2. Create a separate API key for the interactive GeoView browser map.
-3. Restrict the key to the **Maps JavaScript API** and apply Website/HTTP-referrer restrictions appropriate to how Speedtest Analyzer is accessed.
-4. Enter the key in **Google Maps JavaScript API Key** in Configure GeoView.
+Used by the browser to render the interactive geographic GeoView.
+
+1. Enable the **Maps JavaScript API** in your Google Cloud project.
+2. Create a **separate** API key.
+3. Restrict the key to the **Maps JavaScript API**.
+4. Apply Website/HTTP-referrer restrictions appropriate to how Speedtest Analyzer is accessed when practical.
+5. Enter the key in **Google Maps JavaScript API Key** under Configure GeoView.
 
 [Google: Set up the Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/get-api-key)
 
-Google recommends restricting API keys to only the applications and APIs that require them.
-
 [Google Maps Platform API security guidance](https://developers.google.com/maps/api-security-best-practices)
 
-### Site Location
+The Google Server key is stored in protected Device-scoped NCOS credential storage. The Maps JavaScript key is kept separate because it must be supplied to the browser when the interactive map is loaded.
 
-GeoView supports three Site Location sources. Their saved values are retained independently so switching methods does not erase the others.
-
-#### Device GPS
-
-**Refresh GPS** performs one explicit GPS query. GeoView does not continuously poll GPS.
-
-A Device GPS Site Location is usable only when NCOS reports a valid GPS lock and nonzero coordinates. A later no-lock response does not overwrite previously saved valid coordinates.
-
-When contribution is enabled and Device GPS is the active Site Location source, eligible completed cellular tests can contribute the position where the serving cell was observed automatically.
-
-#### Manual Site Location — Site Address
-
-Enter a Site Address and save GeoView. The address is forward-geocoded to latitude/longitude using the configured **Google Server API Key**.
-
-The resolved Site coordinates are stored with the Site Address and are used for the map, distance/bearing calculations, static report, and manual contribution.
-
-If the address cannot be resolved, use **Advanced: Use coordinates instead**.
-
-#### Manual Site Location — Coordinates
-
-Manual latitude/longitude must be within the normal geographic ranges and cannot use the `0.0, 0.0` no-fix sentinel.
+For safest credential entry, access Speedtest Analyzer through **NCM LAN Manager** when available.
 
 ### Resolve Cell Locations
 
-In **Geolocation Services** mode, **Resolve Cell Locations** explicitly resolves eligible serving cells through OpenCellID.
+Select **Resolve Cell Locations** when you want Speedtest Analyzer to request estimated locations for eligible serving cells.
 
-The resolve process:
+Previously resolved locations are cached so the application does not need to request the same information every time Cellular Analysis is opened.
 
-1. Reads the site-wide retained serving-cell inventory locally.
-2. Keeps only cells with a complete eligible LTE/NR primary identity.
-3. Reuses a valid cached OpenCellID result when available.
-4. Calls OpenCellID only for cache misses that require a lookup.
-5. Stores safe resolved or `not_found` results in the persistent GeoView cell-location cache.
-6. Returns the updated resolved count to GeoView.
+When geographic locations are available, the interactive map can show:
 
-The default cache policy is 30 days for resolved locations and 6 hours for `not_found` results.
-
-Authentication, quota, timeout, network, and provider errors are not persisted as reusable locations.
-
-Provider failures are isolated to GeoView and never prevent Speedtest execution, retained-history access, or local Cellular Analysis.
-
-### Interactive Google map
-
-When Geolocation Services is enabled and a Google Maps JavaScript key is configured, GeoView renders an interactive Google map containing:
-
-- The configured Site marker.
-- Resolved serving-cell markers such as A/B/C.
+- The configured Site.
+- Estimated serving-cell markers.
 - Site-to-cell relationship lines.
 - Carrier-aware marker colors.
-- Compact serving-cell popups with primary role/band, **Estimated Serving Cell Location**, distance/direction, and retained test usage.
+- Distance and direction from the Site.
+- Serving-cell information and retained usage.
 
-The distance and direction shown by Speedtest Analyzer are calculated between the configured Site coordinates and the OpenCellID estimated serving-cell coordinates.
+<img width="1254" height="601" alt="GeoView with resolved serving-cell locations" src="https://github.com/user-attachments/assets/9edb38ed-be3c-4641-971f-80d811faf0d0" />
 
-OpenCellID `range` metadata is not treated as Site distance or as a location-accuracy radius.
+## OpenCellID Contributions
 
-### OpenCellID Contributions
+OpenCellID contribution is optional and **Off by default**.
 
-OpenCellID contribution is **Off by default** and must be explicitly enabled.
+When enabled, Speedtest Analyzer can contribute the geographic position where an eligible serving cell was observed by the router.
 
-Contribution sends the geographic position where an eligible serving cell was **observed by the router**. It never submits the OpenCellID estimated serving-cell coordinates.
+It does **not** submit the OpenCellID estimated serving-cell coordinates as an observation.
 
-Eligibility is intentionally narrow:
+Contribution supports eligible primary serving-cell observations from internal or captive cellular modems and uses either Device GPS or a validated Manual Site Location.
 
-- Internal or captive cellular modem observations only.
-- LTE primary, NSA LTE anchor, or SA NR primary identity only.
-- Complete serving identity required.
-- Ethernet, Wi-Fi as WAN, satellite, external/generic modem observations, and secondary/component-carrier-only records are excluded.
+A persistent deduplication record prevents repeated contribution of the same serving cell from effectively the same location.
 
-With **Device GPS**, contribution can occur automatically after a completed eligible cellular test when a valid GPS fix exists.
+## Exporting Cellular Analysis
 
-With **Manual Site Location**, the **Contribute Observations** action scans retained history and submits the most recent eligible observation for each unique primary serving cell using the current validated manual Site coordinates.
+Select **Export HTML Report** to create a self-contained report of the currently selected Cellular Analysis scope.
 
-A persistent contribution ledger prevents repeated same-cell submissions from nearly the same place.
+The report preserves the selected interface and history range and includes the Cellular Overview, Serving Cell Distribution and Timeline, Change Activity, RF conditions, radio-resource information, and geographic context when available.
 
-- The same serving identity is skipped when the new observation is less than 20 meters from its last successfully contributed position.
-- Movement of 20 meters or more makes the same serving identity eligible again.
-- A different serving cell is eligible immediately.
+Unlike the interactive application, where you select one serving cell at a time for detailed analysis, the exported report includes the available detail sections for **all identifiable serving cells** in the selected scope. This makes the report easier to review, share, or archive without requiring the reader to interact with the live application.
 
-The ledger is updated only after OpenCellID acknowledges a successful submission and stores no credentials.
+When geographic GeoView data is available, the live Google map is replaced with a self-contained Site/serving-cell schematic showing the Site, resolved serving-cell locations, distance and direction, and serving-cell location details. The exported report does not require Google Maps, provider credentials, Internet access, or continued access to the router.
 
-### Reset Credentials
+Unknown serving-cell observations remain represented in the overview, distribution, and timeline when identity data is incomplete, but Speedtest Analyzer does not create a detailed serving-cell section for an unidentified cell.
 
-**Reset Credentials**:
+Open the exported HTML file in a browser and use **Print → Save as PDF** when a PDF copy is required.
 
-- Clears the Google Server, Google Maps JavaScript, and OpenCellID keys.
-- Turns OpenCellID contribution Off.
-- Switches GeoView to **Local Only**.
-- Preserves the configured Site Location.
-- Preserves Speedtest history.
-- Preserves the existing OpenCellID serving-cell location cache.
+<img width="1331" height="507" alt="Cellular Analysis export with serving-cell location schematic" src="https://github.com/user-attachments/assets/8bd65e64-9a4c-4191-a882-1086bdf6c5d8" />
 
-Preserving the cache allows previously resolved cell locations to be reused if Geolocation Services is configured again later.
-
-## Exporting Cellular Analysis reports
-
-Cellular Analysis includes an **Export HTML Report** option for sharing or archiving the current analysis. The exported file is a self-contained HTML report that can be opened locally in a standard web browser without requiring continued access to the router.
-
-When geographic GeoView data is available, the interactive Google map is replaced in the report by a self-contained SVG engineering schematic showing the Site, resolved serving-cell locations, relative direction/distance, carrier-aware markers, a scale reference, and serving-cell location details.
-
-The export does not require Google Maps runtime assets, provider credentials, or Internet access.
-
-The report also includes the selected cellular interface and history range, Cellular Overview, serving-cell distribution and timeline, change activity, in-test handoff events when present, and detailed RF/radio-resource information for each identifiable serving cell.
-
-Use the browser's **Print** function and select **Save as PDF** to create a portable PDF copy. The print layout is optimized for **US Letter landscape**.
-
-The router does not generate or store the PDF.
-
-## GeoView persistence and privacy
-
-Non-secret GeoView settings are persisted as the `geoview` section of Speedtest Analyzer's canonical configuration and participate in the normal **Device > NCM Group > Built-in Default** configuration model introduced in v1.1.2.
-
-The historical standalone `geoview_settings` key is migration input only.
-
-Persisted GeoView configuration includes:
-
-- Selected GeoView mode.
-- Contribution preference.
-- Active Site Location source.
-- Independently retained Site Location values.
-- Optional non-secret provider/cache tuning.
-
-Provider credentials are never stored in canonical configuration documents.
-
-Current GPS lock, satellite count, and runtime fix state are transient.
-
-In **Local Only** mode, GeoView performs no OpenCellID serving-location request and does not load the Google geographic map. Cached serving-cell locations are retained but hidden from the local-only presentation.
-
-In **Geolocation Services** mode, only the minimum information required for the requested operation is sent externally:
-
-- OpenCellID serving-cell lookup receives the eligible cellular identity required to locate that serving cell.
-- Google Site Address geocoding receives the manually entered Site Address.
-- OpenCellID contribution receives the eligible serving identity plus the geographic position where it was observed.
-
-The Google Server key and OpenCellID key remain server-side and are never written to reports or exports.
-
-The browser Maps JavaScript key is a separate browser-restricted credential used only to load the interactive map.
+---
 
 # History & Reports
 
@@ -960,111 +959,166 @@ Writing results to fields such as **System Description** or **Asset ID** changes
 
 # Settings and Configuration Management
 
-The **Settings** page is the application-wide administration area. Feature configuration
-(Scheduled Tests, Servers, GeoView, Outputs) remains on its own page; Settings is where you
-review how the application is configured and manage the relationship between this device and
-its NCM Group.
+The **Settings** page is the application-wide administration area for Speedtest Analyzer.
+
+Feature configuration — such as Scheduled Tests, Servers, GeoView, and Outputs — remains on the page where that feature is used. Settings is where you review **where those settings come from**, manage Device overrides, and control the relationship between an individual device and its NCM Group configuration.
 
 ## How configuration works
 
-Speedtest Analyzer configuration can come from two places:
+Speedtest Analyzer configuration can come from three levels:
 
-- **NCM Group configuration** provides a shared baseline for every device in the Group.
-- **Device configuration** is set locally on an individual device.
+- **This Device** — configuration saved locally for one router.
+- **NCM Group** — shared configuration applied to devices through an NCM Group.
+- **Built-in Default** — the application's default behavior when neither the Device nor Group has configured that area.
 
-The application combines them one setting-area at a time. For each area — Scheduled Testing,
-Outputs, iPerf3 Server Mode, User iPerf3 Servers, Netperf Servers, and GeoView — a local
-Device value takes precedence over the Group value, and the Group value takes precedence over
-the built-in default. Areas you have not configured locally simply inherit the Group value,
-or the built-in default when the Group does not configure them either.
+Configuration is resolved independently for each setting area using this priority:
 
-The **Configuration State** shown on the Settings page reflects this relationship:
+**This Device → NCM Group → Built-in Default**
 
-- **Unconfigured** — no saved configuration; built-in defaults are in effect.
-- **Device Managed** — configured locally on this device.
-- **NCM Group** — managed by the NCM Group with no local overrides.
-- **NCM Group + Device Overrides** — managed by the Group, with one or more areas overridden
-  locally on this device.
+The configurable areas include:
 
-The **Effective Configuration Sources** list shows, for each area, whether the value currently
-comes from **This Device**, the **NCM Group**, or the **Built-in Default**.
+- Scheduled Testing
+- Outputs
+- iPerf3 Server Mode
+- User iPerf3 Servers
+- Netperf Servers
+- GeoView
+
+This means a device does not have to be entirely Device-managed or entirely Group-managed.
+
+For example, a router can inherit its iPerf3 Server Mode and User Server List from the NCM Group while maintaining its own Scheduled Testing or GeoView configuration.
+
+The **Configuration State** summarizes the overall relationship:
+
+- **Unconfigured** — no Device or Group configuration is saved; Built-in Defaults are in effect.
+- **Device Managed** — configuration exists only on this device.
+- **NCM Group** — configuration is supplied by the NCM Group with no local Device overrides.
+- **NCM Group + Device Overrides** — the device inherits Group configuration but has one or more locally configured areas taking precedence.
+
+The **Effective Configuration Sources** list shows the active source for every configuration area so you can immediately see which settings come from **This Device**, the **NCM Group**, or the **Built-in Default**.
+
+<img width="850" height="375" alt="Configuration sources and management state" src="https://github.com/user-attachments/assets/9ac97339-c627-48d8-b450-95289aaede1f" />
 
 ## Device Overrides
 
-When a device is Group-managed, any area you configure locally appears under **Device
-Overrides**. Each override shows a short summary and where it will return to if you reset it —
-either the **NCM Group** value or the **Built-in Default**.
+When a Group-managed device is changed locally, only the configuration area being changed becomes a **Device Override**.
 
-- **Reset to Group** / **Reset to Built-in Default** returns a single area to the inherited
-  value.
-- **Reset All Device Overrides** returns every locally overridden area at once.
+The Device override takes precedence over the corresponding NCM Group setting while all other configuration areas continue to inherit normally.
 
-Some settings depend on each other. For example, a scheduled iPerf3 test depends on the iPerf3
-Server Mode. If resetting one area by itself would leave an incompatible combination — such as
-inheriting a Group schedule that expects a different server mode than the device is using —
-Speedtest Analyzer shows a confirmation explaining the dependency and offers to reset the
-related areas together so the result stays consistent. You can cancel without changing
-anything.
+For example, a device could have:
+
+- Scheduled Testing from **This Device**
+- GeoView from **This Device**
+- iPerf3 Server Mode from the **NCM Group**
+- User iPerf3 Servers from the **NCM Group**
+- Netperf Servers from the **Built-in Default**
+
+The **Device Overrides** section lists each locally configured area, provides a short summary of its current value, and shows where the setting will return if the override is removed.
+
+### Resetting a Device Override
+
+Select **Reset to Group** to remove a Device override and return that configuration area to the value supplied by the NCM Group.
+
+Speedtest Analyzer does not copy the Group configuration over the Device configuration.
+
+Instead, the locally configured section is removed from the Device App Data document. Once that Device override no longer exists, the normal configuration priority automatically exposes the NCM Group value underneath it.
+
+If the NCM Group does not configure that area, the setting returns to the **Built-in Default** instead. The Settings page identifies the reset destination before the change is made.
+
+Resetting one Device override does not affect unrelated Device overrides and never modifies the NCM Group configuration.
+
+If the last remaining Device override is removed, Speedtest Analyzer no longer needs a local Device configuration document and removes the `speedtest_analyzer_device` App Data entry. The device then operates entirely from its NCM Group configuration and Built-in Defaults.
+
+<img width="724" height="391" alt="Device Overrides with Reset to Group controls" src="https://github.com/user-attachments/assets/f961758d-93cf-4149-9770-520b7e98b23d" />
+
+### Reset All Device Overrides
+
+**Reset All Device Overrides** removes every locally configured override at once.
+
+After the Device overrides are removed, each configuration area is supplied by the NCM Group when that section exists there, or by the Built-in Default when it does not.
+
+Some configuration areas depend on one another. For example, a scheduled iPerf3 test can depend on the configured iPerf3 Server Mode.
+
+If resetting one area by itself would create an incompatible configuration, Speedtest Analyzer explains the dependency and offers to reset the related areas together. You can cancel the operation without making any changes.
 
 ## Update NCM Group Configuration
 
-Once a device is Group-managed and has local overrides, administrators can promote selected
-overrides into the existing NCM Group standard using **Update NCM Group Configuration**.
+When a device is already Group-managed and has Device overrides, **Update NCM Group Configuration** can be used to promote selected Device settings into the existing NCM Group standard.
 
-The wizard lets you choose which current Device overrides to promote. Selected areas are added
-to (or replace) the corresponding areas in the Group; areas you do not select stay as Device
-overrides and leave the current Group configuration unchanged. The wizard does not let you edit
-values — it only decides placement.
+This is useful when a setting was first tested or customized on one device and you later decide that it should become the standard for the entire Group.
 
-Because the application never writes the Group configuration itself, the wizard generates the
-complete revised Group JSON for you to update in NCM:
+The wizard shows the current Device overrides and lets you choose which ones should be promoted.
 
-1. Select the Device overrides to promote and review the summary of what will change, what
-   stays unchanged in the Group, and what remains a Device override.
-2. Generate the revised Group configuration. The wizard shows the SDK Data name
-   (`speedtest_analyzer_group`), the current and new Group revision, and the complete JSON.
-3. **Update the existing `speedtest_analyzer_group` value** in the NCM Group configuration with
-   the generated JSON. Do not create a second entry with the same name.
-4. Return to the wizard and **Validate**. Once the revised Group configuration is confirmed on
-   the device, the promoted local overrides are removed automatically, so the promoted settings
-   are then served from the Group.
+Selected areas are added to or replace the corresponding areas in the Group configuration.
 
-GeoView has a safety rule: a Device GPS location *policy* can be promoted, but a device's actual
-GPS coordinates and any manually entered coordinates or site address remain device-specific and
-are not copied into the shared Group configuration.
+Areas that are not selected:
 
-If the device configuration changes while the wizard is open, the workflow is cancelled and asks
-you to start again, so stale changes are never merged.
+- remain Device overrides;
+- do not modify the existing Group value;
+- continue to take precedence only on that device.
+
+The wizard controls **where configuration is stored**. It does not provide another place to edit the underlying feature values.
+
+<img width="811" height="312" alt="Update NCM Group Configuration wizard" src="https://github.com/user-attachments/assets/74182d33-d871-44a7-9c5c-e028d6302727" />
+
+Speedtest Analyzer does not directly write the NCM Group configuration. Instead, the wizard generates the complete revised Group JSON for you to apply in NCM.
+
+The workflow is:
+
+1. Select the Device overrides that should become part of the NCM Group standard.
+2. Review which settings will be promoted, which existing Group settings will remain unchanged, and which settings will stay as Device overrides.
+3. Generate the revised Group configuration.
+4. Update the existing `speedtest_analyzer_group` SDK Data value in the NCM Group with the generated JSON.
+5. Return to Speedtest Analyzer and select **Validate**.
+6. After the new Group configuration is confirmed on the device, Speedtest Analyzer removes the promoted sections from the local Device configuration.
+
+Once the promoted Device sections are removed, those settings are supplied by the NCM Group instead.
+
+This preserves the normal configuration hierarchy rather than keeping duplicate copies of the same setting at both Device and Group scope.
+
+### GeoView promotion safety
+
+GeoView includes device-specific location information that should not automatically become a shared Group value.
+
+A **Device GPS location policy** can be promoted to the Group, but actual GPS coordinates are not copied into the Group configuration.
+
+Manually entered Site Addresses and Manual Coordinates are also device-specific and are not promoted as shared Group location data.
+
+If GeoView contains a location configuration that cannot safely be promoted, the wizard explains what must be changed before that section can become part of the Group standard.
+
+If the Device or Group configuration changes while the wizard is open, Speedtest Analyzer stops the workflow and requires it to be restarted. This prevents an older staged configuration from overwriting newer changes.
 
 ## Migrate to NCM Group
 
-For a device that is Device Managed (no Group configuration yet), **Migrate to NCM Group**
-provides the first-time conversion of the device's configuration into a new Group standard. This
-action is offered only in the Device Managed state; a device that is already Group-managed uses
-**Update NCM Group Configuration** instead.
+**Migrate to NCM Group** is used when a router is currently **Device Managed** and no NCM Group configuration exists yet.
+
+This is the first-time workflow for turning an existing Device configuration into a shared Group standard.
+
+The migration process prepares the Device configuration for use as the new NCM Group configuration, provides the Group JSON that must be applied through NCM, and then validates that the Group configuration has arrived on the device.
+
+After the Group configuration is successfully validated, the corresponding local Device configuration is removed so the router begins inheriting those settings from the NCM Group.
+
+A device that is already Group-managed does not use **Migrate to NCM Group**. It uses **Update NCM Group Configuration** to promote new Device overrides into the existing Group standard.
 
 ## Configuration from an earlier version
 
-If a device still has configuration created by an earlier version of the application, Settings
-shows a **Configuration Upgrade Required** notice. Testing, history, and reports continue to
-work; only configuration changes are paused until you convert the existing settings to the
-current format using **Convert Configuration**. Your existing settings remain active during this
-step.
+If Speedtest Analyzer detects configuration created by an earlier application version that has not yet been converted to the current configuration format, the Settings page displays **Configuration Upgrade Required**.
+
+Existing configuration remains active while the upgrade is pending, and normal testing, history, and reporting continue to operate.
+
+Configuration changes are temporarily paused until **Convert Configuration** is used to create the current Device configuration format.
+
+The conversion process preserves the existing settings rather than requiring the application to be configured again from scratch.
 
 ## Factory Reset
 
-**Factory Reset** is a separate, clearly marked destructive action. It removes Speedtest
-Analyzer's locally stored configuration, overrides, and local test history, but leaves the
-application installed and never removes the NCM Group configuration. On a Group-managed device,
-the Group configuration is used again after the local data is cleared.
+**Factory Reset** is a separate destructive operation and is intentionally kept apart from normal Device Override controls.
 
-## Developer Mode note
+Factory Reset removes Speedtest Analyzer's locally stored configuration, Device overrides, and local test history while leaving the application installed.
 
-In Developer Mode, reinstalling or reloading the SDK package can clear the application's local
-retained test history, and a device reboot can remove a manually installed development build. A
-normal router reboot on a production-installed application preserves both the app and its
-configuration. Saved configuration in NCM Group or Device SDK appdata is not affected by a
-reboot.
+Factory Reset does **not** remove or modify the NCM Group configuration.
+
+If the router belongs to an NCM Group, the Group configuration becomes effective again after the local Device data is cleared.
 
 ---
 
