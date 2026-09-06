@@ -605,6 +605,32 @@ Credential status is shown as Configured or Not Configured; existing secret valu
 
 For safest credential entry, access Speedtest Analyzer through **NCM LAN Manager** so the device-management session uses the NCM encrypted tunnel.
 
+### Google API Key Setup
+
+GeoView uses two separate Google Maps Platform API keys so the server-side and browser-side credentials can be restricted independently. Use a Google Cloud project with Google Maps Platform enabled and billing configured.
+
+**Google Server API Key**
+
+1. Enable the **Geocoding API** in the Google Cloud project.
+2. Create an API key for Speedtest Analyzer Site Address geocoding.
+3. Restrict the key to the **Geocoding API** and apply server-side application restrictions appropriate to the deployment when practical.
+4. Enter the key in **Google Server API Key** in Configure GeoView.
+
+[Google: Set up the Geocoding API](https://developers.google.com/maps/documentation/geocoding/get-api-key)
+
+**Google Maps JavaScript API Key**
+
+1. Enable the **Maps JavaScript API** in the Google Cloud project.
+2. Create a separate API key for the interactive GeoView browser map.
+3. Restrict the key to the **Maps JavaScript API** and apply Website/HTTP-referrer restrictions appropriate to how Speedtest Analyzer is accessed.
+4. Enter the key in **Google Maps JavaScript API Key** in Configure GeoView.
+
+[Google: Set up the Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/get-api-key)
+
+Google recommends restricting API keys to only the applications and APIs that require them.
+
+[Google Maps Platform API security guidance](https://developers.google.com/maps/api-security-best-practices)
+
 ### Site Location
 
 GeoView supports three Site Location sources. Their saved values are retained independently so switching methods does not erase the others.
