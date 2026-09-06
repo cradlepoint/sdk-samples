@@ -4,3 +4,4 @@
 tmp/
 # Editor/backup scratch files must never ship in the package.
 *.bak
+script.js
