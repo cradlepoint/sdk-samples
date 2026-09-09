@@ -1,6 +1,6 @@
 # Speedtest Analyzer
 
-Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, historical Cellular Analysis, site-wide GeoView context, iPerf3 server management, endpoint reliability tracking, and reporting.
+Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, historical Cellular Analysis, scope-aware GeoView context, iPerf3 server management, endpoint reliability tracking, and reporting.
 
 **Version:** 1.1.3
 **Firmware family tested:** NCOS 7.26.x
@@ -30,7 +30,7 @@ Key capabilities include:
 - View throughput trends and detailed test information.
 - Monitor cellular health, service type, serving bands, and Carrier Activity when NCOS exposes the required data.
 - Analyze retained cellular history by serving cell, network mode, RF conditions, radio configuration, and observed handoffs.
-- Review a site-wide **Cellular GeoView** showing serving cells observed across all retained cellular interfaces, with carrier filtering and per-cell interface context.
+- Review **Cellular GeoView** for the selected cellular interface and history range, with serving-cell location context, carrier filtering, and Site relationships.
 - Review published modem Carrier Aggregation capability references for supported modem variants.
 - Track saved iPerf3 endpoint reliability.
 - Export results in CSV or HTML format.
@@ -520,54 +520,15 @@ Instead of looking at one final modem snapshot from one speed test, the page com
 
 Cellular Analysis uses data already retained by Speedtest Analyzer. It does not continuously poll the modem outside normal test activity.
 
-The page is divided into two scopes:
+The page begins with the **Interface** and **History Range** selectors together with **Refresh Data** and **Export HTML Report**.
 
-- **Site Cellular GeoView** provides site-wide context across all retained cellular interfaces and history.
-- The lower **Cellular Analysis workspace** lets you select a specific cellular interface and history range for detailed analysis.
-
-## Site Cellular GeoView
-
-**Site Cellular GeoView** appears at the top of the Cellular Analysis page and summarizes the identifiable serving cells observed across all retained cellular interfaces.
-
-The default **Local Only** mode requires no external geolocation service.
-
-In Local Only mode, GeoView shows:
-
-- The Site.
-- Each identifiable serving cell observed in retained history.
-- The number of serving cells, carriers, and cellular interfaces observed.
-- Which interfaces have seen the same serving cell.
-- Carrier-aware serving-cell markers.
-- A local serving-cell schematic.
-
-The local schematic is intentionally **not geographic**. Marker placement shows the observed serving-cell inventory and Site relationship without claiming that the displayed marker position represents the physical tower location.
-
-<img width="1277" height="680" alt="Local GeoView with observed serving cells]" src="https://github.com/user-attachments/assets/3f005b48-29d0-4a43-a1e6-f594b3486902" />
-
-GeoView is site-wide. It does not change when you select a different Interface or History Range in the lower Cellular Analysis workspace.
-
-### Configure GeoView
-
-Select **Configure** to choose how Site context is maintained.
-
-**Local Only** remains fully functional without Google Maps or OpenCellID.
-
-A Site Location can still be configured in Local Only mode using:
-
-- **Device GPS** — queries the router GPS only when requested.
-- **Manual Site Location** — enter a Site Address, or use latitude/longitude through Advanced coordinates.
-
-Saved Site Location information is retained independently from the optional Geolocation Services feature.
-
-Device GPS is not continuously polled. Selecting **Refresh GPS** performs one explicit request to the router.
-
-<img width="872" height="712" alt="Configure GeoView with Site Location options" src="https://github.com/user-attachments/assets/4a032eb7-9bbf-4cdb-8197-8797c1bb1da7" />
+The selected Interface and History Range define one analysis scope. The Cellular Overview, Serving Cell Summary, Site Cellular GeoView, selected-cell details, and exported report all follow that same scope.
 
 ## Cellular Overview
 
-The lower Cellular Analysis workspace begins with an **Interface** and **History Range** selector.
+The **Cellular Overview** is the first analysis section beneath the Interface and History Range controls.
 
-Use these controls to decide which retained cellular tests should be analyzed.
+Those controls determine which retained cellular tests are included throughout the page.
 
 The **Cellular Overview** summarizes the selected scope with:
 
@@ -577,7 +538,9 @@ The **Cellular Overview** summarizes the selected scope with:
 
 This provides a quick indication of whether the selected cellular connection has remained on one network resource or has moved between multiple serving cells or technologies.
 
-## Serving Cell Distribution and Timeline
+## Serving Cell Summary
+
+**Serving Cell Summary** combines Serving Cell Distribution, Change Activity, and the Serving Cell Timeline into one analysis section. Distribution and Change Activity are presented side by side on wider displays, with the Timeline spanning the full width below them.
 
 **Serving Cell Distribution** shows how the selected cellular interface used each identifiable serving cell.
 
@@ -598,7 +561,7 @@ In-test handoff markers can also appear when Speedtest Analyzer observed a servi
 
 <img width="1264" height="560" alt="Cellular Overview with serving-cell distribution and timeline" src="https://github.com/user-attachments/assets/64c1b617-a930-4e83-993f-32e492fc55f8" />
 
-## Cellular Change Activity
+### Cellular Change Activity
 
 **Cellular Change Activity** summarizes how dynamic the selected cellular connection has been.
 
@@ -612,6 +575,44 @@ The page tracks:
 These measurements help distinguish a connection that stays on a stable radio environment from one that frequently changes serving resources or radio configuration.
 
 A change does not automatically indicate a problem. Cellular networks routinely change cells, bands, and carrier combinations based on mobility, RF conditions, traffic demand, and network decisions.
+
+## Site Cellular GeoView
+
+In the application layout, **Site Cellular GeoView** appears below the Serving Cell Summary and summarizes the identifiable serving cells observed for the selected **Interface** and **History Range**.
+
+The default **Local Only** mode requires no external geolocation service.
+
+In Local Only mode, GeoView shows:
+
+- The Site.
+- Each identifiable serving cell observed in the selected interface and history range.
+- The number of serving cells and carriers observed in that selected scope.
+- The selected cellular interface context.
+- Carrier-aware serving-cell markers.
+- A local serving-cell observation schematic.
+
+The local schematic is intentionally **not geographic**. Marker placement shows the observed serving-cell inventory and Site relationship without claiming that the displayed marker position represents the physical tower location.
+
+<img width="1277" height="680" alt="Local GeoView with observed serving cells]" src="https://github.com/user-attachments/assets/3f005b48-29d0-4a43-a1e6-f594b3486902" />
+
+GeoView follows the selected **Interface** and **History Range**. Changing either selector refreshes the serving-cell inventory presented by the Local Only schematic or resolved geographic map so GeoView remains aligned with the rest of Cellular Analysis.
+
+### Configure GeoView
+
+Select **Configure** to choose how Site context is maintained.
+
+**Local Only** remains fully functional without Google Maps or OpenCellID.
+
+A Site Location can still be configured in Local Only mode using:
+
+- **Device GPS** — queries the router GPS only when requested.
+- **Manual Site Location** — enter a Site Address, or use latitude/longitude through Advanced coordinates.
+
+Saved Site Location information is retained independently from the optional Geolocation Services feature.
+
+Device GPS is not continuously polled. Selecting **Refresh GPS** performs one explicit request to the router.
+
+<img width="872" height="712" alt="Configure GeoView with Site Location options" src="https://github.com/user-attachments/assets/4a032eb7-9bbf-4cdb-8197-8797c1bb1da7" />
 
 ## Serving Cell Details
 
@@ -728,13 +729,15 @@ Select **Resolve Cell Locations** when you want Speedtest Analyzer to request es
 
 Previously resolved locations are cached so the application does not need to request the same information every time Cellular Analysis is opened.
 
+Serving-cell location resolution and the local cache are maintained independently from the current presentation filter. GeoView displays only the resolved serving cells that belong to the currently selected **Interface** and **History Range**.
+
 When geographic locations are available, the interactive map can show:
 
 - The configured Site.
 - Estimated serving-cell markers.
 - Site-to-cell relationship lines.
 - Carrier-aware marker colors.
-- Distance and direction from the Site.
+- Distance in miles and direction from the Site.
 - Serving-cell information and retained usage.
 
 <img width="1254" height="601" alt="GeoView with resolved serving-cell locations" src="https://github.com/user-attachments/assets/9edb38ed-be3c-4641-971f-80d811faf0d0" />
@@ -759,7 +762,7 @@ The report preserves the selected interface and history range and includes the C
 
 Unlike the interactive application, where you select one serving cell at a time for detailed analysis, the exported report includes the available detail sections for **all identifiable serving cells** in the selected scope. This makes the report easier to review, share, or archive without requiring the reader to interact with the live application.
 
-When geographic GeoView data is available, the live Google map is replaced with a self-contained Site/serving-cell schematic showing the Site, resolved serving-cell locations, distance and direction, and serving-cell location details. The exported report does not require Google Maps, provider credentials, Internet access, or continued access to the router.
+When geographic GeoView data is available, the live Google map is replaced with a self-contained Site/serving-cell schematic showing the Site, resolved serving-cell locations, distance in miles and direction, and serving-cell location details. The exported report does not require Google Maps, provider credentials, Internet access, or continued access to the router.
 
 Unknown serving-cell observations remain represented in the overview, distribution, and timeline when identity data is incomplete, but Speedtest Analyzer does not create a detailed serving-cell section for an unidentified cell.
 
@@ -1212,7 +1215,11 @@ The README keeps a concise, user-facing changelog for the current Speedtest Anal
 
 - Added **Geolocation Services** to Site Cellular GeoView while preserving **Local Only** as the no-external-lookup mode.
 - Added OpenCellID **Estimated Serving Cell Location** resolution using the complete primary serving identity: LTE primary for LTE-only, LTE anchor for NSA, and NR primary for SA. PCI, band, and channel values are never substituted for ECI/NCI.
-- Added the interactive **Google Maps JavaScript** GeoView with Site and resolved serving-cell markers, carrier-aware styling, Site-to-cell distance/direction, marker popups, and multi-cell presentation.
+- Added the interactive **Google Maps JavaScript** GeoView with Site and resolved serving-cell markers, carrier-aware styling, Site-to-cell distance and direction in miles, marker popups, and multi-cell presentation.
+- Unified Cellular Analysis presentation around the selected **Interface** and **History Range** so Cellular Overview, Serving Cell Summary, Local Only or geographic GeoView, selected-cell details, and the exported report describe the same retained-test scope.
+- Finalized the **Serving Cell Summary** layout with Distribution and 2x2 Change Activity panels above a full-width Serving Cell Timeline.
+- Added responsive Serving Cell presentation and report behavior so Active Traffic bars and narrow timeline labels remain contained at reduced widths.
+- Corrected 5G SA timeline identity matching so the NR primary serving cell remains aligned with the normalized Serving Cell Distribution identity when PLMN completeness differs between retained telemetry paths.
 - Added **Google Site Address geocoding** on Save using a separate server-side Google key.
 - Added split encrypted Device credential storage for the Google Server key, Google Maps JavaScript key, and OpenCellID key using NCOS `certmgmt` and on-router `cp.decrypt()`.
 - Added the persistent OpenCellID serving-cell cache with 30-day resolved and 6-hour `not_found` defaults.

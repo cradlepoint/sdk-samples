@@ -645,6 +645,89 @@ def _cell_key(cell):
     return '%s|%s|%s' % (source, plmn, cell_id)
 
 
+def _cell_key_parts(key):
+    """Return normalized serving-cell identity parts for matching."""
+    if not _present(key) or key == _UNKNOWN_CELL_KEY:
+        return None
+
+    parts = _text(key).split('|', 2)
+    if len(parts) != 3:
+        return None
+
+    source, plmn, cell_id = parts
+
+    cell_id = _canonical_cell_id(cell_id)
+    if not cell_id:
+        return None
+
+    return (
+        _text(source).upper() or 'CELL',
+        _normalize_plmn(plmn) or '?',
+        cell_id,
+    )
+
+
+def _cell_keys_compatible(left, right):
+    """Return True when two keys safely identify the same serving cell.
+
+    A missing PLMN on one side may match a known PLMN on the other side when
+    cell-id source and canonical Cell ID are identical. Two different known
+    PLMNs are never merged.
+    """
+    if left == right:
+        return True
+
+    left_parts = _cell_key_parts(left)
+    right_parts = _cell_key_parts(right)
+
+    if not left_parts or not right_parts:
+        return False
+
+    left_source, left_plmn, left_cell_id = left_parts
+    right_source, right_plmn, right_cell_id = right_parts
+
+    if left_source != right_source:
+        return False
+
+    if left_cell_id != right_cell_id:
+        return False
+
+    if (
+        left_plmn != '?'
+        and right_plmn != '?'
+        and left_plmn != right_plmn
+    ):
+        return False
+
+    return True
+
+
+def _resolve_cell_key(key, cells):
+    """Resolve an observation key to one unambiguous distribution key."""
+    if key == _UNKNOWN_CELL_KEY:
+        return key
+
+    known_keys = [
+        item.get('key')
+        for item in cells
+        if isinstance(item, dict) and item.get('key')
+    ]
+
+    if key in known_keys:
+        return key
+
+    matches = [
+        candidate
+        for candidate in known_keys
+        if _cell_keys_compatible(key, candidate)
+    ]
+
+    if len(matches) == 1:
+        return matches[0]
+
+    return key
+
+
 def _supplement_peak_identity(record, snapshot):
     """Supplement missing peak carrier identity from final cellular data.
 
@@ -1362,14 +1445,18 @@ def _cell_distribution(records):
 def _timeline(records, cells):
     labels = {item['key']: item.get('view_label', '') for item in cells}
     segments = []
+
     for record in records:
         cell = _serving_cell_for_record(record)
-        key = _cell_key(cell)
+        raw_key = _cell_key(cell)
+        key = _resolve_cell_key(raw_key, cells)
         timestamp = _text(record.get('timestamp'))
+
         if segments and segments[-1]['key'] == key:
             segments[-1]['tests'] += 1
             segments[-1]['end'] = timestamp
             continue
+
         segments.append({
             'key': key,
             'label': labels.get(key, 'Unknown'),
@@ -1377,6 +1464,7 @@ def _timeline(records, cells):
             'end': timestamp,
             'tests': 1,
         })
+
     return segments
 
 
@@ -1418,11 +1506,18 @@ def _timeline_events(records, cells):
                 'to'
             )
 
-            from_key = _cell_key(
-                from_cell
+            from_key = _resolve_cell_key(
+                _cell_key(
+                    from_cell
+                ),
+                cells
             )
-            to_key = _cell_key(
-                to_cell
+
+            to_key = _resolve_cell_key(
+                _cell_key(
+                    to_cell
+                ),
+                cells
             )
 
             event = {
@@ -2595,22 +2690,64 @@ def _selected_cell(records, cells, selected_key=''):
 
 
 
-def build_site_cell_inventory(history):
-    """Build site-wide serving-cell inventory across all retained history.
+def build_site_cell_inventory(
+    history,
+    interface='',
+    scope='all',
+    now=None,
+):
+    """Build a serving-cell inventory from retained cellular history.
 
-    GeoView intentionally ignores the lower-page interface and date filters.
-    It represents every identifiable serving cell observed by every cellular
-    interface in the retained local history. The existing traffic-aware cell
-    engine remains authoritative, so cells seen only during an in-test handoff
-    are preserved here as well.
+    With no interface supplied, behavior remains site-wide. Existing callers
+    such as GeoView resolution, contribution, and map composition therefore
+    retain their current device-wide behavior.
+
+    When an interface is supplied, the inventory follows the same Interface
+    and History Range semantics as Cellular Analysis. This is used by the
+    GeoView presentation embedded in Cellular Analysis so its cells, counts,
+    carriers, and test shares describe the selected analysis scope.
+
+    The traffic-aware cell engine remains authoritative, including identifiable
+    cells observed only during an in-test handoff.
     """
+
     history = history if isinstance(history, list) else []
 
-    records = [
-        record
-        for record in history
-        if _is_cellular_history_record(record)
-    ]
+    selected_interface = _text(interface)
+
+    if selected_interface:
+        interfaces = _history_interfaces(history)
+
+        available = {
+            item['interface']
+            for item in interfaces
+        }
+
+        if selected_interface not in available:
+            selected_interface = (
+                interfaces[0]['interface']
+                if interfaces
+                else ''
+            )
+
+        records = (
+            _scope_records(
+                history,
+                selected_interface,
+                scope,
+                now=now,
+            )
+            if selected_interface
+            else []
+        )
+
+    else:
+        # Existing default behavior: every retained cellular result.
+        records = [
+            record
+            for record in history
+            if _is_cellular_history_record(record)
+        ]
 
     records.sort(
         key=lambda record: (

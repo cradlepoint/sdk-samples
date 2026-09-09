@@ -12903,12 +12903,25 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )[0],
             )
 
-            # GeoView is deliberately site-wide. It uses every retained
-            # cellular result across all cellular interfaces, independent
-            # of the lower-page filters.
+            # GeoView presentation follows the same Interface + History
+            # Range used by Cellular Analysis. The inventory builder remains
+            # site-wide by default for resolver/contribution/map callers.
+            analysis_scope = (
+                analysis.get('scope')
+                or {}
+            )
+
             site_inventory = (
                 build_site_cell_inventory(
-                    history
+                    history,
+                    interface=analysis_scope.get(
+                        'interface',
+                        ''
+                    ),
+                    scope=analysis_scope.get(
+                        'history',
+                        'all'
+                    ),
                 )
             )
 
@@ -12980,7 +12993,10 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.send_json(self.get_geo_status())
         elif self.path == '/api/geo/creds/status':
             self.send_json(self.get_geo_creds_status())
-        elif self.path == '/api/geo/mapjs':
+        elif (
+            self.path == '/api/geo/mapjs'
+            or self.path.startswith('/api/geo/mapjs?')
+        ):
             # Browser Maps JavaScript key + resolved SITE/A/B/C markers. The
             # interactive Google Maps JavaScript map is the only live GeoView
             # map (Static Maps removed in v1.1.3 cleanup).
@@ -13928,9 +13944,47 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             # fixed OpenCellID provider and is simply empty when nothing has
             # been resolved yet, which still yields a SITE-only map.
             enrichment = geo_resolver.job().enrichment(GEO_CELL_PROVIDER)
-            inventory = build_site_cell_inventory(load_history())
+
+            # Presentation scope only.
+            #
+            # Cached enrichment remains site-wide. These parameters only
+            # control which already-known serving cells are presented on
+            # the resolved Google map.
+            from urllib.parse import parse_qs, urlsplit
+
+            query = parse_qs(
+                urlsplit(self.path).query
+            )
+
+            interface = (
+                query.get(
+                    'iface',
+                    ['']
+                )[0]
+                or ''
+            )
+
+            history_scope = (
+                query.get(
+                    'history',
+                    ['all']
+                )[0]
+                or 'all'
+            )
+
+            inventory = build_site_cell_inventory(
+                load_history(),
+                interface=interface,
+                scope=history_scope,
+            )
+
             cells = inventory.get('cells', [])
-            markers = _compose_map_markers(settings, enrichment, cells)
+
+            markers = _compose_map_markers(
+                settings,
+                enrichment,
+                cells
+            )
 
             # markers is browser-safe (role/label/lat/lon only; no secrets).
             self.send_json({

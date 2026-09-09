@@ -3493,10 +3493,10 @@
         .ca-serving-row {
             display: grid;
             grid-template-columns:
-                minmax(220px, 1.6fr)
-                minmax(110px, 0.85fr)
-                78px
-                minmax(135px, 1fr);
+                minmax(0, 1.6fr)
+                minmax(0, 0.85fr)
+                minmax(52px, 0.45fr)
+                minmax(0, 1fr);
             gap: 0.7rem;
             align-items: center;
             min-height: 49px;
@@ -3561,14 +3561,28 @@
             font-weight: 600;
         }
 
+        .ca-serving-row > * {
+            min-width: 0;
+        }
+
+        .ca-serving-tech {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         .ca-serving-percent {
             display: grid;
-            grid-template-columns: 38px 1fr;
+            grid-template-columns: 38px minmax(0, 1fr);
             gap: 0.45rem;
             align-items: center;
+            min-width: 0;
         }
 
         .ca-mini-bar {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
             height: 5px;
             overflow: hidden;
             border-radius: 999px;
@@ -3686,6 +3700,27 @@
             font-size: 0.68rem;
             font-weight: 700;
             cursor: default;
+
+            /*
+             * Timeline labels are based on the segment's real rendered
+             * width, not its percentage of total history. This allows
+             * labels to appear naturally as the operator zooms in.
+             */
+            container-type: inline-size;
+        }
+
+        .ca-timeline-segment-label {
+            display: inline;
+        }
+
+        /*
+         * A single A/B/C requires roughly 18 physical pixels to remain
+         * clearly legible without crowding the segment boundaries.
+         */
+        @container (max-width: 17px) {
+            .ca-timeline-segment-label {
+                display: none;
+            }
         }
 
         .ca-timeline-segment:last-child {
@@ -3892,16 +3927,66 @@
             }
 
             .ca-serving-row {
+                /*
+                 * Technology is hidden at this breakpoint, leaving:
+                 * Serving Cell / Tests Seen / Active Traffic.
+                 *
+                 * Keep all tracks compressible so the Active Traffic bar
+                 * remains inside the table at narrow panel widths.
+                 */
                 grid-template-columns:
-                    minmax(180px, 1fr)
-                    82px
-                    minmax(110px, 0.8fr);
+                    minmax(0, 1.4fr)
+                    minmax(48px, 0.35fr)
+                    minmax(0, 0.8fr);
             }
 
             .ca-serving-header > div:nth-child(2),
             .ca-serving-tech {
                 display: none;
             }
+        }
+
+        /*
+         * Local-only GeoView relationship visualization.
+         * Marker placement remains schematic and does not imply geography.
+         */
+        .ca-geo-local-relationship-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        .ca-geo-local-relationship-label {
+            position: absolute;
+            z-index: 2;
+            transform: translate(-50%, -50%);
+            padding: 0.36rem 0.62rem;
+            border: 1px solid var(--border-color);
+            border-left: 3px solid
+                var(
+                    --ca-carrier-accent,
+                    var(--primary-color)
+                );
+            border-radius: 6px;
+            background: var(--card-surface);
+            box-shadow:
+                0 1px 5px
+                rgba(15, 23, 42, 0.12);
+            color: var(--text-primary);
+            font-size: 0.69rem;
+            font-weight: 750;
+            line-height: 1.2;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .ca-geo-site-node,
+        .ca-geo-cell-node {
+            z-index: 3;
         }
 
         /* Cellular Analysis 1.1 layout */
@@ -3972,18 +4057,45 @@
         }
 
         #ca-serving-body {
+            display: block;
+        }
+
+        .ca-serving-summary-top {
             display: grid;
             grid-template-columns:
-                minmax(0, 1.05fr)
-                minmax(360px, 0.95fr);
-            gap: 1.25rem;
-            align-items: start;
+                minmax(0, 1.1fr)
+                minmax(360px, 0.9fr);
+            gap: 0.9rem;
+            align-items: stretch;
+        }
+
+        .ca-serving-summary-panel {
+            min-width: 0;
+            padding: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            background: var(--card-surface);
+        }
+
+        .ca-serving-summary-panel-title {
+            margin-bottom: 0.7rem;
+            color: var(--text-secondary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.035em;
+        }
+
+        .ca-serving-summary-timeline {
+            margin-top: 0.9rem;
         }
 
         #ca-serving-timeline {
             margin-top: 0 !important;
-            padding-left: 1.15rem;
-            border-left: 1px solid var(--border-color);
+            padding-left: 0;
+            padding-top: 0;
+            border-left: 0;
+            border-top: 0;
         }
 
         .ca-detail-grid {
@@ -4003,7 +4115,7 @@
 
         #ca-change-activity > div {
             grid-template-columns:
-                repeat(4, minmax(150px, 1fr)) !important;
+                repeat(2, minmax(150px, 1fr)) !important;
         }
 
         #ca-location-settings {
@@ -4011,15 +4123,8 @@
         }
 
         @media (max-width: 1100px) {
-            #ca-serving-body {
+            .ca-serving-summary-top {
                 grid-template-columns: 1fr;
-            }
-
-            #ca-serving-timeline {
-                padding-left: 0;
-                padding-top: 1rem;
-                border-left: 0;
-                border-top: 1px solid var(--border-color);
             }
 
             .ca-detail-grid {
@@ -4573,12 +4678,104 @@
                     <section class="element-section" id="cellular-analysis">
                         <h2 class="section-title">Cellular Analysis</h2>
 
+                        <div class="ca-analysis-controls">
+                            <div class="ca-interface-control">
+                                <label for="ca-interface-select"
+                                       style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                    Interface
+                                </label>
+                                <select id="ca-interface-select"
+                                        class="form-control"
+                                        style="width:100%;">
+                                    <option value="">No cellular interfaces found</option>
+                                </select>
+                            </div>
+
+                            <div class="ca-history-control">
+                                <label for="ca-history-select"
+                                       style="display:block; font-weight:600; margin-bottom:0.35rem;">
+                                    History Range
+                                </label>
+                                <select id="ca-history-select"
+                                        class="form-control"
+                                        style="width:100%;">
+                                    <option value="all">Available History</option>
+                                    <option value="12h">Last 12 Hours</option>
+                                    <option value="24h">Last 24 Hours</option>
+                                    <option value="3d">Last 3 Days</option>
+                                    <option value="7d">Last 7 Days</option>
+                                </select>
+                            </div>
+
+                            <div class="ca-refresh-control">
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        id="btn-ca-refresh">
+                                    <i class="fas fa-sync-alt"></i>
+                                    Refresh Data
+                                </button>
+                            </div>
+
+                            <div class="ca-export-control">
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        id="btn-ca-export-report">
+                                    <i class="fas fa-file-code"></i>
+                                    Export HTML Report
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3 id="ca-overview-title">CELLULAR OVERVIEW</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="ca-overview-content">
+                                    <p style="color:var(--text-secondary);">
+                                        Select a cellular interface to analyze retained test history.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card ca-serving-summary-card" style="margin-bottom:1rem;">
+                            <div class="card-header">
+                                <h3>Serving Cell Summary</h3>
+                            </div>
+
+                            <div class="card-body" id="ca-serving-body">
+                                <div class="ca-serving-summary-top">
+
+                                    <div class="ca-serving-summary-panel">
+                                        <div class="ca-serving-summary-panel-title">
+                                            Serving Cell Distribution
+                                        </div>
+                                        <div id="ca-serving-distribution"></div>
+                                    </div>
+
+                                    <div class="ca-serving-summary-panel"
+                                         id="ca-change-body">
+                                        <div class="ca-serving-summary-panel-title">
+                                            Cellular Change Activity
+                                        </div>
+                                        <div id="ca-change-activity"></div>
+                                    </div>
+
+                                </div>
+
+                                <div class="ca-serving-summary-panel ca-serving-summary-timeline">
+                                    <div id="ca-serving-timeline"></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="card ca-geo-card" style="margin-bottom:1rem;">
                             <div class="card-header ca-geo-card-header">
                                 <div class="ca-geo-heading">
                                     <h3>SITE CELLULAR GEOVIEW</h3>
                                     <div class="ca-geo-scope">
-                                        Serving cells observed across all cellular interfaces and retained history
+                                        Serving cells observed for the selected interface and history range
                                     </div>
                                 </div>
 
@@ -5035,87 +5232,6 @@
                         </div>
 
                         <hr style="border:0; border-top:1px solid var(--border-color); margin:1.25rem 0;">
-
-                        <div class="ca-analysis-controls">
-                            <div class="ca-interface-control">
-                                <label for="ca-interface-select"
-                                       style="display:block; font-weight:600; margin-bottom:0.35rem;">
-                                    Interface
-                                </label>
-                                <select id="ca-interface-select"
-                                        class="form-control"
-                                        style="width:100%;">
-                                    <option value="">No cellular interfaces found</option>
-                                </select>
-                            </div>
-
-                            <div class="ca-history-control">
-                                <label for="ca-history-select"
-                                       style="display:block; font-weight:600; margin-bottom:0.35rem;">
-                                    History Range
-                                </label>
-                                <select id="ca-history-select"
-                                        class="form-control"
-                                        style="width:100%;">
-                                    <option value="all">Available History</option>
-                                    <option value="12h">Last 12 Hours</option>
-                                    <option value="24h">Last 24 Hours</option>
-                                    <option value="3d">Last 3 Days</option>
-                                    <option value="7d">Last 7 Days</option>
-                                </select>
-                            </div>
-
-                            <div class="ca-refresh-control">
-                                <button type="button"
-                                        class="btn btn-secondary"
-                                        id="btn-ca-refresh">
-                                    <i class="fas fa-sync-alt"></i>
-                                    Refresh Data
-                                </button>
-                            </div>
-
-                            <div class="ca-export-control">
-                                <button type="button"
-                                        class="btn btn-primary"
-                                        id="btn-ca-export-report">
-                                    <i class="fas fa-file-code"></i>
-                                    Export HTML Report
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-bottom:1rem;">
-                            <div class="card-header">
-                                <h3 id="ca-overview-title">CELLULAR OVERVIEW</h3>
-                            </div>
-                            <div class="card-body">
-                                <div id="ca-overview-content">
-                                    <p style="color:var(--text-secondary);">
-                                        Select a cellular interface to analyze retained test history.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-bottom:1rem;">
-                            <div class="card-header">
-                                <h3>Serving Cell Distribution</h3>
-                            </div>
-                            <div class="card-body" id="ca-serving-body">
-                                <div id="ca-serving-distribution"></div>
-                                <div id="ca-serving-timeline"
-                                     style="margin-top:1rem;"></div>
-                            </div>
-                        </div>
-
-                        <div class="card" style="margin-bottom:1rem;">
-                            <div class="card-header">
-                                <h3>Cellular Change Activity</h3>
-                            </div>
-                            <div class="card-body" id="ca-change-body">
-                                <div id="ca-change-activity"></div>
-                            </div>
-                        </div>
 
                         <div class="ca-serving-scope">
                             <div class="ca-serving-scope-control">
@@ -11056,11 +11172,9 @@
                     'width:' + width + '%;' +
                     'background:' + meta.color + ';' +
                     '">' +
-                        (
-                            width >= 5
-                                ? caEscapeHtml(meta.label)
-                                : ''
-                        ) +
+                        '<span class="ca-timeline-segment-label">' +
+                            caEscapeHtml(meta.label) +
+                        '</span>' +
                     '</div>';
             }
 
@@ -12436,6 +12550,195 @@
             return arranged.filter(Boolean);
         }
 
+        /*
+         * Local GeoView observation-share helpers.
+         *
+         * This is not geographic information. It describes how often each
+         * serving cell was observed across the retained cellular tests used
+         * by Site Cellular GeoView.
+         */
+        function caGeoObservationTotal(geo) {
+            geo = geo || {};
+
+            var value = geo.tests;
+
+            if (Array.isArray(value)) {
+                return value.length;
+            }
+
+            value = Number(value);
+
+            if (isFinite(value) && value > 0) {
+                return value;
+            }
+
+            value = Number(
+                geo.tests_analyzed
+            );
+
+            if (isFinite(value) && value > 0) {
+                return value;
+            }
+
+            return 0;
+        }
+
+        function caGeoObservationCount(cell) {
+            cell = cell || {};
+
+            var candidates = [
+                cell.tests_seen,
+                cell.tests,
+                cell.observations
+            ];
+
+            for (
+                var i = 0;
+                i < candidates.length;
+                i++
+            ) {
+                var value =
+                    Number(
+                        candidates[i]
+                    );
+
+                if (
+                    isFinite(value) &&
+                    value >= 0
+                ) {
+                    return value;
+                }
+            }
+
+            var interfaces =
+                Array.isArray(
+                    cell.interfaces
+                )
+                    ? cell.interfaces
+                    : [];
+
+            var total = 0;
+
+            for (
+                var x = 0;
+                x < interfaces.length;
+                x++
+            ) {
+                var tests =
+                    Number(
+                        (
+                            interfaces[x] ||
+                            {}
+                        ).tests || 0
+                    );
+
+                if (
+                    isFinite(tests) &&
+                    tests > 0
+                ) {
+                    total += tests;
+                }
+            }
+
+            return total;
+        }
+
+        function caGeoObservationPct(
+            cell,
+            geo
+        ) {
+            var total =
+                caGeoObservationTotal(
+                    geo
+                );
+
+            if (!total) {
+                return 0;
+            }
+
+            return Math.max(
+                0,
+                Math.min(
+                    100,
+                    caGeoObservationCount(
+                        cell
+                    ) /
+                    total *
+                    100
+                )
+            );
+        }
+
+        function caGeoObservationLabel(
+            cell,
+            geo
+        ) {
+            var total =
+                caGeoObservationTotal(
+                    geo
+                );
+
+            var count =
+                caGeoObservationCount(
+                    cell
+                );
+
+            if (!total) {
+                return (
+                    count +
+                    ' test' +
+                    (
+                        count === 1
+                            ? ''
+                            : 's'
+                    )
+                );
+            }
+
+            return (
+                caGeoObservationPct(
+                    cell,
+                    geo
+                )
+                    .toFixed(1)
+                    .replace(
+                        '.0',
+                        ''
+                    ) +
+                '% of tests'
+            );
+        }
+
+        function caGeoRelationshipWidth(pct) {
+            pct =
+                Number(
+                    pct || 0
+                );
+
+            if (!isFinite(pct)) {
+                pct = 0;
+            }
+
+            pct =
+                Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        pct
+                    )
+                );
+
+            /*
+             * Keep every line clearly visible.
+             * Low-use cells stay near 2px while dominant cells approach 4px.
+             */
+            return (
+                2.0 +
+                pct / 100 *
+                2.0
+            );
+        }
+
         function caGeoSchematicPosition(index, count) {
             count = Math.max(
                 1,
@@ -12878,7 +13181,7 @@
                             '</div>' +
 
                             '<div style="margin-top:0.25rem; font-size:0.7rem;">' +
-                                'Run cellular tests to populate the site-wide GeoView.' +
+                                'No serving-cell observations are available for the selected interface and history range.' +
                             '</div>' +
 
                         '</div>' +
@@ -12930,6 +13233,29 @@
 
             var cellNodes = '';
 
+
+            var relationshipLines =
+
+                '<svg class="ca-geo-local-relationship-layer" ' +
+
+                'viewBox="0 0 100 100" ' +
+
+                'preserveAspectRatio="none" ' +
+
+                'aria-hidden="true">';
+
+
+            var relationshipLabels = '';
+
+
+            /*
+             * Use the scoped GeoView payload being rendered right now.
+             * Do not read window._cellularAnalysisData here: on initial load
+             * that global is assigned only after the render pass completes.
+             */
+            var relationshipGeo = geo;
+
+
             var schematicCells =
                 caGeoArrangeSchematicCells(
                     cells
@@ -12968,6 +13294,141 @@
                         String(
                             caGeoActiveCellKey
                         );
+                var observationPct =
+                    caGeoObservationPct(
+                        cell,
+                        relationshipGeo
+                    );
+
+                var observationLabel =
+                    caGeoObservationLabel(
+                        cell,
+                        relationshipGeo
+                    );
+
+                var relationshipWidth =
+                    caGeoRelationshipWidth(
+                        observationPct
+                    );
+
+                var relationshipCarrierClass =
+                    caGeoCarrierClass(
+                        cell.carrier
+                    );
+
+                relationshipLines +=
+                    '<line class="' +
+                    relationshipCarrierClass +
+                    '" ' +
+                    'x1="50" y1="50" x2="' +
+                    position.left.toFixed(2) +
+                    '" y2="' +
+                    position.top.toFixed(2) +
+                    '" ' +
+                    'vector-effect="non-scaling-stroke" ' +
+                    'style="' +
+                        'stroke:' +
+                        'var(--ca-carrier-accent,' +
+                        'var(--primary-color));' +
+                        'stroke-width:' +
+                        relationshipWidth.toFixed(2) +
+                        'px;' +
+                        'stroke-opacity:' +
+                        (
+                            carrierSelected
+                                ? '0.72'
+                                : '0.16'
+                        ) +
+                    '"/>';
+
+                /*
+                 * Offset the percentage badge away from the line so the
+                 * relationship remains visually obvious.
+                 */
+                var relDx =
+                    position.left - 50;
+
+                var relDy =
+                    position.top - 50;
+
+                var relLength =
+                    Math.max(
+                        1,
+                        Math.sqrt(
+                            relDx * relDx +
+                            relDy * relDy
+                        )
+                    );
+
+                var normalX =
+                    -relDy /
+                    relLength;
+
+                var normalY =
+                    relDx /
+                    relLength;
+
+                var labelSide =
+                    i % 2 === 0
+                        ? 1
+                        : -1;
+
+                var labelLeft =
+                    50 +
+                    relDx * 0.55 +
+                    normalX *
+                    labelSide *
+                    5.5;
+
+                var labelTop =
+                    50 +
+                    relDy * 0.55 +
+                    normalY *
+                    labelSide *
+                    5.5;
+
+                labelLeft =
+                    Math.max(
+                        12,
+                        Math.min(
+                            88,
+                            labelLeft
+                        )
+                    );
+
+                labelTop =
+                    Math.max(
+                        10,
+                        Math.min(
+                            90,
+                            labelTop
+                        )
+                    );
+
+                relationshipLabels +=
+                    '<div class="' +
+                    'ca-geo-local-relationship-label ' +
+                    relationshipCarrierClass +
+                    '" ' +
+                    'aria-hidden="true" ' +
+                    'style="' +
+                        'left:' +
+                        labelLeft.toFixed(2) +
+                        '%;' +
+                        'top:' +
+                        labelTop.toFixed(2) +
+                        '%;' +
+                        'opacity:' +
+                        (
+                            carrierSelected
+                                ? '1'
+                                : '0.28'
+                        ) +
+                    ';">' +
+                        caEscapeHtml(
+                            observationLabel
+                        ) +
+                    '</div>';
 
                 cellNodes +=
                     '<button type="button" ' +
@@ -13035,6 +13496,19 @@
 
                     '</button>';
             }
+
+
+            relationshipLines +=
+                '</svg>';
+
+            /*
+             * Paint order:
+             * relationship lines -> usage badges -> clickable A/B/C nodes.
+             */
+            cellNodes =
+                relationshipLines +
+                relationshipLabels +
+                cellNodes;
 
             var carrierHtml = '';
 
@@ -13623,7 +14097,35 @@
         // Fetch the browser key + markers, then render the JS map. Never
         // triggers resolution (reads already-resolved geography only).
         function caGeoLoadJsMap() {
-            fetch('/api/geo/mapjs', { cache: 'no-store' })
+            /*
+             * Scope only the resolved-map presentation to the same
+             * Interface + History Range selected in Cellular Analysis.
+             * OpenCellID resolution and cached enrichment remain site-wide.
+             */
+            var mapParams = [];
+
+            if (cellularAnalysisState.interface) {
+                mapParams.push(
+                    'iface=' +
+                    encodeURIComponent(
+                        cellularAnalysisState.interface
+                    )
+                );
+            }
+
+            mapParams.push(
+                'history=' +
+                encodeURIComponent(
+                    cellularAnalysisState.history ||
+                    'all'
+                )
+            );
+
+            var mapUrl =
+                '/api/geo/mapjs?' +
+                mapParams.join('&');
+
+            fetch(mapUrl, { cache: 'no-store' })
                 .then(function(resp) {
                     return resp.json().then(function(body) {
                         return { ok: resp.ok, body: body };
@@ -13674,8 +14176,29 @@
         }
 
         function _caGeoDistanceLabel(km) {
-            if (km < 1) return Math.round(km * 1000) + ' m';
-            return km.toFixed(1) + ' km';
+
+            /*
+             * Geographic calculations remain in kilometers internally.
+             * Speedtest Analyzer presents GeoView distance in US miles.
+             */
+            var miles =
+                Number(km) *
+                0.621371192237334;
+
+            if (
+                !isFinite(miles) ||
+                miles < 0
+            ) {
+                return '';
+            }
+
+            return (
+                miles
+                    .toFixed(1)
+                    .replace('.0', '') +
+                ' mi'
+            );
+
         }
 
         // Site coordinates currently plotted (the SITE marker), or null.
@@ -18401,16 +18924,29 @@
 
         // Readable distance: <1000 m whole meters; >=1000 m km (1-2 dp).
         function caReportGeoFormatDistance(meters) {
-            var m = Number(meters);
-            if (!isFinite(m) || m < 0) return '';
-            if (m < 1000) {
-                return '~' + Math.round(m) + ' m';
+
+            var m =
+                Number(meters);
+
+            if (
+                !isFinite(m) ||
+                m < 0
+            ) {
+                return '';
             }
-            var km = m / 1000;
-            var rounded = (km < 10)
-                ? (Math.round(km * 100) / 100)
-                : (Math.round(km * 10) / 10);
-            return '~' + rounded + ' km';
+
+            var miles =
+                m /
+                1609.344;
+
+            return (
+                '~' +
+                miles
+                    .toFixed(1)
+                    .replace('.0', '') +
+                ' mi'
+            );
+
         }
 
         // Collect the resolved serving cells for export in the same
@@ -18432,10 +18968,16 @@
                     loc.lat != null && loc.lon != null &&
                     isFinite(Number(loc.lat)) && isFinite(Number(loc.lon)));
                 out.push({
+                    key: cell.key,
                     label: label,
                     carrier: cell.carrier,
                     carrierName: caGeoCarrierDisplayName(cell.carrier),
                     primarySummary: caGeoPrimarySummary(cell),
+                    tests: Number(
+                        cell.tests_seen != null
+                            ? cell.tests_seen
+                            : (cell.tests || 0)
+                    ),
                     resolved: resolved,
                     provider: (rec && rec.provider) || (geo && geo.provider),
                     lat: resolved ? Number(loc.lat) : null,
@@ -18445,6 +18987,628 @@
             }
             return out;
         }
+
+        function caReportGeoLocalObservationPct(cell, geo) {
+            var total = Number(
+                geo && geo.tests != null
+                    ? geo.tests
+                    : 0
+            );
+
+            var tests = Number(
+                cell && cell.tests != null
+                    ? cell.tests
+                    : 0
+            );
+
+            if (
+                !isFinite(total) ||
+                total <= 0 ||
+                !isFinite(tests) ||
+                tests < 0
+            ) {
+                return 0;
+            }
+
+            return Math.max(
+                0,
+                tests / total * 100.0
+            );
+        }
+
+
+        function caReportGeoRenderLocalSvg(geo, cells) {
+            var W = 860;
+            var H = 330;
+
+            var plot = {
+                x: 10,
+                y: 8,
+                w: 840,
+                h: 314
+            };
+
+            var siteX =
+                plot.x +
+                plot.w / 2;
+
+            var siteY =
+                plot.y +
+                plot.h / 2;
+
+            var svg =
+                '<svg class="ca-geo-report-svg" ' +
+                    'viewBox="0 0 ' + W + ' ' + H + '" ' +
+                    'preserveAspectRatio="xMidYMid meet" ' +
+                    'xmlns="http://www.w3.org/2000/svg" ' +
+                    'role="img" ' +
+                    'aria-label="Local serving cell observation schematic">' +
+
+                    '<defs>' +
+                        '<pattern id="ca-geo-local-report-grid" ' +
+                            'width="48" height="48" ' +
+                            'patternUnits="userSpaceOnUse">' +
+                            '<path d="M48 0H0V48" fill="none" ' +
+                                'stroke="#dfe6f3" stroke-width="1"/>' +
+                        '</pattern>' +
+                    '</defs>' +
+
+                    '<rect x="' + plot.x + '" y="' + plot.y + '" ' +
+                        'width="' + plot.w + '" height="' + plot.h + '" ' +
+                        'rx="9" class="ca-geo-svg-plot"/>' +
+
+                    '<rect x="' + plot.x + '" y="' + plot.y + '" ' +
+                        'width="' + plot.w + '" height="' + plot.h + '" ' +
+                        'rx="9" fill="url(#ca-geo-local-report-grid)" ' +
+                        'opacity="0.48"/>';
+
+            if (!cells.length) {
+                svg +=
+                    caReportGeoSiteGlyph(
+                        siteX,
+                        siteY
+                    ) +
+
+                    '<text x="' +
+                        (siteX + 17).toFixed(1) +
+                        '" y="' +
+                        (siteY + 4).toFixed(1) +
+                        '" class="ca-geo-svg-site-label">' +
+                        'Site' +
+                    '</text>' +
+
+                    '<text x="' +
+                        siteX.toFixed(1) +
+                        '" y="' +
+                        (siteY + 42).toFixed(1) +
+                        '" text-anchor="middle" ' +
+                        'class="ca-geo-svg-empty">' +
+                        'No serving-cell observations available' +
+                    '</text>' +
+
+                '</svg>';
+
+                return svg;
+            }
+
+            var vectors = '';
+            var markers = '';
+
+            for (
+                var i = 0;
+                i < cells.length;
+                i++
+            ) {
+                var cell =
+                    cells[i];
+
+                var position =
+                    caGeoSchematicPosition(
+                        i,
+                        cells.length
+                    );
+
+                var x =
+                    plot.x +
+                    (
+                        Number(
+                            position.left
+                        ) /
+                        100
+                    ) *
+                    plot.w;
+
+                var y =
+                    plot.y +
+                    (
+                        Number(
+                            position.top
+                        ) /
+                        100
+                    ) *
+                    plot.h;
+
+                var pct =
+                    caReportGeoLocalObservationPct(
+                        cell,
+                        geo
+                    );
+
+                var pctLabel =
+                    pct
+                        .toFixed(1)
+                        .replace(
+                            '.0',
+                            ''
+                        ) +
+                    '% of tests';
+
+                var lineWidth =
+                    caGeoRelationshipWidth(
+                        pct
+                    );
+
+                var colors =
+                    caReportGeoCarrierColors(
+                        cell.carrier
+                    );
+
+                vectors +=
+                    '<line x1="' +
+                        siteX.toFixed(1) +
+                        '" y1="' +
+                        siteY.toFixed(1) +
+                        '" x2="' +
+                        x.toFixed(1) +
+                        '" y2="' +
+                        y.toFixed(1) +
+                        '" stroke="' +
+                        colors.accent +
+                        '" stroke-width="' +
+                        lineWidth.toFixed(2) +
+                        '" stroke-opacity="0.72"/>';
+
+                var dx =
+                    x -
+                    siteX;
+
+                var dy =
+                    y -
+                    siteY;
+
+                var len =
+                    Math.max(
+                        1,
+                        Math.sqrt(
+                            dx * dx +
+                            dy * dy
+                        )
+                    );
+
+                var nx =
+                    -dy /
+                    len;
+
+                var ny =
+                    dx /
+                    len;
+
+                var side =
+                    i % 2 === 0
+                        ? 1
+                        : -1;
+
+                var labelWidth =
+                    Math.max(
+                        86,
+                        18 +
+                        pctLabel.length *
+                        6.1
+                    );
+
+                /*
+                 * Match the live Local Observation presentation: the label
+                 * sits beside the relationship line, never on top of it.
+                 *
+                 * Compute clearance from the actual box dimensions projected
+                 * onto the line normal, then add a small visual gap.
+                 */
+                var labelHalfHeight = 12;
+
+                var labelClearance =
+                    Math.abs(nx) *
+                    (
+                        labelWidth /
+                        2
+                    ) +
+                    Math.abs(ny) *
+                    labelHalfHeight +
+                    10;
+
+                var lx =
+                    siteX +
+                    dx * 0.55 +
+                    nx *
+                    side *
+                    labelClearance;
+
+                var ly =
+                    siteY +
+                    dy * 0.55 +
+                    ny *
+                    side *
+                    labelClearance;
+
+                vectors +=
+                    '<g transform="translate(' +
+                        lx.toFixed(1) +
+                        ' ' +
+                        ly.toFixed(1) +
+                        ')">' +
+
+                        '<rect x="' +
+                            (-labelWidth / 2).toFixed(1) +
+                            '" y="-12" width="' +
+                            labelWidth.toFixed(1) +
+                            '" height="24" rx="6" ' +
+                            'class="ca-geo-svg-veclabel-box"/>' +
+
+                        '<line x1="' +
+                            (-labelWidth / 2 + 1.5).toFixed(1) +
+                            '" y1="-7" x2="' +
+                            (-labelWidth / 2 + 1.5).toFixed(1) +
+                            '" y2="7" stroke="' +
+                            colors.accent +
+                            '" stroke-width="3" ' +
+                            'stroke-linecap="round"/>' +
+
+                        '<text x="0" y="4" ' +
+                            'text-anchor="middle" ' +
+                            'class="ca-geo-svg-veclabel-dist">' +
+                            caEscapeHtml(
+                                pctLabel
+                            ) +
+                        '</text>' +
+
+                    '</g>';
+
+                markers +=
+                    '<g class="ca-geo-svg-pin">' +
+
+                        '<circle cx="' +
+                            x.toFixed(1) +
+                            '" cy="' +
+                            y.toFixed(1) +
+                            '" r="15" fill="' +
+                            colors.accent +
+                            '" stroke="#ffffff" ' +
+                            'stroke-width="2"/>' +
+
+                        '<text x="' +
+                            x.toFixed(1) +
+                            '" y="' +
+                            (y + 1).toFixed(1) +
+                            '" text-anchor="middle" ' +
+                            'dominant-baseline="middle" ' +
+                            'class="ca-geo-svg-cell-label">' +
+                            caEscapeHtml(
+                                cell.label
+                            ) +
+                        '</text>' +
+
+                    '</g>';
+            }
+
+            var siteGlyph =
+                '<g class="ca-geo-svg-local-site">' +
+
+                    '<circle cx="' +
+                        siteX.toFixed(1) +
+                        '" cy="' +
+                        siteY.toFixed(1) +
+                        '" r="17" fill="#ffffff" ' +
+                        'stroke="#4f46e5" stroke-width="2.5"/>' +
+
+                    '<path d="M-8,0 L0,-7 L8,0 L8,8 L3,8 L3,3 ' +
+                        'L-3,3 L-3,8 L-8,8 Z" ' +
+                        'transform="translate(' +
+                        siteX.toFixed(1) +
+                        ' ' +
+                        siteY.toFixed(1) +
+                        ')" fill="#4f46e5"/>' +
+
+                '</g>' +
+
+                '<text x="' +
+                    siteX.toFixed(1) +
+                    '" y="' +
+                    (siteY + 31).toFixed(1) +
+                    '" text-anchor="middle" ' +
+                    'class="ca-geo-svg-site-label">' +
+                    'SITE' +
+                '</text>';
+
+            svg +=
+                vectors +
+                siteGlyph +
+                markers +
+                '</svg>';
+
+            return svg;
+        }
+
+
+        function caReportBuildLocalGeoReport(
+            geo,
+            allCells
+        ) {
+            var observed =
+                allCells.length;
+
+            var totalTests =
+                Number(
+                    geo && geo.tests != null
+                        ? geo.tests
+                        : 0
+                );
+
+            if (
+                !isFinite(
+                    totalTests
+                ) ||
+                totalTests < 0
+            ) {
+                totalTests = 0;
+            }
+
+            var provider =
+                String(
+                    (
+                        geo &&
+                        geo.provider
+                    ) ||
+                    'none'
+                );
+
+            /*
+             * Serving-cell geographic estimates use the fixed OpenCellID
+             * source. The schematic itself remains local/non-geographic when
+             * no usable Site/cell coordinates are available.
+             */
+            var sourceText =
+                'OpenCellID';
+
+            var header =
+                '<div class="ca-geo-report-header">' +
+
+                    '<div>' +
+
+                        '<div class="ca-geo-report-kicker">' +
+                            'SITE CELLULAR GEOVIEW' +
+                        '</div>' +
+
+                        '<div class="ca-geo-report-title">' +
+                            'Serving Cell Observation Schematic' +
+                        '</div>' +
+
+                        '<div class="ca-geo-report-sub">' +
+                            'Serving cells observed within the selected ' +
+                            'Interface and History Range. Local observation ' +
+                            'schematic — positions are not geographic.' +
+                        '</div>' +
+
+                    '</div>' +
+
+                    '<div class="ca-geo-report-status">' +
+                        observed +
+                        ' serving cell' +
+                        (
+                            observed === 1
+                                ? ''
+                                : 's'
+                        ) +
+                        ' observed' +
+                    '</div>' +
+
+                '</div>';
+
+            var summaryHtml =
+                '<div class="ca-geo-report-section-title">' +
+                    'Observation Summary' +
+                '</div>' +
+
+                '<table class="ca-geo-summary-table">' +
+                    '<tbody>' +
+
+                        '<tr>' +
+                            '<th>Tests Analyzed</th>' +
+                            '<td>' +
+                                totalTests +
+                            '</td>' +
+                        '</tr>' +
+
+                        '<tr>' +
+                            '<th>Serving Cells</th>' +
+                            '<td>' +
+                                observed +
+                            '</td>' +
+                        '</tr>' +
+
+                        '<tr>' +
+                            '<th>Cell Location Source</th>' +
+                            '<td>' +
+                                caEscapeHtml(
+                                    sourceText
+                                ) +
+                            '</td>' +
+                        '</tr>' +
+
+                    '</tbody>' +
+                '</table>';
+
+            var cards = '';
+
+            for (
+                var i = 0;
+                i < allCells.length;
+                i++
+            ) {
+                var cell =
+                    allCells[i];
+
+                var colors =
+                    caReportGeoCarrierColors(
+                        cell.carrier
+                    );
+
+                var pct =
+                    caReportGeoLocalObservationPct(
+                        cell,
+                        geo
+                    );
+
+                var pctLabel =
+                    pct
+                        .toFixed(1)
+                        .replace(
+                            '.0',
+                            ''
+                        ) +
+                    '%';
+
+                cards +=
+                    '<div class="ca-geo-cell-card" ' +
+                        'style="border-left-color:' +
+                        colors.accent +
+                        ';">' +
+
+                        '<div class="ca-geo-cell-head" ' +
+                            'style="background:' +
+                            colors.accent +
+                            '0D;border-bottom-color:' +
+                            colors.accent +
+                            '33;">' +
+
+                            '<span class="ca-geo-cell-badge" ' +
+                                'style="background:' +
+                                colors.accent +
+                                ';">' +
+                                caEscapeHtml(
+                                    cell.label
+                                ) +
+                            '</span>' +
+
+                            '<span class="ca-geo-cell-name">' +
+                                caEscapeHtml(
+                                    cell.label
+                                ) +
+                                ' — ' +
+                                caEscapeHtml(
+                                    cell.carrierName
+                                ) +
+                            '</span>' +
+
+                            '<span class="ca-geo-cell-estimate">' +
+                                caEscapeHtml(
+                                    cell.primarySummary ||
+                                    'Primary Cell'
+                                ) +
+                            '</span>' +
+
+                        '</div>' +
+
+                        '<table class="ca-geo-cell-table">' +
+                            '<tbody>' +
+
+                                '<tr>' +
+                                    '<th>Tests Seen</th>' +
+                                    '<td>' +
+                                        Number(
+                                            cell.tests || 0
+                                        ) +
+                                    '</td>' +
+                                '</tr>' +
+
+                                '<tr>' +
+                                    '<th>Observed in Tests</th>' +
+                                    '<td>' +
+                                        caEscapeHtml(
+                                            pctLabel
+                                        ) +
+                                    '</td>' +
+                                '</tr>' +
+
+                                '<tr>' +
+                                    '<th>Location</th>' +
+                                    '<td>' +
+                                        'Not geographically resolved' +
+                                    '</td>' +
+                                '</tr>' +
+
+                            '</tbody>' +
+                        '</table>' +
+
+                    '</div>';
+            }
+
+            var detailsHtml =
+                '<div class="ca-geo-report-section-title details-title">' +
+                    'Serving Cell Details' +
+                '</div>' +
+
+                '<div class="ca-geo-cells">' +
+
+                    (
+                        cards ||
+                        '<div class="ca-geo-report-state">' +
+                            'No serving-cell observations available.' +
+                        '</div>'
+                    ) +
+
+                '</div>';
+
+            var noteHtml =
+                '<div class="ca-geo-report-footnote">' +
+                    'Cell positions in this Local Observation schematic are ' +
+                    'not geographic. Relationship labels show how often each ' +
+                    'serving cell was observed within the selected test scope.' +
+                '</div>';
+
+            var contextHtml =
+                '<aside class="ca-geo-report-context">' +
+                    summaryHtml +
+                    detailsHtml +
+                    noteHtml +
+                '</aside>';
+
+            var svg =
+                caReportGeoRenderLocalSvg(
+                    geo,
+                    allCells
+                );
+
+            return (
+                '<div class="ca-geo-report">' +
+                    header +
+
+                    '<div class="ca-geo-report-body">' +
+
+                        '<div class="ca-geo-report-layout">' +
+
+                            '<div class="ca-geo-report-figure">' +
+                                svg +
+                            '</div>' +
+
+                            contextHtml +
+
+                        '</div>' +
+
+                    '</div>' +
+
+                '</div>'
+            );
+        }
+
 
         // Build the self-contained GeoView export section (v5 visual port):
         // a header (kicker/title/sub + resolved-status), an inline SVG
@@ -18458,6 +19622,21 @@
             var allCells = caReportGeoCollectCells(geo);
             var resolved = allCells.filter(function(c) { return c.resolved; });
             var observed = allCells.length;
+
+            /*
+             * Local Only, missing Site, or zero resolved serving-cell locations
+             * still has useful scoped observation data. Export the same
+             * non-geographic relationship schematic used by the live GeoView.
+             */
+            if (
+                !site ||
+                resolved.length === 0
+            ) {
+                return caReportBuildLocalGeoReport(
+                    geo,
+                    allCells
+                );
+            }
 
             var statusText = resolved.length + ' of ' + observed +
                 ' cell location' + (observed === 1 ? '' : 's') + ' resolved';
@@ -18481,19 +19660,6 @@
                         caEscapeHtml(statusText) +
                     '</div>' +
                 '</div>';
-
-            // State: SITE location unavailable — no geographic math at all.
-            if (!site) {
-                return '<div class="ca-geo-report">' + header +
-                    '<div class="ca-geo-report-body">' +
-                        '<div class="ca-geo-report-state">' +
-                            '<i class="fas fa-map-marker-alt"></i> ' +
-                            'Site location unavailable — no geographic ' +
-                            'analysis can be generated for this report.' +
-                        '</div>' +
-                    '</div>' +
-                '</div>';
-            }
 
             var siteCoordText =
                 site.lat.toFixed(6) + ', ' + site.lon.toFixed(6);
@@ -18916,11 +20082,57 @@
 
         // Label a scale-bar length in m or km.
         function caReportGeoScaleLabel(meters) {
-            if (meters < 1000) {
-                return Math.round(meters) + ' m';
+
+            var m =
+                Number(meters);
+
+            if (
+                !isFinite(m) ||
+                m < 0
+            ) {
+                return '';
             }
-            var km = meters / 1000;
-            return (Math.round(km * 100) / 100) + ' km';
+
+            var miles =
+                m /
+                1609.344;
+
+            /*
+             * Use feet only for very short scale bars.
+             * Normal GeoView distances remain in miles.
+             */
+            if (miles < 0.1) {
+                return (
+                    Math.round(
+                        m *
+                        3.28084
+                    ) +
+                    ' ft'
+                );
+            }
+
+            var rounded =
+                miles < 1
+                    ? (
+                        Math.round(
+                            miles *
+                            100
+                        ) /
+                        100
+                    )
+                    : (
+                        Math.round(
+                            miles *
+                            10
+                        ) /
+                        10
+                    );
+
+            return (
+                rounded +
+                ' mi'
+            );
+
         }
 
 /* GEO_EXPORT_PROOF_V3_HARDENING_START */
@@ -19456,23 +20668,56 @@
          * Location Summary -> Cell Location Source.
          * Keep surrounding explanatory copy provider-neutral.
          */
+        var geoTitle =
+            host.querySelector(
+                '.ca-geo-report-title'
+            );
+
+        var localObservation =
+            !!(
+                geoTitle &&
+                geoTitle.textContent ===
+                    'Serving Cell Observation Schematic'
+            );
+
         var geoSub =
-            host.querySelector('.ca-geo-report-sub');
+            host.querySelector(
+                '.ca-geo-report-sub'
+            );
 
         if (geoSub) {
             geoSub.textContent =
-                'Relative positions from the configured Site. ' +
-                'Coordinate schematic — not a street map.';
+                localObservation
+                    ? (
+                        'Serving cells observed for the selected interface ' +
+                        'and history range. Local observation schematic — ' +
+                        'positions are not geographic.'
+                    )
+                    : (
+                        'Relative positions from the configured Site. ' +
+                        'Coordinate schematic — not a street map.'
+                    );
         }
 
         var geoFootnote =
-            host.querySelector('.ca-geo-report-footnote');
+            host.querySelector(
+                '.ca-geo-report-footnote'
+            );
 
         if (geoFootnote) {
             geoFootnote.textContent =
-                'Estimated serving cell locations are database-derived ' +
-                'estimates. Distance and direction are calculated from ' +
-                'the configured Site coordinates.';
+                localObservation
+                    ? (
+                        'Cell positions are schematic, not geographic. ' +
+                        'Relationship labels show the percentage of tests ' +
+                        'in the selected scope where each serving cell was ' +
+                        'observed.'
+                    )
+                    : (
+                        'Estimated serving cell locations are ' +
+                        'database-derived estimates. Distance and direction ' +
+                        'are calculated from the configured Site coordinates.'
+                    );
         }
 
         return '<style>' +
@@ -20281,34 +21526,51 @@
                 '}',
 
                 '.ca-report-document #ca-serving-body{',
-                'grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr)!important;',
+                'display:block!important;',
+                '}',
+                '.ca-report-document .ca-serving-summary-top{',
+                'display:grid!important;',
+                'grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr)!important;',
                 'gap:.7rem!important;',
+                'align-items:stretch!important;',
+                '}',
+                '.ca-report-document .ca-serving-summary-panel{',
+                'min-width:0!important;',
+                '}',
+                '.ca-report-document .ca-serving-summary-timeline{',
+                'margin-top:.7rem!important;',
                 '}',
                 '.ca-report-document .ca-serving-row{',
-                'grid-template-columns:minmax(180px,1.55fr) minmax(90px,.8fr) 58px minmax(105px,.9fr)!important;',
+                'grid-template-columns:minmax(0,1.55fr) minmax(0,.8fr) 58px minmax(0,.9fr)!important;',
                 'gap:.4rem!important;',
                 'font-size:.7rem!important;',
                 '}',
+                '.ca-report-document .ca-serving-row>*{',
+                'min-width:0!important;',
+                '}',
                 '.ca-report-document .ca-serving-percent{',
-                'grid-template-columns:34px minmax(52px,1fr)!important;',
+                'grid-template-columns:34px minmax(0,1fr)!important;',
+                'min-width:0!important;',
                 'gap:.3rem!important;',
                 '}',
-
+                '.ca-report-document .ca-mini-bar{',
+                'width:100%!important;',
+                'max-width:100%!important;',
+                'min-width:0!important;',
+                '}',
                 '.ca-report-document #ca-serving-timeline{',
                 'margin-top:0!important;',
-                'padding-left:.8rem!important;',
+                'padding-left:0!important;',
                 'padding-top:0!important;',
-                'border-left:1px solid var(--border-color)!important;',
+                'border-left:0!important;',
                 'border-top:0!important;',
                 'break-inside:avoid-page;',
                 'page-break-inside:avoid;',
                 '}',
-
                 '.ca-report-document #ca-change-activity>div,',
                 '.ca-report-document .ca-change-grid{',
-                'grid-template-columns:repeat(4,minmax(120px,1fr))!important;',
+                'grid-template-columns:repeat(2,minmax(120px,1fr))!important;',
                 '}',
-
                 '.ca-report-document .ca-detail-grid{',
                 'grid-template-columns:minmax(300px,.9fr) minmax(0,1.1fr)!important;',
                 'gap:.65rem!important;',

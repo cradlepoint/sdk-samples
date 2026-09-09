@@ -129,7 +129,11 @@ Primary components are:
 - `cellular_analysis.py`
   - Normalizes retained serving-cell telemetry.
   - Builds interface/history-scoped Cellular Analysis.
-  - Builds the site-wide serving-cell inventory consumed by GeoView.
+
+  - Builds serving-cell inventories from the same retained-history model, optionally scoped by interface and history range.
+
+  - Preserves no-scope site-wide inventory behavior for resolution and contribution workflows while allowing presentation consumers to use the selected Cellular Analysis scope.
+
   - Preserves traffic-time handoffs and identifiable serving cells that may not be present in the final post-test snapshot.
 
 - `cellular_geo.py`
@@ -1395,7 +1399,7 @@ Graph tooltips also identify the friendly WAN interface associated with each plo
 
 The lower Cellular Analysis workspace and Site Cellular GeoView intentionally use different scopes.
 
-Lower Cellular Analysis:
+Cellular Analysis presentation:
 
 - Applies the selected cellular Interface.
 - Applies the selected retained-history range.
@@ -1404,28 +1408,45 @@ Lower Cellular Analysis:
 
 Site Cellular GeoView:
 
-- Uses every retained cellular test available to the application.
-- Includes all retained cellular interfaces.
+- Uses the same selected **Interface** and **History Range** as the Cellular Analysis presentation.
+
 - Excludes plain Ethernet/non-cellular records.
-- Ignores the lower page Interface and History Range selectors.
-- Shows which identifiable serving cells have been observed at the Site and, when enabled, where those serving cells are estimated to be located relative to the configured Site.
+
+- Refreshes its serving-cell inventory when either analysis selector changes.
+
+- Shows which identifiable serving cells were observed in that selected scope and, when enabled, where those serving cells are estimated to be located relative to the configured Site.
 
 GeoView does not trigger a second modem-telemetry collection pass.
 
-## 11.4 Site-wide serving-cell inventory and identity
+## 11.4 Serving-cell inventory and identity
 
-`build_site_cell_inventory(history)` constructs the site-wide GeoView inventory.
+`build_site_cell_inventory(history, interface='', scope='all', now=None)` builds the retained serving-cell inventory used by both presentation and background GeoView workflows.
 
 The builder:
 
 1. Filters retained history to cellular records.
-2. Sorts cellular records chronologically.
-3. Reuses the traffic-aware serving-cell normalization/distribution engine.
-4. Excludes the aggregate Unknown identity from GeoView markers.
-5. Preserves identifiable cells observed only during an in-test handoff.
-6. Deduplicates each serving cell once per test for observation counts.
-7. Aggregates the same normalized serving-cell identity across cellular interfaces.
-8. Returns site-wide tests, identifiable cells, and observed cellular interfaces.
+
+2. Applies the requested interface and history-range scope when supplied.
+
+3. Sorts the included cellular records chronologically.
+
+4. Reuses the traffic-aware serving-cell normalization/distribution engine.
+
+5. Excludes the aggregate Unknown identity from GeoView markers.
+
+6. Preserves identifiable cells observed only during an in-test handoff.
+
+7. Deduplicates each serving cell once per test for observation counts.
+
+8. Aggregates the same normalized serving-cell identity across the records and interfaces included in the requested scope.
+
+9. Returns the included tests, identifiable cells, and observed cellular interfaces.
+
+The same builder intentionally supports two operating modes:
+
+- **Presentation scope** — Cellular Analysis and the live GeoView pass the selected interface and history range so Cellular Overview, Serving Cell Summary, GeoView, selected-cell details, and export describe the same retained-test scope.
+
+- **Site-wide background scope** — OpenCellID resolution and contribution workflows may call the builder without presentation filters so eligible retained serving identities can be resolved, cached, or contributed independently from what the user is currently viewing.
 
 Geographic lookup is primary-serving-cell only:
 
@@ -1451,7 +1472,7 @@ Local Only:
 
 - Performs no OpenCellID serving-location lookup.
 - Does not load the Google geographic map.
-- Keeps local Cellular Analysis and the retained site-wide serving-cell inventory functional.
+- Keeps local Cellular Analysis and the selected-scope serving-cell inventory functional.
 - Hides cached geographic enrichment without deleting the cache.
 
 ### 11.5.2 Geolocation Services
@@ -1471,12 +1492,12 @@ The compact marker popup emphasizes:
 - Stable A/B/C label and carrier.
 - Primary role and band.
 - **Estimated Serving Cell Location**.
-- Distance and compass direction from the configured Site.
+- Distance in miles and compass direction from the configured Site.
 - Retained test usage count.
 
 Detailed PLMN/TAC/PCI/Cell ID/RF history remains in the lower Cellular Analysis workspace.
 
-The right-side Estimated Serving Cell Location panel shows carrier/label, primary role/band, coordinates, Copy, and Site distance/direction.
+The right-side Estimated Serving Cell Location panel shows carrier/label, primary role/band, coordinates, Copy, and Site distance in miles and direction.
 
 Provider metadata such as OpenCellID range/sample/changeable values is not repeated in the operator-focused presentation.
 
@@ -1536,7 +1557,7 @@ The current v1.1.3 UI uses:
 
 | Method / Path | Purpose |
 |---|---|
-| `GET /api/cellular_analysis` | Returns local Cellular Analysis plus site-wide GeoView inventory and cached enrichment. Never initiates a serving-location lookup. |
+| `GET /api/cellular_analysis` | Returns interface/history-scoped Cellular Analysis plus the matching GeoView presentation inventory and cached enrichment. Never initiates a serving-location lookup. |
 | `GET /api/geo_settings` | Returns normalized effective GeoView settings. |
 | `POST /api/geo_settings` | Validates and persists GeoView settings and performs Site Address forward geocoding when required. |
 | `GET /api/geo_gps` | Performs one explicit NCOS GPS-status request. |
@@ -1546,10 +1567,10 @@ The current v1.1.3 UI uses:
 | `POST /api/geo/creds/record/update` | Write-only update of a server or browser-key certmgmt record. |
 | `POST /api/geo/creds/record/clear` | Clears one protected field or record. |
 | `POST /api/geo/creds/reset` | Clears all three credentials, disables contribution, switches to Local Only, and preserves Site Location/history/cache. |
-| `GET /api/geo/mapjs` | Returns only the browser-restricted Maps JavaScript key plus Site/cached serving-cell marker data. |
+| `GET /api/geo/mapjs[?iface=<interface>&history=<scope>]` | Returns only the browser-restricted Maps JavaScript key plus Site/cached serving-cell marker data. When presentation parameters are supplied, markers are filtered to that Interface and History Range. |
 | `POST /api/geo/contribute` | Manual OpenCellID contribution for a validated Manual Site Location. |
 
-`GET /api/geo/mapjs` never returns the Google Server key or OpenCellID key and never initiates serving-cell resolution.
+`GET /api/geo/mapjs` never returns the Google Server key or OpenCellID key and never initiates serving-cell resolution. The live Cellular Analysis frontend supplies the selected Interface and History Range. A request without those parameters retains site-wide inventory behavior for compatibility.
 
 ## 11.8 Credential, cache, contribution, and export boundaries
 
@@ -1726,7 +1747,7 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
-| **1.1.x — Cellular Analysis, GeoView, configuration, and measurement telemetry** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, site-wide GeoView with Local Only and Geolocation Services modes, OpenCellID estimated serving-cell locations/contribution, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, the two-key NCM Group / Device configuration model introduced in v1.1.2, and v1.1.3 iPerf3 TCP RTT, retransmission, Jitter, and compact interval telemetry. |
+| **1.1.x — Cellular Analysis, GeoView, configuration, and measurement telemetry** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, scope-aware GeoView presentation with Local Only and Geolocation Services modes, site-wide OpenCellID resolution/cache/contribution workflows, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, the two-key NCM Group / Device configuration model introduced in v1.1.2, and v1.1.3 iPerf3 TCP RTT, retransmission, Jitter, and compact interval telemetry. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1750,7 +1771,11 @@ Completed the geographic GeoView feature on top of the v1.1.2 configuration foun
 - Locked the primary identity model: LTE -> LTE primary ECI; NSA -> LTE anchor ECI; SA -> NR primary NCI.
 - Split GeoView secrets into `speedtest_analyzer_geo_server` and `speedtest_analyzer_geo_mapjs`.
 - Added Site Address forward geocoding using Google Geocoding.
-- Added the interactive Google Maps JavaScript GeoView with Site plus cached/resolved serving-cell markers, carrier-aware labels, distance/direction, and operator-focused popups.
+- Added the interactive Google Maps JavaScript GeoView with Site plus cached/resolved serving-cell markers, carrier-aware labels, distance and direction in miles, and operator-focused popups.
+- Unified Cellular Analysis presentation around the selected Interface and History Range so Cellular Overview, Serving Cell Summary, Local Only/geographic GeoView, selected-cell detail, and standalone reporting consume the same retained-test scope.
+- Finalized the Serving Cell Summary presentation with Distribution and 2x2 Change Activity panels above a full-width timeline.
+- Added responsive containment for Serving Cell rows, Active Traffic bars, timeline segment labels, and standalone-report presentation.
+- Corrected 5G SA timeline identity resolution so NR primary observations remain mapped to the normalized serving-cell identity when equivalent retained telemetry contains different PLMN completeness.
 - Added persistent OpenCellID cache `tmp/geoview_cell_cache.json` with 30-day resolved and 6-hour `not_found` defaults.
 - Added `geo_contributions.py` and optional OpenCellID observation contribution, Off by default.
 - Added Device-GPS automatic contribution after eligible completed cellular tests and Manual Site Location contribution from retained history.
@@ -2580,6 +2605,8 @@ Resolution flow:
 6. Persist only safe resolved or `not_found` outcomes.
 7. Aggregate metadata-only status/counts.
 
+The site-wide inventory in this resolution workflow is intentional. Resolution and cache population are independent from the Interface and History Range currently selected in Cellular Analysis. Presentation later filters cached results to the selected analysis scope.
+
 Only one resolution job runs at a time.
 
 Default cache policy:
@@ -2590,7 +2617,7 @@ Default cache policy:
 
 The cache is atomic, schema-guarded, and contains no credentials.
 
-`GET /api/cellular_analysis` and `/api/geo/mapjs` may read cached enrichment but never initiate serving-cell lookup.
+`GET /api/cellular_analysis` and `/api/geo/mapjs` may read cached enrichment but never initiate serving-cell lookup. Their presentation payloads use the requested Cellular Analysis scope while the underlying cache remains available site-wide.
 
 ## 19.6 Interactive map
 
@@ -2599,7 +2626,14 @@ The live geographic map is browser-side Google Maps JavaScript.
 `GET /api/geo/mapjs` returns only:
 
 - The separate browser-restricted Maps JavaScript key.
+
 - Browser-safe Site and cached/resolved A/B/C marker data.
+
+The live frontend requests this endpoint with the selected Cellular Analysis `iface` and `history` values. The endpoint rebuilds the presentation inventory using those parameters and joins only that inventory to already-cached enrichment. It does not trigger OpenCellID resolution.
+
+A request without presentation parameters retains site-wide inventory behavior for compatibility.
+
+The interactive map presents Site-to-cell distance in miles and compass direction from the configured Site.
 
 It does not return the Google Server key, OpenCellID key, or decrypted cert bundle.
 
@@ -2611,7 +2645,7 @@ Map behavior includes:
 - Reset View.
 - Google pan/zoom/fullscreen controls.
 - Marker popup toggle.
-- Compact role/band, estimated-location, distance/direction, and test-usage presentation.
+- Compact role/band, estimated-location, distance in miles and direction, and test-usage presentation.
 
 Site-to-cell distance/bearing is calculated from the configured Site coordinates and OpenCellID estimated serving-cell coordinates.
 
