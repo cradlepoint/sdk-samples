@@ -2,8 +2,8 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.0.2
-**Application release family:** 1.0.x
+**Documentation version:** 1.1.3
+**Application release family:** 1.1.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -37,7 +37,7 @@ The documented application behavior uses several persistent or packaged data sou
 
 Application version information is carried in `package.ini`.
 
-The current branded application release is `1.0.2`. Speedtest Analyzer 1.0.0 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline.
+The current branded application release is `1.1.3`. Speedtest Analyzer 1.1.3 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline. Release `1.1.3` adds optional, Device-scoped GeoView provider enrichment (see [Section 19](#19-geoview-provider-enrichment-113)); all other `1.1.2` behavior is preserved.
 
 ## 2.2 Device validation catalog
 
@@ -74,20 +74,118 @@ The packaged list is sourced from the monitored public-server list at `iperf3ser
 
 ## 2.5 SDK appdata
 
-Configuration is stored through SDK appdata.
+Configuration is stored through SDK appdata. As of `1.1.2`, normal configuration
+uses a **two-key canonical model** (see [Section 18](#18-two-layer-configuration-management-112)
+for the full architecture):
 
-The 2.7.5 README documented configuration categories including:
+| Appdata | Purpose | Written locally by the app |
+|---|---|---|
+| `speedtest_analyzer_group` | NCM Group configuration standard. Read/validated only. | **Never** |
+| `speedtest_analyzer_device` | Locally managed Device configuration and Device overrides. | Yes (only canonical key the app writes/deletes) |
+
+Both canonical documents are schema-versioned, section-sparse, and carry
+**independent** revisions (`group_revision` / `device_revision`). The effective
+configuration in RAM is a whole-section merge of `DEVICE > GROUP > DEFAULT`.
+
+Runtime/statistics values are intentionally **not** configuration and are stored separately:
 
 | Appdata | Purpose |
 |---|---|
-| `speedtest_schedule` | Scheduled-test configuration |
-| `speedtest_outputs` | Configured output targets |
-| `netperf_servers` | Saved Netperf server entries |
-| `iperf3_servers` | Saved iPerf3 server entries |
+| `iperf_server_stats` | iPerf3 endpoint Reliability statistics (dirty-only checkpoint) |
+| `speedtest_results` | Output target when result-write outputs are enabled |
 
-Exact internal JSON structures may change between application versions. Configuration should normally be managed through the web interface rather than edited directly.
+The following fragmented keys are **migration inputs only** and are never written by
+`1.1.2`. They are read once, if present, to convert an earlier installation into a
+Device document, then left untouched:
+
+| Legacy appdata | Historical purpose |
+|---|---|
+| `speedtest_schedule` | Scheduled-test configuration |
+| `iperf_server_settings` | iPerf3 server source/mode |
+| `iperf3_servers` | User Server List |
+| `netperf_servers` | Saved Netperf server entries |
+| `speedtest_outputs` | Configured output targets |
+| `geoview_settings` | GeoView configuration (schema 2) |
+| `speedtest_analyzer` | Abandoned experimental single-key document |
+
+GeoView configuration that previously lived in the standalone `geoview_settings` key is
+now embedded as the `geoview` section inside the canonical documents (see [Section 11.6](#116-geoview-settings-persistence)).
+`cellular_geo.py` still owns GeoView schema-2 validation; the canonical layer delegates
+to it and strips runtime GPS coordinates before persistence.
+
+Exact internal JSON structures may change between application versions. Configuration
+should normally be managed through the web interface rather than edited directly. The
+`speedtest_analyzer_group` value is authored in NCM (or pasted by an administrator), never
+written by the device.
 
 ---
+
+## 2.6 Cellular Analysis and GeoView modules
+
+The v1.1.x architecture separates retained-history analysis, configuration, serving-location enrichment, protected credentials, contribution, HTTP orchestration, and presentation.
+
+Primary components are:
+
+- `cellular_analysis.py`
+  - Normalizes retained serving-cell telemetry.
+  - Builds interface/history-scoped Cellular Analysis.
+
+  - Builds serving-cell inventories from the same retained-history model, optionally scoped by interface and history range.
+
+  - Preserves no-scope site-wide inventory behavior for resolution and contribution workflows while allowing presentation consumers to use the selected Cellular Analysis scope.
+
+  - Preserves traffic-time handoffs and identifiable serving cells that may not be present in the final post-test snapshot.
+
+- `cellular_geo.py`
+  - Owns the non-secret GeoView configuration schema.
+  - Normalizes `provider` (`none` / `opencellid`), `contribution_enabled`, Site Location sources/values, and optional provider/cache tuning.
+  - Integrates with the canonical v1.1.2 Configuration Manager.
+  - Contains no protected credential values and makes no external network calls.
+
+- `geo_identity.py`
+  - Converts site-inventory cells into provider-ready primary serving identities.
+  - LTE-only resolves the LTE primary ECI; NSA resolves the LTE anchor ECI; SA resolves the NR primary NCI.
+  - Requires MCC/MNC/TAC plus ECI/NCI and never substitutes PCI, band, or channel for Cell ID.
+
+- `geo_providers.py`
+  - Implements OpenCellID serving-cell lookup (`/cell/get`).
+  - Implements OpenCellID observation submission (`/measure/add`).
+  - Implements Google Geocoding for Site Address forward geocoding.
+
+- `geo_secrets.py`
+  - The only module permitted to access `config/certmgmt/certs` or call `cp.decrypt()`.
+  - Stores server-side Google/OpenCellID keys separately from the browser Maps JavaScript key.
+  - Exposes metadata-only credential status and write-only mutation paths.
+
+- `geo_cache.py`
+  - Maintains persistent `tmp/geoview_cell_cache.json`.
+  - Uses provider + full normalized serving identity as the cache key.
+  - Defaults to 30-day positive and 6-hour `not_found` TTLs.
+
+- `geo_contributions.py`
+  - Implements optional OpenCellID observation contribution.
+  - Enforces Internal/Captive cellular eligibility, primary-identity-only submission, observed-position semantics, and persistent 20-meter same-cell dedupe in `tmp/geoview_contribution_ledger.json`.
+
+- `geo_resolver.py`
+  - Owns the single bounded OpenCellID resolution job and all lookup failure containment.
+
+- `speedtest_web.py`
+  - Serves Cellular Analysis and GeoView data.
+  - Performs Site Address geocoding on Save.
+  - Exposes resolve/status, credential, map-bootstrap, reset, and manual-contribution endpoints.
+  - Invokes the completed-test Device-GPS contribution hook after eligible cellular tests.
+  - Keeps `GET /api/cellular_analysis` local-only; it never initiates a serving-location lookup.
+
+- `index.html`
+  - Renders Local Only and Geolocation Services modes.
+  - Loads Google Maps JavaScript only for the interactive geographic view.
+  - Renders Site and resolved serving-cell markers, popups, Site Context, Configure GeoView, contributions, and the self-contained SVG report replacement.
+
+GeoView does not introduce a second continuous cellular telemetry collector. It reuses retained Speedtest Analyzer history and the Cellular Analysis normalization model.
+
+Non-secret GeoView configuration is persisted inside the canonical configuration documents as the `geoview` section. The old standalone `geoview_settings` key is migration input only.
+
+Protected provider credentials are stored separately in NCOS certificate management. The cell-location cache and contribution ledger are local runtime files under `tmp/`.
 
 # 3. Platform Validation and Known Defects
 
@@ -176,7 +274,13 @@ iPerf3 is bundled with the application and is the recommended general-purpose th
 
 The application supports TCP Downlink and Uplink, per-WAN source selection, primary and validated non-primary WAN testing, bounded listener retry, live port-attempt status, and controlled cancellation.
 
-The detailed source-routing behavior is documented later in this guide.
+Beginning with v1.1.3, the existing iPerf3 JSON result is also used to retain additional TCP measurement telemetry. The Uplink phase provides automatic TCP RTT average/minimum/maximum and device-side retransmission counts. The Downlink phase retains remote sender retransmission totals where iPerf3 reports them.
+
+An optional supplemental jitter probe can run after a successful TCP test. This measurement does not replace or alter the validated TCP throughput, retry, server-selection, source-routing, or WAN-guard architecture.
+
+TCP RTT is observed while the TCP Uplink is actively transferring data and is therefore a loaded measurement rather than an idle or pre-transfer latency sample.
+
+The detailed source-routing behavior is documented later in this guide. The v1.1.3 RTT, retransmission, jitter, and compact telemetry architecture is documented in Section 20.
 
 ## 5.2 Netperf
 
@@ -981,6 +1085,19 @@ This is especially important when a test uses a randomized listener port or a Pu
 
 The recorded Downlink and Uplink ports show the actual ports used by that execution.
 
+Beginning with v1.1.3, completed iPerf3 results can additionally persist:
+
+- `latency_ms` — average device-side Uplink TCP RTT.
+- `latency_min_ms` — minimum sampled TCP smoothed RTT during Uplink.
+- `latency_max_ms` — maximum sampled TCP smoothed RTT during Uplink.
+- `jitter_ms` — jitter when the optional supplemental probe succeeds.
+- `retransmissions` — device-side TCP Uplink sender retransmission count.
+- `iperf3_tcp` — compact engineering telemetry for Downlink and Uplink.
+
+CSV continues to use the existing `Latency_ms` and `Jitter_ms` columns and adds `TCP_Retransmissions`.
+
+The compact `iperf3_tcp` object is intentionally not flattened into the normal CSV export. It remains available as engineering evidence for future correlation, KPI, and event-analysis features.
+
 Public/User source mode, Region, and backup metadata are not added as additional History fields.
 
 Netperf results continue to use the existing Netperf reporting behavior.
@@ -1070,16 +1187,51 @@ A saved scheduled job stores its own iPerf3 server reference.
 
 Changing or deleting server configuration that makes the scheduled endpoint invalid requires the schedule to be reset before the incompatible change is completed.
 
-### 10.5.1 Auto-start on Boot
+Beginning with v1.1.3, the persisted `include_latency` field has engine-specific meaning while retaining the existing configuration schema:
 
-Schedule configuration remains saved across application and router restarts.
+- For **iPerf3**, `include_latency=true` requests the supplemental Jitter measurement. TCP RTT is automatic and does not depend on this field.
+- For **Netperf**, `include_latency=true` retains the existing Latency/Jitter behavior.
 
-Runtime schedule enablement after restart follows the **Auto-start on boot** setting.
+The Scheduled Tests UI therefore labels the same persisted control **Jitter** for iPerf3 and **Latency/Jitter** for Netperf.
 
-- Auto-start enabled: the saved schedule resumes after restart.
-- Auto-start disabled: the schedule configuration remains saved but execution starts disabled.
+### 10.5.1 Persisted `enabled` / `autostart` versus runtime `running`
 
-This prevents a previously enabled schedule from automatically resuming after reboot when Auto-start on boot is not selected.
+As of `1.1.2`, schedule enablement is modeled with three distinct values. The two
+persisted fields are **independent**; the runtime field is derived and never persisted:
+
+| Field | Kind | Meaning |
+|---|---|---|
+| `enabled` | persisted | The schedule is configured to run. |
+| `autostart` | persisted | The schedule should resume automatically when the application starts. |
+| `running` | runtime-only | Whether the scheduler thread currently fires this schedule. |
+
+The scheduler thread checks `running`, not `enabled`. `running` is computed by the shared
+helper `configuration_manager.compute_schedule_running(enabled, autostart, is_startup)`,
+which both the config hot-reload path and the tests use as the single source of truth:
+
+- **Startup / boot apply** (`is_startup=True`): `running = enabled AND autostart`.
+  An enabled-but-not-autostart schedule does **not** auto-start after an application or
+  router restart.
+- **Interactive save / apply** (`is_startup=False`): `running = enabled`.
+  An explicit user Save runs the schedule immediately, regardless of `autostart`.
+- `enabled = false` never runs, regardless of `autostart` or startup.
+
+The boot rule is applied to the runtime `running` value only. Persisted `enabled` is
+**never** coerced to `false` at startup, so an enabled-but-not-autostart schedule survives
+a restart as `enabled = true` (Enable stays checked in the UI) while `running = false`.
+
+**No-op save that still applies runtime.** After a restart, a persisted
+`enabled = true / autostart = false` schedule is `running = false`. An explicit unchanged
+Save of that schedule is a persistence **no-op** — the manager returns `no_change`, writes
+nothing, and does not increment `device_revision`. The schedule save path treats an explicit
+Save as an apply/runtime action, so it sets `running = enabled` directly even on the no-op
+result. This lets the user start the schedule without forcing a write or a revision. This
+behavior is schedule-specific and does not change the global no-op persistence semantics.
+
+`GET /api/schedule` returns `enabled`, `autostart`, and `running` so the UI can present three
+honest states: **Active** (`running`), **Enabled — Not Running** (`enabled && !running`,
+e.g. after a restart with Auto-start off), and **Disabled** (`!enabled`). The countdown and
+"next run" derive from `running`.
 
 ## 10.6 iPerf3 Stop and User Server Editing
 
@@ -1243,6 +1395,247 @@ History timestamps are stored in UTC but displayed using the viewer's browser ti
 
 Graph tooltips also identify the friendly WAN interface associated with each plotted result.
 
+## 11.3 Cellular Analysis scope versus GeoView scope
+
+The lower Cellular Analysis workspace and Site Cellular GeoView intentionally use different scopes.
+
+Cellular Analysis presentation:
+
+- Applies the selected cellular Interface.
+- Applies the selected retained-history range.
+- Applies the selected serving-cell scope when requested.
+- Answers questions about the selected interface/history context.
+
+Site Cellular GeoView:
+
+- Uses the same selected **Interface** and **History Range** as the Cellular Analysis presentation.
+
+- Excludes plain Ethernet/non-cellular records.
+
+- Refreshes its serving-cell inventory when either analysis selector changes.
+
+- Shows which identifiable serving cells were observed in that selected scope and, when enabled, where those serving cells are estimated to be located relative to the configured Site.
+
+GeoView does not trigger a second modem-telemetry collection pass.
+
+## 11.4 Serving-cell inventory and identity
+
+`build_site_cell_inventory(history, interface='', scope='all', now=None)` builds the retained serving-cell inventory used by both presentation and background GeoView workflows.
+
+The builder:
+
+1. Filters retained history to cellular records.
+
+2. Applies the requested interface and history-range scope when supplied.
+
+3. Sorts the included cellular records chronologically.
+
+4. Reuses the traffic-aware serving-cell normalization/distribution engine.
+
+5. Excludes the aggregate Unknown identity from GeoView markers.
+
+6. Preserves identifiable cells observed only during an in-test handoff.
+
+7. Deduplicates each serving cell once per test for observation counts.
+
+8. Aggregates the same normalized serving-cell identity across the records and interfaces included in the requested scope.
+
+9. Returns the included tests, identifiable cells, and observed cellular interfaces.
+
+The same builder intentionally supports two operating modes:
+
+- **Presentation scope** — Cellular Analysis and the live GeoView pass the selected interface and history range so Cellular Overview, Serving Cell Summary, GeoView, selected-cell details, and export describe the same retained-test scope.
+
+- **Site-wide background scope** — OpenCellID resolution and contribution workflows may call the builder without presentation filters so eligible retained serving identities can be resolved, cached, or contributed independently from what the user is currently viewing.
+
+Geographic lookup is primary-serving-cell only:
+
+- LTE-only -> LTE primary ECI.
+- NSA -> LTE anchor ECI.
+- SA -> NR primary NCI.
+
+Lookup requires MCC, MNC, TAC, and the complete ECI/NCI.
+
+PCI, band, channel, EARFCN, and NR-ARFCN are descriptive radio fields and are never substituted for Cell ID.
+
+NCOS remains authoritative for the observed serving identity and radio mode. OpenCellID enriches that identity with an estimated geographic position.
+
+## 11.5 GeoView presentation modes
+
+GeoView has two user-facing modes.
+
+### 11.5.1 Local Only
+
+`provider = none` is **Local Only** and remains the default.
+
+Local Only:
+
+- Performs no OpenCellID serving-location lookup.
+- Does not load the Google geographic map.
+- Keeps local Cellular Analysis and the selected-scope serving-cell inventory functional.
+- Hides cached geographic enrichment without deleting the cache.
+
+### 11.5.2 Geolocation Services
+
+`provider = opencellid` is **Geolocation Services**.
+
+The final v1.1.3 service roles are separate:
+
+- **OpenCellID** -> Estimated Serving Cell Location lookup and optional contribution.
+- **Google Geocoding API** -> Site Address forward geocoding only.
+- **Google Maps JavaScript API** -> browser-side interactive map only.
+
+When the Maps JavaScript key is available, the browser map renders the configured Site plus already-resolved serving-cell markers.
+
+The compact marker popup emphasizes:
+
+- Stable A/B/C label and carrier.
+- Primary role and band.
+- **Estimated Serving Cell Location**.
+- Distance in miles and compass direction from the configured Site.
+- Retained test usage count.
+
+Detailed PLMN/TAC/PCI/Cell ID/RF history remains in the lower Cellular Analysis workspace.
+
+The right-side Estimated Serving Cell Location panel shows carrier/label, primary role/band, coordinates, Copy, and Site distance in miles and direction.
+
+Provider metadata such as OpenCellID range/sample/changeable values is not repeated in the operator-focused presentation.
+
+## 11.6 GeoView configuration, Site Location, and persistence
+
+`cellular_geo.py` owns the schema-v2 non-secret GeoView configuration.
+
+GeoView is persisted as the `geoview` section inside the canonical v1.1.2 configuration documents (`speedtest_analyzer_device` / `speedtest_analyzer_group`).
+
+The old standalone `geoview_settings` key is migration input only.
+
+Current normalized fields include:
+
+    {
+      "schema_version": 2,
+      "configured": false,
+      "provider": "none",
+      "contribution_enabled": false,
+      "active_location_source": "device_gps",
+      "locations": {
+        "device_gps": {
+          "latitude": null,
+          "longitude": null
+        },
+        "manual_coordinates": {
+          "latitude": null,
+          "longitude": null
+        },
+        "site_address": {
+          "address": "",
+          "latitude": null,
+          "longitude": null
+        }
+      }
+    }
+
+Supported mode values are:
+
+- `none` — Local Only
+- `opencellid` — Geolocation Services
+
+The three Site Location methods are stored independently:
+
+- `device_gps` — last explicitly saved valid Device GPS coordinates.
+- `manual_coordinates` — fixed user-entered latitude/longitude.
+- `site_address` — literal address plus coordinates derived by Google forward geocoding when saved.
+
+Site Address geocoding occurs on Save/Apply using the private Google Server API key. It does not run on every page load.
+
+Device GPS remains explicit/on-demand. NCOS `0.0, 0.0`, no-lock, or invalid coordinate states are not accepted as a usable current fix.
+
+Protected provider credentials are not stored in canonical GeoView configuration.
+
+## 11.7 GeoView HTTP API
+
+The current v1.1.3 UI uses:
+
+| Method / Path | Purpose |
+|---|---|
+| `GET /api/cellular_analysis` | Returns interface/history-scoped Cellular Analysis plus the matching GeoView presentation inventory and cached enrichment. Never initiates a serving-location lookup. |
+| `GET /api/geo_settings` | Returns normalized effective GeoView settings. |
+| `POST /api/geo_settings` | Validates and persists GeoView settings and performs Site Address forward geocoding when required. |
+| `GET /api/geo_gps` | Performs one explicit NCOS GPS-status request. |
+| `GET /api/geo/status` | Returns metadata-only OpenCellID resolve-job state/counts. |
+| `POST /api/geo/resolve` | Starts or reuses the single bounded OpenCellID resolution job. |
+| `GET /api/geo/creds/status` | Returns metadata-only protected-credential status. |
+| `POST /api/geo/creds/record/update` | Write-only update of a server or browser-key certmgmt record. |
+| `POST /api/geo/creds/record/clear` | Clears one protected field or record. |
+| `POST /api/geo/creds/reset` | Clears all three credentials, disables contribution, switches to Local Only, and preserves Site Location/history/cache. |
+| `GET /api/geo/mapjs[?iface=<interface>&history=<scope>]` | Returns only the browser-restricted Maps JavaScript key plus Site/cached serving-cell marker data. When presentation parameters are supplied, markers are filtered to that Interface and History Range. |
+| `POST /api/geo/contribute` | Manual OpenCellID contribution for a validated Manual Site Location. |
+
+`GET /api/geo/mapjs` never returns the Google Server key or OpenCellID key and never initiates serving-cell resolution. The live Cellular Analysis frontend supplies the selected Interface and History Range. A request without those parameters retains site-wide inventory behavior for compatibility.
+
+## 11.8 Credential, cache, contribution, and export boundaries
+
+### Protected credentials
+
+`geo_secrets.py` splits credentials across two stable NCOS certmgmt records:
+
+- `speedtest_analyzer_geo_server`
+  - `api_key` -> private Google Server API key for Site Address geocoding.
+  - `opencellid_key` -> OpenCellID lookup/contribution key.
+
+- `speedtest_analyzer_geo_mapjs`
+  - `maps_js_api_key` -> browser-restricted Google Maps JavaScript key.
+
+NCOS stores the certmgmt `key` field encrypted at rest and `cp.decrypt()` recovers the bundle on-router only when needed.
+
+Server/OpenCellID keys are never returned to the browser.
+
+The separate browser Maps JavaScript key is intentionally returned only by `/api/geo/mapjs` when rendering the map.
+
+### OpenCellID lookup cache
+
+`geo_cache.py` persists safe results in:
+
+    tmp/geoview_cell_cache.json
+
+Default TTLs:
+
+- Resolved location: 30 days.
+- `not_found`: 6 hours.
+
+Authentication, quota, timeout, no-Internet, and provider errors are not persisted as reusable locations.
+
+Reset Credentials intentionally preserves this cache.
+
+### OpenCellID contribution
+
+Contribution is `false` by default.
+
+`geo_contributions.py` sends where the router observed an eligible primary serving cell. It never submits the provider-estimated serving-cell coordinates.
+
+Eligibility is restricted to Internal/Captive cellular observations with complete LTE-primary, NSA-anchor, or SA-NR-primary identity.
+
+With Device GPS, the completed-test hook can submit automatically after an eligible completed cellular test when the required conditions are met.
+
+With Manual Site Location, `/api/geo/contribute` scans retained history and submits the most recent eligible observation for each unique primary serving cell using the current validated manual Site coordinates.
+
+The persistent ledger:
+
+    tmp/geoview_contribution_ledger.json
+
+stores identity plus last successful latitude/longitude/timestamp.
+
+The same identity within 20 meters is skipped. Movement of 20 meters or more makes it eligible again. A different identity is eligible immediately.
+
+### Static report/export
+
+The live Google Maps DOM is never copied into the standalone report.
+
+Export replaces it with a deterministic self-contained SVG showing Site and resolved serving-cell locations, relative vectors, carrier-aware labels, scale, and location details.
+
+Google Maps runtime CSS referencing external Google assets is excluded from the exported CSS.
+
+The integrity validator remains strict. The report contains no provider credential and requires no Google Maps runtime asset or network access.
+
 # 12. Error Handling Principles
 
 The application is designed to fail safely rather than silently return misleading results.
@@ -1354,6 +1747,7 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
+| **1.1.x — Cellular Analysis, GeoView, configuration, and measurement telemetry** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, scope-aware GeoView presentation with Local Only and Geolocation Services modes, site-wide OpenCellID resolution/cache/contribution workflows, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, the two-key NCM Group / Device configuration model introduced in v1.1.2, and v1.1.3 iPerf3 TCP RTT, retransmission, Jitter, and compact interval telemetry. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1367,6 +1761,277 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.1.3
+
+Completed the geographic GeoView feature on top of the v1.1.2 configuration foundation. v1.1.3 resolves **cellular serving infrastructure** through OpenCellID and keeps router/Site location as an independent reference point. See [Section 19](#19-geoview-geolocation-services-and-opencellid-contributions-113).
+
+- Added **Local Only** (`provider=none`) and **Geolocation Services** (`provider=opencellid`) modes.
+- Added OpenCellID `/cell/get` serving-location resolution for eligible primary serving identities.
+- Locked the primary identity model: LTE -> LTE primary ECI; NSA -> LTE anchor ECI; SA -> NR primary NCI.
+- Split GeoView secrets into `speedtest_analyzer_geo_server` and `speedtest_analyzer_geo_mapjs`.
+- Added Site Address forward geocoding using Google Geocoding.
+- Added the interactive Google Maps JavaScript GeoView with Site plus cached/resolved serving-cell markers, carrier-aware labels, distance and direction in miles, and operator-focused popups.
+- Unified Cellular Analysis presentation around the selected Interface and History Range so Cellular Overview, Serving Cell Summary, Local Only/geographic GeoView, selected-cell detail, and standalone reporting consume the same retained-test scope.
+- Finalized the Serving Cell Summary presentation with Distribution and 2x2 Change Activity panels above a full-width timeline.
+- Added responsive containment for Serving Cell rows, Active Traffic bars, timeline segment labels, and standalone-report presentation.
+- Corrected 5G SA timeline identity resolution so NR primary observations remain mapped to the normalized serving-cell identity when equivalent retained telemetry contains different PLMN completeness.
+- Added persistent OpenCellID cache `tmp/geoview_cell_cache.json` with 30-day resolved and 6-hour `not_found` defaults.
+- Added `geo_contributions.py` and optional OpenCellID observation contribution, Off by default.
+- Added Device-GPS automatic contribution after eligible completed cellular tests and Manual Site Location contribution from retained history.
+- Added persistent 20-meter same-cell dedupe in `tmp/geoview_contribution_ledger.json`.
+- Restricted contribution to Internal/Captive cellular observations and primary serving identity only.
+- Added **Reset Credentials** while preserving Site Location, history, and cached serving-cell locations.
+- Hardened standalone Cellular Analysis export by replacing the live Google map with an inline SVG and excluding Google Maps runtime resources.
+- Live E400 validation confirmed multi-cell geographic rendering and OpenCellID contribution, including `2 submitted · 0 duplicates skipped`.
+- Preserved v1.1.2 configuration inheritance/migration behavior and non-GeoView Speedtest functionality.
+- Added automatic iPerf3 TCP RTT reporting from the device-side Uplink sender, including average, minimum, and maximum smoothed RTT.
+- Added device-side Uplink TCP retransmission reporting and retained remote Downlink sender retransmissions inside the compact engineering telemetry block.
+- Added compact per-interval iPerf3 telemetry for future correlation, including throughput, RTT, RTT variation, retransmissions, congestion window, and send-window observations.
+- Added an optional one-shot jitter measurement after successful TCP throughput using the same selected server, successful port, source IP, and bind device.
+- Kept the supplemental jitter phase outside the existing TCP listener retry/failover budget and non-fatal to the already-completed TCP test.
+- Added pre-measurement and post-measurement WAN-path validation so a path change causes supplemental Jitter to be skipped or discarded without invalidating the completed TCP test.
+- Added engine-aware Manual and Scheduled controls: **Jitter** for iPerf3 and **Latency/Jitter** for Netperf.
+- Updated iPerf3 live results to identify loaded RTT as **TCP RTT**, History to show average/minimum/maximum TCP RTT and retransmissions, and CSV to populate `Latency_ms`, `Jitter_ms`, and `TCP_Retransmissions`.
+- Validated Manual iPerf3 operation with Jitter disabled and enabled on Ethernet and cellular WANs, Scheduled iPerf3 Jitter execution, History persistence, compact hidden telemetry, and CSV export.
+
+## v1.1.2
+
+### Two-layer configuration management
+
+- Introduced the two canonical SDK appdata documents `speedtest_analyzer_group` (read/validated only; never written locally) and `speedtest_analyzer_device` (the only canonical key the app writes/deletes), replacing the fragmented per-feature keys as the source of truth. See [Section 18](#18-two-layer-configuration-management-112).
+- Effective configuration is a whole-section merge `DEVICE > GROUP > DEFAULT` resolved by section-key presence, including authoritative falsey values (`[]`, `{}`, `false`, `""`).
+- Documents are section-sparse with independent `group_revision` / `device_revision`; management state is derived from key presence rather than stored metadata.
+- Added exact-name appdata matching, read-back verified Device writes, and normalized no-op detection (identical proposed body → zero writes, no revision increment, no hot reload).
+- Migrated GeoView persistence from the standalone `geoview_settings` key into the canonical `geoview` section, delegating schema-2 validation to `cellular_geo.py` and stripping runtime GPS coordinates before persistence.
+- Fragmented legacy keys and the abandoned experimental `speedtest_analyzer` single key are migration inputs only; conversion builds a schema-1 Device document and never modifies the source keys.
+- Added a Settings page exposing derived configuration state, per-section effective sources, Device Overrides, Migrate to NCM Group, Update NCM Group Configuration, Reset, and a separate Factory Reset. Factory Reset never touches `speedtest_analyzer_group`.
+
+### Reset dependency validation
+
+- Section reset now validates the proposed effective configuration before persisting. When resetting one section alone would create an incompatible configuration (iPerf3 schedule server family versus effective server mode), the backend returns `dependency_reset_required` with `required_reset_sections`, a human-readable reason, and `reset_target`, and writes nothing.
+- Added confirmed atomic coupled reset: removing the coupled overrides in one transaction (one `device_revision` increment or a single Device-key delete), one hot reload, Group untouched, with the final effective configuration re-validated before write.
+- Fixed reset success wording to use the backend-derived `reset_target` so the message names the true destination (NCM Group versus Built-in Default). Reset All validates the final `GROUP + DEFAULT` effective configuration before deleting the Device key.
+
+### Update NCM Group Configuration
+
+- Added promotion of selected current Device overrides into an existing NCM Group standard, offered only in the `group_with_device_overrides` state and distinct from the pure Device-to-Group migration.
+- The candidate is a deep copy of the current Group document with only the selected sections replaced/added, `group_revision = current + 1`; unrelated Group sections and unselected overrides are preserved. Nothing is written locally.
+- Dependency validation runs against the proposed revised Group; GeoView promotes the Device-GPS policy with runtime coordinates stripped and blocks non-promotable manual/site sources.
+- Added a `(group_revision, device_revision)` reconciliation token that aborts validate and cleanup if either layer changes mid-workflow, with a distinct `reconcile_aborted` result that requires restarting the workflow.
+- After the revised Group validates on the device, only the promoted sections are trimmed from the Device document; an emptied Device document is deleted. A cleanup failure leaves the Group intact, keeps Device precedence, and returns `cleanup_incomplete` with a Retry option.
+
+### Scheduler enabled / autostart / running model
+
+- Separated persisted `enabled` and `autostart` (independent fields) from a runtime-only `running` state the scheduler thread checks. See [Section 10.5.1](#1051-persisted-enabled--autostart-versus-runtime-running).
+- Startup computes `running = enabled AND autostart`; an explicit interactive Save computes `running = enabled`. Persisted `enabled` is never coerced to `false` at startup, so an enabled-but-not-autostart schedule survives a restart as enabled while not running.
+- An explicit unchanged Save after a restart starts the runtime schedule even when persistence is a no-op, without forcing a write or a `device_revision` increment. This runtime-apply behavior is schedule-specific and does not change global no-op semantics.
+- `GET /api/schedule` now returns `running` alongside `enabled`/`autostart`, and the Scheduled Tests status distinguishes Active, Enabled — Not Running, and Disabled.
+
+### Device Overrides presentation
+
+- Reworked the Settings Device Overrides cards to be left-aligned and responsive with the reset action beside each override title, wrapping cleanly at narrow widths without clipping or horizontal overflow.
+
+### Validation
+
+- Added permanent off-router regression coverage in `test_configuration_manager.py` for the reset dependency cases and wording, the Update NCM Group candidate/preserve/promote/trim/token/GeoView/dependency/button-visibility behavior, and the scheduler `enabled`/`autostart`/`running` combinations, alongside an appdata write/delete audit confirming zero lifetime writes to the Group, experimental, and legacy keys.
+- Validated end-to-end on a real E400 across User and Public server modes and Group- and Device-managed states, including the reset dependency modal, the full Update NCM Group wizard (Device key removed after Group validation), and the enabled/autostart/running behavior across fresh application startups.
+
+## v1.1.1
+
+### Cellular Analysis report export architecture
+
+- Added **Export HTML Report** directly beside **Refresh Data** in the Cellular Analysis scope controls.
+- Report generation is browser-side. NCOS does not create, retain, or manage report files and does not generate PDF documents.
+- The exported artifact is a self-contained HTML document intended for local viewing, sharing, archival use, and browser-based **Print / Save as PDF**.
+- PDF print styling targets **US Letter landscape** while still allowing the browser print dialog to control the final output settings.
+- Report scope is frozen when export begins so the selected cellular interface, history range, generated timestamp, device label, application version, and theme remain internally consistent throughout report construction.
+- Cellular Analysis scope controls and Refresh are temporarily disabled while the report is generated to prevent a live-page refresh or scope change from racing the export.
+- The top-level Cellular Analysis API response is deep-copied at export start so overview, timeline, change activity, and report metadata come from one consistent analysis snapshot.
+- All identifiable serving cells in the selected analysis scope are loaded sequentially and rendered into the artifact. An individual serving-cell detail failure does not discard the remainder of the report.
+- Unknown serving-cell observations remain represented in overview, distribution, and timeline data but do not generate fabricated serving-cell identity detail sections.
+- In-test handoff observations are materialized as a static engineering table containing timestamp, test phase, phase offset, and from/to serving-cell information when available.
+- Interactive Cellular Analysis controls, configuration UI, JavaScript behavior, live tooltip bindings, and other browser-only controls are removed from the exported artifact.
+- Network Mode and Technology Usage donut visualizations are converted from CSS-gradient rendering to embedded SVG for consistent standalone HTML and Chromium PDF output.
+- Application CSS and required Font Awesome Solid, Regular, and Brands fonts are embedded directly into the report. The finished artifact does not depend on router-hosted stylesheets or font files.
+- A final offline-integrity validation rejects report generation if executable script content, unresolved stylesheet/resource URLs, unresolved CSS resources, duplicate DOM IDs, unconverted report donuts, or interactive Cellular Analysis controls remain.
+- Report filenames include the selected interface and generation timestamp so repeated exports do not overwrite or ambiguously reuse the same filename.
+- Print-specific rendering uses deterministic light-paper colors and removes gradient/shadow effects that were found to rasterize inconsistently in Chromium PDF output.
+- Print pagination allows major analysis sections to flow naturally through available page space while avoiding unnecessary internal card splits. Subsequent serving-cell analysis blocks may begin on clean page boundaries.
+- Serving-cell identifiers, PLMN, TAC, PCI, bands, channels, RF measurements, carrier aggregation information, Site Location, and other analysis data already displayed by Cellular Analysis may be included in the artifact.
+- Credentials, authentication/session data, API keys, cookies, IMEI, ICCID, router serial numbers, and other hidden security-sensitive values are not intentionally exported.
+- PDF creation remains a client/browser responsibility: the recipient opens the standalone HTML and uses the browser's normal **Print → Save as PDF** workflow.
+
+### Site-wide GeoView inventory
+
+- Added **Site Cellular GeoView** above the lower interface/history-scoped Cellular Analysis workspace.
+- GeoView is intentionally site-wide and evaluates all retained cellular history across every cellular interface.
+- Added `build_site_cell_inventory(history)` to reuse the existing traffic-aware serving-cell model without modifying the public `build_cellular_analysis()` response contract used by the existing regression suite.
+- Plain Ethernet/non-cellular history is excluded.
+- Identifiable serving cells observed only during an in-test handoff remain represented.
+- The same normalized serving-cell identity observed through multiple cellular interfaces is aggregated into one GeoView cell with per-interface test counts.
+- Per-test serving-cell/interface counting is deduplicated so two-second telemetry sampling does not inflate the number of tests associated with a cell.
+- Matching final cellular data can supplement missing display metadata for the same cell but cannot create a different serving-cell identity.
+
+### Local observation schematic and carrier focus
+
+- Replaced the earlier GeoView placeholder with a lightweight provider-independent local observation schematic.
+- The schematic explicitly states that marker positions are **not geographic**.
+- Added balanced radial placement for multiple observed cells without adding a mapping library or interactive map runtime.
+- Added carrier-specific color accents for T-Mobile, Verizon, AT&T, and a theme-default fallback without embedding carrier logos or marks.
+- Added carrier focus controls with all observed carriers selected initially.
+- Deselecting a carrier dims its serving-cell markers and disables marker interaction.
+- The final selected carrier cannot be deselected.
+- Added compact serving-cell popups containing Cell ID, PLMN, TAC, PCI, role/band, carrier, and Observed Via interface/test counts.
+- Clicking the already-open serving-cell marker a second time closes its popup while retaining the explicit close control.
+
+### GeoView configuration
+
+- Added the **Configure GeoView** modal.
+- The first saved configuration changes the header action to the smaller gear-style **Configure** control.
+- Added Site Location choices for Device GPS, Manual Coordinates, and literal Site Address.
+- Site Address is descriptive text only and is not automatically geocoded.
+- Manual coordinate input is validated for valid latitude/longitude ranges.
+- **No Geo Provider** remains the enabled v1.1.1 provider mode.
+- Google and Unwired choices are displayed as **Research Pending** and remain disabled until their current APIs/service models are separately researched and validated.
+
+### Local settings persistence
+
+- Added `cellular_geo.py` as the provider-independent GeoView settings layer.
+- Added persistent NCOS SDK appdata key `geoview_settings`.
+- Moved GeoView configuration out of the replaceable application `tmp/` filesystem so saved Site Location settings can survive SDK package upgrades.
+- Advanced the GeoView settings model to schema version 2.
+- Device GPS, Manual Coordinates, and Site Address are retained independently.
+- Added `active_location_source` so one location method is authoritative without deleting the alternatives.
+- GPS lock, satellites, accuracy, and other current-fix state remain transient and are not persisted.
+- Appdata is written only after an explicit **Save GeoView** action; application defaults are not automatically seeded into NCOS configuration.
+- GeoView appdata writes are immediately read back, normalized, and verified before Save reports success.
+- Added in-memory normalization support for the earlier schema-v1 single-location model.
+- Missing, corrupt, or invalid appdata falls back to a safe default state.
+- GeoView configuration remains independent from the rolling Speedtest Analyzer test-history files.
+
+### GeoView API and GPS
+
+- Added `GET /api/geo_settings`.
+- Added `POST /api/geo_settings`.
+- Configure GeoView now explicitly reloads persisted settings from `/api/geo_settings` whenever the modal is opened.
+- Successful GeoView saves synchronize the frontend's complete schema-v2 settings state before the page is re-rendered.
+- Added explicit `GET /api/geo_gps`.
+- `/api/cellular_analysis` now attaches site-wide GeoView inventory at the HTTP layer while preserving lower Cellular Analysis interface/history scoping.
+- GPS is queried only when the user explicitly presses **Refresh GPS**.
+- No continuous GPS polling, GPS worker, or additional per-test GPS collection was introduced.
+- GPS query failure is nonfatal and does not affect speed testing or local Cellular Analysis.
+- Hardened Device GPS validity so a usable fix requires an active NCOS GPS lock plus valid numeric latitude/longitude.
+- Added explicit rejection of the NCOS `0.0, 0.0` no-fix sentinel.
+- A no-fix refresh or GPS query failure preserves previously saved valid Device GPS coordinates rather than replacing them with invalid coordinates.
+- The frontend distinguishes a current GPS fix from retained saved coordinates and no longer presents an unlocked `0.0, 0.0` response as **GPS Fix Available**.
+- Added shared `gps_fix_is_usable()` production validation in `cellular_geo.py` so the HTTP API and regression suite enforce the same GPS validity rule.
+
+### Provider and security boundary
+
+- No external Geo Provider calls are implemented in v1.1.1.
+- No provider API keys, credentials, or secrets are stored.
+- No automatic address geocoding is performed.
+- No provider-derived serving-cell geographic estimates or static provider maps are rendered.
+- Local GeoView does not require ICCID, IMEI, APN, router serial number, or similar modem identity values.
+- Future provider integration must use an explicit minimum-data outbound allowlist and remain isolated from the local test/analysis path.
+
+### Development validation
+
+- Existing Cellular Analysis regression coverage remained green after the GeoView foundation was added.
+- Added dedicated provider-independent GeoView regression coverage for site inventory, multi-interface aggregation, handoff-only cells, Ethernet exclusion, settings defaults, literal Site Address, coordinate validation, and Device GPS fix validity.
+- Added real-device-derived GPS regression cases covering unlocked `0.0, 0.0`, unlocked nonzero coordinates, locked `0.0, 0.0`, and a locked valid coordinate pair.
+- Final v1.1.1 regression checkpoint after GPS and appdata-persistence hardening: **83 tests passing** — 70 core Cellular Analysis tests plus 13 GeoView/GPS tests.
+- Real Chromium validation confirmed schema-v2 modal rehydration, Site Address → Manual Coordinates → Device GPS active-source switching, preservation of inactive saved location methods, and immediate Site Context updates after Save.
+- Live E400 validation confirmed `geoview_settings` persists in NCOS SDK appdata across Speedtest Analyzer SDK package replacement and is subsequently reloaded into Configure GeoView with the saved active Site Location restored.
+- Complete inline JavaScript parses successfully with the macOS JavaScript engine.
+- The current frontend was rendered and exercised in Chromium with a multi-carrier fixture covering carrier focus, disabled markers, serving-cell popups, settings persistence, Device GPS state, and responsive layout.
+- Live E400 validation confirmed the no-fix protection requirement when NCOS returned GPS enabled/running with `lock: false` and `0.0, 0.0`.
+- Loading a new SDK application build clears the app's retained local test history, so device reloads remain deliberate validation events.
+
+## v1.1.0
+
+### Cellular Analysis
+
+- Added a new **Cellular Analysis** page focused on the question: **What cellular network resources has this device been using?**
+- Analysis is scoped by cellular interface and retained-history range. Ethernet and other non-cellular WAN results are excluded from Cellular Analysis.
+- Added serving-cell distribution using stable view labels such as A, B, and C while retaining the underlying Cell ID, PLMN, TAC, PCI, band, and channel where available.
+- Unknown serving-cell observations remain represented when identity telemetry is unavailable rather than being silently converted into a known cell.
+- Updated distribution semantics for traffic-aware history: **Tests Seen** may overlap when one test observes multiple cells, while **Active Traffic** is derived from mutually exclusive timed traffic intervals.
+- Added a chronological Serving Cell Timeline using real elapsed test timestamps and midpoint boundaries between sparse scheduled observations.
+- Added thin in-test handoff event markers to the long-term timeline. These markers identify a proven traffic-time transition without falsely implying that the temporary cell remained serving until the next scheduled test.
+- Added aggregate **Serving Cell Changes**, **Peak Config Changes**, **Bandwidth Changes**, and **Network Mode Changes**.
+- Serving Cell Changes distinguish in-test handoffs from between-test serving-cell changes and avoid double-counting when a test ends on the same cell where the next test begins.
+- Added selected-serving-cell RF summaries for RSRP, RSRQ, SINR, and retained Cellular Health observations.
+- Added **Technology Usage** and **Peak Observed Radio Configurations** as the consolidated radio-resource summary.
+
+### Traffic-aware serving-cell telemetry
+
+- Extended the existing two-second in-test carrier telemetry collector to retain serving-cell identity alongside carrier configuration without introducing a second continuous NCOS polling loop.
+- LTE and NSA observations use the LTE PCell / serving anchor Cell ID and PCI.
+- 5G Standalone observations prefer NR Cell ID and 5G PCI.
+- Traffic-phase serving-cell intervals are retained separately for Download and Upload.
+- Added per-test serving-cell summaries containing the traffic start cell, traffic end cell, unique cells observed, ordered handoffs, and total active-traffic time.
+- Missing/Unknown identity does not bridge two known observations into an invented serving-cell handoff.
+- Download-to-Upload boundary changes are preserved as boundary events because the exact transition second is not known.
+- Cells observed only during an in-test handoff remain eligible for Cellular Analysis distribution and selected-cell analysis.
+- The final post-test cellular snapshot supplements traffic-time observations rather than replacing them.
+
+### Post-test serving-cell stabilization
+
+- Added a conditional post-test stabilization window that runs only after traffic telemetry proves an identifiable serving-cell handoff.
+- The application captures the immediate final cellular state and performs additional modem observations at approximately **+2, +4, and +6 seconds**.
+- Post-test observations are stored separately from active-traffic telemetry and do not modify Peak Observed carrier configuration, RF conditions, bandwidth-change calculations, or throughput results.
+- Post-test state is classified as **persisted**, **reverted**, **continued handoff**, **unstable**, or **inconclusive**.
+- Stable tests incur no additional post-test polling delay.
+- History is still written once per completed test after the conditional stabilization workflow finishes.
+
+### Serving-cell-specific RF and radio configuration
+
+- Selected-cell analysis recognizes every identifiable traffic-active serving cell rather than only the final post-test cell.
+- Each selected cell uses the strongest matching Peak snapshot for that cell within each test, preferring the greatest usable carrier count and then total observed bandwidth.
+- NSA selected-cell primary RF is matched to the LTE serving anchor.
+- 5G SA selected-cell primary RF is matched to the NR PCell.
+- Legacy single-cell history retains compatible top-level RF and Cellular Health fallback behavior.
+- Multi-cell tests keep final Cellular Health associated only with the final identified cell to prevent cross-cell contamination.
+- Peak configuration supplementation may fill missing channel/PCI identity only when RAT, band, and bandwidth match unambiguously; it never adds carriers or changes the observed Peak configuration.
+- Active carriers reporting `0 MHz` remain excluded from usable Peak configuration totals.
+
+### History & Reports integration
+
+- Redesigned cellular test details into three responsive identity areas: **Connection Health**, **Network**, and **Serving Cell**.
+- Network details now present Carrier, Service Detail, Service Type, and APN in a compact fluid layout.
+- Serving Cell details now expose Cell ID, PLMN, TAC, and PCI separately from radio-resource information.
+- Added explicit Channel columns to the LTE and 5G NR radio summaries.
+- NSA 5G NR summary data prefers the active normalized NR SCell while retaining top-level NR compatibility fallbacks.
+- 5G SA primary NR summary prefers the normalized NR PCell, while a secondary NR summary uses an available NR SCell.
+- Radio generation is determined from the normalized reported band rather than assuming every `_5G_` NCOS diagnostic field represents NR.
+- Added transition-only **Serving Cell Activity** presentation with Start, chronological in-test handoffs, End, and compact post-test stabilization status.
+- Stable tests do not display an unnecessary Serving Cell Activity section.
+
+### CSV and reporting
+
+- Added normalized primary **Cell ID**, **PLMN**, **TAC**, and **PCI** columns.
+- Added LTE Channel and 5G NR Channel fields.
+- Added a single combined **Serving Cell Activity** field containing the chronological transition narrative instead of expanding handoff state across many CSV columns.
+- Stable tests leave the Serving Cell Activity field blank.
+- Serving Cell Activity intentionally omits band, bandwidth, and channel details already represented elsewhere in the report.
+
+### History persistence
+
+- Replaced direct in-place history writes with temporary-file creation, flush/fsync, validation, and atomic promotion.
+- Added one last-known-good local history backup and recovery from valid temporary or backup history files.
+- Added protection against replacing a valid backup with a corrupt primary history file.
+- Added corrupt-primary quarantine behavior.
+- Added a history transaction lock around add, delete, clear, and recovery operations.
+- Clear History intentionally removes primary, backup, temporary, and quarantined recovery files before creating a new empty history.
+- The existing rolling 100-result retention behavior remains unchanged.
+
+### Compatibility and telemetry boundaries
+
+- Peak Observed remains the most complete valid component-carrier configuration observed during active test traffic.
+- Secondary-carrier telemetry is treated as active/downlink observation only; the application does not infer unsupported uplink carrier aggregation.
+- Cellular Analysis uses retained local test history and does not require a new continuous polling service.
 
 ## v1.0.2
 
@@ -1662,3 +2327,613 @@ The following releases were internal development builds that preceded the Speedt
 The compatibility information in this README reflects testing performed against the specific firmware versions listed near the top of this document.
 
 A later NCOS release may change native routing, Netperf, WAN, modem-diagnostic, or SDK behavior. When deploying to a different firmware version or device family, validate the required test engines manually before relying on scheduled results.
+
+---
+
+# 18. Two-Layer Configuration Management (1.1.2)
+
+Speedtest Analyzer `1.1.2` manages normal configuration with two canonical SDK appdata
+documents and a section-level merge. This section describes how the two documents combine,
+how configuration is read and written, and the reset, Update NCM Group, and migration
+behaviors built on top of them.
+
+## 18.1 Canonical documents
+
+There are exactly two canonical configuration keys:
+
+- `speedtest_analyzer_group` — the NCM Group standard. **Read and validated only.** The
+  application never writes or deletes this key during normal operation; it normally arrives
+  through NCM Group SDK/Application Data delivery.
+- `speedtest_analyzer_device` — locally managed Device configuration and Device overrides.
+  This is the only canonical key the application itself writes or deletes.
+
+Each document is schema-versioned and **section-sparse** — a section is present only when
+its key exists in the document. Both carry **independent** revisions:
+
+    {
+      "schema_version": 1,
+      "document_type": "device",          // or "group"
+      "device_revision": 4,               // or "group_revision"
+      "config": {
+        "schedule": { ... },              // only sections that are configured
+        "iperf3_server_settings": { ... }
+      }
+    }
+
+The supported sections are `schedule`, `outputs`, `iperf3_server_settings`,
+`iperf3_user_servers`, `netperf_servers`, and `geoview`.
+
+Management state is **derived from which keys exist**, never stored in JSON. There is no
+`management.origin`, no `management.mode`, and no single `config_revision`.
+
+## 18.2 Effective configuration: DEVICE > GROUP > DEFAULT
+
+The effective configuration held in RAM is a whole-section merge with precedence
+`DEVICE > GROUP > DEFAULT`:
+
+- A section comes from the Device document when its **key exists** there.
+- Otherwise from the Group document when its **key exists** there.
+- Otherwise from the built-in defaults.
+
+Section ownership is decided by **key presence, not truthiness**. A falsey value such as
+`[]`, `{}`, `false`, or `""` in a higher layer is authoritative and still overrides the
+layer below. The merge is section-atomic; sections are never deep-merged field-by-field.
+
+Derived management states: `unconfigured` (neither key), `device` (Device only),
+`group` (Group only), `group_with_device_overrides` (both), plus `upgrade_required`,
+`unsupported_schema`, and `error` for migration/schema/corruption handling.
+
+## 18.3 App Data access rules
+
+- **Exact-name matching.** The canonical loader inspects the full appdata entry list and
+  accepts an entry only when `entry['name']` matches exactly. This avoids the loose/substring
+  matching that would otherwise confuse `speedtest_analyzer`, `speedtest_analyzer_group`, and
+  `speedtest_analyzer_device`.
+- **Read-back verified writes.** A Device write serializes the document, writes it, re-reads
+  it by exact name, and verifies `document_type`, schema, and the expected revision before the
+  operation is reported successful. A failed read-back fails closed and does not update
+  effective RAM.
+- **No defaults on startup.** The app never writes defaults to appdata merely because it
+  started; doing so would override NCM Group inheritance.
+
+## 18.4 No-op persistence semantics
+
+An ordinary Device save compares the proposed persistent `device.config` body against the
+currently persisted body (normalized). If identical, the save is a **no-op**: zero writes,
+no `device_revision` increment, no key create/delete, and no hot reload. Runtime-only values
+(for example a fresh device-GPS fix, which is stripped before persistence) therefore never
+count as a configuration change. The schedule save path layers an explicit runtime-apply on
+top of this (see [Section 10.5.1](#1051-persisted-enabled--autostart-versus-runtime-running)).
+
+## 18.5 Validation before persistence — reset dependency handling
+
+Before any reset persists, the manager builds the **proposed** Device document, recomputes the
+**proposed** effective configuration (`DEVICE > GROUP > DEFAULT`), and runs dependency
+validation. It persists only if the proposed effective configuration is internally consistent.
+
+The one dependency enforced in `1.1.2` is the iPerf3 scheduled-test coupling: a configured
+iPerf3 schedule records `params.server_source` (`public` or `user`), and the effective
+`iperf3_server_settings.server_mode` must use the same server family. Netperf and non-iPerf3
+schedules have no such coupling and are never affected.
+
+When resetting one section alone would produce an inconsistent effective configuration
+(the confirmed E400 defect: reset the Device schedule override while the Device still forces
+a different server mode), the reset does **not** persist. The backend returns:
+
+    status = dependency_reset_required
+    requested_section = schedule
+    required_reset_sections = [schedule, iperf3_server_settings]
+    reason = <human-readable dependency>
+    reset_target = group | default
+
+The UI presents a themed confirmation. On confirm, the caller re-invokes the reset with the
+full `required_reset_sections` set, and the manager removes all coupled overrides in **one
+atomic transaction** — one `device_revision` increment (or a single Device-key delete when the
+document is emptied), one hot reload, Group untouched. The final effective configuration is
+validated again before the write. "Reset All Device Overrides" likewise validates the final
+`GROUP + DEFAULT` effective configuration before deleting the Device key.
+
+`reset_target` (`group` when the section also exists in the Group layer, else `default`) is
+backend-derived so the success message names the true destination — "reset to the NCM Group
+configuration" versus "reset to the Built-in Default" — rather than always claiming Group.
+
+## 18.6 Update NCM Group Configuration
+
+"Update NCM Group Configuration" promotes selected current Device overrides into an
+**existing** Group standard. It is offered only in the `group_with_device_overrides` state; it
+never reappears as "Migrate to NCM Group" (the pure Device-to-Group first migration).
+
+The candidate is built from a **deep copy of the current** `speedtest_analyzer_group` document.
+Only the selected Device sections replace/add into that copy; unselected sections and unrelated
+Group sections are left exactly as-is. Built-in defaults are never copied into the Group. The
+candidate's `group_revision` is `current + 1`. Nothing is written locally — the administrator
+updates the Group value in NCM.
+
+- **Dependency validation runs against the proposed revised Group.** For example, a promoted
+  iPerf3 schedule that references a User server requires the revised Group's effective server
+  mode to be User with a non-empty user-server list (already present in the Group, or also
+  promoted).
+- **GeoView safety.** A Device-GPS policy is promotable with runtime coordinates stripped;
+  manual-coordinate and site-address GeoView are device-specific and are not promotable.
+- **Reconciliation token.** The candidate captures `(group_revision, device_revision)`. If
+  either changes during the staged workflow, validate and cleanup abort with a distinct
+  `reconcile_aborted` status; the UI discards the staged candidate, refreshes authoritative
+  state, and requires restarting the workflow. Stale admin work is never auto-merged.
+- **Validate then trim.** After the revised Group is validated present on the device (exact
+  key, `document_type=group`, schema, expected `group_revision`), only the promoted sections
+  are removed from the Device document. If the Device document is emptied, the Device key is
+  deleted. If cleanup fails, the Group is left intact, Device still wins by precedence, and the
+  workflow returns `cleanup_incomplete` with a Retry option.
+
+Validation proves the payload is present on the device; it does not claim NCM provenance
+(a value could in principle be authored at Device scope). The wording is deliberately
+"validated on device," not "NCM Group provenance verified."
+
+## 18.7 Migration inputs and legacy conversion
+
+The abandoned experimental single key `speedtest_analyzer` and the fragmented legacy keys
+(`speedtest_schedule`, `iperf_server_settings`, `iperf3_servers`, `netperf_servers`,
+`speedtest_outputs`, `geoview_settings`) are **migration inputs only**. When no canonical key
+exists but a valid migration source does, the derived state is `upgrade_required` and ordinary
+configuration mutation is blocked until the user converts. Conversion reads the source, builds a
+schema-1 Device document (`device_revision = 1`), read-back verifies it, and unblocks editing.
+Migration sources are never modified or deleted.
+
+## 18.8 Factory Reset and GeoView boundary
+
+Factory Reset removes Speedtest Analyzer-owned local state (the Device key, the experimental
+key, legacy keys, runtime/results/stats keys, and local history files) and **never** touches
+`speedtest_analyzer_group`. When a Group is present, the Group configuration becomes effective
+again after local data is cleared.
+
+GeoView is persisted as the `geoview` section inside the canonical documents. Runtime device-GPS
+coordinates are stripped before persistence and before Group promotion, so canonical
+configuration never carries one device's live fix.
+
+---
+
+# 19. GeoView Geolocation Services and OpenCellID Contributions (1.1.3)
+
+Release `1.1.3` completes the geographic GeoView feature.
+
+The architectural distinction is fundamental:
+
+- **Site location** is the router/site reference point supplied by Device GPS, Site Address geocoding, or Manual Coordinates.
+- **Estimated Serving Cell Location** is the geographic enrichment of the cellular serving identity observed by NCOS.
+
+The feature estimates serving-cell locations. It does not use the cellular network to estimate where the router is located.
+
+## 19.1 Final service responsibilities
+
+| Service | v1.1.3 responsibility |
+|---|---|
+| OpenCellID `/cell/get` | Estimate the geographic location of an eligible primary serving cell. |
+| OpenCellID `/measure/add` | Optional contribution of where an eligible serving cell was observed. |
+| Google Geocoding API | Forward-geocode a manually entered Site Address on Save. |
+| Google Maps JavaScript API | Render the interactive browser map. |
+
+The final UI exposes **Local Only** and **Geolocation Services**, not a menu of interchangeable cellular-location providers.
+
+## 19.2 Serving identity and OpenCellID lookup
+
+NCOS observation is authoritative.
+
+Provider data enriches the observed identity with coordinates; it does not redefine PLMN, TAC, Cell ID, or RAT.
+
+| Network mode | Identity resolved | OpenCellID radio |
+|---|---|---|
+| LTE Only | LTE primary MCC/MNC/TAC/ECI | `LTE` |
+| 5G NSA | LTE anchor MCC/MNC/TAC/ECI | `LTE` |
+| 5G SA | NR primary MCC/MNC/TAC/NCI | `NR` |
+
+The full ECI/NCI is required.
+
+PCI, band, channel, EARFCN, and NR-ARFCN are not unique geographic cell identities and are never substituted.
+
+Secondary/component carriers remain RF/configuration observations unless they independently carry a complete serving identity.
+
+OpenCellID response identity is validated against the requested MCC/MNC/TAC/cell ID.
+
+Provider-returned range/sample/changeable metadata is not interpreted as Site distance or a location-accuracy radius.
+
+## 19.3 Protected credential architecture
+
+`geo_secrets.py` is the only module permitted to access:
+
+    config/certmgmt/certs
+
+or call:
+
+    cp.decrypt()
+
+Two stable app-owned records separate server credentials from the browser key:
+
+    speedtest_analyzer_geo_server
+      schema_version: 1
+      api_key:          Google Server API key
+      opencellid_key:   OpenCellID lookup/contribution key
+
+    speedtest_analyzer_geo_mapjs
+      schema_version: 1
+      maps_js_api_key:  Google Maps JavaScript browser key
+
+NCOS stores the certmgmt `key` field encrypted at rest.
+
+Security rules:
+
+- Google Server and OpenCellID keys never leave the router through normal API responses.
+- Credential-status APIs return metadata/presence only.
+- Credential forms are write-only.
+- The browser Maps JavaScript key is intentionally separate and returned only through `/api/geo/mapjs`.
+- Credentials are never stored in canonical App Data, test history, GeoView cache, contribution ledger, reports, or exports.
+- Credentials remain Device-scoped in v1.1.3.
+
+The historical `speedtest_analyzer_geo_google` record is migration input only.
+
+## 19.4 Site Location
+
+GeoView stores three Site Location methods independently:
+
+- Device GPS.
+- Manual Coordinates.
+- Site Address plus derived coordinates.
+
+Device GPS must have a valid lock and nonzero coordinate pair.
+
+Site Address is forward-geocoded on Save/Apply through Google Geocoding using the private Google Server key.
+
+The resulting Site coordinates are stored with the address.
+
+The configured Site is used as the reference point for:
+
+- Map placement.
+- Site-to-cell distance/bearing.
+- Static SVG export.
+- Contribution position when Manual Site Location is active.
+
+## 19.5 Resolution job and persistent cache
+
+`POST /api/geo/resolve` is the explicit cellular serving-location resolution trigger.
+
+Resolution flow:
+
+1. Build the site-wide retained serving-cell inventory locally.
+2. Normalize and validate each primary identity.
+3. Check `tmp/geoview_cell_cache.json`.
+4. Call OpenCellID `/cell/get` only on an eligible cache miss.
+5. Validate and normalize the response.
+6. Persist only safe resolved or `not_found` outcomes.
+7. Aggregate metadata-only status/counts.
+
+The site-wide inventory in this resolution workflow is intentional. Resolution and cache population are independent from the Interface and History Range currently selected in Cellular Analysis. Presentation later filters cached results to the selected analysis scope.
+
+Only one resolution job runs at a time.
+
+Default cache policy:
+
+- Resolved location — 30 days.
+- `not_found` — 6 hours.
+- Auth/quota/timeout/no-Internet/provider-error — not persisted as reusable locations.
+
+The cache is atomic, schema-guarded, and contains no credentials.
+
+`GET /api/cellular_analysis` and `/api/geo/mapjs` may read cached enrichment but never initiate serving-cell lookup. Their presentation payloads use the requested Cellular Analysis scope while the underlying cache remains available site-wide.
+
+## 19.6 Interactive map
+
+The live geographic map is browser-side Google Maps JavaScript.
+
+`GET /api/geo/mapjs` returns only:
+
+- The separate browser-restricted Maps JavaScript key.
+
+- Browser-safe Site and cached/resolved A/B/C marker data.
+
+The live frontend requests this endpoint with the selected Cellular Analysis `iface` and `history` values. The endpoint rebuilds the presentation inventory using those parameters and joins only that inventory to already-cached enrichment. It does not trigger OpenCellID resolution.
+
+A request without presentation parameters retains site-wide inventory behavior for compatibility.
+
+The interactive map presents Site-to-cell distance in miles and compass direction from the configured Site.
+
+It does not return the Google Server key, OpenCellID key, or decrypted cert bundle.
+
+Map behavior includes:
+
+- Site and serving-cell markers.
+- Carrier-aware colors.
+- Site-to-cell relationship lines.
+- Reset View.
+- Google pan/zoom/fullscreen controls.
+- Marker popup toggle.
+- Compact role/band, estimated-location, distance in miles and direction, and test-usage presentation.
+
+Site-to-cell distance/bearing is calculated from the configured Site coordinates and OpenCellID estimated serving-cell coordinates.
+
+OpenCellID `range` is not used as that distance and is not treated as positional accuracy.
+
+## 19.7 OpenCellID observation contribution
+
+Contribution is independent from lookup and is Off by default:
+
+    contribution_enabled = false
+
+The submitted position is **where the router observed the serving cell**, not the provider-estimated serving-cell location.
+
+Eligibility:
+
+- Internal or captive cellular WAN only.
+- LTE primary, NSA LTE anchor, or SA NR primary identity only.
+- Complete identity required.
+- No Ethernet, Wi-Fi, Satellite, external/generic modem, or SCell-only submission.
+
+### Device GPS automatic contribution
+
+After a completed eligible cellular test, contribution can run automatically only when:
+
+- Geolocation Services is active.
+- Contribution is enabled.
+- Device GPS is the active Site Location source.
+- NCOS reports a usable current GPS fix.
+- The OpenCellID key is configured.
+- The test WAN is authoritatively classified as cellular.
+
+The hook is best-effort and never changes the result of the speed test.
+
+### Manual Site Location contribution
+
+With Site Address or Manual Coordinates active, **Contribute Observations** is available when contribution is enabled.
+
+The handler scans retained history, hard-filters eligible Internal/Captive observations, and submits the most recent observation for each unique primary serving identity using the current validated manual Site coordinates.
+
+### Persistent dedupe ledger
+
+The ledger is:
+
+    tmp/geoview_contribution_ledger.json
+
+It stores no credentials.
+
+Rules:
+
+- Same identity less than 20 meters from the last successful position -> skip.
+- Same identity 20 meters or more away -> eligible again.
+- Different identity -> immediately eligible.
+- Ledger update occurs only after OpenCellID acknowledges successful insertion.
+
+## 19.8 Reset Credentials and mode transition
+
+Reset Credentials:
+
+- Clears all three protected keys.
+- Sets `contribution_enabled=false`.
+- Sets `provider=none`.
+- Returns GeoView to Local Only.
+
+It preserves:
+
+- Site Location configuration.
+- Speedtest history.
+- `tmp/geoview_cell_cache.json`.
+
+Preserving the cache allows a later return to Geolocation Services to reuse valid OpenCellID locations.
+
+## 19.9 Standalone HTML/PDF export
+
+The standalone report never clones the live Google Maps runtime into the artifact.
+
+Export builds a deterministic inline SVG from frozen Site and resolved serving-cell data.
+
+The SVG includes:
+
+- Site marker.
+- A/B/C serving-cell markers.
+- Carrier colors.
+- Relative vectors.
+- Distance/direction labels.
+- Scale.
+- Location Summary.
+- Serving Cell Details.
+
+The report CSS collector excludes Google Maps-injected runtime styles referencing external Google assets.
+
+The integrity validator remains strict.
+
+No Google Maps runtime asset, provider credential, or credentialed provider URL is required by the saved HTML or PDF-ready report.
+
+## 19.10 Validation status
+
+Final v1.1.3 validation included:
+
+- Python compile checks for GeoView backend modules.
+- Browser JavaScript/runtime validation during iterative deployment.
+- E400 live application startup and HTTP validation on NCOS 7.26.60.
+- Encrypted certmgmt proof with masked at-rest reads and successful on-router `cp.decrypt()` recovery.
+- OpenCellID serving-location lookup.
+- Google Maps JavaScript rendering of Site plus multiple resolved serving-cell markers.
+- Correct Site-to-cell distance/bearing.
+- Local Only / Geolocation Services switching and cache reuse.
+- Credential status/update/remove/reset behavior.
+- Site Address geocoding and Manual Coordinates.
+- Standalone HTML export and browser Save-as-PDF rendering with Google runtime assets excluded.
+- OpenCellID manual contribution for one serving cell and later two unique serving cells.
+- Confirmed multi-cell contribution result: `2 submitted · 0 duplicates skipped`.
+- Contribution Opt Out and Manual Contribution button behavior.
+
+The E400 GPS subsystem was also observed in a legitimate **No Lock** state during validation. That NCOS state is handled safely and does not represent a GeoView code failure.
+
+# 20. iPerf3 TCP RTT, Jitter, and Compact Telemetry (1.1.3)
+
+v1.1.3 extends the existing iPerf3 execution path with additional measurement telemetry without redesigning the validated throughput engine.
+
+The existing TCP behavior remains authoritative for throughput:
+
+- The router is the iPerf3 client.
+- Downlink uses iPerf3 reverse mode (`-R`), so the remote server is the TCP payload sender.
+- Uplink uses normal client-send mode, so the router is the TCP payload sender.
+- Existing listener retry, Public backup-server behavior, shared port budgets, source routing, WAN guards, and cancellation remain unchanged.
+
+The additional telemetry is extracted from the JSON already returned by the bundled iPerf3 binary.
+
+## 20.1 TCP RTT measurement
+
+For Uplink, iPerf3 exposes TCP sender RTT through Linux `TCP_INFO`.
+
+Speedtest Analyzer converts the iPerf3 microsecond values to milliseconds and records:
+
+- `latency_ms` — average TCP RTT.
+- `latency_min_ms` — minimum sampled TCP RTT.
+- `latency_max_ms` — maximum sampled TCP RTT.
+
+The user interface labels this measurement **TCP RTT** for iPerf3.
+
+This is a loaded TCP RTT measurement. The values are observed while the router is actively transmitting the Uplink throughput test. They are not equivalent to an idle ping or a pre-transfer latency sample.
+
+Loaded TCP RTT can be significantly higher than idle latency because the access network and path are carrying sustained test traffic. Cellular uplinks can show particularly large increases due to radio scheduling, buffering, congestion, RF conditions, and limited upstream capacity. Ethernet or other higher-capacity WANs often show less inflation because the throughput test consumes a smaller fraction of the available path capacity.
+
+History presents:
+
+`TCP RTT: <average> ms avg (<minimum> - <maximum> ms)`
+
+The minimum and maximum values are the minimum and maximum sampled TCP smoothed-RTT observations reported during Uplink. They are not individual packet-latency extrema.
+
+iPerf3 also reports TCP RTT variation (`rttvar`). Speedtest Analyzer can retain that value inside compact engineering telemetry, but **TCP `rttvar` is never presented as Jitter**.
+
+## 20.2 TCP retransmissions
+
+Retransmission ownership follows the TCP sender.
+
+For Uplink:
+
+- The router is the sender.
+- `end.sum_sent.retransmits` represents device-side TCP sender retransmissions.
+- This value is promoted to the top-level `retransmissions` result field.
+- History presents the value as **Retransmissions**.
+- CSV exports the value as `TCP_Retransmissions`.
+
+For Downlink:
+
+- `-R` makes the remote iPerf3 server the TCP sender.
+- The remote sender retransmission total is retained in `iperf3_tcp.download.retransmissions`.
+- It is not substituted for the top-level device-side Uplink retransmission value.
+
+A retransmission count is a TCP event count. It is **not a packet-loss percentage**.
+
+## 20.3 Compact TCP telemetry
+
+The persisted `iperf3_tcp` object retains engineering evidence for future analysis while keeping normal History concise.
+
+The Downlink object can contain:
+
+- `direction`
+- `sender_scope=remote`
+- total remote sender retransmissions
+- stream count
+- per-interval start/end time
+- per-interval throughput
+
+The Uplink object can contain:
+
+- `direction`
+- `sender_scope=device`
+- total device sender retransmissions
+- stream count
+- TCP MSS
+- RTT minimum/average/maximum
+- maximum congestion window
+- maximum send window
+- per-interval throughput
+- per-interval retransmissions
+- per-interval RTT
+- per-interval RTT variation
+- per-interval congestion window
+- per-interval send window
+
+This object is deliberately hidden from normal History detail and CSV export. It is retained as source evidence for future correlation, event detection, KPI development, and engineering analysis.
+
+A zero-throughput interval is retained as an observation when reported by iPerf3. It is not automatically classified as a disconnect or failure; future analysis must correlate it with RTT, retransmissions, congestion-window behavior, WAN state, and cellular observations.
+
+## 20.4 Optional Jitter measurement
+
+The iPerf3 **Jitter** control does not enable TCP RTT. TCP RTT is automatic.
+
+When Jitter is enabled and the normal TCP Downlink and Uplink test completes successfully, Speedtest Analyzer appends one lightweight UDP iPerf3 probe to the same successful server and port.
+
+The probe uses the equivalent of:
+
+`iperf3 -c <server> -p <port> -u -b 1M -t 5 -J -4`
+
+The same selected source IP and bind device are reused when required by the WAN-selection architecture.
+
+The Jitter probe:
+
+- runs once;
+- has no listener retry loop;
+- does not consume or modify the TCP server retry budget;
+- honors Stop/cancellation;
+- validates the selected WAN path before the probe;
+- validates the selected WAN path again before accepting the result;
+- is non-fatal to the already-completed TCP test.
+
+If UDP is unsupported, times out, returns an error, or the selected WAN changes, the TCP result remains successful and `jitter_ms` remains unset.
+
+Only the true iPerf3 UDP `jitter_ms` value is promoted to normal result/history reporting.
+
+UDP packet-loss counters and loss percentages are intentionally not exposed by this feature so they are not confused with TCP retransmission counts.
+
+## 20.5 Manual and Scheduled control semantics
+
+The Manual Test control is engine-aware:
+
+- **iPerf3** — `Jitter`
+- **Netperf** — `Latency/Jitter`
+
+The Scheduled Test editor uses the same presentation.
+
+The underlying `include_latency` field is preserved for configuration compatibility:
+
+- iPerf3 `include_latency=true` requests the supplemental Jitter probe.
+- Netperf `include_latency=true` retains the existing Netperf Latency/Jitter behavior.
+
+For iPerf3, TCP RTT is collected regardless of the `include_latency` value.
+
+No new configuration key or schema migration is required.
+
+## 20.6 User-interface and reporting behavior
+
+For iPerf3:
+
+- The live result card is labeled **TCP RTT ms**.
+- The optional control is labeled **Jitter**.
+- Jitter remains `--` when the supplemental measurement is not requested or does not produce a valid result.
+- History labels the measurement **TCP RTT** and shows average plus minimum/maximum range.
+- History shows the device-side Uplink **Retransmissions** count.
+- History shows Jitter when collected.
+
+Netperf retains the existing Latency/Jitter terminology and measurement behavior.
+
+CSV uses:
+
+- `Latency_ms`
+- `Jitter_ms`
+- `TCP_Retransmissions`
+
+The first two column names are retained for compatibility even though the iPerf3 `Latency_ms` value specifically represents loaded TCP RTT.
+
+## 20.7 Validation
+
+v1.1.3 iPerf3 telemetry validation included:
+
+- Python syntax validation after telemetry integration.
+- Confirmation that temporary raw-JSON instrumentation was removed before release.
+- Manual iPerf3 TCP-only testing with Jitter disabled.
+- Automatic TCP RTT population with Jitter disabled.
+- Manual iPerf3 testing with Jitter enabled.
+- Successful Jitter collection on Ethernet WAN.
+- Successful Jitter collection on cellular WAN.
+- History validation of TCP RTT average/minimum/maximum.
+- History validation of device-side Uplink retransmissions.
+- Validation that the compact `iperf3_tcp` block persisted 10-second Downlink and Uplink interval data.
+- Scheduled iPerf3 Jitter configuration persistence.
+- Scheduled iPerf3 Jitter execution.
+- CSV validation of `Latency_ms`, `Jitter_ms`, and `TCP_Retransmissions`.
+- Confirmation that successful TCP results remain successful independently of the supplemental Jitter phase.
