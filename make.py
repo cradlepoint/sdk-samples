@@ -754,6 +754,13 @@ def pack_package(app_root, app_name, ignored_files=None, ignored_dirs=None):
             return None
         if tarinfo.isfile() and basename in ignored_files:
             return None
+        # Windows reports dirs as mode 555 (no write bit), breaking extraction
+        # on NCM. Normalise mode/ownership so packages are OS-independent.
+        tarinfo.mode = 0o755 if tarinfo.isdir() else 0o644
+        tarinfo.uid = 0
+        tarinfo.gid = 0
+        tarinfo.uname = ''
+        tarinfo.gname = ''
         return tarinfo
 
     tar_name = f"{app_name}.tar"
