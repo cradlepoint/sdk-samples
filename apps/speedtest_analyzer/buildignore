@@ -1,0 +1,9 @@
+# Files excluded from the deployed SDK package (development-only content).
+# make.py reads this file (named 'buildignore') to prune the package.
+# v1.2 Insights development is not part of the current production package.
+insights.py
+# Developer scratch directory for throwaway validation harnesses.
+tmp/
+# Editor/backup scratch files must never ship in the package.
+*.bak
+script.js

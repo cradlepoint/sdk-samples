@@ -14,10 +14,41 @@ import threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from datetime import datetime
 from threading import Thread
+from urllib.parse import parse_qs, urlparse
+
+from cellular_analysis import (
+    build_cellular_analysis,
+    build_site_cell_inventory,
+)
+from cellular_geo import (
+    apply_geo_settings,
+    gps_fix_is_usable,
+    load_geo_settings,
+)
+
+import configuration_manager as config_mgr
+
+# GeoView v1.1.3: Device-scoped provider credentials + bounded resolution job.
+# These modules own all provider/credential handling. speedtest_web only
+# performs thin HTTP orchestration and never holds a plaintext credential.
+import geo_secrets
+import geo_providers
+import geo_resolver
+import geo_cache
+import geo_contributions
 
 # Constants
 PORT = 8000
+# GeoView has no user-facing provider selector: the cellular serving-location
+# service is fixed to OpenCellID. Enrichment reads, the resolve job, status,
+# and cache invalidation all key on this provider. The browser Maps JS map and
+# Google Site-Address geocoding are INDEPENDENT services that do not depend on
+# it.
+GEO_CELL_PROVIDER = 'opencellid'
 HISTORY_FILE = 'tmp/speedtest_history.json'
+HISTORY_BACKUP_FILE = HISTORY_FILE + '.bak'
+HISTORY_TEMP_FILE = HISTORY_FILE + '.tmp'
+HISTORY_CORRUPT_FILE = HISTORY_FILE + '.corrupt'
 MAX_HISTORY = 100
 
 # Read app version from package.ini
@@ -43,10 +74,15 @@ current_test = {
     'error': None
 }
 test_lock = threading.Lock()
+history_lock = threading.RLock()
 
 # Active local iPerf3 subprocess used for immediate Stop handling.
 _iperf3_process_lock = threading.Lock()
 _active_iperf3_process = None
+
+# WAN/path snapshot for the currently running iPerf3 test.
+# Used only to distinguish a remote endpoint timeout from a local WAN failure.
+_active_iperf3_wan_guard = None
 
 # Dedicated execution slot. Unlike current_test['running'], this remains
 # reserved until the worker thread has completely exited its finally block.
@@ -85,11 +121,12 @@ _active_carrier_collector = None
 
 # Schedule state
 schedule_config = {
-    'enabled': False,
-    'autostart': False,
+    'enabled': False,       # PERSISTED intent
+    'autostart': False,     # PERSISTED intent (independent of enabled)
     'cron': '',
     'engine': 'netperf',
-    'params': {}
+    'params': {},
+    'running': False,       # RUNTIME-ONLY: does the scheduler actually fire?
 }
 schedule_lock = threading.Lock()
 
@@ -104,7 +141,6 @@ _iperf3_stats_dirty = False
 _iperf3_stats_generation = 0
 _iperf3_stats_last_checkpoint = 0.0
 _iperf3_stats_lock = threading.Lock()
-
 
 OOKLA_BINARIES = ('ookla', 'speedtest', 'speedtest-cli')
 IPERF3_BINARIES = ('iperf3', 'iperf3-arm64v8', 'iperf3-aarch64')
@@ -836,7 +872,9 @@ def _collect_cellular_snapshot(interface, include_active_carriers=False):
                 return val.strip().lower() not in _empty_strings
             return True  # Numeric 0 and other types are retained
 
-        snapshot = {}
+        snapshot = {
+            'device_uid': matched_uid,
+        }
 
         # Status fields (signal strength score, health, registration)
         status = matched_dev.get('status', {})
@@ -1568,16 +1606,93 @@ def _build_carrier_summary(carriers):
     }
 
 
-def _carrier_snapshot(diagnostics):
-    """Take a complete carrier snapshot from diagnostics.
+def _serving_cell_snapshot(diagnostics):
+    """Normalize primary serving-cell identity for one diagnostics poll."""
+    if not diagnostics or not isinstance(diagnostics, dict):
+        return {}
 
-    Returns a dict with service_mode, carriers list, and summary.
-    """
+    empty = {'', 'none', 'n/a', 'unknown', '--'}
+
+    def present(value):
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip().lower() not in empty
+        return True
+
+    def first(*keys):
+        return _first_present(diagnostics, keys, present)
+
+    service_mode = _determine_service_mode(diagnostics)
+
+    if service_mode == '5G SA':
+        cell_id = first('NR_CELL_ID', 'CELL_ID')
+        pci = first('PHY_CELL_ID_5G', 'PCI_5G', 'PHY_CELL_ID')
+        band = first('BAND_5G', 'RFBAND_5G', 'RFBAND')
+        channel = first(
+            'CHANNEL_5G',
+            'RFCHANNEL_5G',
+            'NR_RFCHANNEL',
+            'RFCHANNEL'
+        )
+        source = 'NR'
+    else:
+        cell_id = first('CELL_ID')
+        pci = first('PHY_CELL_ID')
+        band = first('RFBAND')
+        channel = first('RFCHANNEL')
+        source = 'LTE'
+
+    serving = {
+        'service_mode': service_mode,
+        'cell_id_source': source
+    }
+
+    values = {
+        'cell_id': cell_id,
+        'plmn': first('CUR_PLMN', 'CURRENT_PLMN'),
+        'tac': first('TAC', 'TRACKING_AREA_CODE'),
+        'pci': pci,
+        'band': band,
+        'channel': channel,
+        'carrier': first('CARRID'),
+    }
+
+    for key, value in values.items():
+        if present(value):
+            serving[key] = value
+
+    return serving
+
+
+def _serving_cell_snapshot_signature(snapshot):
+    """Return fields that identify meaningful serving-cell changes."""
+    if not snapshot or not isinstance(snapshot, dict):
+        return ()
+
+    serving = snapshot.get('serving_cell')
+
+    if not isinstance(serving, dict):
+        return ()
+
+    return (
+        str(serving.get('cell_id_source') or '').strip().upper(),
+        str(serving.get('cell_id') or '').strip(),
+        str(serving.get('plmn') or '').strip(),
+        str(serving.get('tac') or '').strip(),
+        str(serving.get('pci') or '').strip(),
+    )
+
+
+def _carrier_snapshot(diagnostics):
+    """Take a complete carrier and serving-cell snapshot."""
     carriers = _parse_active_carriers(diagnostics)
     service_mode = _determine_service_mode(diagnostics)
     summary = _build_carrier_summary(carriers)
+
     return {
         'service_mode': service_mode,
+        'serving_cell': _serving_cell_snapshot(diagnostics),
         'carriers': carriers,
         'carrier_count': summary['carrier_count'],
         'bands': summary['bands'],
@@ -1630,6 +1745,12 @@ def _snapshots_differ(a, b):
         return True
 
     if a.get('service_mode') != b.get('service_mode'):
+        return True
+
+    if (
+        _serving_cell_snapshot_signature(a)
+        != _serving_cell_snapshot_signature(b)
+    ):
         return True
 
     if a.get('carrier_count') != b.get('carrier_count'):
@@ -1686,6 +1807,284 @@ def _get_modem_diagnostics_for_interface(interface):
         return None, None
 
 
+def _canonical_serving_cell_id(value):
+    """Normalize NCOS decimal + hex serving-cell formatting."""
+    if value is None:
+        return ''
+
+    value = str(value).strip()
+
+    if not value:
+        return ''
+
+    match = re.match(
+        r'^(\d+)\s*\(0x[0-9a-f]+\)$',
+        value,
+        flags=re.IGNORECASE
+    )
+
+    return match.group(1) if match else value
+
+
+def _serving_cell_identity_key(cell):
+    """Return stable primary-cell identity or None when unidentified."""
+    if not isinstance(cell, dict):
+        return None
+
+    cell_id = _canonical_serving_cell_id(
+        cell.get('cell_id')
+    )
+
+    if not cell_id:
+        return None
+
+    return (
+        str(
+            cell.get('cell_id_source')
+            or ''
+        ).strip().upper(),
+        str(
+            cell.get('plmn')
+            or ''
+        ).strip(),
+        cell_id,
+    )
+
+
+def _traffic_serving_cell_handoff_summary(
+    download_activity,
+    upload_activity,
+):
+    """Summarize proven serving-cell transitions during active traffic.
+
+    Unknown/missing identity never bridges two known cells into an invented
+    handoff. A Download -> Upload boundary change is preserved separately
+    because its exact transition second is not known.
+    """
+    result = {
+        'start_cell': None,
+        'end_cell': None,
+        'handoffs': [],
+    }
+
+    previous_phase_last = None
+
+    for phase_name, activity in (
+        ('download', download_activity),
+        ('upload', upload_activity),
+    ):
+        if not isinstance(activity, dict):
+            continue
+
+        timeline = activity.get('timeline')
+
+        if not isinstance(timeline, list) or not timeline:
+            continue
+
+        observations = []
+
+        for state in timeline:
+            if not isinstance(state, dict):
+                continue
+
+            cell = state.get('serving_cell')
+
+            if not isinstance(cell, dict):
+                cell = {}
+
+            observations.append({
+                'elapsed_s': state.get('elapsed_s', 0),
+                'cell': dict(cell),
+                'key': _serving_cell_identity_key(cell),
+            })
+
+        if not observations:
+            continue
+
+        first_known = next(
+            (
+                item
+                for item in observations
+                if item['key'] is not None
+            ),
+            None
+        )
+
+        last_known = next(
+            (
+                item
+                for item in reversed(observations)
+                if item['key'] is not None
+            ),
+            None
+        )
+
+        if (
+            result['start_cell'] is None
+            and first_known is not None
+        ):
+            result['start_cell'] = dict(
+                first_known['cell']
+            )
+
+        # Only the actual first phase observation can prove a phase-boundary
+        # transition. Do not skip an Unknown state and infer a change.
+        phase_first = observations[0]
+
+        if (
+            previous_phase_last is not None
+            and phase_first['key'] is not None
+            and previous_phase_last['key']
+                != phase_first['key']
+        ):
+            result['handoffs'].append({
+                'phase': phase_name,
+                'elapsed_s': None,
+                'phase_boundary': True,
+                'from': dict(
+                    previous_phase_last['cell']
+                ),
+                'to': dict(
+                    phase_first['cell']
+                ),
+            })
+
+        for index in range(
+            1,
+            len(observations)
+        ):
+            previous = observations[index - 1]
+            current = observations[index]
+
+            if (
+                previous['key'] is None
+                or current['key'] is None
+            ):
+                continue
+
+            if previous['key'] == current['key']:
+                continue
+
+            result['handoffs'].append({
+                'phase': phase_name,
+                'elapsed_s': current.get(
+                    'elapsed_s',
+                    0
+                ),
+                'phase_boundary': False,
+                'from': dict(previous['cell']),
+                'to': dict(current['cell']),
+            })
+
+        if last_known is not None:
+            result['end_cell'] = dict(
+                last_known['cell']
+            )
+
+            previous_phase_last = last_known
+
+    return result
+
+
+def _classify_post_test_stability(
+    start_cell,
+    end_cell,
+    checks,
+):
+    """Classify three post-test serving-cell observations conservatively."""
+    start_key = _serving_cell_identity_key(
+        start_cell
+    )
+
+    end_key = _serving_cell_identity_key(
+        end_cell
+    )
+
+    identified = []
+
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+
+        key = _serving_cell_identity_key(
+            check.get('serving_cell')
+        )
+
+        if key is None:
+            continue
+
+        identified.append({
+            'elapsed_s': check.get(
+                'elapsed_s'
+            ),
+            'key': key,
+        })
+
+    result = {
+        'status': 'inconclusive',
+        'checks_requested': len(checks),
+        'checks_identifiable': len(identified),
+        'reverted_at_s': None,
+    }
+
+    # We deliberately require all three +2/+4/+6 checks for a firm
+    # persistence/reversion/continued-handoff conclusion.
+    if (
+        len(checks) != 3
+        or len(identified) != 3
+    ):
+        return result
+
+    keys = [
+        item['key']
+        for item in identified
+    ]
+
+    unique_keys = set(keys)
+
+    if (
+        end_key is not None
+        and all(
+            key == end_key
+            for key in keys
+        )
+    ):
+        result['status'] = 'persisted'
+        return result
+
+    if (
+        start_key is not None
+        and end_key is not None
+        and start_key != end_key
+        and all(
+            key == start_key
+            for key in keys
+        )
+    ):
+        result['status'] = 'reverted'
+        result['reverted_at_s'] = (
+            identified[0]['elapsed_s']
+        )
+        return result
+
+    if len(unique_keys) == 1:
+        only_key = keys[0]
+
+        if (
+            only_key != start_key
+            and only_key != end_key
+        ):
+            result['status'] = (
+                'continued_handoff'
+            )
+            return result
+
+    if len(unique_keys) > 1:
+        result['status'] = 'unstable'
+
+    return result
+
+
 class CarrierTelemetryCollector:
     """Background collector for active carrier telemetry during speed tests.
 
@@ -1705,6 +2104,12 @@ class CarrierTelemetryCollector:
         self.changes = []  # List of (elapsed_seconds, snapshot, description)
         self.peak = None
         self.final = None
+
+        # Populated only when active-traffic telemetry proves a serving-cell
+        # handoff. These samples are deliberately separate from _samples so
+        # they cannot influence Peak Observed or traffic-phase RF/config data.
+        self.post_test = None
+
         self._last_snapshot = None
         self._start_time = None
 
@@ -1785,6 +2190,209 @@ class CarrierTelemetryCollector:
                 f'Carrier telemetry final capture error (non-fatal): {e}'
             )
 
+    def _traffic_handoff_summary(self):
+        """Build traffic-only serving-cell handoff state from captured data."""
+        with self._lock:
+            samples = [
+                (
+                    sample_time,
+                    self._copy_snapshot(snapshot)
+                )
+                for sample_time, snapshot
+                in self._samples
+            ]
+
+            phase_windows = {
+                phase: dict(window)
+                for phase, window
+                in self._phase_windows.items()
+            }
+
+        download_activity = self._build_phase_activity(
+            'download',
+            samples,
+            phase_windows.get('download')
+        )
+
+        upload_activity = self._build_phase_activity(
+            'upload',
+            samples,
+            phase_windows.get('upload')
+        )
+
+        return _traffic_serving_cell_handoff_summary(
+            download_activity,
+            upload_activity,
+        )
+
+    def collect_post_test_stability(self):
+        """Conditionally sample the modem at +2/+4/+6 seconds after a handoff.
+
+        Stable tests return immediately with no additional polling. Post-test
+        observations are diagnostic only and never feed Peak Observed,
+        traffic RF, carrier configuration, or throughput calculations.
+        """
+        try:
+            summary = self._traffic_handoff_summary()
+
+            if not summary.get('handoffs'):
+                return False
+
+            cp.log(
+                'Carrier telemetry: in-test serving-cell handoff detected; '
+                'checking post-test state at +2/+4/+6 seconds'
+            )
+
+            with self._lock:
+                immediate_snapshot = (
+                    self._copy_snapshot(self.final)
+                    if self.final
+                    else None
+                )
+
+            immediate = None
+
+            if immediate_snapshot:
+                immediate = {
+                    'elapsed_s': 0,
+                    'available': True,
+                    'service_mode': immediate_snapshot.get(
+                        'service_mode',
+                        ''
+                    ),
+                    'serving_cell': dict(
+                        immediate_snapshot.get(
+                            'serving_cell',
+                            {}
+                        )
+                    ),
+                }
+
+            checks = []
+            started_at = time.monotonic()
+
+            for elapsed_s in (2, 4, 6):
+                target = (
+                    started_at
+                    + elapsed_s
+                )
+
+                remaining = (
+                    target
+                    - time.monotonic()
+                )
+
+                if remaining > 0:
+                    time.sleep(remaining)
+
+                diag, uid = (
+                    _get_modem_diagnostics_for_interface(
+                        self.interface
+                    )
+                )
+
+                if not diag:
+                    checks.append({
+                        'elapsed_s': elapsed_s,
+                        'available': False,
+                        'service_mode': '',
+                        'serving_cell': {},
+                    })
+                    continue
+
+                snapshot = _carrier_snapshot(
+                    diag
+                )
+
+                checks.append({
+                    'elapsed_s': elapsed_s,
+                    'available': True,
+                    'service_mode': snapshot.get(
+                        'service_mode',
+                        ''
+                    ),
+                    'serving_cell': dict(
+                        snapshot.get(
+                            'serving_cell',
+                            {}
+                        )
+                    ),
+                })
+
+            classification = (
+                _classify_post_test_stability(
+                    summary.get(
+                        'start_cell'
+                    ),
+                    summary.get(
+                        'end_cell'
+                    ),
+                    checks,
+                )
+            )
+
+            post_test = {
+                'triggered': True,
+                'reason': (
+                    'in_test_serving_cell_handoff'
+                ),
+                'window_s': 6,
+                'start_cell': dict(
+                    summary.get(
+                        'start_cell'
+                    )
+                    or {}
+                ),
+                'end_cell': dict(
+                    summary.get(
+                        'end_cell'
+                    )
+                    or {}
+                ),
+                'immediate': immediate,
+                'checks': checks,
+                'status': classification.get(
+                    'status',
+                    'inconclusive'
+                ),
+                'checks_requested': (
+                    classification.get(
+                        'checks_requested',
+                        3
+                    )
+                ),
+                'checks_identifiable': (
+                    classification.get(
+                        'checks_identifiable',
+                        0
+                    )
+                ),
+                'reverted_at_s': (
+                    classification.get(
+                        'reverted_at_s'
+                    )
+                ),
+            }
+
+            with self._lock:
+                self.post_test = post_test
+
+            cp.log(
+                'Carrier telemetry: post-test serving-cell state '
+                f'{post_test["status"]} '
+                f'({post_test["checks_identifiable"]}/'
+                f'{post_test["checks_requested"]} identifiable checks)'
+            )
+
+            return True
+
+        except Exception as e:
+            cp.log(
+                'Carrier telemetry post-test stability error '
+                f'(non-fatal): {e}'
+            )
+            return False
+
     def _poll_loop(self):
         """Background polling loop — every 2 seconds."""
         while self._running:
@@ -1830,6 +2438,12 @@ class CarrierTelemetryCollector:
             dict(carrier)
             for carrier in snapshot.get('carriers', [])
         ]
+
+        serving_cell = snapshot.get('serving_cell')
+
+        if isinstance(serving_cell, dict):
+            copied['serving_cell'] = dict(serving_cell)
+
         return copied
 
     def record_phase_window(self, phase, started_at, ended_at):
@@ -1892,6 +2506,9 @@ class CarrierTelemetryCollector:
 
         record = {
             'service_mode': snapshot.get('service_mode', ''),
+            'serving_cell': dict(
+                snapshot.get('serving_cell', {})
+            ),
             'carrier_count': snapshot.get('carrier_count', 0),
             'bands': snapshot.get('bands', ''),
             'bandwidth_mhz': snapshot.get('bandwidth_mhz', 0),
@@ -2063,6 +2680,23 @@ class CarrierTelemetryCollector:
         parts = []
         if prev.get('service_mode') != curr.get('service_mode'):
             parts.append(curr.get('service_mode', ''))
+
+        if (
+            _serving_cell_snapshot_signature(prev)
+            != _serving_cell_snapshot_signature(curr)
+        ):
+            previous_cell = (
+                prev.get('serving_cell') or {}
+            ).get('cell_id')
+
+            current_cell = (
+                curr.get('serving_cell') or {}
+            ).get('cell_id')
+
+            if previous_cell != current_cell:
+                parts.append('serving cell changed')
+            else:
+                parts.append('serving-cell details changed')
         if prev.get('carrier_count', 0) < curr.get('carrier_count', 0):
             diff = curr['carrier_count'] - prev.get('carrier_count', 0)
             parts.append(f'+{diff} carrier' + ('s' if diff > 1 else ''))
@@ -2107,6 +2741,130 @@ class CarrierTelemetryCollector:
                 for phase, window in self._phase_windows.items()
             }
 
+            post_test = None
+
+            if isinstance(self.post_test, dict):
+                post_test = {
+                    'triggered': bool(
+                        self.post_test.get(
+                            'triggered'
+                        )
+                    ),
+                    'reason': self.post_test.get(
+                        'reason',
+                        ''
+                    ),
+                    'window_s': self.post_test.get(
+                        'window_s',
+                        0
+                    ),
+                    'start_cell': dict(
+                        self.post_test.get(
+                            'start_cell',
+                            {}
+                        )
+                    ),
+                    'end_cell': dict(
+                        self.post_test.get(
+                            'end_cell',
+                            {}
+                        )
+                    ),
+                    'immediate': (
+                        {
+                            'elapsed_s': (
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'elapsed_s',
+                                    0
+                                )
+                            ),
+                            'available': bool(
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'available'
+                                )
+                            ),
+                            'service_mode': (
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'service_mode',
+                                    ''
+                                )
+                            ),
+                            'serving_cell': dict(
+                                self.post_test[
+                                    'immediate'
+                                ].get(
+                                    'serving_cell',
+                                    {}
+                                )
+                            ),
+                        }
+                        if isinstance(
+                            self.post_test.get(
+                                'immediate'
+                            ),
+                            dict
+                        )
+                        else None
+                    ),
+                    'checks': [
+                        {
+                            'elapsed_s': check.get(
+                                'elapsed_s'
+                            ),
+                            'available': bool(
+                                check.get(
+                                    'available'
+                                )
+                            ),
+                            'service_mode': check.get(
+                                'service_mode',
+                                ''
+                            ),
+                            'serving_cell': dict(
+                                check.get(
+                                    'serving_cell',
+                                    {}
+                                )
+                            ),
+                        }
+                        for check in self.post_test.get(
+                            'checks',
+                            []
+                        )
+                        if isinstance(
+                            check,
+                            dict
+                        )
+                    ],
+                    'status': self.post_test.get(
+                        'status',
+                        'inconclusive'
+                    ),
+                    'checks_requested': (
+                        self.post_test.get(
+                            'checks_requested',
+                            0
+                        )
+                    ),
+                    'checks_identifiable': (
+                        self.post_test.get(
+                            'checks_identifiable',
+                            0
+                        )
+                    ),
+                    'reverted_at_s': (
+                        self.post_test.get(
+                            'reverted_at_s'
+                        )
+                    ),
+                }
+
         download_activity = self._build_phase_activity(
             'download',
             samples,
@@ -2147,6 +2905,9 @@ class CarrierTelemetryCollector:
         result = {
             'baseline': {
                 'service_mode': baseline.get('service_mode', ''),
+                'serving_cell': dict(
+                    baseline.get('serving_cell', {})
+                ),
                 'carrier_count': baseline.get('carrier_count', 0),
                 'bands': baseline.get('bands', ''),
                 'bandwidth_mhz': baseline.get('bandwidth_mhz', 0),
@@ -2157,6 +2918,9 @@ class CarrierTelemetryCollector:
             },
             'peak': {
                 'service_mode': peak.get('service_mode', ''),
+                'serving_cell': dict(
+                    peak.get('serving_cell', {})
+                ),
                 'carrier_count': peak.get('carrier_count', 0),
                 'bands': peak.get('bands', ''),
                 'bandwidth_mhz': peak.get('bandwidth_mhz', 0),
@@ -2179,6 +2943,9 @@ class CarrierTelemetryCollector:
             # as a CA End CSV field.
             'final': {
                 'service_mode': final.get('service_mode', ''),
+                'serving_cell': dict(
+                    final.get('serving_cell', {})
+                ),
                 'carrier_count': final.get('carrier_count', 0),
                 'bands': final.get('bands', ''),
                 'bandwidth_mhz': final.get('bandwidth_mhz', 0),
@@ -2186,11 +2953,17 @@ class CarrierTelemetryCollector:
             } if final else None,
         }
 
+        if post_test:
+            result['post_test'] = post_test
+
         # Record meaningful transitions only, not every two-second poll.
         for elapsed, snap, desc in changes:
             result['changes'].append({
                 'elapsed_s': elapsed,
                 'service_mode': snap.get('service_mode', ''),
+                'serving_cell': dict(
+                    snap.get('serving_cell', {})
+                ),
                 'carrier_count': snap.get('carrier_count', 0),
                 'bands': snap.get('bands', ''),
                 'bandwidth_mhz': snap.get('bandwidth_mhz', 0),
@@ -2269,32 +3042,235 @@ def _record_carrier_phase_window(phase, started_at, ended_at):
         return False
 
 
-def load_history():
-    """Load test history from file."""
+def _read_history_file(path):
+    """Read and validate a history JSON file."""
+    with open(path, 'r') as f:
+        history = json.load(f)
+    if not isinstance(history, list):
+        raise ValueError('history root must be a JSON array')
+    return history
+
+
+def _remove_history_file(path):
+    """Best-effort removal of a history working file."""
     try:
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, 'r') as f:
-                return json.load(f)
+        if os.path.exists(path):
+            os.remove(path)
     except Exception as e:
-        cp.log(f'Error loading history: {e}')
-    return []
+        cp.log(f'Unable to remove history file {path}: {e}')
+
+
+def _fsync_history_directory():
+    """Best-effort sync of history directory metadata after rename."""
+    try:
+        directory_fd = os.open('tmp', os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except Exception:
+        pass
+
+
+def _write_history_temp(history):
+    """Write a complete, validated temporary history file."""
+    os.makedirs('tmp', exist_ok=True)
+    records = history[-MAX_HISTORY:]
+
+    with open(HISTORY_TEMP_FILE, 'w') as f:
+        json.dump(records, f)
+        f.flush()
+        os.fsync(f.fileno())
+
+    check = _read_history_file(HISTORY_TEMP_FILE)
+    if check != records:
+        raise IOError('temporary history validation failed')
+
+    return records
+
+
+def _quarantine_corrupt_primary():
+    """Move an invalid primary aside without replacing a good backup."""
+    if not os.path.exists(HISTORY_FILE):
+        return
+
+    os.replace(HISTORY_FILE, HISTORY_CORRUPT_FILE)
+    _fsync_history_directory()
+
+
+def _restore_history(history, source_name):
+    """Restore validated history data to the primary file."""
+    records = _write_history_temp(history)
+
+    if os.path.exists(HISTORY_FILE):
+        _quarantine_corrupt_primary()
+
+    os.replace(HISTORY_TEMP_FILE, HISTORY_FILE)
+    _fsync_history_directory()
+
+    cp.log(f'History recovered from {source_name}')
+    return records
+
+
+def _load_history_locked():
+    """Load primary history or recover from a valid local copy."""
+    candidates_exist = any(
+        os.path.exists(path)
+        for path in (
+            HISTORY_FILE,
+            HISTORY_TEMP_FILE,
+            HISTORY_BACKUP_FILE,
+        )
+    )
+
+    if os.path.exists(HISTORY_FILE):
+        try:
+            history = _read_history_file(HISTORY_FILE)
+
+            # A valid primary is authoritative. Any remaining temp file
+            # belongs to an uncommitted write and can be discarded.
+            _remove_history_file(HISTORY_TEMP_FILE)
+
+            return history
+
+        except Exception as e:
+            cp.log(f'Primary history is invalid: {e}')
+
+    for path, source_name in (
+        (HISTORY_TEMP_FILE, 'temporary history'),
+        (HISTORY_BACKUP_FILE, 'history backup'),
+    ):
+        if not os.path.exists(path):
+            continue
+
+        try:
+            history = _read_history_file(path)
+            return _restore_history(history, source_name)
+
+        except Exception as e:
+            cp.log(f'Unable to recover from {source_name}: {e}')
+
+    if not candidates_exist:
+        return []
+
+    raise RuntimeError('no valid history copy is available')
+
+
+def load_history():
+    """Load test history, recovering local history when possible."""
+    with history_lock:
+        try:
+            return _load_history_locked()
+
+        except Exception as e:
+            cp.log(f'History unavailable: {e}')
+            return []
+
+
+def _load_history_for_update():
+    """Load history for mutation; never turn corruption into [] silently."""
+    try:
+        return _load_history_locked()
+
+    except Exception as e:
+        cp.log(f'History update blocked: {e}')
+        return None
 
 
 def save_history(history):
-    """Save test history to file."""
-    try:
-        os.makedirs('tmp', exist_ok=True)
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(history[-MAX_HISTORY:], f)
-    except Exception as e:
-        cp.log(f'Error saving history: {e}')
+    """Atomically save history while retaining one last-known-good copy."""
+    with history_lock:
+        try:
+            _write_history_temp(history)
+
+            if os.path.exists(HISTORY_FILE):
+                # Validate the live history before rotating it into backup.
+                # A corrupt primary must never replace a known-good backup.
+                _read_history_file(HISTORY_FILE)
+
+                os.replace(
+                    HISTORY_FILE,
+                    HISTORY_BACKUP_FILE
+                )
+                _fsync_history_directory()
+
+            try:
+                os.replace(
+                    HISTORY_TEMP_FILE,
+                    HISTORY_FILE
+                )
+                _fsync_history_directory()
+
+            except Exception:
+                # If the primary was already rotated but promotion of the
+                # new temp file failed, immediately restore the old primary.
+                if (
+                    not os.path.exists(HISTORY_FILE)
+                    and os.path.exists(HISTORY_BACKUP_FILE)
+                ):
+                    os.replace(
+                        HISTORY_BACKUP_FILE,
+                        HISTORY_FILE
+                    )
+                    _fsync_history_directory()
+
+                raise
+
+            return True
+
+        except Exception as e:
+            cp.log(f'Error saving history atomically: {e}')
+
+            # Preserve a completed temp file when the primary disappeared;
+            # it may be usable by recovery on the next load.
+            if os.path.exists(HISTORY_FILE):
+                _remove_history_file(HISTORY_TEMP_FILE)
+
+            return False
+
+
+def clear_history_storage():
+    """Intentionally clear primary history and all recovery copies."""
+    with history_lock:
+        try:
+            os.makedirs('tmp', exist_ok=True)
+
+            for path in (
+                HISTORY_FILE,
+                HISTORY_BACKUP_FILE,
+                HISTORY_TEMP_FILE,
+                HISTORY_CORRUPT_FILE,
+            ):
+                _remove_history_file(path)
+
+            _write_history_temp([])
+
+            os.replace(
+                HISTORY_TEMP_FILE,
+                HISTORY_FILE
+            )
+            _fsync_history_directory()
+
+            return True
+
+        except Exception as e:
+            cp.log(f'Error clearing history: {e}')
+            return False
 
 
 def add_result(result):
-    """Add a test result to history."""
-    history = load_history()
-    history.append(result)
-    save_history(history)
+    """Add a test result to history as one serialized transaction."""
+    with history_lock:
+        history = _load_history_for_update()
+
+        if history is None:
+            cp.log(
+                'New test result not saved because history is unrecoverable'
+            )
+            return False
+
+        history.append(result)
+        return save_history(history)
 
 
 # =============================================================================
@@ -3301,17 +4277,6 @@ def _default_iperf3_server_settings():
     }
 
 
-def _persist_iperf3_server_settings(settings):
-    """Persist iPerf3 server preferences using one SDK appdata write."""
-    cp.put_appdata(
-        _IPERF3_SERVER_SETTINGS_KEY,
-        json.dumps(
-            settings,
-            separators=(',', ':')
-        )
-    )
-
-
 def _load_iperf3_server_settings():
     """Load the small server-mode settings object once."""
     global _iperf3_server_settings
@@ -3529,19 +4494,14 @@ def _load_public_iperf3_server_source():
 
 
 def _load_user_iperf3_server_source():
-    """Read the existing User Server List from SDK appdata once."""
-    value = cp.get_appdata('iperf3_servers')
-
-    if not value:
-        servers = []
-
-    else:
-        servers = json.loads(value)
-
-        if not isinstance(servers, list):
-            raise ValueError(
-                'iperf3_servers appdata must contain a JSON list'
-            )
+    """Read the User Server List from canonical RAM (or legacy on Day-1)."""
+    # Effective (Device>Group>Default) User Server list from the two-layer
+    # manager. Legacy App Data is NEVER a fallback here: once either canonical
+    # key exists it is outside the source-of-truth chain, and the manager's
+    # upgrade-required compatibility view already surfaces legacy through the
+    # effective config (§16).
+    effective_users = config_mgr.active_section('iperf3_user_servers')
+    servers = effective_users if isinstance(effective_users, list) else []
 
     # Preserve existing 2.6.5 User Server entries exactly as stored.
     # Schema modernization belongs to the later User Server feature patch.
@@ -3587,27 +4547,19 @@ def _load_active_iperf3_server_cache(force=False):
                         valid_regions[0]
                     )
 
+                    # last_public_region is RAM-only runtime state. Correcting
+                    # an invalid remembered region updates RAM only and never
+                    # persists to canonical or legacy App Data.
                     with _iperf3_server_settings_lock:
                         _iperf3_server_settings = dict(
                             settings
                         )
 
-                    try:
-                        _persist_iperf3_server_settings(
-                            settings
-                        )
-
-                        cp.log(
-                            'Initialized iPerf3 server settings: '
-                            f'{settings["server_mode"]}, '
-                            f'{settings["last_public_region"]}'
-                        )
-
-                    except Exception as e:
-                        cp.log(
-                            'Unable to persist iPerf3 '
-                            f'server settings: {e}'
-                        )
+                    cp.log(
+                        'Initialized iPerf3 server settings (RAM): '
+                        f'{settings["server_mode"]}, '
+                        f'{settings.get("last_public_region", "")}'
+                    )
 
             else:
                 new_cache = (
@@ -3882,6 +4834,23 @@ def _download_listener_failure_ports(
     ):
         return []
 
+    # New timeout-aware retry results explicitly identify only failures
+    # attributable to an iPerf3 listener. Healthy-WAN timeouts may be
+    # retryable operationally but must not redefine the existing
+    # Reliability -> Endpoint Failures metric.
+    explicit = result.get(
+        'listener_failure_ports'
+    )
+
+    if explicit is not None:
+        return sorted(
+            set(
+                explicit
+                or []
+            )
+        )
+
+    # Compatibility fallback for older retry results.
     attempted = set(
         result.get(
             'attempted',
@@ -3939,6 +4908,23 @@ def _upload_listener_failure_ports(
     ):
         return []
 
+    # Timeout-aware Uplink retries explicitly identify only failures
+    # attributable to an iPerf3 listener. A timeout on a verified healthy
+    # WAN may be retryable operationally but remains excluded from the
+    # existing Reliability -> Endpoint Failures metric.
+    explicit = upload_result.get(
+        'listener_failure_ports'
+    )
+
+    if explicit is not None:
+        return sorted(
+            set(
+                explicit
+                or []
+            )
+        )
+
+    # Compatibility fallback for older retry-result shapes.
     before = set(
         attempted_before
         or set()
@@ -4827,9 +5813,9 @@ def _iperf3_schedule_is_configured(config=None):
     )
 
 
-def _reset_iperf3_schedule(reason):
-    """Persist the known-safe empty scheduler state."""
-    config = {
+def _safe_empty_schedule():
+    """Return the known-safe disabled schedule section value."""
+    return {
         'enabled': False,
         'autostart': False,
         'cron': '',
@@ -4837,13 +5823,28 @@ def _reset_iperf3_schedule(reason):
         'params': {}
     }
 
-    save_schedule(config)
 
-    cp.log(
-        f'iPerf3 schedule reset: {reason}'
-    )
+def _apply_safe_schedule_to_ram():
+    """Apply the known-safe disabled schedule to RAM only (no persistence).
 
-    return config
+    Used by the startup validator so an unsafe saved iPerf3 schedule cannot
+    run, without writing canonical or legacy App Data merely because the app
+    started (and never creating a Device override).
+    """
+    global schedule_config
+    with schedule_lock:
+        schedule_config.update(_safe_empty_schedule())
+
+
+def _disable_unsafe_schedule_at_startup(reason):
+    """Startup safety: prevent an unsafe saved iPerf3 schedule from running.
+
+    Applies the safe disabled schedule to RAM and logs the reason. Does NOT
+    write canonical or legacy App Data (the app must not persist merely
+    because it started, and must not create a Device override).
+    """
+    _apply_safe_schedule_to_ram()
+    cp.log(f'iPerf3 schedule disabled at startup: {reason}')
 
 
 def _validate_loaded_iperf3_schedule():
@@ -4871,13 +5872,13 @@ def _validate_loaded_iperf3_schedule():
     # intentionally defaults to Public mode, an old User-server schedule
     # must never silently resume after upgrade.
     if saved_source not in ('public', 'user'):
-        _reset_iperf3_schedule(
+        _disable_unsafe_schedule_at_startup(
             'legacy schedule has no 2.7 server-source metadata'
         )
         return
 
     if saved_source != active_mode:
-        _reset_iperf3_schedule(
+        _disable_unsafe_schedule_at_startup(
             f'saved source {saved_source} does not match '
             f'active mode {active_mode}'
         )
@@ -4898,7 +5899,7 @@ def _validate_loaded_iperf3_schedule():
                 cache
             )
         ):
-            _reset_iperf3_schedule(
+            _disable_unsafe_schedule_at_startup(
                 'saved Public server no longer exists '
                 'in the active catalog'
             )
@@ -4911,7 +5912,7 @@ def _validate_loaded_iperf3_schedule():
                 cache
             )
         ):
-            _reset_iperf3_schedule(
+            _disable_unsafe_schedule_at_startup(
                 'saved User server no longer exists '
                 'in the User Server List'
             )
@@ -4921,7 +5922,11 @@ def _switch_iperf3_server_mode(
     mode,
     confirm_schedule_reset=False
 ):
-    """Safely replace the single active iPerf3 server source."""
+    """Safely replace the single active iPerf3 server source.
+
+    Persistence is routed through the canonical Configuration Manager as an
+    ordinary Device-only Save. There is no management-scope prompt.
+    """
     global _iperf3_server_settings
     global _active_iperf3_server_cache
 
@@ -4976,6 +5981,8 @@ def _switch_iperf3_server_mode(
             schedule_config
         )
 
+    schedule_reset_needed = False
+
     if _iperf3_schedule_is_configured(
         schedule_snapshot
     ):
@@ -4987,51 +5994,52 @@ def _switch_iperf3_server_mode(
                 'schedule_reset_required': True
             }, 409
 
-        # Safety-first ordering: remove the automated job before changing
-        # its server-source configuration.
-        _reset_iperf3_schedule(
-            'iPerf3 server mode changed'
-        )
+        # The schedule reset is folded into the SAME canonical transaction as
+        # the server-mode change (one revision / one Group JSON). It is not
+        # persisted separately.
+        schedule_reset_needed = True
 
-    updated = dict(settings)
-    updated['server_mode'] = mode
+    # Canonical value carries ONLY server_mode. last_public_region is RAM-only
+    # runtime state and is corrected in RAM below, never persisted.
+    section_updates = {
+        'iperf3_server_settings': {'server_mode': mode},
+    }
+    if schedule_reset_needed:
+        section_updates['schedule'] = _safe_empty_schedule()
 
+    # Compute the corrected remembered region for RAM only.
+    remembered_region = settings.get('last_public_region', '')
     if mode == 'public':
-        valid_regions = candidate.get(
-            'regions',
-            []
-        )
+        valid_regions = candidate.get('regions', [])
+        if valid_regions and remembered_region not in valid_regions:
+            remembered_region = valid_regions[0]
 
-        if (
-            valid_regions
-            and updated.get('last_public_region')
-            not in valid_regions
-        ):
-            updated['last_public_region'] = (
-                valid_regions[0]
-            )
+    # Persist the change(s) as ONE Device-only transaction. The manager handles
+    # mutation gating, revision-pair reconciliation, sparse Device section
+    # update, and read-back verified writes. Runtime RAM/cache is updated by the
+    # hot-reload callback ONLY after a successful write.
+    apply = persist_config_section(None, None, updates=section_updates)
 
-    # Persist the new mode before making it the active runtime cache.
-    # If this write fails, the current source remains authoritative.
-    try:
-        _persist_iperf3_server_settings(
-            updated
-        )
+    if apply.action == 'reconciled':
+        return {'status': 'reconciled', 'error': apply.message}, 409
 
-    except Exception as e:
+    if apply.action == 'blocked':
+        return {'status': 'upgrade_required', 'error': apply.message,
+                'block_reason': apply.block_reason}, 409
+
+    if apply.action != 'saved':
         return {
-            'error':
-                'Unable to persist iPerf3 server mode: '
-                f'{e}'
+            'error': apply.message or 'Unable to persist iPerf3 server mode.'
         }, 500
 
+    # Local write succeeded; hot-reload refreshed server_mode in RAM. Set the
+    # RAM-only last_public_region to the corrected remembered value (runtime
+    # state, never persisted).
     with _iperf3_server_settings_lock:
-        _iperf3_server_settings = dict(
-            updated
-        )
+        if isinstance(_iperf3_server_settings, dict):
+            _iperf3_server_settings['last_public_region'] = remembered_region
 
-    # Atomic reference replacement. The previous source is no longer
-    # retained as the active server cache.
+    # Replace the active server-source cache with the validated candidate.
     with _active_iperf3_server_cache_lock:
         _active_iperf3_server_cache = (
             candidate
@@ -5092,17 +6100,10 @@ def _read_user_iperf3_servers_for_edit():
                 if isinstance(server, dict)
             ]
 
-    value = cp.get_appdata('iperf3_servers')
-
-    if not value:
-        return []
-
-    servers = json.loads(value)
-
-    if not isinstance(servers, list):
-        raise ValueError(
-            'iperf3_servers appdata must contain a JSON list'
-        )
+    # Effective User Server list from the two-layer manager; legacy is never a
+    # fallback once a canonical key exists (§16).
+    effective_users = config_mgr.active_section('iperf3_user_servers')
+    servers = effective_users if isinstance(effective_users, list) else []
 
     return [
         dict(server)
@@ -5180,11 +6181,24 @@ def _user_server_refs(servers):
     return refs
 
 
+# Sentinel returned by _guard_user_server_list_change when the caller must
+# fold a schedule reset into the same canonical persistence transaction.
+SCHEDULE_RESET_REQUIRED = 'schedule_reset_required'
+
+
 def _guard_user_server_list_change(
     final_servers,
     confirm_schedule_reset=False
 ):
-    """Protect a scheduled User endpoint from destructive changes."""
+    """Protect a scheduled User endpoint from destructive changes.
+
+    Returns:
+      - None: no scheduled dependency affected; persist the list normally.
+      - dict (409 body): confirmation required before the change.
+      - SCHEDULE_RESET_REQUIRED: confirmed; the caller MUST persist the safe
+        empty schedule together with the server-list change as ONE canonical
+        transaction (do not persist the schedule separately here).
+    """
     scheduled_ref = _user_schedule_server_ref()
 
     if not scheduled_ref:
@@ -5204,11 +6218,7 @@ def _guard_user_server_list_change(
             'schedule_reset_required': True
         }
 
-    _reset_iperf3_schedule(
-        'scheduled User iPerf3 server was removed or changed'
-    )
-
-    return None
+    return SCHEDULE_RESET_REQUIRED
 
 
 def _persist_last_public_region_after_test(region):
@@ -5244,17 +6254,15 @@ def _persist_last_public_region_after_test(region):
     updated['last_public_region'] = region
 
     try:
-        _persist_iperf3_server_settings(
-            updated
-        )
-
+        # last_public_region is last-used RUNTIME state: update RAM only.
+        # Never persist to canonical (no config_revision bump) or legacy.
         with _iperf3_server_settings_lock:
             _iperf3_server_settings = dict(
                 updated
             )
 
         cp.log(
-            f'Updated last Public iPerf3 region after test: {region}'
+            f'Updated last Public iPerf3 region after test (RAM): {region}'
         )
 
     except Exception as e:
@@ -7983,6 +8991,308 @@ def _iperf3_retryable_endpoint_reason(error):
     return ''
 
 
+def _iperf3_timeout_error(error):
+    """Return True only for an iPerf3 timeout-style error."""
+    message = str(error or '').strip().lower()
+
+    return (
+        'timed out' in message
+        or 'timeout' in message
+    )
+
+
+def _iperf3_validate_active_wan_path():
+    """Verify the selected WAN still owns the path after an iPerf3 timeout.
+
+    Returns:
+        Tuple of (healthy, detail).
+    """
+    guard = _active_iperf3_wan_guard
+
+    if not isinstance(guard, dict):
+        return False, 'WAN validation context unavailable'
+
+    device_uid = str(
+        guard.get('device_uid') or ''
+    ).strip()
+
+    source_ip = str(
+        guard.get('source_ip') or ''
+    ).strip()
+
+    expected_gateway = str(
+        guard.get('gateway') or ''
+    ).strip()
+
+    is_primary_wan = bool(
+        guard.get('is_primary_wan')
+    )
+
+    table_id = guard.get(
+        'source_route_table_id'
+    )
+
+    policy_index = guard.get(
+        'source_route_policy_index'
+    )
+
+    if not device_uid:
+        return False, 'selected WAN identity unavailable'
+
+    if not source_ip:
+        return False, 'selected WAN source IP unavailable'
+
+    # Gateway is supplemental validation data. Some NCOS WAN status
+    # responses may omit it even while the selected IPv4 WAN is healthy.
+    # When a baseline gateway is available, verify that it remains stable.
+    try:
+        devices = cp.get(
+            'status/wan/devices'
+        ) or {}
+
+        if not isinstance(devices, dict):
+            return False, 'WAN device state unavailable'
+
+        device = devices.get(
+            device_uid
+        )
+
+        if not isinstance(device, dict):
+            return False, 'selected WAN device disappeared'
+
+        status = device.get(
+            'status',
+            {}
+        )
+
+        if not isinstance(status, dict):
+            return False, 'selected WAN status unavailable'
+
+        connection_state = str(
+            status.get(
+                'connection_state',
+                ''
+            ) or ''
+        ).strip().lower()
+
+        if connection_state != 'connected':
+            return (
+                False,
+                'selected WAN is {}'.format(
+                    connection_state or 'not connected'
+                )
+            )
+
+        ipinfo = status.get(
+            'ipinfo',
+            {}
+        )
+
+        if not isinstance(ipinfo, dict):
+            return False, 'selected WAN IP state unavailable'
+
+        current_ip = str(
+            ipinfo.get(
+                'ip_address',
+                ''
+            ) or ''
+        ).strip()
+
+        if current_ip != source_ip:
+            return (
+                False,
+                'selected WAN source IP changed from {} to {}'.format(
+                    source_ip,
+                    current_ip or 'none'
+                )
+            )
+
+        current_gateway = str(
+            ipinfo.get(
+                'gateway',
+                ''
+            ) or ''
+        ).strip()
+
+        if (
+            expected_gateway
+            and current_gateway
+            and current_gateway != expected_gateway
+        ):
+            return (
+                False,
+                'selected WAN gateway changed from {} to {}'.format(
+                    expected_gateway,
+                    current_gateway or 'none'
+                )
+            )
+
+        if is_primary_wan:
+            current_primary = str(
+                cp.get_wan_primary_device() or ''
+            ).strip()
+
+            if current_primary != device_uid:
+                return (
+                    False,
+                    'primary WAN changed from {} to {}'.format(
+                        device_uid,
+                        current_primary or 'none'
+                    )
+                )
+
+            return True, 'selected primary WAN path healthy'
+
+        if not table_id or policy_index is None:
+            return (
+                False,
+                'non-primary source-routing context unavailable'
+            )
+
+        tables = _normalize_routing_list(
+            cp.get('config/routing/tables')
+        )
+
+        route_table = None
+
+        for table in tables:
+            if (
+                isinstance(table, dict)
+                and table.get('_id_') == table_id
+            ):
+                route_table = table
+                break
+
+        if route_table is None:
+            return (
+                False,
+                'temporary source-routing table disappeared'
+            )
+
+        routes = route_table.get(
+            'routes',
+            []
+        )
+
+        if not isinstance(routes, list):
+            return (
+                False,
+                'temporary source-routing table invalid'
+            )
+
+        route_valid = any(
+            isinstance(route, dict)
+            and route.get('ip_network') == '0.0.0.0/0'
+            and route.get('dev') == device_uid
+            and bool(route.get('auto_gateway'))
+            for route in routes
+        )
+
+        if not route_valid:
+            return (
+                False,
+                'temporary source route no longer targets selected WAN'
+            )
+
+        policy = cp.get(
+            'config/routing/policies/{}'.format(
+                policy_index
+            )
+        )
+
+        if not isinstance(policy, dict):
+            return (
+                False,
+                'temporary source-routing policy disappeared'
+            )
+
+        policy_valid = (
+            policy.get('table') == table_id
+            and policy.get('src_ip_network') == source_ip
+            and policy.get('ip_version') == 'ip4'
+            and policy.get('priority') == 1
+        )
+
+        if not policy_valid:
+            return (
+                False,
+                'temporary source-routing policy changed'
+            )
+
+        return True, 'selected non-primary WAN path healthy'
+
+    except Exception as exc:
+        return (
+            False,
+            'WAN path validation failed: {}'.format(
+                exc
+            )
+        )
+
+
+def _iperf3_runtime_retry_reason(error):
+    """Classify runtime retry eligibility without changing Reliability meaning.
+
+    Returns:
+        Tuple of (reason, listener_failure).
+
+        reason:
+            Non-empty when another listener port may be attempted.
+
+        listener_failure:
+            True only for the existing listener-specific failure classes
+            that are eligible for Reliability Endpoint Failure accounting.
+    """
+    listener_reason = (
+        _iperf3_retryable_endpoint_reason(
+            error
+        )
+    )
+
+    if listener_reason:
+        return (
+            listener_reason,
+            True
+        )
+
+    if not _iperf3_timeout_error(
+        error
+    ):
+        return (
+            '',
+            False
+        )
+
+    healthy, detail = (
+        _iperf3_validate_active_wan_path()
+    )
+
+    if healthy:
+        cp.log(
+            'iPerf3 timeout classified as retryable endpoint/path condition; '
+            '{}'.format(
+                detail
+            )
+        )
+
+        return (
+            'timed out',
+            False
+        )
+
+    cp.log(
+        'iPerf3 timeout classified as hard WAN/routing failure; '
+        '{}'.format(
+            detail
+        )
+    )
+
+    return (
+        '',
+        False
+    )
+
+
 def _choose_iperf3_unused_port(
     port_start,
     port_end,
@@ -8012,7 +9322,7 @@ def _choose_iperf3_unused_port(
     ) >= span:
         return None
 
-    # With a maximum attempted set of five ports, random collision
+    # With a maximum attempted set of three ports, random collision
     # probability is tiny for normal public-server ranges.
     for _ in range(
         16
@@ -8110,6 +9420,311 @@ def _get_public_iperf3_backup_server(
         return first
 
     return None
+
+
+def _iperf3_us_to_ms(value):
+    """Convert iPerf3 TCP microsecond telemetry to milliseconds."""
+    try:
+        return round(
+            float(value) / 1000.0,
+            3
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_iperf3_tcp_telemetry(data, direction):
+    """Extract compact TCP telemetry for history and future Insights."""
+    if not isinstance(
+        data,
+        dict
+    ):
+        return {}
+
+    start = data.get(
+        'start',
+        {}
+    )
+
+    end = data.get(
+        'end',
+        {}
+    )
+
+    sum_sent = end.get(
+        'sum_sent',
+        {}
+    )
+
+    stream_sender = {}
+
+    end_streams = end.get(
+        'streams',
+        []
+    )
+
+    if (
+        isinstance(
+            end_streams,
+            list
+        )
+        and end_streams
+    ):
+        first_end_stream = end_streams[0]
+
+        if isinstance(
+            first_end_stream,
+            dict
+        ):
+            stream_sender = (
+                first_end_stream.get(
+                    'sender',
+                    {}
+                )
+                or {}
+            )
+
+    telemetry = {
+        'direction':
+            direction,
+        'sender_scope':
+            (
+                'device'
+                if direction == 'upload'
+                else 'remote'
+            ),
+        'retransmissions':
+            int(
+                sum_sent.get(
+                    'retransmits',
+                    0
+                )
+                or 0
+            ),
+        'intervals':
+            []
+    }
+
+    test_start = start.get(
+        'test_start',
+        {}
+    )
+
+    if isinstance(
+        test_start,
+        dict
+    ):
+        telemetry[
+            'num_streams'
+        ] = int(
+            test_start.get(
+                'num_streams',
+                1
+            )
+            or 1
+        )
+
+    # Rich sender-side TCP telemetry is available when the E400 is the
+    # sender during the normal upload phase.
+    if direction == 'upload':
+        tcp_mss = start.get(
+            'tcp_mss_default'
+        )
+
+        if tcp_mss is not None:
+            telemetry[
+                'tcp_mss_bytes'
+            ] = tcp_mss
+
+        min_rtt = _iperf3_us_to_ms(
+            stream_sender.get(
+                'min_rtt'
+            )
+        )
+
+        mean_rtt = _iperf3_us_to_ms(
+            stream_sender.get(
+                'mean_rtt'
+            )
+        )
+
+        max_rtt = _iperf3_us_to_ms(
+            stream_sender.get(
+                'max_rtt'
+            )
+        )
+
+        if any(
+            value not in (
+                None,
+                0
+            )
+            for value in (
+                min_rtt,
+                mean_rtt,
+                max_rtt
+            )
+        ):
+            telemetry[
+                'rtt_ms'
+            ] = {
+                'min':
+                    min_rtt,
+                'avg':
+                    mean_rtt,
+                'max':
+                    max_rtt
+            }
+
+        max_cwnd = stream_sender.get(
+            'max_snd_cwnd'
+        )
+
+        if max_cwnd is not None:
+            telemetry[
+                'max_cwnd_bytes'
+            ] = max_cwnd
+
+        max_snd_wnd = stream_sender.get(
+            'max_snd_wnd'
+        )
+
+        if max_snd_wnd is not None:
+            telemetry[
+                'max_snd_wnd_bytes'
+            ] = max_snd_wnd
+
+    intervals = data.get(
+        'intervals',
+        []
+    )
+
+    if not isinstance(
+        intervals,
+        list
+    ):
+        intervals = []
+
+    for interval in intervals:
+        if not isinstance(
+            interval,
+            dict
+        ):
+            continue
+
+        interval_sum = interval.get(
+            'sum',
+            {}
+        )
+
+        if not isinstance(
+            interval_sum,
+            dict
+        ):
+            interval_sum = {}
+
+        item = {
+            'start_s':
+                interval_sum.get(
+                    'start'
+                ),
+            'end_s':
+                interval_sum.get(
+                    'end'
+                ),
+            'mbps':
+                round(
+                    float(
+                        interval_sum.get(
+                            'bits_per_second',
+                            0
+                        )
+                        or 0
+                    )
+                    / 1000000.0,
+                    3
+                )
+        }
+
+        interval_streams = interval.get(
+            'streams',
+            []
+        )
+
+        stream = (
+            interval_streams[0]
+            if (
+                isinstance(
+                    interval_streams,
+                    list
+                )
+                and interval_streams
+                and isinstance(
+                    interval_streams[0],
+                    dict
+                )
+            )
+            else {}
+        )
+
+        if direction == 'upload':
+            item[
+                'retransmissions'
+            ] = int(
+                stream.get(
+                    'retransmits',
+                    0
+                )
+                or 0
+            )
+
+            rtt_ms = _iperf3_us_to_ms(
+                stream.get(
+                    'rtt'
+                )
+            )
+
+            if rtt_ms is not None:
+                item[
+                    'rtt_ms'
+                ] = rtt_ms
+
+            rttvar_ms = _iperf3_us_to_ms(
+                stream.get(
+                    'rttvar'
+                )
+            )
+
+            if rttvar_ms is not None:
+                item[
+                    'rttvar_ms'
+                ] = rttvar_ms
+
+            if stream.get(
+                'snd_cwnd'
+            ) is not None:
+                item[
+                    'cwnd_bytes'
+                ] = stream.get(
+                    'snd_cwnd'
+                )
+
+            if stream.get(
+                'snd_wnd'
+            ) is not None:
+                item[
+                    'snd_wnd_bytes'
+                ] = stream.get(
+                    'snd_wnd'
+                )
+
+        telemetry[
+            'intervals'
+        ].append(
+            item
+        )
+
+    return telemetry
 
 
 def _run_iperf3_phase(
@@ -8497,6 +10112,11 @@ def _run_iperf3_phase(
                 )
         }
 
+    tcp_telemetry = _extract_iperf3_tcp_telemetry(
+        data,
+        stage
+    )
+
     summary_key = (
         'sum_received'
         if is_download
@@ -8571,6 +10191,8 @@ def _run_iperf3_phase(
             byte_count,
         'port':
             port,
+        'tcp_telemetry':
+            tcp_telemetry,
         'error':
             ''
     }
@@ -8587,11 +10209,12 @@ def _iperf3_search_download_ports(
     bind_dev,
     is_primary_wan
 ):
-    """Search at most five unique listener ports for Downlink."""
+    """Search at most three unique listener ports for Downlink."""
     attempted = set()
+    listener_failures = set()
 
     budget = min(
-        5,
+        3,
         (
             int(
                 port_end
@@ -8616,6 +10239,8 @@ def _iperf3_search_download_ports(
                 'hard_failure': True,
                 'attempted':
                     attempted,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     None,
                 'error':
@@ -8659,6 +10284,8 @@ def _iperf3_search_download_ports(
                 'hard_failure': False,
                 'attempted':
                     attempted,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     attempt_port,
                 'bps':
@@ -8670,17 +10297,28 @@ def _iperf3_search_download_ports(
                     phase.get(
                         'bytes'
                     ),
+                'tcp_telemetry':
+                    phase.get(
+                        'tcp_telemetry',
+                        {}
+                    ),
                 'error':
                     ''
             }
 
-        reason = (
-            _iperf3_retryable_endpoint_reason(
-                phase.get(
-                    'error'
-                )
+        (
+            reason,
+            listener_failure
+        ) = _iperf3_runtime_retry_reason(
+            phase.get(
+                'error'
             )
         )
+
+        if listener_failure:
+            listener_failures.add(
+                attempt_port
+            )
 
         if not reason:
             return {
@@ -8688,6 +10326,8 @@ def _iperf3_search_download_ports(
                 'hard_failure': True,
                 'attempted':
                     attempted,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     attempt_port,
                 'error':
@@ -8740,6 +10380,8 @@ def _iperf3_search_download_ports(
             False,
         'attempted':
             attempted,
+        'listener_failure_ports':
+            listener_failures,
         'port':
             (
                 last_phase.get(
@@ -8775,6 +10417,8 @@ def _iperf3_run_upload_with_retries(
     is_primary_wan
 ):
     """Run Uplink on the locked server with the shared port budget."""
+    listener_failures = set()
+
     phase = _run_iperf3_phase(
         iperf3_bin,
         server,
@@ -8793,6 +10437,8 @@ def _iperf3_run_upload_with_retries(
         return {
             'success':
                 True,
+            'listener_failure_ports':
+                listener_failures,
             'port':
                 successful_download_port,
             'bps':
@@ -8804,22 +10450,35 @@ def _iperf3_run_upload_with_retries(
                 phase.get(
                     'bytes'
                 ),
+            'tcp_telemetry':
+                phase.get(
+                    'tcp_telemetry',
+                    {}
+                ),
             'error':
                 ''
         }
 
-    reason = (
-        _iperf3_retryable_endpoint_reason(
-            phase.get(
-                'error'
-            )
+    (
+        reason,
+        listener_failure
+    ) = _iperf3_runtime_retry_reason(
+        phase.get(
+            'error'
         )
     )
+
+    if listener_failure:
+        listener_failures.add(
+            successful_download_port
+        )
 
     if not reason:
         return {
             'success':
                 False,
+            'listener_failure_ports':
+                listener_failures,
             'port':
                 successful_download_port,
             'bps':
@@ -8834,7 +10493,7 @@ def _iperf3_run_upload_with_retries(
         }
 
     budget = min(
-        5,
+        3,
         (
             int(
                 port_end
@@ -8857,6 +10516,8 @@ def _iperf3_run_upload_with_retries(
             return {
                 'success':
                     False,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     last_phase.get(
                         'port'
@@ -8940,6 +10601,8 @@ def _iperf3_run_upload_with_retries(
             return {
                 'success':
                     True,
+                'listener_failure_ports':
+                    listener_failures,
                 'port':
                     attempt_port,
                 'bps':
@@ -8951,17 +10614,28 @@ def _iperf3_run_upload_with_retries(
                     phase.get(
                         'bytes'
                     ),
+                'tcp_telemetry':
+                    phase.get(
+                        'tcp_telemetry',
+                        {}
+                    ),
                 'error':
                     ''
             }
 
-        reason = (
-            _iperf3_retryable_endpoint_reason(
-                phase.get(
-                    'error'
-                )
+        (
+            reason,
+            listener_failure
+        ) = _iperf3_runtime_retry_reason(
+            phase.get(
+                'error'
             )
         )
+
+        if listener_failure:
+            listener_failures.add(
+                attempt_port
+            )
 
         if not reason:
             break
@@ -8969,6 +10643,8 @@ def _iperf3_run_upload_with_retries(
     return {
         'success':
             False,
+        'listener_failure_ports':
+            listener_failures,
         'port':
             last_phase.get(
                 'port'
@@ -8985,6 +10661,316 @@ def _iperf3_run_upload_with_retries(
     }
 
 
+def _run_iperf3_udp_jitter_probe(
+    iperf3_bin,
+    server,
+    port,
+    bind_ip,
+    bind_dev=''
+):
+    """Run one non-fatal UDP probe and return iPerf3 jitter in ms."""
+    global current_test
+    global _active_iperf3_process
+
+    probe_duration = 5
+
+    if not current_test.get(
+        'running'
+    ):
+        return None
+
+    healthy, detail = (
+        _iperf3_validate_active_wan_path()
+    )
+
+    if not healthy:
+        cp.log(
+            'iPerf3 jitter probe skipped because selected WAN '
+            'path changed or became unavailable: {}'.format(
+                detail
+            )
+        )
+
+        return None
+
+    with test_lock:
+        current_test[
+            'progress'
+        ] = {
+            'stage':
+                'jitter',
+            'percent':
+                0,
+            'message':
+                'Measuring jitter...'
+        }
+
+    command = [
+        iperf3_bin,
+        '-c',
+        server,
+        '-p',
+        str(port),
+        '-u',
+        '-b',
+        '1M',
+        '-t',
+        str(probe_duration),
+        '-J',
+        '-4'
+    ]
+
+    if bind_ip:
+        command.extend([
+            '-B',
+            bind_ip
+        ])
+
+    if bind_dev:
+        command.extend([
+            '--bind-dev',
+            bind_dev
+        ])
+
+    cp.log(
+        'iPerf3 jitter cmd: {}'.format(
+            ' '.join(
+                command
+            )
+        )
+    )
+
+    proc = None
+
+    try:
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        with _iperf3_process_lock:
+            _active_iperf3_process = proc
+
+        # Preserve Stop-button behavior if cancellation happened while
+        # the subprocess was being registered.
+        with test_lock:
+            cancel_requested = not current_test.get(
+                'running'
+            )
+
+        if cancel_requested:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+        try:
+            stdout, stderr = proc.communicate(
+                timeout=probe_duration + 15
+            )
+
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+            try:
+                proc.communicate()
+            except Exception:
+                pass
+
+            cp.log(
+                'iPerf3 jitter probe timed out; jitter unavailable'
+            )
+
+            return None
+
+        with test_lock:
+            cancel_requested = not current_test.get(
+                'running'
+            )
+
+        if cancel_requested:
+            return None
+
+        if proc.returncode != 0:
+            try:
+                error = _parse_iperf3_error(
+                    stdout,
+                    stderr
+                )
+            except Exception:
+                error = (
+                    stderr.decode(
+                        'utf-8',
+                        errors='replace'
+                    ).strip()
+                    if stderr
+                    else 'unknown error'
+                )
+
+            cp.log(
+                'iPerf3 jitter probe unavailable: {}'.format(
+                    error
+                )
+            )
+
+            return None
+
+        healthy, detail = (
+            _iperf3_validate_active_wan_path()
+        )
+
+        if not healthy:
+            cp.log(
+                'iPerf3 jitter result discarded because selected WAN '
+                'path changed during the probe: {}'.format(
+                    detail
+                )
+            )
+
+            return None
+
+        try:
+            data = json.loads(
+                stdout.decode(
+                    'utf-8'
+                )
+            )
+
+        except Exception as exc:
+            cp.log(
+                'iPerf3 jitter JSON unavailable: {}'.format(
+                    exc
+                )
+            )
+
+            return None
+
+        end = data.get(
+            'end',
+            {}
+        )
+
+        candidates = []
+
+        # iPerf3 UDP JSON structure can expose receiver jitter through
+        # the aggregate result and/or the per-stream UDP object.
+        for key in (
+            'sum',
+            'sum_received',
+            'sum_sent'
+        ):
+            obj = end.get(
+                key,
+                {}
+            )
+
+            if isinstance(
+                obj,
+                dict
+            ):
+                candidates.append(
+                    obj.get(
+                        'jitter_ms'
+                    )
+                )
+
+        streams = end.get(
+            'streams',
+            []
+        )
+
+        if (
+            isinstance(
+                streams,
+                list
+            )
+            and streams
+            and isinstance(
+                streams[0],
+                dict
+            )
+        ):
+            first_stream = streams[0]
+
+            for key in (
+                'udp',
+                'receiver',
+                'sender'
+            ):
+                obj = first_stream.get(
+                    key,
+                    {}
+                )
+
+                if isinstance(
+                    obj,
+                    dict
+                ):
+                    candidates.append(
+                        obj.get(
+                            'jitter_ms'
+                        )
+                    )
+
+        jitter_ms = None
+
+        for value in candidates:
+            if value is None:
+                continue
+
+            try:
+                parsed = float(
+                    value
+                )
+            except (
+                TypeError,
+                ValueError
+            ):
+                continue
+
+            if parsed >= 0:
+                jitter_ms = round(
+                    parsed,
+                    3
+                )
+                break
+
+        if jitter_ms is None:
+            cp.log(
+                'iPerf3 jitter probe completed but returned no jitter value'
+            )
+
+            return None
+
+        cp.log(
+            'iPerf3 UDP jitter: {:.3f} ms'.format(
+                jitter_ms
+            )
+        )
+
+        return jitter_ms
+
+    except Exception as exc:
+        # Jitter is supplemental. It must never change TCP test status.
+        cp.log(
+            'iPerf3 jitter probe failed non-fatally: {}'.format(
+                exc
+            )
+        )
+
+        return None
+
+    finally:
+        if proc is not None:
+            with _iperf3_process_lock:
+                if _active_iperf3_process is proc:
+                    _active_iperf3_process = None
+
+
 def run_iperf3(
     server,
     duration=10,
@@ -8993,7 +10979,9 @@ def run_iperf3(
     context=None
 ):
     """Run bounded iPerf3 retries with optional Public backup."""
-    global current_test
+    global current_test, _active_iperf3_wan_guard
+
+    _active_iperf3_wan_guard = None
 
     context = (
         context
@@ -9105,6 +11093,7 @@ def run_iperf3(
 
     bind_ip = ''
     bind_dev = ''
+    selected_gateway = ''
     is_primary_wan = False
     matched_uid = ''
 
@@ -9147,6 +11136,17 @@ def run_iperf3(
                             {}
                         ).get(
                             'ip_address',
+                            ''
+                        )
+
+                        selected_gateway = dev.get(
+                            'status',
+                            {}
+                        ).get(
+                            'ipinfo',
+                            {}
+                        ).get(
+                            'gateway',
                             ''
                         )
 
@@ -9287,6 +11287,83 @@ def run_iperf3(
         if use_source_routing
         else bind_dev
     )
+
+    guard_uid = matched_uid
+
+    # Auto mode follows the current primary WAN. Do not change the
+    # existing bind behavior; this lookup is validation-only.
+    if not interface:
+        guard_uid = primary_uid
+
+    guard_source_ip = bind_ip
+    guard_gateway = selected_gateway
+
+    if guard_uid and (
+        not guard_source_ip
+        or not guard_gateway
+    ):
+        try:
+            guard_devices = cp.get(
+                'status/wan/devices'
+            ) or {}
+
+            if isinstance(
+                guard_devices,
+                dict
+            ):
+                guard_device = guard_devices.get(
+                    guard_uid,
+                    {}
+                )
+
+                if isinstance(
+                    guard_device,
+                    dict
+                ):
+                    guard_ipinfo = guard_device.get(
+                        'status',
+                        {}
+                    ).get(
+                        'ipinfo',
+                        {}
+                    )
+
+                    if not guard_source_ip:
+                        guard_source_ip = guard_ipinfo.get(
+                            'ip_address',
+                            ''
+                        )
+
+                    if not guard_gateway:
+                        guard_gateway = guard_ipinfo.get(
+                            'gateway',
+                            ''
+                        )
+
+        except Exception as exc:
+            cp.log(
+                'iPerf3 WAN validation snapshot warning: {}'.format(
+                    exc
+                )
+            )
+
+    _active_iperf3_wan_guard = {
+        'device_uid':
+            guard_uid,
+        'source_ip':
+            guard_source_ip,
+        'gateway':
+            guard_gateway,
+        'is_primary_wan':
+            bool(
+                guard_uid
+                and guard_uid == primary_uid
+            ),
+        'source_route_table_id':
+            source_route_table_id,
+        'source_route_policy_index':
+            source_route_policy_index,
+    }
 
     try:
         locked_server = server
@@ -9667,8 +11744,90 @@ def run_iperf3(
             'upload_port':
                 upload.get(
                     'port'
-                )
+                ),
+            'iperf3_tcp': {
+                'download':
+                    download.get(
+                        'tcp_telemetry',
+                        {}
+                    ),
+                'upload':
+                    upload.get(
+                        'tcp_telemetry',
+                        {}
+                    )
+            }
         }
+
+        upload_tcp = result[
+            'iperf3_tcp'
+        ].get(
+            'upload',
+            {}
+        )
+
+        upload_rtt = upload_tcp.get(
+            'rtt_ms',
+            {}
+        )
+
+        if upload_rtt.get(
+            'avg'
+        ) not in (
+            None,
+            0
+        ):
+            result[
+                'latency_ms'
+            ] = upload_rtt.get(
+                'avg'
+            )
+
+            result[
+                'latency_min_ms'
+            ] = upload_rtt.get(
+                'min'
+            )
+
+            result[
+                'latency_max_ms'
+            ] = upload_rtt.get(
+                'max'
+            )
+
+        result[
+            'retransmissions'
+        ] = upload_tcp.get(
+            'retransmissions',
+            0
+        )
+
+        if (
+            upload.get(
+                'success'
+            )
+            and context.get(
+                'include_latency',
+                False
+            )
+            and current_test.get(
+                'running'
+            )
+        ):
+            jitter_ms = _run_iperf3_udp_jitter_probe(
+                iperf3_bin,
+                locked_server,
+                upload.get(
+                    'port'
+                ),
+                bind_ip,
+                effective_bind_dev
+            )
+
+            if jitter_ms is not None:
+                result[
+                    'jitter_ms'
+                ] = jitter_ms
 
         if not upload.get(
             'success'
@@ -9723,6 +11882,8 @@ def run_iperf3(
                 source_route_table_id,
                 source_route_policy_index
             )
+
+        _active_iperf3_wan_guard = None
 
 
 
@@ -9921,11 +12082,10 @@ def run_ookla(interface=''):
 def write_outputs(entry):
     """Write test results to configured output paths."""
     try:
-        val = cp.get_appdata('speedtest_outputs')
-        if not val:
-            return
-        outputs = json.loads(val)
-        if not outputs:
+        # Configured output targets: EFFECTIVE (Device>Group>Default) from the
+        # two-layer manager. Legacy App Data is never a fallback (§16).
+        outputs = config_mgr.active_section('outputs')
+        if not isinstance(outputs, list) or not outputs:
             return
 
         # Format result text with datetime and interface/carrier
@@ -10302,6 +12462,35 @@ def run_test_thread(engine, params):
                 ] = result.get(
                     'upload_port'
                 )
+
+                entry[
+                    'latency_min_ms'
+                ] = result.get(
+                    'latency_min_ms'
+                )
+
+                entry[
+                    'latency_max_ms'
+                ] = result.get(
+                    'latency_max_ms'
+                )
+
+                entry[
+                    'retransmissions'
+                ] = int(
+                    result.get(
+                        'retransmissions',
+                        0
+                    )
+                    or 0
+                )
+
+                entry[
+                    'iperf3_tcp'
+                ] = result.get(
+                    'iperf3_tcp',
+                    {}
+                )
             if status_val == 'failed':
                 entry['error'] = result.get('error', 'Test returned zero results')
                 entry['status_message'] = (
@@ -10337,6 +12526,20 @@ def run_test_thread(engine, params):
             cellular = _collect_cellular_snapshot(interface)
             if cellular:
                 entry['cellular'] = cellular
+
+            # Only tests with a proven traffic-active serving-cell handoff
+            # incur the short +2/+4/+6 second stabilization window. The
+            # immediate top-level cellular snapshot above is intentionally
+            # captured first so its semantics do not change.
+            if carrier_collector:
+                try:
+                    carrier_collector.collect_post_test_stability()
+                except Exception as e:
+                    cp.log(
+                        'Carrier telemetry post-test check error '
+                        f'(non-fatal): {e}'
+                    )
+
             # Add carrier activity telemetry from collector
             if carrier_collector:
                 try:
@@ -10352,6 +12555,15 @@ def run_test_thread(engine, params):
             # Write to configured outputs (only for successful tests)
             if status_val == 'complete':
                 write_outputs(entry)
+                # v1.1.3: silent automatic OpenCellID contribution hook. Runs
+                # ONLY after a completed cellular test/history result, never
+                # from polling/page load/reboot/history selection/rendering.
+                # Fully gated + contained; never affects the test result.
+                try:
+                    _maybe_auto_contribute_after_test(entry)
+                except Exception as _auto_exc:
+                    cp.log('GeoView auto-contribution (non-fatal): %s'
+                           % geo_secrets.scrub(_auto_exc))
             with test_lock:
                 current_test['progress'] = {
                     'stage': 'complete',
@@ -10415,6 +12627,20 @@ def run_test_thread(engine, params):
             cellular = _collect_cellular_snapshot(interface)
             if cellular:
                 entry['cellular'] = cellular
+
+            # Only tests with a proven traffic-active serving-cell handoff
+            # incur the short +2/+4/+6 second stabilization window. The
+            # immediate top-level cellular snapshot above is intentionally
+            # captured first so its semantics do not change.
+            if carrier_collector:
+                try:
+                    carrier_collector.collect_post_test_stability()
+                except Exception as e:
+                    cp.log(
+                        'Carrier telemetry post-test check error '
+                        f'(non-fatal): {e}'
+                    )
+
             # Add carrier activity telemetry from collector
             if carrier_collector:
                 try:
@@ -10640,6 +12866,142 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                     if part.startswith('iface='):
                         iface = part[6:]
             self.send_json(self.get_cellular_status(iface))
+        elif self.path == '/api/geo_gps':
+            self.send_json(
+                self.get_geo_gps()
+            )
+
+        elif self.path == '/api/geo_settings':
+            self.send_json(
+                _effective_geo_settings()
+            )
+
+        elif (
+            self.path == '/api/cellular_analysis'
+            or self.path.startswith('/api/cellular_analysis?')
+        ):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+
+            history = load_history()
+
+            # Normal Cellular Analysis remains scoped by the lower-page
+            # Interface and History controls.
+            analysis = build_cellular_analysis(
+                history,
+                interface=params.get(
+                    'iface',
+                    ['']
+                )[0],
+                scope=params.get(
+                    'history',
+                    ['all']
+                )[0],
+                selected_cell_key=params.get(
+                    'cell',
+                    ['']
+                )[0],
+            )
+
+            # GeoView presentation follows the same Interface + History
+            # Range used by Cellular Analysis. The inventory builder remains
+            # site-wide by default for resolver/contribution/map callers.
+            analysis_scope = (
+                analysis.get('scope')
+                or {}
+            )
+
+            site_inventory = (
+                build_site_cell_inventory(
+                    history,
+                    interface=analysis_scope.get(
+                        'interface',
+                        ''
+                    ),
+                    scope=analysis_scope.get(
+                        'history',
+                        'all'
+                    ),
+                )
+            )
+
+            geo = dict(
+                analysis.get('geo')
+                or {}
+            )
+
+            geo.update({
+                'cells':
+                    site_inventory.get(
+                        'cells',
+                        []
+                    ),
+
+                'interfaces':
+                    site_inventory.get(
+                        'interfaces',
+                        []
+                    ),
+
+                'tests':
+                    site_inventory.get(
+                        'tests',
+                        0
+                    ),
+
+                # External cell-location providers are intentionally not
+                # implemented in the v1.1.1 foundation.
+                'estimated_locations': 0,
+            })
+
+            analysis['geo'] = (
+                apply_geo_settings(
+                    geo,
+                    _effective_geo_settings(),
+                )
+            )
+
+            # v1.1.3: attach already-cached Geo enrichment (metadata only).
+            # This is a READ of the resolve job's cache; it must NEVER initiate
+            # a provider request (HLD §2, LLD §5, J7).
+            #
+            # Local Only (provider=none) SUPPRESSES enrichment/estimated
+            # locations from the active presentation but does NOT delete the
+            # on-disk cache. Geolocation Services (provider=opencellid) surfaces
+            # any valid cached enrichment immediately.
+            try:
+                enrichment = (
+                    geo_resolver.job().enrichment(GEO_CELL_PROVIDER)
+                    if _effective_geo_provider() == 'opencellid'
+                    else {})
+                if enrichment:
+                    analysis['geo']['enrichment'] = enrichment
+                    analysis['geo']['estimated_locations'] = sum(
+                        1 for item in enrichment.values()
+                        if item.get('location')
+                    )
+            except Exception as exc:
+                # Enrichment is best-effort; never break Cellular Analysis.
+                cp.log('GeoView enrichment read skipped: %s'
+                       % geo_secrets.scrub(exc))
+
+            self.send_json(
+                analysis
+            )
+
+        elif self.path == '/api/geo/status':
+            self.send_json(self.get_geo_status())
+        elif self.path == '/api/geo/creds/status':
+            self.send_json(self.get_geo_creds_status())
+        elif (
+            self.path == '/api/geo/mapjs'
+            or self.path.startswith('/api/geo/mapjs?')
+        ):
+            # Browser Maps JavaScript key + resolved SITE/A/B/C markers. The
+            # interactive Google Maps JavaScript map is the only live GeoView
+            # map (Static Maps removed in v1.1.3 cleanup).
+            self.handle_geo_map_js()
+
         elif self.path == '/api/version':
             self.send_json({'version': APP_VERSION})
         elif self.path == '/api/capabilities' or self.path.startswith('/api/capabilities?'):
@@ -10657,12 +13019,16 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         elif self.path == '/api/schedule':
             with schedule_lock:
                 data = dict(schedule_config)
-            # Compute seconds until next cron match
-            if data.get('enabled') and data.get('cron'):
+            # 'enabled'/'autostart' are the persisted intent; 'running' is the
+            # runtime state (may be false after a restart when autostart is off
+            # even though enabled=true). Countdown reflects the RUNTIME state.
+            if data.get('running') and data.get('cron'):
                 data['next_run_seconds'] = self._seconds_to_next_cron(data['cron'])
             self.send_json(data)
         elif self.path == '/api/outputs':
             self.send_json(self.get_outputs())
+        elif self.path == '/api/config/state':
+            self.handle_config_state()
         elif self.path == '/api/iperf3/server_state':
             self.send_json(
                 _get_active_iperf3_server_state()
@@ -10728,6 +13094,52 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_save_schedule()
         elif self.path == '/api/outputs':
             self.handle_save_outputs()
+        elif self.path == '/api/geo_settings':
+            self.handle_save_geo_settings()
+        # --- GeoView v1.1.3: resolution job + Device credential endpoints ---
+        elif self.path == '/api/geo/resolve':
+            self.handle_geo_resolve()
+        elif self.path == '/api/geo/creds/update':
+            self.handle_geo_creds_update()
+        elif self.path == '/api/geo/creds/clear':
+            self.handle_geo_creds_clear()
+        elif self.path == '/api/geo/creds/record/update':
+            self.handle_geo_creds_record_update()
+        elif self.path == '/api/geo/creds/record/clear':
+            self.handle_geo_creds_record_clear()
+        elif self.path == '/api/geo/creds/reset':
+            self.handle_geo_creds_reset()
+        elif self.path == '/api/geo/contribute':
+            self.handle_geo_contribute()
+        # --- Two-layer Configuration Management endpoints (v1.1.2) ----------
+        elif self.path == '/api/config/state':
+            self.handle_config_state()
+        elif self.path == '/api/config/convert':
+            self.handle_config_convert()
+        elif self.path == '/api/config/group_upgrade_candidate':
+            self.handle_config_group_upgrade_candidate()
+        elif self.path == '/api/config/migrate/sections':
+            self.handle_config_migrate_sections()
+        elif self.path == '/api/config/migrate/candidate':
+            self.handle_config_migrate_candidate()
+        elif self.path == '/api/config/migrate/validate':
+            self.handle_config_migrate_validate()
+        elif self.path == '/api/config/migrate/cleanup':
+            self.handle_config_migrate_cleanup()
+        elif self.path == '/api/config/update_group/sections':
+            self.handle_config_update_group_sections()
+        elif self.path == '/api/config/update_group/candidate':
+            self.handle_config_update_group_candidate()
+        elif self.path == '/api/config/update_group/validate':
+            self.handle_config_update_group_validate()
+        elif self.path == '/api/config/update_group/cleanup':
+            self.handle_config_update_group_cleanup()
+        elif self.path == '/api/config/reset_section':
+            self.handle_config_reset_section()
+        elif self.path == '/api/config/reset':
+            self.handle_config_reset()
+        elif self.path == '/api/config/factory_reset':
+            self.handle_config_factory_reset()
         else:
             self.send_error(404)
 
@@ -10737,6 +13149,853 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.handle_delete_server()
         else:
             self.send_error(404)
+
+    # =====================================================================
+    # CANONICAL CONFIGURATION MANAGEMENT ENDPOINTS (v1.1.2)
+    # =====================================================================
+
+    def handle_config_state(self):
+        """Return the two-layer configuration state (§53).
+
+        Exposes the LOCKED new model: derived state, per-layer presence /
+        revision / schema_version, override sections, and mutation-block info.
+        Old origin/mode is NEVER exposed as the source of truth.
+        """
+        try:
+            report = config_mgr.state_report()
+
+            try:
+                report['history_count'] = len(load_history())
+            except Exception:
+                report['history_count'] = None
+            report['history_capacity'] = MAX_HISTORY
+            report['app_version'] = APP_VERSION
+
+            self.send_json(report)
+        except Exception as exc:
+            cp.log(f'Config state error: {exc}')
+            self.send_json({'error': 'Unable to read configuration state.'},
+                           500)
+
+    def handle_config_convert(self):
+        """Convert legacy/experimental OR older-schema Device config (§17-§21,
+        §49). This is the ONLY action that migrates data to
+        speedtest_analyzer_device."""
+        block = config_mgr.mutation_blocked()
+        device_load = config_mgr._load_layer('device')
+        if device_load.status == 'older':
+            result = config_mgr.convert_older_device_schema()
+        else:
+            result = config_mgr.convert_legacy_to_device()
+        if result.status == 'saved':
+            self.send_json({'status': 'converted', 'message': result.message})
+        else:
+            self.send_json({'status': 'error',
+                            'error': result.error or 'Conversion failed.'},
+                           409)
+
+    def handle_config_group_upgrade_candidate(self):
+        """Return an upgraded Group JSON candidate for an older Group schema
+        (§50). Never written locally."""
+        cand = config_mgr.build_group_upgrade_candidate()
+        if cand is None:
+            self.send_json({'error': 'No older-schema Group configuration to '
+                                     'upgrade.'}, 409)
+            return
+        self.send_json({
+            'status': 'candidate',
+            'sdk_data_name': config_mgr.GROUP_KEY,
+            'config_json': cand.to_json(),
+            'group_revision': cand.group_revision,
+        })
+
+    # --- Group Migration wizard (selection-only, group-first) ---------------
+
+    def handle_config_migrate_sections(self):
+        """Return the configured Device sections eligible for Group promotion
+        (§25). Selection only; no configuration values are editable here."""
+        try:
+            sections = config_mgr.migration_available_sections()
+            self.send_json({'status': 'ok', 'sections': sections})
+        except Exception as exc:
+            cp.log(f'Migration sections error: {exc}')
+            self.send_json({'error': 'Unable to read migration sections.'},
+                           500)
+
+    def handle_config_migrate_candidate(self):
+        """Validate the selection and build the Group candidate JSON (§27-§29).
+
+        Nothing is written locally. Returns the SDK Data NAME and the complete
+        Group JSON VALUE for the user to paste into the NCM Group.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        selected = data.get('sections')
+        if not isinstance(selected, list):
+            self.send_json({'error': 'sections list required.'}, 400)
+            return
+        cand, reason = config_mgr.build_group_migration_candidate(selected)
+        if cand is None:
+            self.send_json({'status': 'invalid', 'reason': reason}, 409)
+            return
+        self.send_json({
+            'status': 'candidate',
+            'sdk_data_name': config_mgr.GROUP_KEY,
+            'config_json': cand.to_json(),
+            'group_revision': cand.group_revision,
+            'promoted_sections': selected,
+        })
+
+    def handle_config_migrate_validate(self):
+        """Validate the expected Group payload is visible on device (§30).
+
+        Does NOT claim NCM provenance. Does NOT mutate the Device document.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        try:
+            revision = int(data.get('group_revision', 1))
+        except Exception:
+            revision = 1
+        result = config_mgr.validate_group_present(revision)
+        if result.ok:
+            self.send_json({'status': 'validated', 'message': result.reason})
+        else:
+            self.send_json({'status': 'not_yet', 'reason': result.reason})
+
+    def handle_config_migrate_cleanup(self):
+        """Trim promoted sections from the Device document AFTER Group
+        validation (§31, §32, §34). Supports cleanup retry on failure."""
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        promoted = data.get('promoted_sections')
+        if not isinstance(promoted, list):
+            self.send_json({'error': 'promoted_sections list required.'}, 400)
+            return
+        result = config_mgr.trim_promoted_device_sections(promoted)
+        if result.status == 'saved':
+            self.send_json({'status': 'complete', 'message': result.message})
+        else:
+            # Group stays intact; Device cleanup incomplete -> allow retry.
+            self.send_json({'status': 'cleanup_incomplete',
+                            'error': result.error}, 409)
+
+    # --- Update NCM Group Configuration (promote into an EXISTING Group) -----
+
+    def handle_config_update_group_sections(self):
+        """Return the current Device overrides eligible for Group update.
+
+        Same shape as the migrate wizard: {section, label, default_selected,
+        promotable, reason}. Shows ONLY current Device overrides.
+        """
+        try:
+            sections = config_mgr.update_group_available_sections()
+            self.send_json({'status': 'ok', 'sections': sections})
+        except Exception as exc:
+            cp.log(f'Update-group sections error: {exc}')
+            self.send_json({'error': 'Unable to read Device overrides.'}, 500)
+
+    def handle_config_update_group_candidate(self):
+        """Validate the selection and build the REVISED Group candidate JSON.
+
+        Starts from a deep copy of the current Group and promotes ONLY the
+        selected Device sections. group_revision = current + 1. Nothing is
+        written locally. Returns the SDK Data NAME, the complete revised Group
+        VALUE, the current + new group_revision, the promoted sections, and the
+        reconciliation token (group_revision, device_revision).
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        selected = data.get('sections')
+        if not isinstance(selected, list):
+            self.send_json({'error': 'sections list required.'}, 400)
+            return
+        cand, reason, token = config_mgr.build_group_update_candidate(selected)
+        if cand is None:
+            self.send_json({'status': 'invalid', 'reason': reason}, 409)
+            return
+        self.send_json({
+            'status': 'candidate',
+            'sdk_data_name': config_mgr.GROUP_KEY,
+            'config_json': cand.to_json(),
+            'new_group_revision': cand.group_revision,
+            'current_group_revision': cand.group_revision - 1,
+            'promoted_sections': selected,
+            'token': token,
+        })
+
+    def handle_config_update_group_validate(self):
+        """Validate the revised Group payload is visible at the new revision.
+
+        Honors the reconciliation token: if the Device changed during the
+        staged workflow the update is aborted and the user must restart. Does
+        NOT mutate the Device document; does NOT claim NCM provenance.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        try:
+            revision = int(data.get('new_group_revision'))
+        except Exception:
+            self.send_json({'error': 'new_group_revision required.'}, 400)
+            return
+        token = data.get('token')
+        if token is not None and not isinstance(token, dict):
+            self.send_json({'error': 'token must be an object.'}, 400)
+            return
+        result = config_mgr.validate_group_update(revision, token=token)
+        if result.ok:
+            self.send_json({'status': 'validated', 'message': result.reason})
+        elif getattr(result, 'reconcile_aborted', False):
+            # Device changed during the staged workflow: this is NOT a
+            # "retry validate" case -- the whole workflow must be restarted.
+            self.send_json({'status': 'reconcile_aborted',
+                            'reason': result.reason}, 409)
+        else:
+            self.send_json({'status': 'not_yet', 'reason': result.reason})
+
+    def handle_config_update_group_cleanup(self):
+        """Remove promoted Device sections AFTER the revised Group validated.
+
+        Honors the reconciliation token. On failure the Group is left intact
+        and cleanup_incomplete is returned (Device still wins); Retry allowed.
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        promoted = data.get('promoted_sections')
+        if not isinstance(promoted, list):
+            self.send_json({'error': 'promoted_sections list required.'}, 400)
+            return
+        token = data.get('token')
+        if token is not None and not isinstance(token, dict):
+            self.send_json({'error': 'token must be an object.'}, 400)
+            return
+        result = config_mgr.cleanup_promoted_after_group_update(
+            promoted, token=token)
+        if result.status == 'saved':
+            self.send_json({'status': 'complete', 'message': result.message})
+        elif getattr(result, 'reconcile_aborted', False):
+            # Device changed during the staged workflow: restart required, NOT
+            # a cleanup retry (retrying with a stale token keeps failing).
+            self.send_json({'status': 'reconcile_aborted',
+                            'error': result.error}, 409)
+        else:
+            self.send_json({'status': 'cleanup_incomplete',
+                            'error': result.error}, 409)
+
+    # --- Device override reset (§36, §37) -----------------------------------
+
+    def handle_config_reset_section(self):
+        """Reset ONE Device override section (§36).
+
+        The manager validates the PROPOSED effective config first. When the
+        requested reset alone would create a dependency conflict (the confirmed
+        iPerf3 schedule <-> server-mode defect) it returns
+        dependency_reset_required with the coupled sections and NOTHING is
+        written; the frontend confirms a coupled reset by re-POSTing with
+        confirm_sections. On success reset_target says whether the section
+        inherited the NCM Group value or the Built-in Default (§ wording fix).
+        """
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        section = data.get('section')
+        if not section:
+            self.send_json({'error': 'section required.'}, 400)
+            return
+        confirm_sections = data.get('confirm_sections')
+        if confirm_sections is not None and \
+                not isinstance(confirm_sections, list):
+            self.send_json({'error': 'confirm_sections must be a list.'}, 400)
+            return
+        result = config_mgr.reset_section_to_group(
+            section, confirm_sections=confirm_sections)
+        if result.status == 'saved':
+            self.send_json({'status': 'reset', 'message': result.message,
+                            'reset_target': result.reset_target})
+        elif result.status == 'dependency_reset_required':
+            dep = result.dependency or {}
+            self.send_json({
+                'status': 'dependency_reset_required',
+                'requested_section': dep.get('requested_section'),
+                'requested_label': dep.get('requested_label'),
+                'required_reset_sections': dep.get('required_reset_sections',
+                                                   []),
+                'required_reset_labels': dep.get('required_reset_labels', []),
+                'reason': dep.get('reason', ''),
+                'reset_target': dep.get('reset_target'),
+            }, 409)
+        else:
+            self.send_json({'status': 'error',
+                            'error': result.error or 'Reset failed.'}, 409)
+
+    def handle_config_reset(self):
+        """Reset ALL Device overrides (§37) / Device-only reset (§38).
+
+        Never deletes speedtest_analyzer_group.
+        """
+        result = config_mgr.reset_all_device_overrides()
+        if result.status == 'saved':
+            self.send_json({'status': 'reset', 'message': result.message})
+        else:
+            self.send_json({'status': 'error',
+                            'error': result.error or 'Reset failed.'}, 409)
+
+    def handle_config_factory_reset(self):
+        """Factory Reset (explicit confirmation required in request body)."""
+        try:
+            data = self._read_json_request()
+        except Exception:
+            data = {}
+        if not data.get('confirm'):
+            self.send_json({'error': 'Explicit confirmation required.'}, 400)
+            return
+        outcome = config_mgr.factory_reset(clear_history_fn=clear_history_storage)
+        self.send_json({
+            'status': 'factory_reset',
+            'removed_appdata': outcome.removed_appdata,
+            'removed_files': outcome.removed_files,
+            'kept_group_config': outcome.kept_group,
+            'message': outcome.message,
+        })
+
+    def handle_save_geo_settings(self):
+        """Persist explicit provider-independent GeoView configuration."""
+        content_length = int(
+            self.headers.get(
+                'Content-Length',
+                0
+            )
+        )
+
+        body = (
+            self.rfile.read(
+                content_length
+            ).decode('utf-8')
+            if content_length
+            else '{}'
+        )
+
+        try:
+            data = json.loads(body)
+
+        except json.JSONDecodeError:
+            self.send_json(
+                {
+                    'error':
+                        'Invalid JSON'
+                },
+                400,
+            )
+            return
+
+        # Validate/normalize the incoming GeoView settings WITHOUT persisting
+        # to the legacy geoview_settings key. Persistence is routed through the
+        # canonical Configuration Manager so it participates in the Device/
+        # NCM Group workflow like every other normal configuration section.
+        # Site Address forward-geocoding (v1.1.3 Pass 2). When the active
+        # location source is site_address, the address must resolve to real
+        # SITE coordinates so the live map, Site Context, and the export SVG
+        # all share the same effective SITE point. Geocoding happens HERE on
+        # Save/Apply only (never on every page load): reuse already-resolved
+        # coordinates when the address is unchanged, re-geocode when it
+        # changes, and fail closed with a clear error rather than persisting
+        # fake coordinates. The private SERVER key stays on the router.
+        try:
+            data = self._geocode_site_address_on_save(data)
+        except _SiteAddressGeocodeError as exc:
+            self.send_json({'error': str(exc)}, 400)
+            return
+
+        try:
+            normalized = config_mgr.cellular_geo.normalize_geo_settings(
+                data, mark_configured=True)
+            geoview_value = config_mgr.cellular_geo._persisted_settings(
+                normalized)
+
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+            return
+
+        self._respond_config_apply(
+            'geoview', geoview_value,
+            success_payload=normalized)
+
+    def _geocode_site_address_on_save(self, data):
+        """Ensure a site_address payload carries derived lat/lon.
+
+        Returns the (possibly augmented) incoming settings dict. Raises
+        ``_SiteAddressGeocodeError`` with a user-facing message when the
+        address cannot be resolved, so nothing fake is ever persisted. Only
+        touches the site_address case; device_gps and manual_coordinates are
+        returned unchanged.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        source = str(
+            data.get('active_location_source')
+            or (data.get('location') or {}).get('source')
+            or 'device_gps').strip().lower()
+        if source != 'site_address':
+            return data
+
+        locations = data.get('locations')
+        if not isinstance(locations, dict):
+            locations = {}
+            data['locations'] = locations
+        site = locations.get('site_address')
+        if not isinstance(site, dict):
+            site = {}
+            locations['site_address'] = site
+
+        address = str(site.get('address') or '').strip()
+        if not address:
+            # normalize_geo_settings raises the empty-address error later.
+            return data
+
+        # Reuse already-resolved coordinates when the address is unchanged.
+        prev = {}
+        try:
+            prev = (((_effective_geo_settings() or {}).get('locations')
+                     or {}).get('site_address') or {})
+        except Exception:
+            prev = {}
+        prev_address = str(prev.get('address') or '').strip()
+        prev_lat = prev.get('latitude')
+        prev_lon = prev.get('longitude')
+        if (address == prev_address and prev_lat is not None
+                and prev_lon is not None):
+            site['latitude'] = prev_lat
+            site['longitude'] = prev_lon
+            return data
+
+        # Forward-geocode with the private Google SERVER key (Geocoding API).
+        # The key never leaves the router and never enters a log/exception
+        # body. This is the Google GEOCODING service ONLY -- independent of the
+        # OpenCellID cellular resolver.
+        cred = geo_secrets.resolve_device('google')
+        if not cred.is_configured:
+            raise _SiteAddressGeocodeError(
+                'Site Address requires a configured Google Server API Key. '
+                'Add the credential, or switch to Manual Coordinates.')
+
+        try:
+            adapter = geo_providers.build_geocoder(cred.bundle)
+            lat, lon, _formatted = adapter.forward_geocode(address)
+        except geo_providers.ProviderError as exc:
+            raise _SiteAddressGeocodeError(
+                _site_address_error_message(exc.status))
+        except Exception as exc:
+            cp.log('GeoView site-address geocode error: %s'
+                   % geo_secrets.scrub(exc))
+            raise _SiteAddressGeocodeError(
+                'Could not resolve the site address. Verify the address, or '
+                'switch to Manual Coordinates.')
+
+        site['latitude'] = lat
+        site['longitude'] = lon
+        return data
+
+
+    # -- GeoView v1.1.3 resolution job + Device credential endpoints --------
+    def _read_json_body(self):
+        """Read and parse a JSON request body. Returns dict or None (replied)."""
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = (self.rfile.read(content_length).decode('utf-8')
+                if content_length else '{}')
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError:
+            self.send_json({'error': 'Invalid JSON'}, 400)
+            return None
+
+    def get_geo_status(self):
+        """Return the metadata-only GeoView resolve-job status for the fixed
+        OpenCellID cellular-location provider (state/counts)."""
+        try:
+            return geo_resolver.job().status(GEO_CELL_PROVIDER)
+        except Exception as exc:
+            cp.log('GeoView status error: %s' % geo_secrets.scrub(exc))
+            return {'state': geo_resolver.STATE_IDLE, 'error': 'status_error'}
+
+    def get_geo_creds_status(self):
+        """Return metadata-only Device credential status per provider.
+
+        Never returns secret values (write-only credential model, L8).
+        """
+        try:
+            # Logical-provider metadata (compat) + per-record metadata for the
+            # split-key GeoView config UX (server keys vs browser Maps JS key).
+            # Never returns secret values -- per-field presence booleans only.
+            return {
+                'credentials': geo_secrets.status_all(),
+                'records': geo_secrets.record_status_all(),
+            }
+        except Exception as exc:
+            cp.log('GeoView creds status error: %s' % geo_secrets.scrub(exc))
+            return {'credentials': {}, 'records': {}, 'error': 'status_error'}
+
+    def handle_geo_resolve(self):
+        """Start (or reuse) the single bounded GeoView resolution job.
+
+        This is the ONLY place cellular resolution is initiated, and only in
+        response to the explicit Resolve Cell Locations action. Uses the fixed
+        OpenCellID cellular-location provider. Reads the site-wide cell
+        inventory locally; the job gates on the OpenCellID credential and
+        contains all provider failures.
+        """
+        _ = self._read_json_body()
+        if _ is None:
+            return
+        try:
+            # Local Only (provider=none): resolution is disabled entirely.
+            if _effective_geo_provider() != 'opencellid':
+                self.send_json(geo_resolver.job().status('none'))
+                return
+
+            inventory = build_site_cell_inventory(load_history())
+            cells = inventory.get('cells', [])
+
+            timeout = _geo_provider_timeout()
+            _apply_geo_cache_policy()
+
+            status = geo_resolver.job().resolve(
+                GEO_CELL_PROVIDER, cells, timeout=timeout)
+            self.send_json(status)
+        except Exception as exc:
+            # Never let a GeoView failure break the request path.
+            cp.log('GeoView resolve error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'state': geo_resolver.STATE_FAILED,
+                            'reason': 'resolve_error'}, 200)
+
+    def handle_geo_creds_update(self):
+        """Write-only Device credential update for a provider.
+
+        Body: {"provider": "google", "fields": {...}}. Responds with
+        metadata-only status. The credential value is never echoed back.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+        provider = data.get('provider')
+        fields = data.get('fields') or {}
+        try:
+            status = geo_secrets.update_device(provider, fields)
+            self.send_json({'status': 'saved', 'credential': status})
+        except ValueError as exc:
+            # Message is provider-safe (no secrets); still avoid logging input.
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds update error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_write_failed'}, 500)
+
+    def handle_geo_creds_clear(self):
+        """Explicitly clear a provider's Device credential (delete cert)."""
+        data = self._read_json_body()
+        if data is None:
+            return
+        provider = data.get('provider')
+        try:
+            status = geo_secrets.clear_device(provider)
+            # Invalidate cached cellular results (keyed by the OpenCellID
+            # cell-location provider). A key change can change resolution.
+            geo_cache.shared_cache().invalidate('opencellid')
+            self.send_json({'status': 'cleared', 'credential': status})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds clear error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_clear_failed'}, 500)
+
+    def handle_geo_creds_record_update(self):
+        """Write-only update for a single credential RECORD (split-key UX).
+
+        Body: {"record": "server"|"mapjs", "fields": {...}}. The server record
+        holds the Google server geocoding key and the OpenCellID key; the mapjs
+        record holds the browser Maps JS key. Values are never echoed back.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+        record = data.get('record')
+        fields = data.get('fields') or {}
+        try:
+            status = geo_secrets.update_record(record, fields)
+            # Independent-service invalidation: ONLY an OpenCellID key change
+            # affects cached cell-location results. Replacing the Google server
+            # geocoding key or the Maps JS key must NOT drop existing safe cell
+            # enrichment/cache.
+            if isinstance(fields, dict) and isinstance(
+                    fields.get('opencellid_key'), str) and fields[
+                        'opencellid_key'].strip():
+                geo_cache.shared_cache().invalidate('opencellid')
+            self.send_json({'status': 'saved', 'record': status})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds record update error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_write_failed'}, 500)
+
+    def handle_geo_creds_record_clear(self):
+        """Clear one credential RECORD, or one FIELD within a record (Remove).
+
+        Body: {"record": "server"|"mapjs", "field": "opencellid_key"?}. Omit
+        ``field`` to remove the whole record.
+        """
+        data = self._read_json_body()
+        if data is None:
+            return
+        record = data.get('record')
+        field = data.get('field')
+        try:
+            rec = str(record or '').strip().lower()
+            fld = field.strip() if isinstance(field, str) else ''
+            if fld:
+                status = geo_secrets.clear_single_field(record, fld)
+            else:
+                status = geo_secrets.clear_record(record)
+            # Independent-service invalidation: ONLY OpenCellID credential
+            # changes drop cached cell-location results. That is either the
+            # explicit opencellid_key field, or clearing the whole server
+            # record (which removes the OpenCellID key). Removing the Google
+            # geocoding key or the Maps JS record leaves cell enrichment/cache
+            # intact.
+            opencellid_affected = (
+                fld == 'opencellid_key'
+                or (not fld and rec == geo_secrets.RECORD_SERVER)
+            )
+            if opencellid_affected:
+                geo_cache.shared_cache().invalidate('opencellid')
+            self.send_json({'status': 'cleared', 'record': status})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds record clear error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_clear_failed'}, 500)
+
+    def handle_geo_creds_reset(self):
+        """Reset GeoView credentials + downgrade to Local Only.
+
+        Confirmation is enforced client-side. This:
+          * clears all THREE protected keys (Google server, Maps JS,
+            OpenCellID) via the credential store,
+          * sets contribution_enabled=false and provider=none in the
+            persisted geoview section, and
+          * PRESERVES Site Location, history, and the OpenCellID cache.
+        """
+        _ = self._read_json_body()
+        if _ is None:
+            return
+        try:
+            # 1) Clear all protected credential records (both records + legacy).
+            # Resetting credentials intentionally preserves the OpenCellID
+            # cell-location cache so switching back to Geolocation Services
+            # can immediately reuse previously resolved serving locations.
+            geo_secrets.clear_device()
+        except Exception as exc:
+            cp.log('GeoView creds reset (clear) error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'credential_clear_failed'}, 500)
+            return
+
+        # 2) Downgrade the geoview policy to Local Only + contribution OFF,
+        #    preserving Site Location (locations) exactly as configured.
+        try:
+            current = _effective_geo_settings() or {}
+            proposed = {
+                'provider': 'none',
+                'contribution_enabled': False,
+                'active_location_source': current.get(
+                    'active_location_source', 'device_gps'),
+                'locations': current.get('locations') or {},
+            }
+            normalized = config_mgr.cellular_geo.normalize_geo_settings(
+                proposed, mark_configured=bool(current.get('configured')))
+            geoview_value = config_mgr.cellular_geo._persisted_settings(
+                normalized)
+            self._respond_config_apply(
+                'geoview', geoview_value,
+                success_payload={'status': 'reset',
+                                 'geoview': normalized})
+        except ValueError as exc:
+            self.send_json({'error': str(exc)}, 400)
+        except Exception as exc:
+            cp.log('GeoView creds reset (policy) error: %s'
+                   % geo_secrets.scrub(exc))
+            self.send_json({'error': 'reset_failed'}, 500)
+
+    def handle_geo_contribute(self):
+        """Manual OpenCellID contribution (Manual Site Location only).
+
+        Gated: provider=opencellid AND contribution_enabled AND the active
+        location source is a manual site point (site_address / manual
+        coordinates) AND a configured OpenCellID key. Scans retained history
+        hard-filtered to Internal/Captive cellular observations, dedupes via
+        the ledger + 20 m rule, and submits using the CURRENT validated manual
+        Site coordinates. Returns counts; never runs a resolve or lookup.
+        """
+        _ = self._read_json_body()
+        if _ is None:
+            return
+        try:
+            settings = _effective_geo_settings() or {}
+            provider = 'opencellid' if settings.get(
+                'provider') == 'opencellid' else 'none'
+            source = str(settings.get('active_location_source')
+                         or 'device_gps')
+
+            if provider != 'opencellid':
+                self.send_json({'error': 'geoview_disabled'}, 409)
+                return
+            if not settings.get('contribution_enabled'):
+                self.send_json({'error': 'contribution_disabled'}, 409)
+                return
+            if source not in ('site_address', 'manual_coordinates'):
+                # Device GPS contributes automatically; manual is hidden.
+                self.send_json({'error': 'manual_location_required'}, 409)
+                return
+
+            # Current validated manual Site coordinates.
+            loc = settings.get('location') or {}
+            lat = loc.get('latitude')
+            lon = loc.get('longitude')
+            if lat is None or lon is None:
+                self.send_json({'error': 'site_coordinates_invalid'}, 409)
+                return
+
+            cred = geo_secrets.resolve_device('opencellid')
+            if not cred.is_configured:
+                self.send_json({'error': 'credentials_required'}, 409)
+                return
+
+            # Hard-filter site inventory to Internal/Captive cellular cells.
+            inventory = build_site_cell_inventory(load_history())
+            cells = _eligible_contribution_cells(inventory.get('cells', []))
+            if not cells:
+                self.send_json({'status': 'complete', 'counts': {
+                    'submitted': 0, 'duplicates': 0, 'failed': 0,
+                    'eligible': 0}})
+                return
+
+            counts = geo_contributions.contribute_manual(
+                cred.bundle, cells, lat, lon,
+                timeout=_geo_provider_timeout())
+            self.send_json({'status': 'complete', 'counts': counts})
+        except Exception as exc:
+            cp.log('GeoView contribute error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'contribute_failed'}, 500)
+
+    def handle_geo_map_js(self):
+        """Return the browser Maps JavaScript key + resolved markers.
+
+        This is the ONLY live GeoView map data endpoint. It returns ONLY:
+
+            * ``maps_js_api_key`` -- the browser-restricted Google Maps
+              JavaScript API key (a DISTINCT key from the server-side
+              ``api_key``), and only when the effective provider is google and
+              that field exists in the configured bundle.
+            * ``markers`` -- the SITE + resolved A/B/C cell set, read from
+              ALREADY-cached enrichment (never resolving), so the JavaScript
+              map plots current known geography.
+
+        It NEVER returns the private server ``api_key`` / OpenCellID key or the
+        full decrypted bundle, and it NEVER initiates cellular geolocation. The
+        map depends ONLY on the browser Maps JS record, independent of the
+        server-key record. Failure modes degrade gracefully with JSON reasons:
+        geoview_disabled | maps_js_key_missing.
+        """
+        try:
+            settings = _effective_geo_settings()
+
+            # Local Only (provider=none): no Google map is presented. Degrade
+            # to the local schematic; the on-disk cache is untouched.
+            if str((settings or {}).get('provider')) != 'opencellid':
+                self.send_json({'error': 'geoview_disabled'}, 409)
+                return
+
+            # The browser map is INDEPENDENT of the cellular-location service:
+            # it needs only the Maps JS key + already-cached markers. It does
+            # NOT require OpenCellID (or any server key) to be configured.
+            # Bootstrap returns the browser Maps JS key ONLY -- server-side
+            # keys (Google server / OpenCellID) are never part of this payload.
+            js_key = geo_secrets.maps_js_api_key()
+            if not js_key:
+                # No browser Maps JS key configured yet.
+                self.send_json({'error': 'maps_js_key_missing'}, 409)
+                return
+
+            # Read cached cellular enrichment ONLY (never resolve); join to the
+            # inventory for stable A/B/C labels. Enrichment is keyed on the
+            # fixed OpenCellID provider and is simply empty when nothing has
+            # been resolved yet, which still yields a SITE-only map.
+            enrichment = geo_resolver.job().enrichment(GEO_CELL_PROVIDER)
+
+            # Presentation scope only.
+            #
+            # Cached enrichment remains site-wide. These parameters only
+            # control which already-known serving cells are presented on
+            # the resolved Google map.
+            from urllib.parse import parse_qs, urlsplit
+
+            query = parse_qs(
+                urlsplit(self.path).query
+            )
+
+            interface = (
+                query.get(
+                    'iface',
+                    ['']
+                )[0]
+                or ''
+            )
+
+            history_scope = (
+                query.get(
+                    'history',
+                    ['all']
+                )[0]
+                or 'all'
+            )
+
+            inventory = build_site_cell_inventory(
+                load_history(),
+                interface=interface,
+                scope=history_scope,
+            )
+
+            cells = inventory.get('cells', [])
+
+            markers = _compose_map_markers(
+                settings,
+                enrichment,
+                cells
+            )
+
+            # markers is browser-safe (role/label/lat/lon only; no secrets).
+            self.send_json({
+                'maps_js_api_key': js_key,
+                'markers': markers,
+            })
+        except Exception as exc:
+            # No secret/key leaks into the error body.
+            cp.log('GeoView map-js error: %s' % geo_secrets.scrub(exc))
+            self.send_json({'error': 'map_unavailable'}, 502)
+
 
     def handle_set_iperf3_server_mode(self):
         """Switch between Public and User iPerf3 server sources."""
@@ -10781,6 +14040,90 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             status_code
         )
 
+
+    def get_geo_gps(self):
+        """Return one on-demand local GPS status sample for GeoView."""
+        try:
+            gps = (
+                cp.get_gps_status()
+                or {}
+            )
+
+        except Exception as exc:
+            cp.log(
+                'GeoView GPS query failed: %s'
+                % exc
+            )
+
+            return {
+                'available': False,
+                'gps_lock': False,
+                'fix_available': False,
+                'latitude': None,
+                'longitude': None,
+                'satellites': None,
+                'accuracy': None,
+                'last_fix_age': None,
+            }
+
+        latitude = gps.get(
+            'latitude'
+        )
+
+        longitude = gps.get(
+            'longitude'
+        )
+
+        gps_lock = bool(
+            gps.get(
+                'gps_lock'
+            )
+            if gps.get(
+                'gps_lock'
+            ) is not None
+            else gps.get(
+                'lock'
+            )
+        )
+
+        fix_available = gps_fix_is_usable(
+            {
+                'gps_lock': gps_lock,
+                'latitude': latitude,
+                'longitude': longitude,
+            }
+        )
+
+        return {
+            'available': True,
+
+            'gps_lock':
+                gps_lock,
+
+            'fix_available':
+                fix_available,
+
+            'latitude':
+                latitude,
+
+            'longitude':
+                longitude,
+
+            'satellites':
+                gps.get(
+                    'satellites'
+                ),
+
+            'accuracy':
+                gps.get(
+                    'accuracy'
+                ),
+
+            'last_fix_age':
+                gps.get(
+                    'last_fix_age'
+                ),
+        }
 
     def get_status(self):
         """Get current test status."""
@@ -10917,15 +14260,16 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         Appdata format: [{"server":"host","port":"5201-5210","country":"US","city":"Seattle"}, ...]
         Port can be a single port ("5201") or a range ("5201-5210").
         """
-        # Try appdata first (allows NCM group config push)
+        # Effective (Device>Group>Default) User Server list from the two-layer
+        # manager. Legacy App Data is never a fallback once a canonical key
+        # exists (§16); the manager surfaces legacy through its effective
+        # config only while in upgrade-required compatibility mode.
         try:
-            servers_json = cp.get_appdata('iperf3_servers')
-            if servers_json:
-                servers = json.loads(servers_json)
-                if isinstance(servers, list) and len(servers) > 0:
-                    return servers
+            effective_users = config_mgr.active_section('iperf3_user_servers')
+            if isinstance(effective_users, list) and len(effective_users) > 0:
+                return effective_users
         except Exception as e:
-            cp.log(f'Error reading iperf3_servers appdata: {e}')
+            cp.log(f'Error reading iperf3 user servers: {e}')
 
         # Fall back to bundled JSON file
         servers = []
@@ -11179,67 +14523,83 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
         self.send_json({'status': 'stopped'})
 
     def handle_clear_history(self):
-        """Clear test history."""
-        save_history([])
+        """Clear test history and all local recovery copies."""
+        if not clear_history_storage():
+            self.send_json(
+                {'error': 'Unable to clear history'},
+                500
+            )
+            return
+
         self.send_json({'status': 'cleared'})
 
     def handle_delete_history_entry(self):
         """Delete a single history entry by index."""
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length).decode('utf-8') if content_length else '{}'
+
         try:
             data = json.loads(body)
         except json.JSONDecodeError:
             self.send_json({'error': 'Invalid JSON'}, 400)
             return
+
         idx = data.get('index')
+
         if not isinstance(idx, int):
-            self.send_json({'error': 'index must be an integer'}, 400)
+            self.send_json(
+                {'error': 'index must be an integer'},
+                400
+            )
             return
-        history = load_history()
-        if idx < 0 or idx >= len(history):
-            self.send_json({'error': 'index out of range'}, 400)
-            return
-        history.pop(idx)
-        save_history(history)
-        self.send_json({'status': 'deleted', 'history': history})
+
+        with history_lock:
+            history = _load_history_for_update()
+
+            if history is None:
+                self.send_json(
+                    {'error': 'History is unavailable'},
+                    500
+                )
+                return
+
+            if idx < 0 or idx >= len(history):
+                self.send_json(
+                    {'error': 'index out of range'},
+                    400
+                )
+                return
+
+            history.pop(idx)
+
+            if not save_history(history):
+                self.send_json(
+                    {'error': 'Unable to save history'},
+                    500
+                )
+                return
+
+        self.send_json({
+            'status': 'deleted',
+            'history': history
+        })
 
     def get_netperf_servers(self):
-        """Return Netperf servers without touching iPerf3 appdata."""
-        try:
-            value = cp.get_appdata(
-                'netperf_servers'
-            )
+        """Return EFFECTIVE Netperf servers from the two-layer manager.
 
-            if value:
-                servers = json.loads(
-                    value
-                )
-
-                if isinstance(
-                    servers,
-                    list
-                ):
-                    return servers
-
-        except Exception as e:
-            cp.log(
-                f'Error reading netperf_servers appdata: {e}'
-            )
-
+        Legacy App Data is never a fallback once a canonical key exists (§16).
+        """
+        effective_netperf = config_mgr.active_section('netperf_servers')
+        if isinstance(effective_netperf, list):
+            return effective_netperf
         return []
 
 
     def get_all_servers(self):
         """Get all saved servers (netperf and iperf3) from appdata."""
         result = {'netperf': [], 'iperf3': []}
-        # Netperf servers
-        try:
-            val = cp.get_appdata('netperf_servers')
-            if val:
-                result['netperf'] = json.loads(val)
-        except Exception:
-            pass
+        # Netperf servers (canonical RAM once adopted; legacy on Day-1).
+        result['netperf'] = self.get_netperf_servers()
         # iPerf3 servers
         result['iperf3'] = self.get_iperf3_servers()
         return result
@@ -11392,32 +14752,19 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to save User Server List: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(final_servers)
-
-        self.send_json({
-            'status': 'saved',
-            'server_ref': new_ref,
-            'total': len(final_servers)
-        })
+        # Persist through the canonical Configuration Manager (no legacy
+        # write). If the change also requires a schedule reset, both are
+        # persisted as ONE transaction. Refresh the active User cache only
+        # after a successful local save.
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'saved',
+                'server_ref': new_ref,
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_user_iperf3_edit(self):
@@ -11539,39 +14886,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             )
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as error:
-            self.send_json({
-                'error': (
-                    'Unable to edit User server: {}'
-                ).format(error)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(
-            final_servers
-        )
-
-        self.send_json({
-            'status': 'edited',
-            'server_ref': new_ref,
-            'previous_server_ref': original_ref,
-            'endpoint_changed': (
-                new_ref != original_ref
-            ),
-            'total': len(final_servers)
-        })
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'edited',
+                'server_ref': new_ref,
+                'previous_server_ref': original_ref,
+                'endpoint_changed': (new_ref != original_ref),
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_user_iperf3_delete(self):
@@ -11622,31 +14947,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to delete User server: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(final_servers)
-
-        self.send_json({
-            'status': 'deleted',
-            'total': len(final_servers)
-        })
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'deleted',
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_user_iperf3_delete_all(self):
@@ -11676,28 +14984,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                '[]'
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to clear User Server List: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache([])
-
-        self.send_json({
-            'status': 'deleted_all',
-            'total': 0
-        })
+        result = respond_user_iperf3_list_apply(
+            self, [], guard,
+            success_payload={
+                'status': 'deleted_all',
+                'total': 0,
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache([])
 
 
     def handle_user_iperf3_import(self):
@@ -11857,34 +15151,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             bool(data.get('confirm_schedule_reset', False))
         )
 
-        if guard:
-            self.send_json(guard, 409)
-            return
-
-        try:
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-        except Exception as e:
-            self.send_json({
-                'error':
-                    'Unable to save imported User Server List: {}'.format(e)
-            }, 500)
-            return
-
-        _sync_active_user_iperf3_cache(final_servers)
-
-        self.send_json({
-            'status': 'imported',
-            'mode': mode,
-            'added': added,
-            'duplicates_skipped': duplicate_count,
-            'total': len(final_servers)
-        })
+        result = respond_user_iperf3_list_apply(
+            self, final_servers, guard,
+            success_payload={
+                'status': 'imported',
+                'mode': mode,
+                'added': added,
+                'duplicates_skipped': duplicate_count,
+                'total': len(final_servers),
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache(final_servers)
 
 
     def handle_save_server(self):
@@ -12049,53 +15326,19 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
-            if guard:
-                self.send_json(
-                    guard,
-                    409
-                )
-                return
-
-            try:
-                cp.put_appdata(
-                    'iperf3_servers',
-                    json.dumps(
-                        final_servers,
-                        separators=(',', ':')
-                    )
-                )
-
-            except Exception as e:
-                self.send_json({
-                    'error':
-                        f'Unable to save User Server List: {e}'
-                }, 500)
-                return
-
-            _sync_active_user_iperf3_cache(
-                final_servers
-            )
-
-            self.send_json({
-                'status': 'saved',
-                'servers': final_servers
-            })
+            result = respond_user_iperf3_list_apply(
+                self, final_servers, guard,
+                success_payload={
+                    'status': 'saved',
+                    'servers': final_servers,
+                })
+            if result and result.action == 'saved':
+                _sync_active_user_iperf3_cache(final_servers)
             return
 
-        # Preserve existing Netperf storage behavior.
-        try:
-            existing = cp.get_appdata(
-                'netperf_servers'
-            )
-
-            servers = (
-                json.loads(existing)
-                if existing
-                else []
-            )
-
-        except Exception:
-            servers = []
+        # Netperf: read current list (canonical RAM once adopted), append,
+        # persist through the Configuration Manager (no legacy write).
+        servers = self.get_netperf_servers()
 
         server_host = server_entry.get(
             'server',
@@ -12114,15 +15357,12 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             server_entry
         )
 
-        cp.put_appdata(
-            'netperf_servers',
-            json.dumps(servers)
-        )
-
-        self.send_json({
-            'status': 'saved',
-            'servers': servers
-        })
+        respond_config_apply_on(
+            self, 'netperf_servers', servers,
+            success_payload={
+                'status': 'saved',
+                'servers': servers,
+            })
 
     def handle_delete_server(self):
         """Delete one server and protect dependent User schedules."""
@@ -12262,29 +15502,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
-            if guard:
-                self.send_json(
-                    guard,
-                    409
-                )
-                return
-
-            cp.put_appdata(
-                'iperf3_servers',
-                json.dumps(
-                    final_servers,
-                    separators=(',', ':')
-                )
-            )
-
-            _sync_active_user_iperf3_cache(
-                final_servers
-            )
-
-            self.send_json({
-                'status': 'deleted',
-                'servers': final_servers
-            })
+            result = respond_user_iperf3_list_apply(
+                self, final_servers, guard,
+                success_payload={
+                    'status': 'deleted',
+                    'servers': final_servers,
+                })
+            if result and result.action == 'saved':
+                _sync_active_user_iperf3_cache(final_servers)
             return
 
         if not engine or not server_host:
@@ -12294,19 +15519,9 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             }, 400)
             return
 
-        try:
-            existing = cp.get_appdata(
-                'netperf_servers'
-            )
-
-            servers = (
-                json.loads(existing)
-                if existing
-                else []
-            )
-
-        except Exception:
-            servers = []
+        # Netperf: read current list (canonical RAM once adopted), remove the
+        # host, persist through the Configuration Manager (no legacy write).
+        servers = self.get_netperf_servers()
 
         servers = [
             server
@@ -12316,15 +15531,12 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             ) != server_host
         ]
 
-        cp.put_appdata(
-            'netperf_servers',
-            json.dumps(servers)
-        )
-
-        self.send_json({
-            'status': 'deleted',
-            'servers': servers
-        })
+        respond_config_apply_on(
+            self, 'netperf_servers', servers,
+            success_payload={
+                'status': 'deleted',
+                'servers': servers,
+            })
 
     def handle_delete_all_servers(self):
         """Clear the complete User iPerf3 Server List safely."""
@@ -12402,29 +15614,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             )
         )
 
-        if guard:
-            self.send_json(
-                guard,
-                409
-            )
-            return
-
-        # Keep the SDK appdata key but clear its value to a valid
-        # empty JSON list. This is one deterministic SDK write and
-        # avoids a delete/read/recreate lifecycle.
-        cp.put_appdata(
-            'iperf3_servers',
-            '[]'
-        )
-
-        _sync_active_user_iperf3_cache(
-            []
-        )
-
-        self.send_json({
-            'status': 'deleted_all',
-            'servers': []
-        })
+        # Clear the User iPerf3 list through the canonical Configuration
+        # Manager (no legacy write), folding any required schedule reset into
+        # the same transaction.
+        result = respond_user_iperf3_list_apply(
+            self, [], guard,
+            success_payload={
+                'status': 'deleted_all',
+                'servers': [],
+            })
+        if result and result.action == 'saved':
+            _sync_active_user_iperf3_cache([])
 
 
     def handle_import_servers(self):
@@ -12722,46 +15922,21 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 )
             )
 
-            if guard:
-                self.send_json(
-                    guard,
-                    409
-                )
-                return
-
-            try:
-                cp.put_appdata(
-                    'iperf3_servers',
-                    json.dumps(
-                        final_servers,
-                        separators=(',', ':')
-                    )
-                )
-
-            except Exception as e:
-                self.send_json({
-                    'error':
-                        f'Unable to save imported User Server List: {e}'
-                }, 500)
-                return
-
-            _sync_active_user_iperf3_cache(
-                final_servers
-            )
-
-            self.send_json({
-                'status': 'imported',
-                'mode': mode,
-                'added': added,
-                'duplicates_skipped':
-                    duplicate_count,
-                'total':
-                    len(final_servers)
-            })
+            result = respond_user_iperf3_list_apply(
+                self, final_servers, guard,
+                success_payload={
+                    'status': 'imported',
+                    'mode': mode,
+                    'added': added,
+                    'duplicates_skipped': duplicate_count,
+                    'total': len(final_servers),
+                })
+            if result and result.action == 'saved':
+                _sync_active_user_iperf3_cache(final_servers)
             return
 
         # -------------------------------------------------------------
-        # Existing Netperf import behavior
+        # Netperf import behavior (routed through Configuration Manager)
         # -------------------------------------------------------------
         mode = data.get(
             'mode',
@@ -12863,19 +16038,7 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
 
         if mode == 'merge':
             try:
-                existing_json = (
-                    cp.get_appdata(
-                        'netperf_servers'
-                    )
-                )
-
-                existing = (
-                    json.loads(
-                        existing_json
-                    )
-                    if existing_json
-                    else []
-                )
+                existing = self.get_netperf_servers()
 
             except Exception:
                 existing = []
@@ -12904,22 +16067,14 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                 valid_entries
             )
 
-        cp.put_appdata(
-            'netperf_servers',
-            json.dumps(
-                final_servers
-            )
-        )
-
-        self.send_json({
-            'status': 'imported',
-            'imported':
-                len(valid_entries),
-            'skipped':
-                skipped,
-            'total':
-                len(final_servers)
-        })
+        respond_config_apply_on(
+            self, 'netperf_servers', final_servers,
+            success_payload={
+                'status': 'imported',
+                'imported': len(valid_entries),
+                'skipped': skipped,
+                'total': len(final_servers),
+            })
 
     def get_cell_diagnostics(self):
         """Return raw modem diagnostics for every cellular WAN device.
@@ -13339,19 +16494,51 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             'engine': schedule_engine,
             'params': schedule_params
         }
-        save_schedule(config)
-        status = 'enabled' if config['enabled'] else 'disabled'
-        cp.log(f'Schedule {status}: {config["cron"]}')
-        self.send_json({'status': status, 'schedule': config})
+
+        # Persist through the canonical Configuration Manager. All schedule
+        # feature validation above has already passed; the manager handles
+        # mutation gating, revision reconciliation, and read-back writes.
+        apply_result = self._respond_config_apply(
+            'schedule', config,
+            success_payload={
+                'status': ('enabled' if config['enabled'] else 'disabled'),
+                'schedule': config,
+            })
+
+        # Explicit Schedule Save is an APPLY/RUNTIME action: the schedule must
+        # run now when enabled=true, INDEPENDENT of autostart. When the save
+        # was a persistence NO-OP (e.g. after a restart the persisted schedule
+        # is enabled=true/autostart=false so runtime was not running, and the
+        # user re-saves the unchanged schedule), the manager does not hot-reload
+        # -- so we set the runtime running flag here without forcing any write
+        # or device_revision increment. Only on a successful save/no-op-save
+        # (never on reconciled/blocked/error).
+        if apply_result is not None and apply_result.action == 'saved':
+            with schedule_lock:
+                schedule_config['running'] = bool(config['enabled'])
+                schedule_config['enabled'] = bool(config['enabled'])
+                schedule_config['autostart'] = bool(config['autostart'])
+
+    def _respond_config_apply(self, section, value,
+                              success_payload=None):
+        """Route an ordinary section save through the manager + reply.
+
+        Thin method wrapper around the module-level respond_config_apply_on so
+        every Save surface shares one contract. Returns the ConfigApplyResult.
+        """
+        return respond_config_apply_on(
+            self, section, value,
+            success_payload or {'status': 'saved'})
 
     def get_outputs(self):
-        """Get configured output paths."""
-        try:
-            val = cp.get_appdata('speedtest_outputs')
-            if val:
-                return {'outputs': json.loads(val)}
-        except Exception:
-            pass
+        """Get EFFECTIVE configured output paths from the two-layer manager.
+
+        Legacy App Data is never a fallback once a canonical key exists (§16);
+        the manager's effective config already reflects the correct layer.
+        """
+        effective_outputs = config_mgr.active_section('outputs')
+        if isinstance(effective_outputs, list):
+            return {'outputs': effective_outputs}
         return {'outputs': []}
 
     def handle_save_outputs(self):
@@ -13364,9 +16551,10 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.send_json({'error': 'Invalid JSON'}, 400)
             return
         outputs = data.get('outputs', [])
-        cp.put_appdata('speedtest_outputs', json.dumps(outputs))
         cp.log(f'Outputs configured: {outputs}')
-        self.send_json({'status': 'saved', 'outputs': outputs})
+        self._respond_config_apply(
+            'outputs', outputs,
+            success_payload={'status': 'saved', 'outputs': outputs})
 
     def send_json(self, data, code=200):
         """Send a JSON response."""
@@ -13467,34 +16655,701 @@ def cron_matches(cron_expr, dt):
 
 
 def load_schedule():
-    """Load saved schedule; runtime enablement follows autostart."""
-    global schedule_config
+    """DEPRECATED (v1.1.2 two-layer): schedule is loaded from the EFFECTIVE
+    configuration by config_mgr.initialize() -> _apply_config_to_runtime().
+
+    This no longer reads the fragmented legacy ``speedtest_schedule`` key
+    directly: once either canonical key exists, legacy is never a fallback
+    (§16), and while upgrade_required the manager surfaces legacy through its
+    effective compatibility view. Kept as a safe no-op so any residual caller
+    does not reintroduce a legacy read.
+    """
+    return
+
+
+# =============================================================================
+# TWO-LAYER CONFIGURATION INTEGRATION (v1.1.2)
+# =============================================================================
+#
+# Effective configuration is the section-level merge of the two canonical
+# layers (speedtest_analyzer_device > speedtest_analyzer_group > built-in
+# defaults). Ordinary user changes are persisted ONLY to
+# speedtest_analyzer_device through the Configuration Manager. The Group key is
+# never written locally. Runtime readers consult the EFFECTIVE config (via
+# config_mgr.active_section); fragmented legacy App Data is NEVER a fallback
+# once either canonical key exists (§16). The hot-reload callback below
+# repopulates RAM globals/caches from the effective config. No legacy or Group
+# App Data is written by any of this.
+
+# Runtime-only Device GPS fix, refreshed when the effective GeoView policy is
+# device_gps becomes authoritative (save/convert/validate/reset/startup) and on
+# explicit Refresh GPS. This is RUNTIME STATE ONLY: it is never persisted into
+# either canonical key and never triggers a revision increment (§39-§41).
+_device_gps_runtime = {
+    'polled': False,
+    'gps_lock': False,
+    'latitude': None,
+    'longitude': None,
+    'polled_at': None,
+    'status': 'unknown',   # 'lock' | 'no_lock' | 'unavailable' | 'unknown'
+}
+_device_gps_runtime_lock = threading.Lock()
+
+
+def _poll_device_gps_runtime(reason=''):
+    """Perform ONE fresh Device GPS acquisition and store it in RUNTIME only.
+
+    Uses the existing safe, non-blocking status read (cp.get_gps_status), the
+    same call the on-demand Refresh GPS path uses. No background thread is
+    started. No App Data is written; no revision changes. "No Lock" is a valid
+    outcome: the app stays in Device GPS mode and does NOT fall back to
+    manual/default/fake coordinates. Never raises.
+    """
+    global _device_gps_runtime
     try:
-        val = cp.get_appdata('speedtest_schedule')
-        if val:
-            data = json.loads(val)
-            with schedule_lock:
-                schedule_config.update(data)
+        gps = cp.get_gps_status() or {}
+    except Exception as exc:
+        cp.log('GeoView: Device GPS poll unavailable (%s): %s'
+               % (reason, exc))
+        with _device_gps_runtime_lock:
+            _device_gps_runtime = {
+                'polled': True, 'gps_lock': False, 'latitude': None,
+                'longitude': None, 'polled_at': time.time(),
+                'status': 'unavailable',
+            }
+        return
 
-                # Preserve the saved job configuration, but only
-                # resume execution after restart when Auto-start
-                # on boot was explicitly enabled.
-                schedule_config['enabled'] = bool(
-                    schedule_config.get(
-                        'autostart',
-                        False
-                    )
-                )
-    except Exception:
-        pass
+    lock_val = gps.get('gps_lock')
+    if lock_val is None:
+        lock_val = gps.get('lock')
+    gps_lock = bool(lock_val)
+    latitude = gps.get('latitude')
+    longitude = gps.get('longitude')
+
+    usable = gps_fix_is_usable({
+        'gps_lock': gps_lock, 'latitude': latitude, 'longitude': longitude,
+    })
+
+    with _device_gps_runtime_lock:
+        if usable:
+            _device_gps_runtime = {
+                'polled': True, 'gps_lock': True, 'latitude': latitude,
+                'longitude': longitude, 'polled_at': time.time(),
+                'status': 'lock',
+            }
+        else:
+            # No Lock is valid. Stay in Device GPS mode; do NOT fabricate or
+            # fall back to any other coordinates.
+            _device_gps_runtime = {
+                'polled': True, 'gps_lock': False, 'latitude': None,
+                'longitude': None, 'polled_at': time.time(),
+                'status': 'no_lock',
+            }
+    cp.log('GeoView: Device GPS poll (%s) -> %s'
+           % (reason, 'lock' if usable else 'no_lock'))
 
 
-def save_schedule(config):
-    """Save schedule to appdata."""
+def get_device_gps_runtime():
+    """Return a copy of the current runtime Device GPS fix (never persisted)."""
+    with _device_gps_runtime_lock:
+        return dict(_device_gps_runtime)
+
+
+def _apply_config_to_runtime(effective):
+    """Reinitialize affected runtime subsystems from the EFFECTIVE config.
+
+    Called by the Configuration Manager after any successful save/convert/
+    reload with the EFFECTIVE (merged Device>Group>Default) config body. This
+    updates ONLY in-RAM structures and caches. It NEVER writes configuration
+    back into any App Data key: a group-managed configuration must not cause
+    the device to create or update device-level App Data.
+
+    Architecture:
+        (group,device) layers -> effective RAM body -> runtime globals/caches.
+
+    When the effective GeoView policy is device_gps, ONE fresh GPS acquisition
+    is triggered here (runtime-only). Never raises.
+    """
     global schedule_config
-    with schedule_lock:
-        schedule_config.update(config)
-    cp.put_appdata('speedtest_schedule', json.dumps(config))
+    global _iperf3_server_settings
+
+    # True only while the startup initialize() apply runs. Used to suppress
+    # runtime auto-start of an enabled-but-not-autostart schedule after a
+    # restart, WITHOUT writing enabled=false back to App Data. Module-scope
+    # default set below.
+    global _config_startup_apply
+
+    # The hot-reload callback receives the effective config body directly
+    # (already section-merged). Tolerate a wrapped {'config': {...}} shape too.
+    if isinstance(effective, dict) and 'config' in effective and \
+            isinstance(effective.get('config'), dict):
+        body = effective['config']
+    else:
+        body = effective if isinstance(effective, dict) else {}
+
+    # --- Scheduled Tasks -----------------------------------------------------
+    schedule = body.get('schedule')
+    if isinstance(schedule, dict):
+        try:
+            with schedule_lock:
+                # enabled and autostart are INDEPENDENT PERSISTED fields and
+                # are mirrored into runtime EXACTLY as persisted -- we never
+                # mutate persisted/effective 'enabled' here. The separate
+                # RUNTIME flag schedule_config['running'] controls whether the
+                # scheduler thread actually fires.
+                schedule_config.update({
+                    'enabled': bool(schedule.get('enabled', False)),
+                    'autostart': bool(schedule.get('autostart', False)),
+                    'cron': schedule.get('cron', ''),
+                    'engine': schedule.get('engine', 'netperf'),
+                    'params': dict(schedule.get('params', {})),
+                })
+                # Derive the runtime running state via the single shared helper
+                # (config_mgr.compute_schedule_running) so the web layer and the
+                # regression tests use ONE source of truth:
+                #   - startup/boot apply: running = enabled AND autostart
+                #   - interactive save/apply: running = enabled
+                enabled = schedule_config['enabled']
+                autostart = schedule_config['autostart']
+                schedule_config['running'] = config_mgr.compute_schedule_running(
+                    enabled, autostart, is_startup=_config_startup_apply)
+                if _config_startup_apply and enabled and not autostart:
+                    cp.log('Schedule: enabled but autostart=false -> not '
+                           'auto-starting after restart (persisted enabled '
+                           'preserved; runtime not running)')
+        except Exception as e:
+            cp.log(f'Config apply (schedule) error: {e}')
+
+    # --- iPerf3 server settings ---------------------------------------------
+    # Only server_mode is canonical. last_public_region is RAM-only runtime
+    # state and is preserved across a canonical apply (never sourced from or
+    # written to canonical).
+    iperf3_settings = body.get('iperf3_server_settings')
+    if isinstance(iperf3_settings, dict):
+        try:
+            mode = iperf3_settings.get('server_mode', 'public')
+            with _iperf3_server_settings_lock:
+                remembered_region = ''
+                if isinstance(_iperf3_server_settings, dict):
+                    remembered_region = _iperf3_server_settings.get(
+                        'last_public_region', '')
+                _iperf3_server_settings = {
+                    'server_mode': mode,
+                    'last_public_region': remembered_region,
+                }
+            # Rebuild the active server-source RAM cache from the new settings.
+            # (Reads the bundled public catalog / canonical user list; no
+            # legacy App Data write.)
+            _load_active_iperf3_server_cache(force=True)
+        except Exception as e:
+            cp.log(f'Config apply (iperf3 settings) error: {e}')
+
+    # --- GeoView authoritative Device-GPS poll ------------------------------
+    # When the newly authoritative effective GeoView policy is device_gps,
+    # trigger ONE fresh runtime GPS acquisition (§40, §41). This covers every
+    # activation path because the manager calls this callback after Device
+    # save, legacy/experimental conversion, Group validation, Device-override
+    # removal, and startup. Runtime-only; no writes; no revision change.
+    geoview = body.get('geoview')
+    if isinstance(geoview, dict) and \
+            geoview.get('active_location_source') == 'device_gps':
+        try:
+            _poll_device_gps_runtime(reason='effective device_gps authoritative')
+        except Exception as e:
+            cp.log(f'Config apply (geoview device_gps poll) error: {e}')
+
+
+def _effective_geo_settings():
+    """Return the EFFECTIVE GeoView settings (Device>Group>Default merge).
+
+    The effective ``geoview`` section stores the GeoView persisted sub-object
+    (schema 2); run it through the GeoView normalizer so callers receive the
+    same fully normalized structure that load_geo_settings() returns. No
+    legacy App Data is written or consulted here once the manager is loaded.
+    """
+    effective_geo = config_mgr.active_section('geoview')
+    if effective_geo is not None:
+        try:
+            return config_mgr.cellular_geo.normalize_geo_settings(effective_geo)
+        except Exception as exc:
+            cp.log(f'Config apply (geoview normalize) error: {exc}')
+    return load_geo_settings()
+
+
+def _effective_geo_provider():
+    """Return the effective GeoView mode: 'none' (Local Only) or 'opencellid'.
+
+    Missing/legacy values are migrated by the normalizer. 'none' disables
+    geographic GeoView (no Google map, no OpenCellID enrichment displayed);
+    cached results on disk are preserved regardless.
+    """
+    try:
+        settings = _effective_geo_settings() or {}
+        return 'opencellid' if settings.get('provider') == 'opencellid' \
+            else 'none'
+    except Exception:
+        return 'none'
+
+
+def _contribution_enabled():
+    """Return True when the non-secret contribution opt-in is enabled."""
+    try:
+        return bool((_effective_geo_settings() or {}).get(
+            'contribution_enabled'))
+    except Exception:
+        return False
+
+
+def _eligible_contribution_cells(cells):
+    """Filter inventory cells using authoritative NCOS WAN classification.
+
+    Each inventory row carries the raw NCOS interface identifier separately
+    from its display label. Contribution eligibility is therefore determined
+    from the live WAN/device identity, never from friendly-label text or rmnet
+    naming.
+    """
+    eligible = []
+    for cell in (cells or []):
+        if not isinstance(cell, dict):
+            continue
+
+        rows = cell.get('interfaces') or []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+
+            raw_interface = str(row.get('interface') or '').strip()
+            if raw_interface and _interface_is_cellular_wan(raw_interface):
+                eligible.append(cell)
+                break
+
+    return eligible
+
+
+def _maybe_auto_contribute_after_test(entry):
+    """Automatic OpenCellID contribution hook for ONE completed cellular test.
+
+    Silent (no toast/popup; diagnostic logging only). Contributes ONLY when
+    ALL are true:
+      * provider=opencellid AND contribution_enabled AND OpenCellID key set,
+      * active location source is Device GPS with a valid, nonzero GPS lock,
+      * the completed test is on an Internal/Captive cellular modem,
+      * a complete primary serving identity exists for the cell(s).
+    Uses the router's OBSERVED GPS position (never provider coordinates), and
+    applies the same 20 m ledger dedupe. Never raises; never affects the test.
+    """
+    try:
+        if not isinstance(entry, dict):
+            return
+        settings = _effective_geo_settings() or {}
+        if settings.get('provider') != 'opencellid':
+            return
+        if not settings.get('contribution_enabled'):
+            return
+        if str(settings.get('active_location_source')
+               or 'device_gps') != 'device_gps':
+            return
+
+        # Only cellular WAN tests are eligible. Use the raw NCOS interface/WAN
+        # identity and the app's existing authoritative cellular classifier;
+        # never infer contribution eligibility from display-label text.
+        raw_interface = str(entry.get('interface') or '').strip()
+        if not _interface_is_cellular_wan(raw_interface):
+            return
+
+        # Require a valid, nonzero GPS lock (queried once, on demand).
+        try:
+            gps = cp.get_gps_status() or {}
+        except Exception:
+            return
+        if not gps_fix_is_usable(gps):
+            return
+        lat = gps.get('latitude')
+        lon = gps.get('longitude')
+
+        cred = geo_secrets.resolve_device('opencellid')
+        if not cred.is_configured:
+            return
+
+        # Serving cell(s) for THIS completed test. Build a one-record inventory
+        # so identity normalization matches Cellular Analysis semantics, then
+        # keep only Internal/Captive-eligible cells.
+        inventory = build_site_cell_inventory([entry])
+        cells = _eligible_contribution_cells(inventory.get('cells', []))
+        if not cells:
+            return
+
+        counts = geo_contributions.contribute_from_completed_test(
+            cred.bundle, cells, lat, lon, interface_eligible=True,
+            measured_at_ms=int(time.time() * 1000),
+            timeout=_geo_provider_timeout())
+        if counts.get('submitted') or counts.get('failed'):
+            cp.log('GeoView auto-contribution: %s submitted, %s skipped, '
+                   '%s failed' % (counts.get('submitted', 0),
+                                  counts.get('skipped', 0),
+                                  counts.get('failed', 0)))
+    except Exception as exc:
+        cp.log('GeoView auto-contribution hook skipped: %s'
+               % geo_secrets.scrub(exc))
+
+
+def _geo_provider_timeout():
+    """Return the non-secret per-provider request timeout (seconds).
+
+    Sourced from the effective GeoView section when present, else a safe
+    default. Bounded so a misconfigured value can never stall the worker.
+    """
+    default = geo_providers._DEFAULT_TIMEOUT
+    try:
+        settings = _effective_geo_settings()
+        value = (settings or {}).get('provider_timeout_s')
+        if value is None:
+            return default
+        value = float(value)
+        return min(max(value, 2.0), 30.0)
+    except Exception:
+        return default
+
+
+def _apply_geo_cache_policy():
+    """Apply non-secret cache TTL/retry policy from effective GeoView config.
+
+    Credentials are never involved here; only cache tuning knobs. Missing keys
+    fall back to the cache defaults.
+    """
+    try:
+        settings = _effective_geo_settings() or {}
+        geo_cache.shared_cache().configure(
+            positive_ttl=settings.get('cache_positive_ttl_s'),
+            negative_ttl=settings.get('cache_negative_ttl_s'),
+            max_attempts=settings.get('provider_max_attempts'),
+        )
+    except Exception as exc:
+        cp.log('GeoView cache policy skipped: %s' % geo_secrets.scrub(exc))
+
+
+# Upper bound on markers composed for one map. Caps an unbounded retained
+# history from producing an absurd marker set. Site marker is additional to
+# this cell cap.
+_GEO_MAP_MAX_CELLS = 12
+
+
+def _coord_pair(latitude, longitude):
+    """Return (lat, lon) floats if both parse to a usable pair, else None."""
+    try:
+        lat = float(latitude)
+        lon = float(longitude)
+    except (TypeError, ValueError):
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    # 0,0 is the GPS no-fix sentinel; never treat it as a real point.
+    if lat == 0.0 and lon == 0.0:
+        return None
+    return lat, lon
+
+
+class _SiteAddressGeocodeError(Exception):
+    """User-facing Save/Apply error when a site address cannot be geocoded.
+
+    The message is safe to show and never contains credentials.
+    """
+
+
+def _site_address_error_message(status):
+    """Map a provider status to a clear, user-facing Save/Apply message."""
+    if status == geo_providers.STATUS_NOT_FOUND:
+        return ('That site address could not be found. Check the address, '
+                'or switch to Manual Coordinates.')
+    if status == geo_providers.STATUS_AUTH_ERROR:
+        return ('The Google Server API Key was rejected for Geocoding. '
+                'Verify the key, or switch to Manual Coordinates.')
+    if status == geo_providers.STATUS_QUOTA:
+        return ('Google Geocoding quota was exceeded. Try again later, or '
+                'switch to Manual Coordinates.')
+    if status in (geo_providers.STATUS_TIMEOUT,
+                  geo_providers.STATUS_NO_INTERNET):
+        return ('Could not reach Google Geocoding (network/timeout). Try '
+                'again, or switch to Manual Coordinates.')
+    return ('Could not resolve the site address. Verify the address, or '
+            'switch to Manual Coordinates.')
+
+
+def _resolve_site_point(settings, gps_sample=None):
+    """Resolve the active site coordinate for map composition (runtime only).
+
+    device_gps        -> a FRESH runtime GPS query (never the persisted null).
+    manual_coordinates-> effective config coordinates.
+    site_address      -> derived coordinates persisted at Save/Apply time by
+                         forward-geocoding the address (v1.1.3 Pass 2).
+    Returns (lat, lon) or None. Never persists anything and never geocodes
+    here (geocoding is a Save/Apply-time action, not a read-path action).
+    """
+    source = str((settings or {}).get('active_location_source')
+                 or 'device_gps').lower()
+    locations = (settings or {}).get('locations') or {}
+
+    if source == 'device_gps':
+        # Fresh runtime fix; the persisted device_gps coords are always null.
+        sample = gps_sample if gps_sample is not None else _live_gps_sample()
+        if sample and sample.get('fix_available'):
+            return _coord_pair(sample.get('latitude'),
+                               sample.get('longitude'))
+        return None
+
+    if source == 'manual_coordinates':
+        manual = locations.get('manual_coordinates') or {}
+        return _coord_pair(manual.get('latitude'), manual.get('longitude'))
+
+    # site_address: use the derived coordinates resolved on Save/Apply. Null
+    # until a successful geocode (no SITE marker until then).
+    site = locations.get('site_address') or {}
+    return _coord_pair(site.get('latitude'), site.get('longitude'))
+
+
+def _live_gps_sample():
+    """Return one fresh runtime GPS sample dict, or None. Runtime only."""
+    try:
+        gps = cp.get_gps_status() or {}
+    except Exception as exc:
+        cp.log('GeoView map GPS query failed: %s' % geo_secrets.scrub(exc))
+        return None
+    latitude = gps.get('latitude')
+    longitude = gps.get('longitude')
+    gps_lock = gps.get('gps_lock')
+    if gps_lock is None:
+        gps_lock = gps.get('lock')
+    fix = gps_fix_is_usable({
+        'gps_lock': bool(gps_lock),
+        'latitude': latitude,
+        'longitude': longitude,
+    })
+    return {
+        'fix_available': fix,
+        'latitude': latitude,
+        'longitude': longitude,
+    }
+
+
+def _compose_map_markers(settings, enrichment, inventory_cells,
+                         gps_sample=None):
+    """Compose the normalized marker set from current backend state.
+
+    Site marker (if a site point resolves) plus one marker per resolved cell,
+    joined enrichment[cell_key] <-> inventory cell for an A/B/C label. Returns
+    a list of normalized marker dicts (possibly empty). Reads cached
+    enrichment only; never initiates resolution.
+    """
+    markers = []
+
+    site = _resolve_site_point(settings, gps_sample=gps_sample)
+    if site is not None:
+        markers.append(geo_providers.make_marker(
+            geo_providers.MARKER_ROLE_SITE, 'SITE', site[0], site[1]))
+    # (Marker set is consumed by the /api/geo/mapjs JavaScript-map endpoint.)
+
+    # Stable A/B/C labels follow the site inventory order (same order the UI
+    # lists serving cells). Build a key->label map first.
+    labels = {}
+    idx = 0
+    for cell in (inventory_cells or []):
+        key = cell.get('key') if isinstance(cell, dict) else None
+        if not key or key in labels:
+            continue
+        labels[key] = _index_label(idx)
+        idx += 1
+
+    cell_count = 0
+    enrichment = enrichment or {}
+    # Iterate in inventory order so labels and markers agree.
+    for cell in (inventory_cells or []):
+        if cell_count >= _GEO_MAP_MAX_CELLS:
+            break
+        key = cell.get('key') if isinstance(cell, dict) else None
+        if not key:
+            continue
+        record = enrichment.get(key)
+        if not isinstance(record, dict):
+            continue
+        loc = record.get('location')
+        if not isinstance(loc, dict):
+            continue
+        pair = _coord_pair(loc.get('lat'), loc.get('lon'))
+        if pair is None:
+            continue
+        markers.append(geo_providers.make_marker(
+            geo_providers.MARKER_ROLE_CELL, labels.get(key, '?'),
+            pair[0], pair[1], accuracy_m=loc.get('accuracy_m'),
+            cell_key=key,
+            # Browser-safe carrier string used only to color the live-map
+            # accuracy circle per carrier (no secret material).
+            carrier=(cell.get('carrier') if isinstance(cell, dict) else None)))
+        cell_count += 1
+
+    return markers
+
+
+def _index_label(index):
+    """0->A, 1->B, ... 25->Z, 26->AA (spreadsheet-style)."""
+    label = ''
+    index = int(index)
+    while True:
+        label = chr(ord('A') + (index % 26)) + label
+        index = index // 26 - 1
+        if index < 0:
+            break
+    return label
+
+
+class ConfigApplyResult(object):
+    """Result of an ordinary Device Save routed through the manager.
+
+    action (LOCKED two-layer model -- NO scope / NO group candidate):
+      'saved'       -> Device configuration written (or emptied+deleted)
+      'reconciled'  -> a canonical layer changed; staged edit discarded (409)
+      'blocked'     -> configuration mutation is blocked (upgrade/error) (409)
+      'error'       -> failure with message
+
+    ``removed_override_sections`` carries the sections whose redundant Device
+    override was auto-removed because it matched the Group value (§14). The UI
+    shows a non-blocking informational message; there is NO confirmation modal.
+    """
+
+    def __init__(self, action, message='', config=None,
+                 removed_override_sections=None, block_reason=None,
+                 no_change=False):
+        self.action = action
+        self.message = message
+        self.config = config
+        self.removed_override_sections = removed_override_sections or []
+        self.block_reason = block_reason
+        self.no_change = no_change
+
+
+def persist_config_section(section, value, updates=None):
+    """Persist ordinary configuration change(s) as a Device-only save.
+
+    Always writes speedtest_analyzer_device (never Group, never the old
+    experimental key, never fragmented legacy keys). The manager performs, in
+    order: mutation-block gating -> revision-pair reconciliation -> sparse
+    Device section update (with redundant-override removal when Group matches)
+    -> read-back verified write (or delete when emptied) -> effective recompute
+    -> hot apply.
+
+    Pass a single ``section``/``value`` for one section, or an ``updates`` dict
+    of {section: value} for a multi-section transaction (ONE device_revision
+    increment). Callers invoke this only AFTER their own feature validation.
+    """
+    if updates is not None:
+        kw = {'updates': updates}
+    else:
+        kw = {'section': section, 'value': value}
+
+    result = config_mgr.save_device(**kw)
+
+    if result.status == 'saved':
+        return ConfigApplyResult(
+            'saved', config=result.config,
+            removed_override_sections=result.removed_override_sections,
+            message=result.message,
+            no_change=getattr(result, 'no_change', False))
+    if result.status == 'reconciled':
+        return ConfigApplyResult('reconciled', message=result.message,
+                                 config=result.config)
+    if result.status == 'blocked':
+        block = config_mgr.mutation_blocked()
+        return ConfigApplyResult(
+            'blocked',
+            message=(block.detail if block else result.message),
+            block_reason=(block.reason if block else 'upgrade_required'))
+    return ConfigApplyResult('error', message=(result.error or 'save failed'))
+
+
+def respond_user_iperf3_list_apply(handler, final_servers, guard,
+                                   success_payload):
+    """Persist a User iPerf3 list change (optionally + schedule reset).
+
+    ``guard`` is the result of _guard_user_server_list_change:
+      - dict  -> confirmation required; sent as 409 (no persistence).
+      - SCHEDULE_RESET_REQUIRED -> fold a safe schedule reset into the SAME
+        Device transaction as the list change (one device_revision increment).
+      - None -> persist the list change alone.
+
+    Returns the ConfigApplyResult (or None when a 409 confirmation was sent).
+    """
+    if isinstance(guard, dict):
+        handler.send_json(guard, 409)
+        return None
+
+    if guard == SCHEDULE_RESET_REQUIRED:
+        updates = {
+            'iperf3_user_servers': final_servers,
+            'schedule': _safe_empty_schedule(),
+        }
+        result = persist_config_section(None, None, updates=updates)
+        _emit_apply_contract(handler, result, success_payload)
+        return result
+
+    return respond_config_apply_on(
+        handler, 'iperf3_user_servers', final_servers, success_payload)
+
+
+def _emit_apply_contract(handler, result, success_payload):
+    """Send the uniform ordinary-Save response for a ConfigApplyResult.
+
+    Ordinary saves NEVER return scope_required or group_candidate. On success
+    the caller's success_payload is augmented with any redundant-override
+    removal notice so the UI can show a non-blocking informational message.
+    """
+    if result.action == 'reconciled':
+        handler.send_json({'status': 'reconciled', 'error': result.message},
+                          409)
+    elif result.action == 'blocked':
+        handler.send_json({
+            'status': 'upgrade_required',
+            'error': result.message,
+            'block_reason': result.block_reason,
+        }, 409)
+    elif result.action == 'saved':
+        payload = dict(success_payload) if isinstance(success_payload, dict) \
+            else {'status': 'saved'}
+        if result.removed_override_sections:
+            payload['override_removed_sections'] = \
+                result.removed_override_sections
+            if result.message:
+                payload['override_removed_message'] = result.message
+        if getattr(result, 'no_change', False):
+            # True normalized no-op: persistent + effective config unchanged.
+            payload['no_change'] = True
+        handler.send_json(payload)
+    else:
+        handler.send_json({'error': result.message or 'Save failed.'}, 500)
+
+
+def respond_config_apply_on(handler, section, value, success_payload):
+    """Route an ordinary section Save through the manager and send the reply.
+
+    Module-level twin of SpeedtestHandler._respond_config_apply so non-method
+    persistence paths (server-list handlers, iPerf3 mode switch) share one
+    contract:
+
+      reconciled        -> 409 {"status":"reconciled","error":...}
+      upgrade_required  -> 409 {"status":"upgrade_required","error":...}
+      saved             -> 200 success_payload (+ override_removed_* if any)
+      error             -> 500 {"error":...}
+
+    Returns the ConfigApplyResult so the caller can perform success-side RAM
+    cache/runtime updates ONLY after persistence actually succeeded.
+    """
+    try:
+        result = persist_config_section(section, value)
+    except Exception as exc:
+        cp.log(f'Config apply error ({section}): {exc}')
+        handler.send_json({'error': 'Configuration save failed.'}, 500)
+        return ConfigApplyResult('error', message=str(exc))
+
+    _emit_apply_contract(handler, result, success_payload)
+    return result
 
 
 def scheduler_thread():
@@ -13508,12 +17363,18 @@ def scheduler_thread():
             _checkpoint_iperf3_stats_if_due()
 
             with schedule_lock:
-                enabled = schedule_config.get('enabled', False)
+                # The scheduler fires on the RUNTIME running flag, not the
+                # persisted 'enabled' intent. 'running' is derived by the
+                # config-apply callback (boot: enabled AND autostart; save:
+                # enabled). Fall back to 'enabled' only if 'running' has not
+                # been set yet (defensive; the callback always sets it).
+                running = schedule_config.get(
+                    'running', schedule_config.get('enabled', False))
                 cron = schedule_config.get('cron', '')
                 engine = schedule_config.get('engine', 'netperf')
                 params = schedule_config.get('params', {})
 
-            if enabled and cron:
+            if running and cron:
                 now = datetime.utcnow()
                 current_minute = (now.year, now.month, now.day, now.hour, now.minute)
                 if current_minute != last_fired and cron_matches(cron, now):
@@ -13549,17 +17410,57 @@ if has_ookla():
 else:
     cp.log('No Ookla binary - using Netperf (built-in) as default')
 
-# Load iPerf3 settings first, then load only the configured server
-# source into the single active RAM cache.
+# Register the runtime reinitialization callback so the Configuration Manager
+# can hot-reload affected subsystems after adopt/save/validate/reload.
+# _config_startup_apply is True ONLY during the startup initialize() apply so
+# an enabled-but-not-autostart schedule does not auto-start after a restart
+# (runtime-only suppression; persisted enabled is never changed).
+_config_startup_apply = False
+config_mgr.register_hot_reload(_apply_config_to_runtime)
+
+# Load iPerf3 runtime server settings + active server-source RAM cache. These
+# establish baseline RAM state; the manager's effective config corrects them
+# via the hot-reload callback below.
 _load_iperf3_server_settings()
 _load_active_iperf3_server_cache()
 
-# Load saved schedule and validate iPerf3 server-source metadata
-# before the scheduler thread can execute anything.
-load_schedule()
-_validate_loaded_iperf3_schedule()
-if schedule_config.get('enabled'):
-    cp.log(f'Schedule active: {schedule_config.get("cron", "")}')
+# Load the two-layer configuration. The manager computes the EFFECTIVE config
+# (Device>Group>Default), or the legacy compatibility view while
+# upgrade_required, and hot-applies it into the runtime RAM surfaces above
+# (including the schedule) WITHOUT writing any App Data on startup. The
+# schedule is therefore established here, not by a direct legacy-key read.
+try:
+    # Startup apply: gate the boot-only no-autostart suppression for THIS apply.
+    _config_startup_apply = True
+    try:
+        _config_state = config_mgr.initialize()
+    finally:
+        _config_startup_apply = False
+    cp.log('Configuration: state=%s (group_present=%s device_present=%s)'
+           % (_config_state.state, _config_state.group_present,
+              _config_state.device_present))
+    if _config_state.mutation_block is not None:
+        cp.log('Configuration: mutation blocked (%s)'
+               % _config_state.mutation_block.reason)
+    # The effective config has been hot-applied by initialize(); re-validate
+    # iPerf3 schedule metadata against the (possibly updated) runtime schedule
+    # for the normal operating states.
+    if _config_state.state in (config_mgr.STATE_DEVICE,
+                               config_mgr.STATE_GROUP,
+                               config_mgr.STATE_GROUP_WITH_DEVICE_OVERRIDES,
+                               config_mgr.STATE_UPGRADE_REQUIRED):
+        _validate_loaded_iperf3_schedule()
+except Exception as _cfg_exc:
+    cp.log('Configuration: initialize error: %s' % _cfg_exc)
+
+# Log the RUNTIME running state (not just persisted enabled) so the boot log is
+# honest: an enabled-but-not-autostart schedule is preserved as enabled but is
+# NOT running after a restart.
+if schedule_config.get('running'):
+    cp.log(f'Schedule active (running): {schedule_config.get("cron", "")}')
+elif schedule_config.get('enabled') and not schedule_config.get('autostart'):
+    cp.log('Schedule enabled but NOT running after restart '
+           '(Auto-start off): %s' % schedule_config.get('cron', ''))
 
 # Start scheduler thread
 sched_thread = Thread(target=scheduler_thread, daemon=True)
