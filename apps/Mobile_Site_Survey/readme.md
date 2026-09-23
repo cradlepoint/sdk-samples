@@ -59,10 +59,29 @@ which is exactly the case the fall-through handles.
 
 ## Quick Start
 
-1. **Access Web Interface** - Navigate to the router's IP on port 8000-8100
+1. **Access Web Interface** - Navigate to the router's IP on the port the app logged (8000 by default)
 2. **Configure Settings** - Set distance/time intervals and testing options
 3. **Run Survey** - Click "Run Survey Now" for manual testing or enable automatic testing
 4. **View Results** - Real-time results display with professional formatting
+
+### Web Interface Port
+
+The web interface starts on **port 8000**. If 8000 is already in use, the app
+walks up through **8001-8100** and binds the first free port. If every port in
+that range is taken, the app logs an error and exits.
+
+The chosen port is always written to the router log at startup:
+
+```text
+Web interface available on port 8000
+```
+
+Check the log (or `make.py deploy` output) to see which port was used before
+browsing to the router. LAN clients also need a firewall zone forward from the
+Primary LAN Zone to the Router Zone to reach the app's port.
+
+Note: surveyor coordination (`enable_surveyors`) contacts peer routers on port
+**8000** only, so peers that fell back to another port will not be triggered.
 
 ## Requirements
 
