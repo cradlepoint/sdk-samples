@@ -188,6 +188,69 @@ def add_result(result):
 # NETPERF ENGINE
 # =============================================================================
 
+# With a byte limit the test length is unknown up front, so poll for this long
+# instead of deriving a deadline from the (unused) duration.
+SIZE_LIMIT_POLL_SECONDS = 300
+
+
+def _netperf_limit(duration, size):
+    """Build the netperf limit dict.
+
+    The router rejects a request where size and time are both > 0
+    ("Cannot have a data and time limited test. Time OR Size must be > 0."),
+    so exactly one of them is set. A byte limit wins when supplied.
+
+    size is in BYTES — it becomes netperf's negative -l argument.
+    """
+    try:
+        size = int(size or 0)
+    except (TypeError, ValueError):
+        size = 0
+    try:
+        duration = int(duration or 0)
+    except (TypeError, ValueError):
+        duration = 0
+    if size > 0:
+        return {"size": size, "time": 0}
+    return {"size": 0, "time": duration or 10}
+
+
+def _netperf_poll_deadline(duration, size):
+    """Seconds to wait for a netperf run to finish."""
+    if _netperf_limit(duration, size)['size'] > 0:
+        return SIZE_LIMIT_POLL_SECONDS
+    return int(duration or 10) + 30
+
+
+def _start_netperf(params):
+    """Start a netperf run.
+
+    Returns None on success, or an error string when the router rejected the
+    request. Without this check a rejection is silent and the caller goes on to
+    read status/.../perf_results, which still holds the PREVIOUS run's numbers.
+    """
+    resp = cp.put('control/netperf', params)
+    if resp is None:
+        return 'No response from the netperf service'
+    if not isinstance(resp, dict):
+        return None
+    # On-router socket returns {'status': 'ok'|'error', ...};
+    # REST returns {'success': True|False, ...}.
+    if 'status' in resp:
+        ok = resp.get('status') == 'ok'
+    elif 'success' in resp:
+        ok = bool(resp.get('success'))
+    else:
+        return None
+    if ok:
+        return None
+    data = resp.get('data')
+    reason = ''
+    if isinstance(data, dict):
+        reason = data.get('reason') or data.get('exception') or ''
+    return reason or 'The netperf service rejected the test request'
+
+
 def run_netperf(interface='', duration=10, direction='both', include_latency=False, host='', size=0):
     """Run a speed test using the router's built-in netperf service."""
     global current_test
@@ -213,7 +276,7 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
             params = {
                 "input": {
                     "options": {
-                        "limit": {"size": size, "time": duration},
+                        "limit": _netperf_limit(duration, size),
                         "port": None,
                         "fwport": None,
                         "host": host,
@@ -233,11 +296,17 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
             time.sleep(1)
 
             # Start the test
-            cp.put('control/netperf', params)
-            cp.log(f'Netperf started: recv={recv} send={send} iface={interface}')
+            err = _start_netperf(params)
+            if err:
+                cp.log(f'Netperf rejected the test request: {err}')
+                results['error'] = err
+                return None
+            limit = params['input']['options']['limit']
+            cp.log(f'Netperf started: recv={recv} send={send} iface={interface} '
+                   f'limit={limit}')
 
             # Poll for progress/completion
-            deadline = time.time() + duration + 30
+            deadline = time.time() + _netperf_poll_deadline(duration, size)
             while time.time() < deadline:
                 if not current_test['running']:
                     cp.put('control/netperf/stop', '')
@@ -247,7 +316,9 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
                     progress = out.get('progress', '')
                     status = out.get('status', '')
                     if status == 'error' or out.get('error'):
-                        cp.log(f'Netperf error: {out.get("error", status)}')
+                        reason = out.get('error') or status
+                        cp.log(f'Netperf error: {reason}')
+                        results['error'] = reason
                         return None
                     if status == 'complete' or progress == 'done':
                         results_path = out.get('results_path', '')
@@ -258,6 +329,7 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
                         return None
                 time.sleep(1)
             cp.log('Netperf poll timed out')
+            results['error'] = 'Netperf test did not finish in time'
             return None
 
         # Download test
@@ -306,10 +378,12 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
                     'stage': 'latency',
                     'percent': 0
                 }
+            # An RR test measures transactions, not bytes, so it is always
+            # time-limited regardless of the data limit set for throughput.
             rr_params = {
                 "input": {
                     "options": {
-                        "limit": {"size": size, "time": duration},
+                        "limit": _netperf_limit(duration, 0),
                         "port": None,
                         "fwport": None,
                         "host": host,
@@ -327,10 +401,13 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
             # Reset state
             cp.put('/state/system/netperf', {"run_count": 0})
             time.sleep(1)
-            cp.put('control/netperf', rr_params)
+            rr_err = _start_netperf(rr_params)
+            if rr_err:
+                cp.log(f'Netperf rejected the TCP_RR request: {rr_err}')
+                return results
             cp.log(f'Netperf TCP_RR started: iface={interface}')
 
-            deadline = time.time() + duration + 30
+            deadline = time.time() + _netperf_poll_deadline(duration, 0)
             while time.time() < deadline:
                 if not current_test['running']:
                     cp.put('control/netperf/stop', '')
@@ -386,11 +463,124 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
 # IPERF3 ENGINE
 # =============================================================================
 
-def run_iperf3(server, duration=10, interface='', port=5201):
+def _iperf3_length_args(duration, size):
+    """Return the iperf3 test-length flag: -n <bytes> or -t <seconds>.
+
+    size is in BYTES, matching the netperf engine's data limit. iperf3 accepts
+    only one of -n/-t, so a byte limit replaces the duration.
+    """
+    try:
+        size = int(size or 0)
+    except (TypeError, ValueError):
+        size = 0
+    if size > 0:
+        return ['-n', str(size)]
+    return ['-t', str(int(duration or 10))]
+
+
+def _iperf3_proc_timeout(duration, size):
+    """Subprocess timeout. A byte-limited run has no predictable length."""
+    try:
+        size = int(size or 0)
+    except (TypeError, ValueError):
+        size = 0
+    if size > 0:
+        return SIZE_LIMIT_POLL_SECONDS
+    return int(duration or 10) + 30
+
+
+def _iperf3_json(stdout):
+    """Parse iperf3 -J output, tolerating leading warning lines.
+
+    iperf3 writes warnings such as "Block size N > sending socket buffer size M"
+    to stdout ahead of the JSON document, which breaks a plain json.loads.
+    """
+    text = stdout.decode('utf-8', 'replace') if stdout else ''
+    start = text.find('{')
+    if start < 0:
+        raise json.JSONDecodeError('no JSON in iperf3 output', text or '', 0)
+    return json.loads(text[start:])
+
+
+def _iperf3_rtt_ms(data):
+    """Mean RTT in ms from an iperf3 TCP JSON result, or None.
+
+    iperf3 reports RTT in microseconds under the sending stream's stats, so
+    this is only meaningful for a run where the router is the sender (upload).
+    The field is absent on platforms without TCP_INFO.
+    """
+    try:
+        streams = data.get('end', {}).get('streams', [])
+        rtts = []
+        for stream in streams:
+            rtt = stream.get('sender', {}).get('mean_rtt')
+            if rtt:
+                rtts.append(float(rtt))
+        if rtts:
+            return (sum(rtts) / len(rtts)) / 1000.0
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return None
+
+
+def _run_iperf3_udp_jitter(iperf3_bin, server, port, duration, bind_ip,
+                           bind_dev, target_bps):
+    """Run a short reverse UDP pass to measure downstream jitter.
+
+    TCP carries no jitter figure, so this needs its own run. Returns
+    (jitter_ms, loss_percent), either of which may be None.
+
+    The send rate is derived from the measured TCP throughput and clamped, so a
+    slow link is not swamped and a fast link is not under-sampled.
+    """
+    try:
+        rate_mbps = 10
+        if target_bps and target_bps > 0:
+            rate_mbps = int(max(1, min(500, (target_bps * 0.8) / 1000000)))
+        cmd = [iperf3_bin, '-c', server, '-p', str(port),
+               '-t', str(int(duration or 10)), '-u', '-b', f'{rate_mbps}M',
+               '-R', '-J', '-4']
+        if bind_ip:
+            cmd.extend(['-B', bind_ip])
+        if bind_dev:
+            cmd.extend(['--bind-dev', bind_dev])
+        cp.log(f'iPerf3 UDP jitter cmd: {" ".join(cmd)}')
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        try:
+            stdout, stderr = proc.communicate(timeout=int(duration or 10) + 30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            cp.log('iPerf3 UDP jitter run timed out')
+            return None, None
+        if proc.returncode != 0:
+            # Many public iperf3 servers refuse UDP. Not fatal.
+            cp.log(f'iPerf3 UDP jitter run failed: '
+                   f'{_parse_iperf3_error(stdout, stderr)}')
+            return None, None
+        data = _iperf3_json(stdout)
+        summary = data.get('end', {}).get('sum', {})
+        jitter = summary.get('jitter_ms')
+        loss = summary.get('lost_percent')
+        jitter = float(jitter) if jitter is not None else None
+        loss = float(loss) if loss is not None else None
+        cp.log(f'iPerf3 UDP jitter: {jitter} ms, loss: {loss}%')
+        return jitter, loss
+    except Exception as e:
+        cp.log(f'iPerf3 UDP jitter error: {e}')
+        return None, None
+
+
+def run_iperf3(server, duration=10, interface='', port=5201, size=0,
+               include_latency=False):
     """Run a speed test using iperf3 binary with port range retry support.
     
     port can be an int (single port) or string with range like "5201-5210".
     If a port fails, retries on the next port in range.
+
+    size is a data limit in bytes (0 = time-based). include_latency adds RTT
+    parsing plus an extra UDP pass for jitter.
     """
     global current_test
 
@@ -455,7 +645,8 @@ def run_iperf3(server, duration=10, interface='', port=5201):
                     'error': 'Test cancelled'}
 
         results = _run_iperf3_on_port(
-            iperf3_bin, server, attempt_port, duration, bind_ip, bind_dev)
+            iperf3_bin, server, attempt_port, duration, bind_ip, bind_dev,
+            size=size, include_latency=include_latency)
 
         if results and (results['download_bps'] > 0 or results['upload_bps'] > 0):
             return results
@@ -471,17 +662,20 @@ def run_iperf3(server, duration=10, interface='', port=5201):
                        'error': f'iPerf3 failed on all ports ({ports[0]}-{ports[-1]})'}
 
 
-def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''):
+def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev='',
+                        size=0, include_latency=False):
     """Run iperf3 download+upload on a specific port. Returns results dict."""
     global current_test
     results = {'download_bps': 0, 'upload_bps': 0, 'test_duration': duration}
+    length_args = _iperf3_length_args(duration, size)
+    proc_timeout = _iperf3_proc_timeout(duration, size)
 
     try:
         # Download test (reverse mode)
         with test_lock:
             current_test['progress'] = {'stage': 'download', 'percent': 0}
-        cmd = [iperf3_bin, '-c', server, '-p', str(port),
-               '-t', str(duration), '-R', '-J', '-4']
+        cmd = ([iperf3_bin, '-c', server, '-p', str(port)]
+               + length_args + ['-R', '-J', '-4'])
         if bind_ip:
             cmd.extend(['-B', bind_ip])
         if bind_dev:
@@ -489,10 +683,10 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
         cp.log(f'iPerf3 download cmd: {" ".join(cmd)}')
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            stdout, stderr = proc.communicate(timeout=duration + 30)
+            stdout, stderr = proc.communicate(timeout=proc_timeout)
             cp.log(f'iPerf3 download returncode: {proc.returncode}')
             if proc.returncode == 0:
-                data = json.loads(stdout.decode('utf-8'))
+                data = _iperf3_json(stdout)
                 bps = data.get('end', {}).get('sum_received', {}).get(
                     'bits_per_second', 0)
                 results['download_bps'] = bps
@@ -506,7 +700,7 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
                     cp.log(f'iPerf3 download retry cmd: {" ".join(cmd_retry)}')
                     proc2 = subprocess.Popen(cmd_retry, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     try:
-                        stdout, stderr = proc2.communicate(timeout=duration + 30)
+                        stdout, stderr = proc2.communicate(timeout=proc_timeout)
                     except subprocess.TimeoutExpired:
                         proc2.kill()
                         proc2.communicate()
@@ -515,7 +709,7 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
                         return results
                     cp.log(f'iPerf3 download retry returncode: {proc2.returncode}')
                     if proc2.returncode == 0:
-                        data = json.loads(stdout.decode('utf-8'))
+                        data = _iperf3_json(stdout)
                         bps = data.get('end', {}).get('sum_received', {}).get(
                             'bits_per_second', 0)
                         results['download_bps'] = bps
@@ -547,8 +741,8 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
         # Upload test
         with test_lock:
             current_test['progress'] = {'stage': 'upload', 'percent': 0}
-        cmd = [iperf3_bin, '-c', server, '-p', str(port),
-               '-t', str(duration), '-J', '-4']
+        cmd = ([iperf3_bin, '-c', server, '-p', str(port)]
+               + length_args + ['-J', '-4'])
         if bind_ip:
             cmd.extend(['-B', bind_ip])
         if bind_dev:
@@ -556,14 +750,21 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
         cp.log(f'iPerf3 upload cmd: {" ".join(cmd)}')
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            stdout, stderr = proc.communicate(timeout=duration + 30)
+            stdout, stderr = proc.communicate(timeout=proc_timeout)
             cp.log(f'iPerf3 upload returncode: {proc.returncode}')
             if proc.returncode == 0:
-                data = json.loads(stdout.decode('utf-8'))
+                data = _iperf3_json(stdout)
                 bps = data.get('end', {}).get('sum_sent', {}).get(
                     'bits_per_second', 0)
                 results['upload_bps'] = bps
                 cp.log(f'iPerf3 upload: {bps/1e6:.2f} Mbps (port {port})')
+                if include_latency:
+                    rtt_ms = _iperf3_rtt_ms(data)
+                    if rtt_ms is not None:
+                        results['latency_ms'] = rtt_ms
+                        cp.log(f'iPerf3 latency (mean RTT): {rtt_ms:.2f} ms')
+                    else:
+                        cp.log('iPerf3 reported no mean_rtt for this run')
             else:
                 err_msg = _parse_iperf3_error(stdout, stderr)
                 # Retry without --bind-dev if not permitted on this platform
@@ -573,7 +774,7 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
                     cp.log(f'iPerf3 upload retry cmd: {" ".join(cmd_retry)}')
                     proc2 = subprocess.Popen(cmd_retry, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     try:
-                        stdout, stderr = proc2.communicate(timeout=duration + 30)
+                        stdout, stderr = proc2.communicate(timeout=proc_timeout)
                     except subprocess.TimeoutExpired:
                         proc2.kill()
                         proc2.communicate()
@@ -582,11 +783,17 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
                     else:
                         cp.log(f'iPerf3 upload retry returncode: {proc2.returncode}')
                         if proc2.returncode == 0:
-                            data = json.loads(stdout.decode('utf-8'))
+                            data = _iperf3_json(stdout)
                             bps = data.get('end', {}).get('sum_sent', {}).get(
                                 'bits_per_second', 0)
                             results['upload_bps'] = bps
                             cp.log(f'iPerf3 upload: {bps/1e6:.2f} Mbps (port {port})')
+                            if include_latency:
+                                rtt_ms = _iperf3_rtt_ms(data)
+                                if rtt_ms is not None:
+                                    results['latency_ms'] = rtt_ms
+                                    cp.log(f'iPerf3 latency (mean RTT): '
+                                           f'{rtt_ms:.2f} ms')
                         else:
                             err_msg = _parse_iperf3_error(stdout, stderr)
                             cp.log(f'iPerf3 upload failed on port {port}: {err_msg}')
@@ -601,6 +808,20 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
             results['error'] = 'Upload timed out'
         except json.JSONDecodeError as e:
             cp.log(f'iPerf3 JSON error: {e}')
+
+        # Jitter needs its own UDP run — TCP carries no jitter figure.
+        if (include_latency and current_test['running']
+                and (results['download_bps'] or results['upload_bps'])):
+            with test_lock:
+                current_test['progress'] = {'stage': 'latency', 'percent': 0}
+            time.sleep(2)
+            jitter_ms, loss_pct = _run_iperf3_udp_jitter(
+                iperf3_bin, server, port, duration, bind_ip, bind_dev,
+                results['download_bps'])
+            if jitter_ms is not None:
+                results['jitter_ms'] = jitter_ms
+            if loss_pct is not None:
+                results['loss_percent'] = loss_pct
 
         cp.log(f'iPerf3 complete on port {port}: DL={results["download_bps"]/1e6:.2f}Mbps '
                f'UL={results["upload_bps"]/1e6:.2f}Mbps')
@@ -806,13 +1027,23 @@ def run_test_thread(engine, params):
                     current_test['running'] = False
                 return
             port = params.get('port', 5201)
-            result = run_iperf3(server, duration, interface, port)
+            result = run_iperf3(server, duration, interface, port,
+                                size=params.get('size', 0),
+                                include_latency=params.get(
+                                    'include_latency', False))
 
         if result:
             # Detect failed test (all zeros = failed)
             dl = result.get('download_bps', 0)
             ul = result.get('upload_bps', 0)
             is_failed = (dl == 0 and ul == 0)
+
+            # Only netperf and iperf3 honour the data limit and the
+            # latency/jitter option — record what actually applied.
+            supports_options = engine in ('netperf', 'iperf3')
+            applied_size = params.get('size', 0) if supports_options else 0
+            applied_latency = (params.get('include_latency', False)
+                               if supports_options else False)
 
             # Build history entry
             entry = {
@@ -821,16 +1052,23 @@ def run_test_thread(engine, params):
                 'download_mbps': round(dl / 1000000, 2),
                 'upload_mbps': round(ul / 1000000, 2),
                 'ping_ms': round(result.get('ping_ms', 0), 1) if result.get('ping_ms') else None,
-                'latency_ms': round(result.get('latency_ms', 0), 2) if result.get('latency_ms') else None,
-                'jitter_ms': round(result.get('jitter_ms', 0), 2) if result.get('jitter_ms') else None,
+                'latency_ms': (round(result['latency_ms'], 2)
+                               if result.get('latency_ms') is not None
+                               else None),
+                'jitter_ms': (round(result['jitter_ms'], 2)
+                              if result.get('jitter_ms') is not None
+                              else None),
+                'loss_percent': (round(result['loss_percent'], 2)
+                                 if result.get('loss_percent') is not None
+                                 else None),
                 'interface': interface or 'auto',
-                'duration': duration,
-                'size': params.get('size', 0),
+                'duration': 0 if applied_size else duration,
+                'size': applied_size,
                 'host': params.get('host', ''),
                 'server': result.get('server', ''),
                 'port': params.get('port', ''),
                 'isp': result.get('isp', ''),
-                'include_latency': params.get('include_latency', False),
+                'include_latency': applied_latency,
                 'status': 'failed' if is_failed else 'complete'
             }
             if engine == 'iperf3':

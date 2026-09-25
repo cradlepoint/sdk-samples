@@ -312,9 +312,11 @@
                                 <option value="20">20 seconds</option>
                                 <option value="30">30 seconds</option>
                             </select>
-                            <input type="number" id="size-limit" placeholder="Size MB (0=unlimited)" value="0" min="0" style="width:130px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.875rem; background:var(--light-surface); color:var(--text-primary);" title="Data limit in MB (0 = time-based only)">
-                            <label style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.85rem; cursor:pointer;">
-                                <input type="checkbox" id="latency-checkbox"> TCP Latency/Jitter
+                            <span id="size-limit-wrap">
+                                <input type="number" id="size-limit" placeholder="Data limit MB" value="0" min="0" style="width:130px; padding:0.5rem 0.75rem; border:1px solid var(--border-color); border-radius:var(--radius-md); font-size:0.875rem; background:var(--light-surface); color:var(--text-primary);" title="Data limit in MB. When set above 0 the test stops after this much data and the duration is ignored. 0 = time-based test.">
+                            </span>
+                            <label id="latency-wrap" style="display:inline-flex; align-items:center; gap:0.3rem; font-size:0.85rem; cursor:pointer;" title="Measures round-trip latency, and jitter via an extra UDP pass on iPerf3.">
+                                <input type="checkbox" id="latency-checkbox"> Latency/Jitter
                             </label>
                             <button type="button" class="btn btn-primary" id="btn-start">
                                 <i class="fas fa-play"></i> Start Test
@@ -774,6 +776,41 @@
         var netperfRow = document.getElementById('netperf-server-row');
         var durationSelect = document.getElementById('duration-select');
         var latencyCheckbox = document.getElementById('latency-checkbox');
+        var sizeLimitInput = document.getElementById('size-limit');
+        var sizeLimitWrap = document.getElementById('size-limit-wrap');
+        var latencyWrap = document.getElementById('latency-wrap');
+
+        // Data limit is entered in MB; the API takes bytes.
+        var BYTES_PER_MB = 1000000;
+        function sizeLimitBytes() {
+            if (sizeLimitWrap.style.display === 'none') return 0;
+            var mb = parseFloat(sizeLimitInput.value);
+            if (!mb || mb <= 0) return 0;
+            return Math.round(mb * BYTES_PER_MB);
+        }
+
+        // Only netperf and iPerf3 honour the data limit / latency options.
+        function engineSupportsOptions(engine) {
+            return engine === 'netperf' || engine === 'iperf3';
+        }
+
+        // Stored size limits are bytes; show them as MB.
+        function formatSizeLimit(bytes) {
+            if (!bytes || bytes <= 0) return '--';
+            var mb = bytes / BYTES_PER_MB;
+            return (mb < 1 ? mb.toFixed(2) : mb.toFixed(mb % 1 ? 1 : 0)) + ' MB';
+        }
+
+        // A data limit replaces the duration — the netperf API rejects both.
+        function syncDurationState() {
+            var limited = sizeLimitBytes() > 0;
+            durationSelect.disabled = limited;
+            durationSelect.style.opacity = limited ? '0.5' : '';
+            durationSelect.title = limited
+                ? 'Ignored while a data limit is set'
+                : '';
+        }
+        sizeLimitInput.addEventListener('input', syncDurationState);
 
         engineSelect.addEventListener('change', function() {
             var val = this.value;
@@ -789,14 +826,16 @@
                 iperfRow.classList.remove('visible');
                 netperfRow.classList.remove('visible');
             }
-            // Hide duration for ookla (it manages its own timing)
-            if (val === 'ookla') {
-                durationSelect.style.display = 'none';
-                latencyCheckbox.parentElement.style.display = 'none';
-            } else {
-                durationSelect.style.display = '';
-                latencyCheckbox.parentElement.style.display = '';
+            // Ookla manages its own timing and supports neither option.
+            var supported = engineSupportsOptions(val);
+            durationSelect.style.display = supported ? '' : 'none';
+            sizeLimitWrap.style.display = supported ? '' : 'none';
+            latencyWrap.style.display = supported ? '' : 'none';
+            if (!supported) {
+                latencyCheckbox.checked = false;
+                latencyCheckbox.dispatchEvent(new Event('change'));
             }
+            syncDurationState();
         });
 
         // iPerf3 server select change handler
@@ -928,7 +967,7 @@
             var engine = engineSelect.value;
             var iface = document.getElementById('interface-select').value;
             var duration = parseInt(durationSelect.value);
-            var sizeLimit = parseInt(document.getElementById('size-limit').value) || 0;
+            var sizeLimit = sizeLimitBytes();
             includeLatency = latencyCheckbox.checked;
             var params = {
                 engine: engine,
@@ -1020,11 +1059,15 @@
             // Disable/enable controls while running
             engineSelect.disabled = running;
             document.getElementById('interface-select').disabled = running;
-            durationSelect.disabled = running;
             latencyCheckbox.disabled = running;
             document.getElementById('netperf-server-select').disabled = running;
             document.getElementById('iperf-server-select').disabled = running;
-            document.getElementById('size-limit').disabled = running;
+            sizeLimitInput.disabled = running;
+            if (running) {
+                durationSelect.disabled = true;
+            } else {
+                syncDurationState();
+            }
             if (running) {
                 document.getElementById('result-download').textContent = '--';
                 document.getElementById('result-upload').textContent = '--';
@@ -1202,7 +1245,7 @@
 
                 // Table
                 var html = '<table class="history-table"><thead><tr>';
-                html += '<th>Time</th><th>Engine</th><th>Status</th><th>Download</th><th>Upload</th><th>Latency</th><th>Jitter</th><th>Interface</th><th>Server</th><th>Duration</th><th>Size</th>';
+                html += '<th>Time</th><th>Engine</th><th>Status</th><th>Download</th><th>Upload</th><th>Latency</th><th>Jitter</th><th>Interface</th><th>Server</th><th>Duration</th><th>Data Limit</th>';
                 html += '</tr></thead><tbody>';
                 for (var i = data.length - 1; i >= 0; i--) {
                     var r = data[i];
@@ -1222,7 +1265,7 @@
                     html += '<td>' + (r.interface || '--') + '</td>';
                     html += '<td>' + serverInfo + '</td>';
                     html += '<td>' + (r.duration ? r.duration + 's' : '--') + '</td>';
-                    html += '<td>' + (r.size ? r.size + 'MB' : '--') + '</td>';
+                    html += '<td>' + formatSizeLimit(r.size) + '</td>';
                     html += '</tr>';
                 }
                 html += '</tbody></table>';
@@ -1341,13 +1384,14 @@
         function exportCSV() {
             fetch('/api/history').then(function(r) { return r.json(); }).then(function(data) {
                 if (!data || data.length === 0) { alert('No data.'); return; }
-                var csv = 'Timestamp,Engine,Status,Download_Mbps,Upload_Mbps,Latency_ms,Jitter_ms,Interface,Server,Port,Duration_s,Size_MB,Error\n';
+                var csv = 'Timestamp,Engine,Status,Download_Mbps,Upload_Mbps,Latency_ms,Jitter_ms,Loss_Percent,Interface,Server,Port,Duration_s,Data_Limit_Bytes,Error\n';
                 for (var i = 0; i < data.length; i++) {
                     var r = data[i];
                     csv += r.timestamp + ',' + r.engine + ',' + (r.status || 'complete') + ',';
                     csv += r.download_mbps + ',' + r.upload_mbps + ',';
                     csv += (r.latency_ms != null ? r.latency_ms : (r.ping_ms != null ? r.ping_ms : '')) + ',';
                     csv += (r.jitter_ms != null ? r.jitter_ms : '') + ',';
+                    csv += (r.loss_percent != null ? r.loss_percent : '') + ',';
                     csv += (r.interface || '') + ',' + (r.server || r.host || '') + ',';
                     csv += (r.port || '') + ',' + (r.duration || '') + ',';
                     csv += (r.size || '') + ',' + (r.error || '') + '\n';
@@ -1571,8 +1615,14 @@
             var engine = engineSelect.value;
             var iface = document.getElementById('interface-select').value;
             var duration = parseInt(durationSelect.value);
-            var sizeLimit = parseInt(document.getElementById('size-limit').value) || 0;
-            var params = { interface: iface, duration: duration, size: sizeLimit, include_latency: latencyCheckbox.checked };
+            var supported = engineSupportsOptions(engine);
+            var sizeLimit = supported ? sizeLimitBytes() : 0;
+            var params = {
+                interface: iface,
+                duration: duration,
+                size: sizeLimit,
+                include_latency: supported && latencyCheckbox.checked
+            };
 
             // Include server info based on engine
             if (engine === 'netperf') {
@@ -1637,8 +1687,11 @@
                 }
                 if (p.host) details += '<br>Server: <strong>' + p.host + '</strong>';
                 if (p.server) details += '<br>Server: <strong>' + p.server + (p.port ? ':' + p.port : '') + '</strong>';
-                if (p.duration) details += '<br>Duration: <strong>' + p.duration + 's</strong>';
-                if (p.size) details += '<br>Size limit: <strong>' + p.size + ' MB</strong>';
+                if (p.size) {
+                    details += '<br>Data limit: <strong>' + formatSizeLimit(p.size) + '</strong>';
+                } else if (p.duration) {
+                    details += '<br>Duration: <strong>' + p.duration + 's</strong>';
+                }
                 if (p.include_latency) details += '<br>Latency/Jitter: <strong>Yes</strong>';
 
                 if (data.enabled) {

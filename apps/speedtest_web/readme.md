@@ -23,8 +23,9 @@ Web-based speed test interface with scheduling, history tracking, and report gen
 - **Port range retry**: iPerf3 tries next port in range if current one fails
 - **Result outputs**: Write results to multiple NCOS fields simultaneously
 - **Interface selection**: Auto-detects connected WANs sorted by priority with carrier names
-- **Size limit**: Netperf supports data size limit in addition to time
-- **TCP Latency/Jitter**: Optional TCP_RR measurement
+- **Data limit**: Stop the test after a set amount of data instead of a set time
+  (netperf and iPerf3)
+- **Latency/Jitter**: Optional measurement on netperf (TCP_RR) and iPerf3
 - **Dark mode**: Toggle light/dark theme
 - **Tab persistence**: Active tab survives page refresh
 
@@ -39,8 +40,8 @@ The app streams JSONL output in real-time for live progress updates.
 Uses the router's built-in netperf service via `control/netperf`. No additional
 software or server needed. Supports custom server host or auto-detect.
 - TCP Download and Upload
-- Optional TCP Latency/Jitter (TCP_RR)
-- Size limit (MB) or time-based duration
+- Optional Latency/Jitter via a third TCP_RR run (`RT_LATENCY`, `STDDEV_LATENCY`)
+- Data limit or time-based duration
 - Per-interface testing via `ifc_wan`
 
 ### iPerf3
@@ -49,6 +50,25 @@ for automatic retry on busy ports. Bundled `iperf3-arm64v8` binary included.
 Also detects `iperf3` or `iperf3-aarch64` binary names.
 - Source IP binding (`-B`) for per-interface testing
 - Port range retry on connection failure
+- Data limit or time-based duration (`-n` vs `-t`)
+- Optional Latency from the upload run's `mean_rtt`, plus Jitter and packet loss
+  from an extra reverse UDP run. The UDP send rate is derived from the measured
+  download throughput (clamped to 1-500 Mbps). Many public iPerf3 servers refuse
+  UDP; when that happens Latency is still reported and Jitter is left blank.
+
+## Data limit and duration are mutually exclusive
+
+A test is either time-limited or data-limited, never both. The netperf service
+rejects a request with both set ("Cannot have a data and time limited test.
+Time OR Size must be > 0."), and iPerf3 accepts only one of `-n`/`-t`.
+
+Entering a data limit above 0 therefore disables the duration selector, and the
+history row records `duration: 0`. The UI takes the limit in MB and sends bytes;
+history and CSV store bytes. Only netperf and iPerf3 support the data limit and
+the Latency/Jitter option, so both controls are hidden when Ookla is selected.
+
+The netperf Latency/Jitter run stays time-limited even when a data limit is set,
+because an RR test measures transactions rather than bytes.
 
 ## Web Interface
 
@@ -61,7 +81,7 @@ to the Router Zone.
 ## Tabs
 
 ### Run Tests
-- Manual test execution with engine, interface, duration, size limit, latency options
+- Manual test execution with engine, interface, duration or data limit, latency options
 - Schedule configuration with visual cron builder
 - Schedule status showing all active test parameters
 
@@ -118,7 +138,8 @@ Options:
 ## History Entry Fields
 
 Each test result stores: timestamp, engine, download_mbps, upload_mbps, latency_ms,
-jitter_ms, interface, server, port, host, duration, size, include_latency, status, error
+jitter_ms, loss_percent, interface, server, port, host, duration, size (bytes),
+include_latency, status, error
 
 ## Requirements
 
