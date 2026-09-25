@@ -57,6 +57,11 @@ class MobileSiteSurvey {
             this.syncServerSelectToInput();
         });
 
+        // TCP and UDP do not offer the same options, so the form follows along
+        document.getElementById('iperf3_protocol').addEventListener('change', () => {
+            this.toggleProtocolOptions();
+        });
+
         // Real-time form validation
         this.setupFormValidation();
 
@@ -204,7 +209,10 @@ class MobileSiteSurvey {
             'speedtests', 'packet_loss', 'full_diagnostics', 'write_csv', 'debug',
             'send_to_server', 'include_logs', 'server_url', 'server_token',
             'enable_surveyors', 'surveyors',
-            'speedtest_engine', 'iperf3_server', 'iperf3_ports'
+            'speedtest_engine', 'iperf3_server', 'iperf3_ports',
+            'iperf3_protocol', 'iperf3_duration', 'iperf3_parallel',
+            'iperf3_bandwidth', 'iperf3_bytes', 'iperf3_buffer_length',
+            'iperf3_window', 'iperf3_omit', 'iperf3_no_delay', 'iperf3_zero_copy'
         ];
 
         fields.forEach(field => {
@@ -219,15 +227,41 @@ class MobileSiteSurvey {
         });
 
         this.toggleEngineOptions();
+        this.toggleProtocolOptions();
         this.syncInputToServerSelect();
     }
 
     toggleEngineOptions() {
-        // The iPerf3 server and port range only apply to the iPerf3 engine.
+        // The iPerf3 server, ports and test options only apply to iPerf3.
         const engine = document.getElementById('speedtest_engine');
         const options = document.getElementById('iperf3-options');
         if (engine && options) {
             options.style.display = engine.value === 'iperf3' ? 'block' : 'none';
+        }
+    }
+
+    toggleProtocolOptions() {
+        // -N and -Z are TCP-only in iperf3, and UDP measures jitter instead of
+        // latency and needs a bandwidth target to test above 1 Mbps.
+        const protocol = document.getElementById('iperf3_protocol');
+        const tcpFlags = document.getElementById('iperf3-tcp-flags');
+        const protocolHint = document.getElementById('iperf3-protocol-hint');
+        const bandwidthHint = document.getElementById('iperf3-bandwidth-hint');
+        if (!protocol) return;
+
+        const isUdp = protocol.value === 'udp';
+        if (tcpFlags) {
+            tcpFlags.style.display = isUdp ? 'none' : 'grid';
+        }
+        if (protocolHint) {
+            protocolHint.textContent = isUdp
+                ? 'jitter and datagram loss, no latency'
+                : 'latency and jitter from TCP round-trip stats';
+        }
+        if (bandwidthHint) {
+            bandwidthHint.textContent = isUdp
+                ? 'e.g. 50M, required: UDP caps at 1M (-b)'
+                : 'e.g. 50M, blank = unlimited (-b)';
         }
     }
 

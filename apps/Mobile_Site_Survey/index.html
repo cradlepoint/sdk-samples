@@ -153,12 +153,72 @@
                                     </div>
                                     <div class="form-row" id="iperf3-custom-row" style="display: none;">
                                         <label for="iperf3_server">Hostname or IP</label>
-                                        <input type="text" name="iperf3_server" id="iperf3_server" class="form-input" placeholder="iperf.example.com or 203.0.113.10">
+                                        <input type="text" name="iperf3_server" id="iperf3_server" class="form-input">
+                                        <span class="field-unit">e.g. iperf.example.com</span>
                                     </div>
                                     <div class="form-row">
                                         <label for="iperf3_ports">Port Range</label>
-                                        <input type="text" name="iperf3_ports" id="iperf3_ports" class="form-input compact-input" placeholder="5201-5210">
-                                        <span class="field-unit">busy ports fall through to the next</span>
+                                        <input type="text" name="iperf3_ports" id="iperf3_ports" class="form-input compact-input">
+                                        <span class="field-unit">e.g. 5201-5210 &mdash; busy ports fall through to the next</span>
+                                    </div>
+
+                                    <h4 class="form-subheading">Test Options</h4>
+                                    <div class="form-row">
+                                        <label for="iperf3_protocol">Protocol</label>
+                                        <select name="iperf3_protocol" id="iperf3_protocol" class="form-input compact-input">
+                                            <option value="tcp">TCP</option>
+                                            <option value="udp">UDP</option>
+                                        </select>
+                                        <span class="field-unit" id="iperf3-protocol-hint">latency and jitter from TCP round-trip stats</span>
+                                    </div>
+                                    <div class="option-grid">
+                                        <div class="form-row">
+                                            <label for="iperf3_duration">Duration</label>
+                                            <input type="number" name="iperf3_duration" id="iperf3_duration" class="form-input compact-input" min="1" max="300" aria-label="iPerf3 test duration in seconds per direction">
+                                            <span class="field-unit">sec each way, default 10 (-t)</span>
+                                        </div>
+                                        <div class="form-row">
+                                            <label for="iperf3_parallel">Streams</label>
+                                            <input type="number" name="iperf3_parallel" id="iperf3_parallel" class="form-input compact-input" min="1" max="128" aria-label="Parallel iPerf3 streams">
+                                            <span class="field-unit">parallel, default 1 (-P)</span>
+                                        </div>
+                                        <div class="form-row">
+                                            <label for="iperf3_bandwidth">Bandwidth</label>
+                                            <input type="text" name="iperf3_bandwidth" id="iperf3_bandwidth" class="form-input compact-input" aria-label="Target bandwidth">
+                                            <span class="field-unit" id="iperf3-bandwidth-hint">e.g. 50M, blank = unlimited (-b)</span>
+                                        </div>
+                                        <div class="form-row">
+                                            <label for="iperf3_bytes">Size</label>
+                                            <input type="text" name="iperf3_bytes" id="iperf3_bytes" class="form-input compact-input" aria-label="Bytes to transfer instead of a timed test">
+                                            <span class="field-unit">e.g. 100M, overrides duration (-n)</span>
+                                        </div>
+                                        <div class="form-row">
+                                            <label for="iperf3_buffer_length">Buffer</label>
+                                            <input type="text" name="iperf3_buffer_length" id="iperf3_buffer_length" class="form-input compact-input" aria-label="Read and write buffer length">
+                                            <span class="field-unit">block size, e.g. 128K (-l)</span>
+                                        </div>
+                                        <div class="form-row">
+                                            <label for="iperf3_window">Window</label>
+                                            <input type="text" name="iperf3_window" id="iperf3_window" class="form-input compact-input" aria-label="Socket buffer or TCP window size">
+                                            <span class="field-unit">socket buffer, e.g. 512K (-w)</span>
+                                        </div>
+                                        <div class="form-row">
+                                            <label for="iperf3_omit">Omit</label>
+                                            <input type="number" name="iperf3_omit" id="iperf3_omit" class="form-input compact-input" min="0" max="60" aria-label="Seconds to omit from the start of each test">
+                                            <span class="field-unit">skip ramp-up sec, default 0 (-O)</span>
+                                        </div>
+                                    </div>
+                                    <div class="checkbox-grid" id="iperf3-tcp-flags">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" name="iperf3_no_delay" id="iperf3_no_delay" value="1">
+                                            <span class="checkmark"></span>
+                                            No Delay &mdash; disable Nagle (-N)
+                                        </label>
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" name="iperf3_zero_copy" id="iperf3_zero_copy" value="1">
+                                            <span class="checkmark"></span>
+                                            Zero Copy &mdash; lower router CPU (-Z)
+                                        </label>
                                     </div>
                                 </div>
                             </div>

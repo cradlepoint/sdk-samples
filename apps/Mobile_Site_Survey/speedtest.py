@@ -37,7 +37,8 @@ when the engine could not measure them.
 USAGE:
     import speedtest
     speedtest.configure(engine='iperf3', iperf3_server='iperf.example.com',
-                        iperf3_ports='5201-5210')
+                        iperf3_ports='5201-5210',
+                        iperf3_options={'protocol': 'udp', 'bandwidth': '50M'})
     st = speedtest.Speedtest(source_address='10.0.0.1', interface='pmip3',
                              device='mdm-41949674')
     st.start()
@@ -48,9 +49,33 @@ PORT RANGES (iperf3 only):
     Surveys test every connected modem at the same time, so each test needs its
     own port. Ports are reserved from the configured range for the life of a
     test and a port that is busy or errors falls through to the next one.
+
+IPERF3 TEST OPTIONS:
+    iperf3 is the one engine whose test parameters are worth exposing, because
+    the user owns the server on the other end. Every option below is passed
+    straight through to the bundled binary, and every value is range checked
+    here so a bad appdata entry cannot produce an unparseable command line:
+
+      protocol       'tcp' or 'udp'          -u when udp
+      duration       seconds per direction   -t
+      parallel       simultaneous streams    -P
+      bandwidth      target rate, e.g. 50M   -b
+      bytes          volume instead of time  -n  (overrides duration)
+      buffer_length  read/write buffer size  -l
+      omit           seconds to discard      -O
+      window         socket buffer size      -w
+      no_delay       disable Nagle (TCP)     -N
+      zero_copy      sendfile() (TCP)        -Z
+
+    UDP changes what can be measured. There are no TCP round-trip stats, so
+    latency comes back None, but iperf3 reports jitter and datagram loss
+    directly and those are used instead. iperf3 also caps an unrestricted UDP
+    test at 1 Mbit/s, so a bandwidth target is effectively required for UDP -
+    configure() logs a warning when one is missing.
 """
 
 import cp
+import re
 import subprocess
 import json
 import os
@@ -68,6 +93,40 @@ IPERF3_BINARIES = ('iperf3', 'iperf3-arm64v8', 'iperf3-aarch64')
 
 DEFAULT_DURATION = 10
 DEFAULT_PORT = 5201
+
+PROTOCOL_TCP = 'tcp'
+PROTOCOL_UDP = 'udp'
+IPERF3_PROTOCOLS = (PROTOCOL_TCP, PROTOCOL_UDP)
+
+# Bounds for the numeric iperf3 options. 128 is iperf3's own compile-time limit
+# on parallel streams; the duration and omit ceilings just keep a typo from
+# turning one survey point into an hour-long test.
+MAX_PARALLEL_STREAMS = 128
+MAX_DURATION = 300
+MAX_OMIT = 60
+
+# A size-limited run (-n) has no time bound at all, so it gets a hard ceiling
+# instead of "duration + grace". Without it, one stalled transfer would hang a
+# survey indefinitely.
+IPERF3_SIZE_TIMEOUT = 300
+
+# iperf3 accepts a byte count with an optional K/M/G suffix for -b, -n, -l and
+# -w. Anything else is rejected here rather than handed to the binary.
+_SIZE_VALUE = re.compile(r'^\d+(\.\d+)?[kmgKMG]?$')
+
+# The iperf3 test parameters, with the values used when nothing is configured.
+DEFAULT_IPERF3_OPTIONS = {
+    'protocol': PROTOCOL_TCP,
+    'duration': DEFAULT_DURATION,
+    'parallel': 1,
+    'bandwidth': '',
+    'bytes': '',
+    'buffer_length': '',
+    'omit': 0,
+    'window': '',
+    'no_delay': False,
+    'zero_copy': False,
+}
 
 # TCP_RR is a request/response test, so it needs round trips rather than volume.
 # Five seconds is plenty and keeps the extra leg from lengthening a survey.
@@ -87,6 +146,7 @@ _engine = ENGINE_NETPERF
 _iperf3_server = ''
 _iperf3_port_start = DEFAULT_PORT
 _iperf3_port_end = DEFAULT_PORT
+_iperf3_options = dict(DEFAULT_IPERF3_OPTIONS)
 
 # iperf3 port reservation, shared across concurrent modem tests
 _port_condition = threading.Condition()
@@ -125,8 +185,94 @@ def parse_port_range(ports):
         return None, None
 
 
-def configure(engine=None, iperf3_server=None, iperf3_ports=None):
-    """Set the active engine and iPerf3 target.
+def _clean_choice(value, choices, current, field):
+    """Return value if it is one of choices, else current."""
+    candidate = str(value).strip().lower()
+    if candidate in choices:
+        return candidate
+    cp.log(f'Invalid iPerf3 {field} "{value}" - keeping {current}')
+    return current
+
+
+def _clean_int(value, minimum, maximum, current, field):
+    """Return value clamped into [minimum, maximum], else current."""
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        cp.log(f'Invalid iPerf3 {field} "{value}" - keeping {current}')
+        return current
+    if number < minimum or number > maximum:
+        clamped = min(max(number, minimum), maximum)
+        cp.log(f'iPerf3 {field} {number} out of range - using {clamped}')
+        return clamped
+    return number
+
+
+def _clean_size(value, current, field):
+    """Return a byte count with an optional K/M/G suffix, blank to disable."""
+    text = str(value).strip()
+    if not text:
+        return ''
+    if _SIZE_VALUE.match(text):
+        return text
+    cp.log(f'Invalid iPerf3 {field} "{value}" - expected a number with an '
+           f'optional K, M or G suffix, keeping {current or "default"}')
+    return current
+
+
+def _clean_bool(value):
+    """Coerce a checkbox value, which may arrive as "1"/"0"/True, to a bool."""
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    return text in ('1', 'true', 'yes', 'on')
+
+
+def _apply_iperf3_options(options):
+    """Validate and store the iperf3 test options. Assumes _config_lock held."""
+    global _iperf3_options
+    if not isinstance(options, dict):
+        cp.log(f'Ignoring iPerf3 options of type {type(options).__name__}')
+        return
+
+    current = _iperf3_options
+    updated = dict(current)
+    if 'protocol' in options:
+        updated['protocol'] = _clean_choice(
+            options['protocol'], IPERF3_PROTOCOLS, current['protocol'],
+            'protocol')
+    if 'duration' in options:
+        updated['duration'] = _clean_int(
+            options['duration'], 1, MAX_DURATION, current['duration'],
+            'duration')
+    if 'parallel' in options:
+        updated['parallel'] = _clean_int(
+            options['parallel'], 1, MAX_PARALLEL_STREAMS, current['parallel'],
+            'parallel streams')
+    if 'omit' in options:
+        updated['omit'] = _clean_int(
+            options['omit'], 0, MAX_OMIT, current['omit'], 'omit')
+    for key, label in (('bandwidth', 'bandwidth'), ('bytes', 'size'),
+                       ('buffer_length', 'buffer length'),
+                       ('window', 'window size')):
+        if key in options:
+            updated[key] = _clean_size(options[key], current[key], label)
+    for key in ('no_delay', 'zero_copy'):
+        if key in options:
+            updated[key] = _clean_bool(options[key])
+
+    _iperf3_options = updated
+
+    # iperf3 caps an unrestricted UDP test at 1 Mbit/s, which looks like a
+    # terrible link rather than a missing setting, so say so out loud.
+    if updated['protocol'] == PROTOCOL_UDP and not updated['bandwidth']:
+        cp.log('iPerf3 UDP has no bandwidth target - iperf3 will cap the test '
+               'at 1 Mbit/s. Set a target rate to measure the link.')
+
+
+def configure(engine=None, iperf3_server=None, iperf3_ports=None,
+              iperf3_options=None):
+    """Set the active engine, iPerf3 target and iPerf3 test options.
 
     Safe to call at any time - the web UI calls it again whenever settings are
     saved so an engine change takes effect without restarting the app.
@@ -156,6 +302,8 @@ def configure(engine=None, iperf3_server=None, iperf3_ports=None):
             elif str(iperf3_ports).strip():
                 cp.log(f'Invalid iPerf3 port range "{iperf3_ports}" - keeping '
                        f'{_iperf3_port_start}-{_iperf3_port_end}')
+        if iperf3_options is not None:
+            _apply_iperf3_options(iperf3_options)
 
 
 def get_engine():
@@ -181,6 +329,16 @@ def get_iperf3_target():
     """Return the configured iPerf3 target as (server, port_start, port_end)."""
     with _config_lock:
         return _iperf3_server, _iperf3_port_start, _iperf3_port_end
+
+
+def get_iperf3_options():
+    """Return a copy of the iPerf3 test options.
+
+    A copy, so a test that reads the options at its start keeps a consistent
+    set even if the user saves new settings while it is running.
+    """
+    with _config_lock:
+        return dict(_iperf3_options)
 
 
 def _find_binary(names):
@@ -274,6 +432,33 @@ def engine_label(engine):
     }.get(engine, engine)
 
 
+def describe_iperf3_options():
+    """Return a short summary of the iPerf3 test options for logging."""
+    options = get_iperf3_options()
+    parts = [options['protocol'].upper()]
+    # -n replaces -t, so only one of the two is ever in effect.
+    if options['bytes']:
+        parts.append(f"{options['bytes']}B")
+    else:
+        parts.append(f"{options['duration']}s")
+    if options['parallel'] > 1:
+        parts.append(f"{options['parallel']} streams")
+    if options['bandwidth']:
+        parts.append(f"{options['bandwidth']}bps")
+    if options['buffer_length']:
+        parts.append(f"buf {options['buffer_length']}")
+    if options['window']:
+        parts.append(f"win {options['window']}")
+    if options['omit']:
+        parts.append(f"omit {options['omit']}s")
+    if options['protocol'] == PROTOCOL_TCP:
+        if options['no_delay']:
+            parts.append('no-delay')
+        if options['zero_copy']:
+            parts.append('zero-copy')
+    return ' '.join(parts)
+
+
 def describe_engine():
     """Return a one-line description of the active engine for logging."""
     engine = resolve_engine()
@@ -281,7 +466,7 @@ def describe_engine():
         server, start, end = get_iperf3_target()
         ports = str(start) if start == end else f'{start}-{end}'
         target = f'{server}:{ports}' if server else 'no server configured'
-        return f'iPerf3 | {target}'
+        return f'iPerf3 | {target} | {describe_iperf3_options()}'
     return engine_label(engine)
 
 
@@ -398,6 +583,38 @@ def _iperf3_error(stdout, stderr):
     return err or out or 'unknown error'
 
 
+def _iperf3_binary_missing(error):
+    """True when an iperf3 failure means the binary itself is gone.
+
+    Popen raises FileNotFoundError, whose str() is the errno 2 message. That is
+    not a per-port failure, so the caller stops instead of retrying every port.
+    """
+    return 'No such file or directory' in str(error or '')
+
+
+def _iperf3_summary(data, *keys):
+    """Return the first populated summary block from an iperf3 result.
+
+    TCP runs report "sum_sent" and "sum_received" separately. UDP runs report a
+    single "sum", so callers pass the TCP key first and "sum" as the fallback
+    and get the right block for either protocol.
+    """
+    end = (data or {}).get('end') or {}
+    for key in keys:
+        block = end.get(key)
+        if isinstance(block, dict) and block.get('bits_per_second'):
+            return block
+    return {}
+
+
+def _to_float(value):
+    """Coerce an iperf3 numeric field to a float, or None when absent."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _iperf3_rtt(data):
     """Derive (latency_ms, jitter_ms) from an iperf3 TCP result.
 
@@ -440,18 +657,22 @@ class Speedtest:
             as iperf3's --bind-dev.
         device: WAN device uid, e.g. 'mdm-41949674'. Used to locate netperf
             results when the control tree does not report a results path.
-        duration: Seconds per direction.
+        duration: Seconds per direction. Leave unset to let iPerf3 use its
+            configured duration; the other engines always use DEFAULT_DURATION.
     """
 
     def __init__(self, config=None, source_address=None, interface='', device='',
-                 timeout=None, duration=DEFAULT_DURATION, secure=False,
+                 timeout=None, duration=None, secure=False,
                  shutdown_event=None):
         self.config = config or {}
         self._source_address = source_address
         self._interface = interface or ''
         self._device = device or ''
+        # An explicit duration wins over the configured iPerf3 duration, so a
+        # caller that asks for a specific length still gets it.
+        self._duration_override = duration
         self._duration = duration or DEFAULT_DURATION
-        self._timeout = timeout or (self._duration + 30)
+        self._timeout = timeout
         self._secure = secure
         self._shutdown_event = shutdown_event
         self.results = None
@@ -475,6 +696,10 @@ class Speedtest:
     def download_and_upload(self, callback=None, threads=None):
         """Run the full test."""
         return self.start()
+
+    def _default_timeout(self):
+        """Subprocess timeout for a run of self._duration seconds."""
+        return self._timeout or (self._duration + 30)
 
     # -- entry point ---------------------------------------------------------
 
@@ -653,6 +878,10 @@ class Speedtest:
         if not server:
             raise Exception('No iPerf3 server configured')
 
+        # Read the options once so both directions of this test use the same
+        # parameters even if the user saves new settings mid-survey.
+        options = get_iperf3_options()
+
         tried = set()
         last_error = 'no port was attempted'
         for _ in range(port_end - port_start + 1):
@@ -661,18 +890,27 @@ class Speedtest:
                 break
             tried.add(port)
             try:
-                results, error = self._iperf3_on_port(binary, server, port)
+                results, error = self._iperf3_on_port(binary, server, port,
+                                                      options)
             finally:
                 _release_port(port)
             if results:
                 return results
             last_error = error or 'unknown error'
+            if _iperf3_binary_missing(last_error):
+                # The binary is gone, so no port will work. This happens when
+                # the app directory is removed underneath a running test - a
+                # purge or uninstall during a survey - and walking the rest of
+                # the range would just repeat the same error per port.
+                raise Exception(f'iPerf3 binary {binary} is no longer present - '
+                                f'the app directory was removed while the test '
+                                f'was running')
             cp.log(f'iPerf3 {server}:{port} unusable ({last_error})')
 
         raise Exception(f'iPerf3 failed on every port in {port_start}-{port_end} '
                         f'for {server}: {last_error}')
 
-    def _iperf3_on_port(self, binary, server, port):
+    def _iperf3_on_port(self, binary, server, port, options):
         """Run download then upload on one port.
 
         Returns (results, error). results is None when the port produced no
@@ -682,32 +920,53 @@ class Speedtest:
         bytes_received, bytes_sent = 0, 0
         latency, jitter = None, None
         error = None
+        udp = options['protocol'] == PROTOCOL_UDP
+        down_stats, up_stats = {}, {}
 
         # Download first: reverse mode, the server sends to us.
-        download, error = self._iperf3_direction(binary, server, port, reverse=True)
+        download, error = self._iperf3_direction(binary, server, port, options,
+                                                 reverse=True)
         if download:
-            end = download.get('end') or {}
-            received = end.get('sum_received') or {}
-            download_bps = int(received.get('bits_per_second') or 0)
-            bytes_received = int(received.get('bytes') or 0)
+            down_stats = _iperf3_summary(download, 'sum_received', 'sum')
+            download_bps = int(down_stats.get('bits_per_second') or 0)
+            bytes_received = int(down_stats.get('bytes') or 0)
         else:
             # A dead port or unreachable server fails here - move on quickly
             # rather than paying the upload timeout as well.
             return None, error
 
         upload, upload_error = self._iperf3_direction(binary, server, port,
-                                                     reverse=False)
+                                                     options, reverse=False)
         if upload:
-            end = upload.get('end') or {}
-            sent = end.get('sum_sent') or {}
-            upload_bps = int(sent.get('bits_per_second') or 0)
+            # Volume sent is always taken from the sending side, so the survey's
+            # data usage total reflects what the modem actually transmitted.
+            sent = _iperf3_summary(upload, 'sum_sent', 'sum')
             bytes_sent = int(sent.get('bytes') or 0)
-            # RTT stats are only reported for the sending side, so the upload
-            # run is where latency and jitter come from.
-            latency, jitter = _iperf3_rtt(upload)
+            if udp:
+                # For UDP the sender's own block reports no jitter and no loss -
+                # both live in the receiver's block, which iperf3 relays back
+                # from the server. That block is also the honest upload rate,
+                # since it counts only datagrams that arrived.
+                up_stats = _iperf3_summary(upload, 'sum_received', 'sum',
+                                           'sum_sent')
+            else:
+                up_stats = sent
+                # RTT stats are only reported for the sending side, so the
+                # upload run is where latency and jitter come from.
+                latency, jitter = _iperf3_rtt(upload)
+            upload_bps = int(up_stats.get('bits_per_second') or 0)
         else:
             error = upload_error
             cp.log(f'iPerf3 upload failed on {server}:{port}: {upload_error}')
+
+        if udp:
+            # UDP carries no TCP round-trip stats, so latency stays None, but
+            # iperf3 measures jitter directly. The download figure is measured
+            # locally by this client, so prefer it over the server's report.
+            jitter = _to_float(down_stats.get('jitter_ms'))
+            if jitter is None:
+                jitter = _to_float(up_stats.get('jitter_ms'))
+            self._log_udp_loss(server, port, down_stats, up_stats)
 
         if not download_bps and not upload_bps:
             return None, error or 'no data transferred'
@@ -719,10 +978,69 @@ class Speedtest:
             engine=ENGINE_IPERF3)
         return self.results, error
 
-    def _iperf3_direction(self, binary, server, port, reverse):
+    def _log_udp_loss(self, server, port, down_stats, up_stats):
+        """Log the datagram loss iperf3 reports for a UDP test.
+
+        Loss is not part of SpeedtestResults - the survey's packet loss column
+        comes from its own continuous ping - so it is logged rather than
+        recorded, which keeps the CSV and the server payload unchanged.
+        """
+        parts = []
+        for label, block in (('down', down_stats), ('up', up_stats)):
+            percent = _to_float(block.get('lost_percent'))
+            if percent is None:
+                continue
+            lost = block.get('lost_packets')
+            total = block.get('packets')
+            detail = f'{label} {percent:.2f}%'
+            if lost is not None and total:
+                detail += f' ({lost}/{total})'
+            parts.append(detail)
+        if parts:
+            cp.log(f'iPerf3 UDP datagram loss on {server}:{port}: '
+                   f'{", ".join(parts)}')
+
+    def _iperf3_duration(self, options):
+        """Seconds per direction: an explicit duration wins over the setting."""
+        return self._duration_override or options['duration']
+
+    def _iperf3_timeout(self, options):
+        """Subprocess timeout for one iperf3 direction."""
+        if self._timeout:
+            return self._timeout
+        if options['bytes']:
+            # -n transfers a volume with no time limit, so the only sane bound
+            # is a fixed ceiling.
+            return IPERF3_SIZE_TIMEOUT + options['omit']
+        return self._iperf3_duration(options) + options['omit'] + 30
+
+    def _iperf3_direction(self, binary, server, port, options, reverse):
         """Run one iperf3 direction. Returns (parsed_json, error_message)."""
-        cmd = [binary, '-c', server, '-p', str(port),
-               '-t', str(self._duration), '-J', '-4']
+        cmd = [binary, '-c', server, '-p', str(port), '-J', '-4']
+
+        # -n takes precedence over -t in iperf3, so only one is ever passed.
+        if options['bytes']:
+            cmd.extend(['-n', options['bytes']])
+        else:
+            cmd.extend(['-t', str(self._iperf3_duration(options))])
+        if options['protocol'] == PROTOCOL_UDP:
+            cmd.append('-u')
+        if options['parallel'] > 1:
+            cmd.extend(['-P', str(options['parallel'])])
+        if options['bandwidth']:
+            cmd.extend(['-b', options['bandwidth']])
+        if options['buffer_length']:
+            cmd.extend(['-l', options['buffer_length']])
+        if options['omit']:
+            cmd.extend(['-O', str(options['omit'])])
+        if options['window']:
+            cmd.extend(['-w', options['window']])
+        if options['protocol'] == PROTOCOL_TCP:
+            # Both of these are TCP-only in iperf3 and are rejected with -u.
+            if options['no_delay']:
+                cmd.append('-N')
+            if options['zero_copy']:
+                cmd.append('-Z')
         if reverse:
             cmd.append('-R')
         if self._source_address:
@@ -730,7 +1048,8 @@ class Speedtest:
         if self._interface:
             cmd.extend(['--bind-dev', self._interface])
 
-        data, error = self._iperf3_exec(cmd)
+        timeout = self._iperf3_timeout(options)
+        data, error = self._iperf3_exec(cmd, timeout)
         if data is None and error and 'Operation not permitted' in error \
                 and '--bind-dev' in cmd:
             # SO_BINDTODEVICE needs CAP_NET_RAW, which the SDK sandbox may not
@@ -739,16 +1058,16 @@ class Speedtest:
             cp.log('--bind-dev not permitted here - retrying with -B only')
             retry = [arg for arg in cmd
                      if arg not in ('--bind-dev', self._interface)]
-            data, error = self._iperf3_exec(retry)
+            data, error = self._iperf3_exec(retry, timeout)
         return data, error
 
-    def _iperf3_exec(self, cmd):
+    def _iperf3_exec(self, cmd, timeout):
         """Execute one iperf3 command. Returns (parsed_json, error_message)."""
         proc = None
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)
-            stdout, stderr = proc.communicate(timeout=self._timeout)
+            stdout, stderr = proc.communicate(timeout=timeout)
             if proc.returncode == 0:
                 return json.loads(stdout.decode('utf-8')), None
             return None, _iperf3_error(stdout, stderr)
@@ -759,7 +1078,7 @@ class Speedtest:
                     proc.communicate()
                 except Exception:
                     pass
-            return None, f'timed out after {self._timeout}s'
+            return None, f'timed out after {timeout}s'
         except json.JSONDecodeError as e:
             return None, f'could not parse iperf3 output: {e}'
         except Exception as e:
@@ -792,7 +1111,7 @@ class Speedtest:
     def _run_ookla_json(self, cmd):
         """Run an Ookla binary that emits a single JSON blob."""
         result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=self._timeout)
+                                timeout=self._default_timeout())
         if result.returncode != 0:
             raise Exception(f'Ookla speedtest failed with return code '
                             f'{result.returncode}: {result.stderr}')

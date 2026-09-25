@@ -137,6 +137,32 @@ class SubmitHandler(tornado.web.RequestHandler):
             cp.log(f'Exception parsing iperf3_ports: {e}')
 
         try:
+            protocol = self.get_argument('iperf3_protocol', '').strip().lower()
+            if protocol:
+                dispatcher.config["iperf3_protocol"] = protocol
+        except Exception as e:
+            cp.log(f'Exception parsing iperf3_protocol: {e}')
+
+        # Size-style iPerf3 options. Blank means "let iperf3 decide", so an empty
+        # field is stored as-is rather than falling back to a default.
+        for field in ('iperf3_bandwidth', 'iperf3_bytes', 'iperf3_buffer_length',
+                      'iperf3_window'):
+            try:
+                dispatcher.config[field] = self.get_argument(field, '').strip()
+            except Exception as e:
+                cp.log(f'Exception parsing {field}: {e}')
+
+        # Numeric iPerf3 options. A blank field falls back to the code default
+        # instead of 0, which would mean a zero-second test.
+        for field in ('iperf3_duration', 'iperf3_parallel', 'iperf3_omit'):
+            try:
+                value = self.get_argument(field, '').strip()
+                dispatcher.config[field] = int(value) if value else settings[field]
+            except Exception as e:
+                cp.log(f'Exception parsing {field}: {e}')
+                dispatcher.config[field] = settings[field]
+
+        try:
             surveyors = self.get_argument('surveyors')
             if surveyors:
                 surveyors = [x.strip() for x in surveyors.split(',')]
@@ -159,7 +185,9 @@ class SubmitHandler(tornado.web.RequestHandler):
             "debug": bool,
             "enabled": bool,
             "enable_timer": bool,
-            "all_wans": bool
+            "all_wans": bool,
+            "iperf3_no_delay": bool,
+            "iperf3_zero_copy": bool
         }
 
         # Function to safely get and convert arguments
@@ -506,9 +534,37 @@ def get_config(name):
                 config['iperf3_server'] = settings['iperf3_server']
         if config.get('iperf3_ports') is None:
             config['iperf3_ports'] = settings['iperf3_ports']
+        # Fill in any iPerf3 test option a config saved by an older version
+        # predates, so the UI always has a value to show.
+        for field, default in settings.items():
+            if field.startswith('iperf3_') and config.get(field) is None:
+                config[field] = default
         config.pop('speedtest_url', None)
         save_config(config, 'Mobile_Site_Survey')
     return config
+
+
+def iperf3_options(config):
+    """Collect the iPerf3 test options from config, keyed as speedtest wants.
+
+    Only keys actually present are passed through, so the speedtest module keeps
+    its own default for anything this config does not carry. Values are validated
+    there rather than here.
+    """
+    mapping = {
+        'iperf3_protocol': 'protocol',
+        'iperf3_duration': 'duration',
+        'iperf3_parallel': 'parallel',
+        'iperf3_bandwidth': 'bandwidth',
+        'iperf3_bytes': 'bytes',
+        'iperf3_buffer_length': 'buffer_length',
+        'iperf3_omit': 'omit',
+        'iperf3_window': 'window',
+        'iperf3_no_delay': 'no_delay',
+        'iperf3_zero_copy': 'zero_copy'
+    }
+    return {option: config[field] for field, option in mapping.items()
+            if config.get(field) is not None}
 
 
 def apply_speedtest_config(config):
@@ -517,7 +573,8 @@ def apply_speedtest_config(config):
         speedtest.configure(
             engine=config.get('speedtest_engine'),
             iperf3_server=config.get('iperf3_server', ''),
-            iperf3_ports=config.get('iperf3_ports', ''))
+            iperf3_ports=config.get('iperf3_ports', ''),
+            iperf3_options=iperf3_options(config))
         problem = speedtest.engine_error()
         if problem:
             cp.log(f'Speedtest engine: {speedtest.describe_engine()} '

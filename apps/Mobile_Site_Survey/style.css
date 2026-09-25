@@ -523,6 +523,44 @@ body {
     width: 6rem;
 }
 
+/* A group of related fields inside a section, e.g. the iPerf3 test options. */
+.form-subheading {
+    margin: 0.875rem 0 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+}
+
+/* Two columns where there is room, so the iPerf3 options do not push the
+   Speedtest Settings tab into scrolling. Collapses to one column when narrow. */
+.option-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    column-gap: 1rem;
+}
+
+.option-grid > .form-row {
+    flex-wrap: wrap;
+}
+
+.option-grid > .form-row > label {
+    flex: 0 0 5rem;
+}
+
+/* Hints carry the examples now that the inputs have no placeholder text, so let
+   them wrap and sit on their own line aligned under the input (5rem label plus
+   the 0.5rem row gap) rather than trailing off the edge of the panel. */
+#iperf3-options .field-unit {
+    white-space: normal;
+}
+
+.option-grid > .form-row > .field-unit {
+    flex: 1 0 100%;
+    margin-left: 5.5rem;
+}
+
 .field-unit {
     font-size: 0.7rem;
     color: var(--text-secondary);
