@@ -1,11 +1,7 @@
 # Mobile Site Survey v3
 Professional cellular network drive testing application with modern web interface and high-performance speed testing.
 
-Light Side:
-![image](https://github.com/user-attachments/assets/712a198b-4930-49f9-9e6a-0c6acb1ae96b)
-
-Dark Side:
-![image](https://github.com/user-attachments/assets/117ce0fd-7389-48cd-a995-3dfc0e619d40)
+<img width="1403" height="761" alt="image" src="https://github.com/user-attachments/assets/08fa0945-a91c-47e2-8b52-780e0ed6ece2" />
 
 ## Key Features
 
