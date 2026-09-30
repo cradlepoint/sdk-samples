@@ -2,7 +2,7 @@
 
 Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, historical Cellular Analysis, scope-aware GeoView context, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.1.3
+**Version:** 1.1.4
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
@@ -19,7 +19,7 @@ Speedtest Analyzer is designed to let a technical user test, monitor, and compar
 Key capabilities include:
 
 - Run on-demand **Downlink and Uplink** throughput tests.
-- Test the current **Active Primary WAN** or select a specific connected WAN.
+- Test the current **Active Primary WAN**, a specific connected physical WAN, or a supported individual **SD-WAN tunnel**.
 - Use **iPerf3**, **Netperf**, or an optional licensed **Ookla** binary.
 - Use the bundled **Public iPerf3 Server** catalog or maintain a separate **User Server List**.
 - Run one-time tests against a **Custom Server** without saving it.
@@ -142,9 +142,11 @@ The default selection is **Active Primary WAN**.
 
 This is useful when the goal is to test the router's currently preferred connection without manually selecting an interface. The application resolves the actual primary WAN when the test starts, and History records the real interface that was used.
 
-Manual Tests and Scheduled Tests both keep the WAN selector available whenever a connected WAN exists. The selector shows **Active Primary WAN** first and also lists each connected WAN interface, even when only one physical WAN is connected.
+Manual Tests keep the WAN selector available whenever a supported connected WAN exists. The selector shows **Active Primary WAN** first, followed by connected physical WAN interfaces and supported connected **individual SD-WAN tunnel interfaces**.
 
-Select a specific interface when you want the test pinned to that WAN instead of following whichever WAN is primary when the test starts.
+Scheduled Tests remain **physical-WAN only**. Individual SD-WAN tunnel interfaces are Manual iPerf3 targets and are not offered as Scheduled Test interfaces.
+
+Select a specific interface when you want the test pinned to that physical WAN or SD-WAN tunnel instead of following whichever WAN is primary when the test starts.
 
 Friendly interface labels may include:
 
@@ -154,8 +156,12 @@ Friendly interface labels may include:
 - **E3000 Internal - VZW-SIM1**
 - **W1850 Captive - TMO-SIM1**
 - **W1850 - TMO-SIM1** on a standalone adapter
+- **SD-WAN Tunnel - Ethernet WAN**
+- **SD-WAN Tunnel - R1900 Internal - TMO-SIM1**
 
-The friendly name is only a display label. The application retains the underlying NCOS interface identity for actual test execution.
+The friendly name is only a display label. The application retains the underlying NCOS identities required for actual test execution and routing.
+
+**WAN Bond is intentionally excluded as a Speedtest Analyzer test target.** Router-originated SDK test traffic does not reliably represent forwarded client traffic using Traffic Steering or Intelligent Bonding policies.
 
 ### Typical workflow
 
@@ -221,7 +227,7 @@ Use **Scheduled Tests** to run recurring tests automatically.
 
 Run a configuration manually first to verify that the selected WAN, engine, and server complete successfully before scheduling it.
 
-The WAN selector defaults to **Active Primary WAN**.
+The WAN selector defaults to **Active Primary WAN**. Scheduled Tests remain limited to physical WAN interfaces; individual SD-WAN tunnel interfaces are Manual iPerf3 only.
 
 Available schedule methods include:
 
@@ -280,7 +286,9 @@ iPerf3 is bundled with the application and is the recommended general-purpose th
 User-facing capabilities include:
 
 - TCP Downlink and Uplink testing.
-- Primary and validated non-primary WAN testing.
+- Primary and validated non-primary physical-WAN testing.
+- Manual iPerf3 testing of supported connected individual SD-WAN tunnel interfaces.
+- Cellular telemetry for a cellular-backed SD-WAN tunnel follows the resolved physical cellular underlay.
 - Public, User, and Custom server workflows.
 - Port-range support.
 - Automatic retry for eligible listener failures.
@@ -308,6 +316,8 @@ User-facing capabilities include:
 - Optional latency and jitter reporting.
 - Native Cradlepoint Netperf infrastructure.
 - Automatic safety handling when a native test does not stop normally.
+
+Netperf remains available for supported physical WAN interfaces. Individual SD-WAN tunnel interfaces are iPerf3-only and are not offered as Netperf targets.
 
 Some platforms have confirmed NCOS Netperf defects. The application disables Netperf only where the matching known-defect rule applies.
 
@@ -1210,6 +1220,20 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 # Changelog — 1.x
 
 The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.1.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.1.4
+
+- Added Manual **iPerf3 testing for connected individual SD-WAN tunnel interfaces**.
+- Added friendly SD-WAN tunnel names based on the resolved physical underlay, including **SD-WAN Tunnel - Ethernet WAN** and cellular-backed tunnel names.
+- Added SD-WAN source routing using the tunnel control identity and authoritative overlay source/gateway information.
+- Preserved cellular telemetry for cellular-backed SD-WAN tunnels so Cellular Health, Carrier Activity, History, and Cellular Analysis follow the physical cellular underlay while the test remains identified as the SD-WAN tunnel.
+- Preserved supplemental iPerf3 **Jitter** testing on SD-WAN tunnel paths without using the physical-WAN bind-device fallback.
+- Kept **Scheduled Tests physical-WAN only**.
+- Kept **Netperf physical-WAN only**.
+- Removed **WAN Bond** as a selectable Speedtest Analyzer test path and removed obsolete WAN-Bond-specific test execution logic.
+- Added the authoritative **Router Primary WAN** display.
+- Retained the informational **Traffic Steering active — effective WAN path may vary by policy** indicator.
+- Validated v1.1.4 on the **R1900** with physical and SD-WAN paths and on the **E3000** with physical Ethernet and cellular paths, including iPerf3, Jitter, Netperf, History, and Cellular Analysis.
 
 ## v1.1.3
 

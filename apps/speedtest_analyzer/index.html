@@ -4346,9 +4346,11 @@
                         <!-- Row 2: Server selection -->
                         <div style="margin-bottom:1rem;">
                             <div id="primary-wan-indicator" style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem; display:none;">
-                                <i class="fas fa-network-wired" style="color:var(--success-color);"></i>
-                                <strong>Primary WAN:</strong> <span id="primary-wan-name">—</span>
+                                <strong>🌐 Router Primary WAN:</strong> <span id="primary-wan-name">—</span>
                                 <span id="primary-wan-ip" style="opacity:0.7;"></span>
+                            </div>
+                            <div id="traffic-steering-indicator" style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.5rem; display:none;">
+                                ⓘ Traffic Steering active — effective WAN path may vary by policy.
                             </div>
                             <label style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary); margin-bottom:0.25rem;">Pick Your Server</label>
 
@@ -6869,16 +6871,12 @@
                 var sel = document.getElementById('interface-select');
                 sel.innerHTML = '';
 
-                // Show primary WAN indicator (first interface is highest priority)
-                var wanIndicator = document.getElementById('primary-wan-indicator');
+                // primaryWanIface still tracks the highest-priority connected
+                // WAN for capability logic tied to the selector. The displayed
+                // Router Primary WAN label is resolved authoritatively below.
                 if (data && data.length > 0) {
-                    var primary = data[0];
-                    document.getElementById('primary-wan-name').textContent = primary.name;
-                    document.getElementById('primary-wan-ip').textContent = '(' + primary.ip + ')';
-                    wanIndicator.style.display = '';
-                    primaryWanIface = primary.iface;
+                    primaryWanIface = data[0].iface;
                 } else {
-                    wanIndicator.style.display = 'none';
                     primaryWanIface = '';
                 }
 
@@ -6926,6 +6924,11 @@
                 if (data && data.length > 0) {
                     for (var i = 0; i < data.length; i++) {
                         var s = data[i];
+                        // SD-WAN tunnels are manual-only for now. Do not
+                        // offer them as Scheduled Test interfaces yet.
+                        if (s.manual_only) {
+                            continue;
+                        }
                         var opt = document.createElement('option');
                         opt.value = s.iface;
                         opt.textContent = s.name + (s.ip ? ' (' + s.ip + ')' : '');
@@ -6933,6 +6936,37 @@
                     }
                 }
                 refreshSchedCapabilities();
+                loadPrimaryWan();
+            });
+        }
+
+        function loadPrimaryWan() {
+            // Router Primary WAN is resolved authoritatively from
+            // status/wan/primary_device on the backend. It is never inferred
+            // from the selected test interface or traffic steering.
+            return fetch('/api/primary_wan').then(function(r) {
+                return r.json();
+            }).then(function(data) {
+                var wanIndicator = document.getElementById('primary-wan-indicator');
+                var steeringLine = document.getElementById('traffic-steering-indicator');
+                var primary = data && data.primary;
+
+                if (primary && primary.name) {
+                    document.getElementById('primary-wan-name').textContent = primary.name;
+                    document.getElementById('primary-wan-ip').textContent =
+                        primary.ip ? '(' + primary.ip + ')' : '';
+                    wanIndicator.style.display = '';
+                } else {
+                    wanIndicator.style.display = 'none';
+                }
+
+                // Traffic Steering line appears only when non-management
+                // steering is active.
+                steeringLine.style.display =
+                    (data && data.steering_active) ? '' : 'none';
+            }).catch(function() {
+                // Fail quiet: leave the indicator hidden on any error.
+                document.getElementById('traffic-steering-indicator').style.display = 'none';
             });
         }
 
