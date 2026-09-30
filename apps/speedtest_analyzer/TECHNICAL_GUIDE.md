@@ -2,7 +2,7 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.1.3
+**Documentation version:** 1.1.4
 **Application release family:** 1.1.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
@@ -37,7 +37,7 @@ The documented application behavior uses several persistent or packaged data sou
 
 Application version information is carried in `package.ini`.
 
-The current branded application release is `1.1.3`. Speedtest Analyzer 1.1.3 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline. Release `1.1.3` adds optional, Device-scoped GeoView provider enrichment (see [Section 19](#19-geoview-provider-enrichment-113)); all other `1.1.2` behavior is preserved.
+The current branded application release is `1.1.4`. Speedtest Analyzer 1.1.4 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline. Release `1.1.4` adds Manual iPerf3 testing for connected individual SD-WAN tunnel interfaces, preserves cellular-underlay telemetry for cellular-backed tunnels, and removes WAN Bond as a selectable synthetic test target. Existing v1.1.3 GeoView, measurement telemetry, configuration, history, and reporting behavior is preserved.
 
 ## 2.2 Device validation catalog
 
@@ -239,9 +239,13 @@ The user interface presents friendly WAN labels while preserving the underlying 
 
 `Active Primary WAN` is a selector alias, not a persisted interface identity. It is resolved to one concrete NCOS interface before test execution proceeds.
 
-Manual Tests and Scheduled Tests use the same selector presentation: **Active Primary WAN** is listed first, followed by every connected concrete WAN interface. This remains true when only one physical WAN is connected so users can choose between dynamic primary-WAN resolution and an explicitly pinned interface. This is frontend selector behavior only and does not change the existing backend Active Primary WAN resolver or persisted interface identity.
+Manual Tests and Scheduled Tests intentionally have different interface scope beginning with v1.1.4.
 
-The implementation fails closed if NCOS cannot determine the current primary WAN. It does not silently choose another connection.
+- **Manual Tests** list **Active Primary WAN**, connected physical WAN interfaces, and supported connected **individual SD-WAN tunnel interfaces** for iPerf3.
+- **Scheduled Tests** remain **physical-WAN only**.
+- **WAN Bond** is explicitly excluded from Speedtest Analyzer interface discovery.
+
+`Active Primary WAN` remains a selector alias that resolves to one concrete physical WAN before execution. The implementation fails closed if NCOS cannot determine the current primary WAN and does not silently choose another connection.
 
 ## 4.1 Friendly WAN interface names
 
@@ -253,9 +257,10 @@ The app converts NCOS interface identities into user-facing labels in interface 
 - Unknown carriers or MVNOs retain the modem-owner label and available SIM slot.
 - A validated Starlink or satellite connection uses **Satellite WAN-XXXX**, where `XXXX` is derived from the end of its stable NCOS WAN UID so multiple satellite connections can be distinguished.
 - An `mdm-*` UID alone is not considered proof that an interface is cellular. Cellular naming requires carrier, SIM, LTE, 5G, NR, cellular, or WWAN evidence.
+- Connected SD-WAN tunnels use **SD-WAN Tunnel - <resolved underlay name>** when the physical dependency can be identified.
 - Unknown future interface types retain the best NCOS-provided product, interface, or UID label.
 
-These names are display-only. The original NCOS WAN UID, raw interface, source IP, active-primary status, and routing identity remain unchanged for test-engine selection and source routing. Existing CSV **Interface** values also remain unchanged.
+These names are display-only. Physical and SD-WAN execution preserve the distinct NCOS identities required for control lookup, routing, Linux interface binding, history, and reporting. Existing CSV **Interface** values remain unchanged.
 
 A Satellite WAN remains selectable by every supported test engine and retains its raw NCOS interface, WAN UID, source IP, and routing identity. For statistics and reporting, it follows the same non-cellular path as Ethernet WAN:
 
@@ -272,7 +277,7 @@ A Satellite WAN remains selectable by every supported test engine and retains it
 
 iPerf3 is bundled with the application and is the recommended general-purpose throughput engine.
 
-The application supports TCP Downlink and Uplink, per-WAN source selection, primary and validated non-primary WAN testing, bounded listener retry, live port-attempt status, and controlled cancellation.
+The application supports TCP Downlink and Uplink, per-WAN source selection, primary and validated non-primary physical-WAN testing, Manual testing of supported connected individual SD-WAN tunnel interfaces, bounded listener retry, live port-attempt status, and controlled cancellation.
 
 Beginning with v1.1.3, the existing iPerf3 JSON result is also used to retain additional TCP measurement telemetry. The Uplink phase provides automatic TCP RTT average/minimum/maximum and device-side retransmission counts. The Downlink phase retains remote sender retransmission totals where iPerf3 reports them.
 
@@ -287,6 +292,8 @@ The detailed source-routing behavior is documented later in this guide. The v1.1
 Netperf uses the router's native NCOS speed-test service.
 
 The application adds stale-result protection, lifecycle protection, timeout handling, cleanup verification, and model-specific safeguards around the native service.
+
+Netperf remains limited to supported physical WAN interfaces. Individual SD-WAN tunnel interfaces are iPerf3-only.
 
 ## 5.3 Ookla
 
@@ -639,7 +646,29 @@ The policy is intentionally deleted **before** the table.
 
 This workflow was successfully validated on the R1900 in v2.5.3 with Ethernet remaining the active primary WAN while iPerf3 traffic was steered through the selected cellular WAN.
 
-### 8.2.1 Stale route cleanup
+### 8.2.1 Individual SD-WAN tunnel routing
+
+Beginning with v1.1.4, Manual iPerf3 tests can target a connected individual SD-WAN tunnel directly.
+
+NCOS exposes separate identities for an SD-WAN tunnel and Speedtest Analyzer keeps their roles distinct:
+
+- The selected WAN object identifies the tunnel in `status/wan/devices` and is used by the temporary routing configuration.
+- `info.uid` is the SD-WAN control/routing identity.
+- `info.iface` is the Linux interface identity used by iPerf3 where applicable.
+
+The app resolves the SD-WAN control object under:
+
+`control/sdwan_adv/user_mode_driver/interface/<info.uid>`
+
+The returned overlay `local_ip` is used as the source address and `remote_ip` as the explicit gateway for the temporary source-routing path. Unlike a normal physical WAN, SD-WAN does not use automatic gateway discovery for this route.
+
+The route and source policy are read back and validated before the test proceeds. WAN Guard revalidates the SD-WAN source around the supplemental Jitter workflow so a path change causes Jitter to be skipped or discarded without invalidating an already completed TCP throughput test.
+
+For cellular-backed SD-WAN tunnels, throughput remains identified as the selected SD-WAN tunnel while cellular telemetry follows the resolved physical cellular underlay. Ethernet-backed SD-WAN tunnels remain non-cellular.
+
+WAN Bond is intentionally not a selectable Speedtest Analyzer test path. Router-originated synthetic traffic is not used to characterize forwarded client behavior through Traffic Steering or Intelligent Bonding.
+
+### 8.2.2 Stale route cleanup
 
 Before creating a new temporary route, the app checks for stale `STWEB-*` routing tables left by interrupted tests.
 
@@ -647,7 +676,7 @@ Policies referencing those tables are removed before the tables themselves are d
 
 This prevents abandoned application-created routing objects from accumulating in NCOS.
 
-### 8.2.2 W2255 routing limitation
+### 8.2.3 W2255 routing limitation
 
 On the tested W2255 firmware, the NCOS configuration API only permits the **Main** routing table.
 
@@ -1182,6 +1211,8 @@ Saved server definitions are not deleted by resetting Reliability statistics.
 ## 10.5 Scheduled Test Behavior
 
 Manual and Scheduled iPerf3 selections are intentionally independent.
+
+Beginning with v1.1.4, Scheduled Tests remain physical-WAN only. Individual SD-WAN tunnel interfaces are exposed only to Manual iPerf3 testing.
 
 A saved scheduled job stores its own iPerf3 server reference.
 
@@ -1761,6 +1792,26 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.1.4
+
+Focused Speedtest Analyzer on valid physical WAN and individual SD-WAN tunnel test paths while preserving the existing v1.1.3 measurement, Cellular Analysis, GeoView, configuration, history, and reporting architecture.
+
+- Added connected individual **SD-WAN tunnel interfaces** to the Manual iPerf3 selector.
+- Kept Scheduled Tests physical-WAN only.
+- Added friendly SD-WAN tunnel labels based on the resolved physical underlay.
+- Preserved separate NCOS identities for the selected WAN object, SD-WAN `info.uid`, and Linux `info.iface`.
+- Added SD-WAN source/gateway resolution from `control/sdwan_adv/user_mode_driver/interface/<info.uid>`.
+- Extended temporary `STWEB-*` source routing for SD-WAN using the authoritative overlay source address and explicit remote gateway.
+- Preserved route read-back, WAN Guard, cleanup ordering, and fail-closed behavior.
+- Preserved supplemental iPerf3 Jitter for SD-WAN without enabling the physical-WAN bind-device fallback path.
+- Extended cellular telemetry so a cellular-backed SD-WAN tunnel uses its physical modem underlay for Cellular Health, Carrier Activity, retained telemetry, and Cellular Analysis while History continues to identify the selected SD-WAN tunnel.
+- Kept Ethernet-backed SD-WAN tunnel tests non-cellular.
+- Kept Netperf physical-WAN only.
+- Removed **WAN Bond** from selectable test targets and removed WAN-Bond-specific member display, resolver, routing, WAN Guard, jitter, and execution paths.
+- Preserved generic SDK WAN-bonding status support where unrelated to the test path.
+- Added the authoritative **Router Primary WAN** display and retained the runtime-intent-based Traffic Steering indicator.
+- Validated v1.1.4 on the R1900 with physical and SD-WAN paths and on the E3000 with physical Ethernet and cellular paths.
 
 ## v1.1.3
 

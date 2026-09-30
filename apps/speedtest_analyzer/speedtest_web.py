@@ -451,47 +451,168 @@ def _friendly_wan_name(uid, device):
     ):
         return 'Ethernet WAN'
 
-    # Preserve unknown interfaces such as future satellite, wbond, or
-    # Secure Connect interfaces until their NCOS identities are validated.
+    # WBOND WANs report product="unset"; give them a stable label instead
+    # of exposing the raw NCOS value. No hub/interface name in the label.
+    if wan_type.lower() == 'wbond':
+        return 'WAN Bond'
+
+    # SD-WAN tunnels are labeled by their dependent (underlay) physical WAN,
+    # reusing this same friendly-name logic for that dependent device.
+    if wan_type.lower() == 'sdwan':
+        underlay_label = _sdwan_underlay_friendly_name(device)
+
+        if underlay_label:
+            return 'SD-WAN Tunnel - {}'.format(underlay_label)
+
+        return 'SD-WAN Tunnel'
+
+    # Preserve unknown interfaces such as future satellite or Secure Connect
+    # interfaces until their NCOS identities are validated.
     return product or iface or uid or 'Unknown WAN'
 
 
+def _sdwan_underlay_uid(device):
+    """Return the dependent (underlay) WAN UID for an SD-WAN device.
+
+    Prefers status.active_dep_wandev, then the first entry of
+    status.dep_wandevs. Returns '' when no dependent WAN is exposed.
+    """
+    device = device if isinstance(device, dict) else {}
+    status = device.get('status', {})
+    status = status if isinstance(status, dict) else {}
+
+    active_dep = str(status.get('active_dep_wandev', '') or '').strip()
+
+    if active_dep:
+        return active_dep
+
+    dep_wandevs = status.get('dep_wandevs')
+
+    if isinstance(dep_wandevs, list):
+        for dep in dep_wandevs:
+            dep = str(dep or '').strip()
+
+            if dep:
+                return dep
+
+    elif isinstance(dep_wandevs, dict):
+        for dep in dep_wandevs:
+            dep = str(dep or '').strip()
+
+            if dep:
+                return dep
+
+    return ''
+
+
+def _sdwan_underlay_friendly_name(device):
+    """Return the friendly name of an SD-WAN tunnel's dependent WAN.
+
+    Reuses _friendly_wan_name on the dependent physical WAN device so the
+    cellular/satellite/ethernet naming logic is not duplicated. Returns ''
+    if the dependent WAN cannot be resolved.
+    """
+    underlay_uid = _sdwan_underlay_uid(device)
+
+    if not underlay_uid:
+        return ''
+
+    try:
+        devices = cp.get('status/wan/devices') or {}
+
+        if not isinstance(devices, dict):
+            return ''
+
+        underlay_device = devices.get(underlay_uid)
+
+        if not isinstance(underlay_device, dict):
+            return ''
+
+        return _friendly_wan_name(underlay_uid, underlay_device)
+
+    except Exception:
+        return ''
+
+
+
 def get_wan_interfaces():
-    """Get connected WAN interfaces with display and routing identities."""
+    """Get connected WAN interfaces with display and routing identities.
+
+    Physical WANs and connected SD-WAN tunnel WANs are returned as selectable
+    interfaces. SD-WAN entries remain MANUAL-only (manual_only=True) so they
+    appear in the Manual iPerf3 dropdown without being offered for Scheduled
+    Tests. WBOND and generic vpn/gre/ipsec overlays are excluded.
+    """
     try:
         devices = cp.get('status/wan/devices')
         interfaces = []
-        # Interface types to exclude from speed testing — these are overlay
-        # or tunnel interfaces that don't represent a physical WAN link.
-        _exclude_types = ('sdwan', 'vpn', 'gre', 'ipsec')
+        # Interfaces that should not be exposed as STA test targets.
+        # SD-WAN is intentionally NOT excluded here.
+        _exclude_types = ('wbond', 'vpn', 'gre', 'ipsec')
         if devices and isinstance(devices, dict):
             for uid, info in devices.items():
                 if isinstance(info, dict):
-                    iface = info.get('info', {}).get('iface', '')
-                    wan_type = info.get('info', {}).get('type', '')
-                    # Skip overlay/tunnel interfaces
+                    info_block = info.get('info', {})
+                    info_block = (
+                        info_block
+                        if isinstance(info_block, dict)
+                        else {}
+                    )
+                    iface = info_block.get('iface', '')
+                    wan_type = info_block.get('type', '')
+                    info_uid = info_block.get('uid', '')
+                    # Skip generic overlay/tunnel interfaces
                     if wan_type in _exclude_types:
                         continue
                     status = info.get('status', {})
+                    status = (
+                        status if isinstance(status, dict) else {}
+                    )
                     conn_state = status.get('connection_state', 'unknown')
                     if conn_state != 'connected':
                         continue
                     ipinfo = status.get('ipinfo', {})
+                    ipinfo = (
+                        ipinfo if isinstance(ipinfo, dict) else {}
+                    )
                     ip = ipinfo.get('ip_address', '')
                     # Get priority from config
                     config = info.get('config', {})
+                    config = (
+                        config if isinstance(config, dict) else {}
+                    )
                     priority = config.get('priority', 999)
                     # Build a display-only name. iface remains the raw
                     # NCOS value used for routing and test-engine selection.
                     product = _friendly_wan_name(uid, info)
+
+                    is_sdwan = (wan_type == 'sdwan')
+                    underlay_uid = ''
+
+                    if is_sdwan:
+                        underlay_uid = _sdwan_underlay_uid(info)
+
+                        # SD-WAN overlay source address comes from the
+                        # control plane, not the (untrusted) status.ipinfo.
+                        sdwan_local_ip, _sdwan_gw = (
+                            _resolve_sdwan_source_ip(info_uid)
+                        )
+
+                        if sdwan_local_ip:
+                            ip = sdwan_local_ip
+
                     if iface:
                         interfaces.append({
                             'uid': uid,
+                            'info_uid': info_uid,
                             'iface': iface,
+                            'type': wan_type,
                             'ip': ip,
                             'state': conn_state,
                             'priority': priority,
-                            'name': product
+                            'name': product,
+                            'underlay_uid': underlay_uid,
+                            'manual_only': bool(is_sdwan),
                         })
         # Sort by priority (lowest value = highest priority)
         interfaces.sort(key=lambda x: x.get('priority', 999))
@@ -568,6 +689,237 @@ def _interface_is_cellular_wan(interface):
         )
 
     return False
+
+
+def _resolve_router_primary_wan():
+    """Resolve the router's authoritative primary WAN for display.
+
+    Uses status/wan/primary_device as the sole authority (e.g.
+    'ethernet-wan'), then reuses the existing friendly-name/IP logic to
+    build a display object. Does NOT infer primacy from the selected test
+    interface, priority ordering, or steering.
+
+    Returns a dict {'name', 'ip'} or None if primary cannot be resolved.
+    """
+    try:
+        primary = str(cp.get_wan_primary_device() or '').strip()
+
+        if not primary:
+            return None
+
+        devices = cp.get('status/wan/devices') or {}
+
+        if not isinstance(devices, dict):
+            return None
+
+        device = devices.get(primary)
+
+        if not isinstance(device, dict):
+            return None
+
+        name = _friendly_wan_name(primary, device)
+
+        status = device.get('status', {})
+        status = status if isinstance(status, dict) else {}
+        ipinfo = status.get('ipinfo', {})
+        ipinfo = ipinfo if isinstance(ipinfo, dict) else {}
+        ip = str(ipinfo.get('ip_address', '') or '')
+
+        return {'name': name, 'ip': ip}
+
+    except Exception as e:
+        cp.log(f'Primary WAN resolution failed (non-fatal): {e}')
+        return None
+
+
+def _traffic_steering_active():
+    """Return True when non-management traffic steering is active.
+
+    Authoritative source is status/wan/steering -> data.rules. A rule is
+    considered active steering only when its resolved runtime intent is
+    something OTHER than 'Management (Management traffic)'. UUIDs, rule
+    names, matched_devs, steering_to, and flow counts are NEVER used to
+    determine active state. Fails quiet (returns False) if the endpoint is
+    missing or malformed so the indicator is simply omitted.
+    """
+    try:
+        # cp.get() returns the unwrapped object, so runtime rules live at
+        # steering.get('rules', []). Each rule exposes a top-level resolved
+        # semantic intent in rule['intent'], validated on the R1900 (e.g.
+        # 'Management (Management traffic)', 'Best Effort (Data traffic)').
+        steering = cp.get('status/wan/steering') or {}
+
+        if not isinstance(steering, dict):
+            return False
+
+        rules = steering.get('rules', [])
+
+        if not isinstance(rules, list):
+            return False
+
+        # A rule is classified ONLY when rule['intent'] is a non-empty
+        # string. Non-dict rules, missing/non-string/empty intents are
+        # ignored (fail quiet). Steering is active when at least one such
+        # valid intent is something OTHER than the Management steering rule.
+        # Never classify by UUID, rule name, matched_devs, steering_to,
+        # or flow counts.
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+
+            intent = rule.get('intent')
+
+            if not isinstance(intent, str):
+                continue
+
+            if not intent.strip():
+                continue
+
+            if intent != 'Management (Management traffic)':
+                return True
+
+        return False
+
+    except Exception as e:
+        cp.log(f'Traffic steering detection failed (indicator omitted): {e}')
+        return False
+
+
+def _resolve_telemetry_interface(interface):
+    """Resolve which WAN carries cellular telemetry for the selected test.
+
+    Telemetry-only helper. The selected test identity/history/interface is
+    unchanged; this only decides which device the EXISTING cellular
+    telemetry pipeline polls.
+
+    - Physical WAN selections: telemetry follows the selected interface.
+    - SD-WAN selections: resolve the dependent (underlay) physical WAN via
+      the existing active_dep_wandev / dep_wandevs logic. If that underlay
+      is type=mdm, telemetry follows the underlay modem. Ethernet-backed
+      SD-WAN stays non-cellular.
+
+    Returns a dict:
+        {'telemetry_interface', 'selected_uid', 'selected_type',
+         'underlay_uid', 'underlay_type', 'is_sdwan', 'cellular_enabled'}
+    """
+    requested = str(interface or '').strip()
+
+    result = {
+        'telemetry_interface': requested,
+        'selected_uid': requested,
+        'selected_type': '',
+        'underlay_uid': '',
+        'underlay_type': '',
+        'is_sdwan': False,
+        'cellular_enabled': False,
+    }
+
+    try:
+        devices = cp.get('status/wan/devices') or {}
+
+        if not isinstance(devices, dict):
+            return result
+
+        if not requested or requested == 'auto':
+            requested = str(cp.get_wan_primary_device() or '').strip()
+            result['telemetry_interface'] = requested
+            result['selected_uid'] = requested
+
+        # Locate the selected device by uid or info.iface.
+        selected_uid = ''
+        selected_device = None
+
+        for uid, device in devices.items():
+            if not isinstance(device, dict):
+                continue
+
+            iface = device.get('info', {}).get('iface', '')
+
+            if requested == uid or requested == iface:
+                selected_uid = uid
+                selected_device = device
+                break
+
+        if not isinstance(selected_device, dict):
+            return result
+
+        selected_type = str(
+            selected_device.get('info', {}).get('type', '') or ''
+        )
+
+        result['selected_uid'] = selected_uid
+        result['selected_type'] = selected_type
+
+        if selected_type != 'sdwan':
+            # Non-SD-WAN: telemetry follows the selected WAN as before.
+            result['cellular_enabled'] = _wan_is_cellular_device(
+                selected_uid, selected_device
+            )
+            return result
+
+        # SD-WAN: telemetry follows the dependent (underlay) physical WAN.
+        result['is_sdwan'] = True
+
+        underlay_uid = _sdwan_underlay_uid(selected_device)
+        result['underlay_uid'] = underlay_uid
+
+        if not underlay_uid:
+            return result
+
+        underlay_device = devices.get(underlay_uid)
+
+        if not isinstance(underlay_device, dict):
+            return result
+
+        underlay_info = underlay_device.get('info', {})
+        underlay_info = underlay_info if isinstance(underlay_info, dict) else {}
+        underlay_type = str(underlay_info.get('type', '') or '')
+        result['underlay_type'] = underlay_type
+
+        # Only a cellular (mdm) underlay reuses the cellular telemetry
+        # pipeline. Ethernet-backed SD-WAN remains non-cellular.
+        if underlay_type == 'mdm' and _wan_is_cellular_device(
+            underlay_uid, underlay_device
+        ):
+            # Hand the collector the SAME identifier convention the normal
+            # direct-cellular selection path uses. _sdwan_underlay_uid()
+            # returns the WAN object key (e.g. 'mdm-1ea0ac'), which is a
+            # different domain from info.iface (e.g. 'rmnet501'). The
+            # existing _get_modem_diagnostics_for_interface() resolver
+            # matches on WAN key OR info.iface, and the direct-cellular
+            # selector value is info.iface, so prefer info.iface and fall
+            # back to the WAN key.
+            underlay_iface = str(underlay_info.get('iface', '') or '').strip()
+            result['telemetry_interface'] = underlay_iface or underlay_uid
+            result['cellular_enabled'] = True
+
+        return result
+
+    except Exception as e:
+        cp.log(
+            f'Telemetry interface resolution failed '
+            f'(telemetry disabled, test unaffected): {e}'
+        )
+        return result
+
+
+def _cellular_snapshot_interface(interface):
+    """Return the interface to read cellular diagnostics from.
+
+    Shared by the Live Card and completed-test/history finalization so both
+    use identical topology logic: a cellular-backed SD-WAN resolves to its
+    modem underlay, everything else resolves to itself. The caller's test
+    identity/history interface is unchanged; this only selects the modem the
+    existing _collect_cellular_snapshot() reads from.
+    """
+    try:
+        info = _resolve_telemetry_interface(interface)
+        if info.get('cellular_enabled'):
+            return info.get('telemetry_interface') or interface
+    except Exception:
+        pass
+
+    return interface
 
 
 # =============================================================================
@@ -6968,6 +7320,41 @@ def _is_w2255_726x():
     return is_w2255 and is_726x
 
 
+def _interface_is_sdwan(interface):
+    """Return True when the selected interface/uid is an SD-WAN WAN.
+
+    Matches on WAN object key (uid) or info.iface, mirroring how the rest
+    of the engine resolves a selected interface. 'auto'/empty is never
+    SD-WAN (Active Primary WAN is a physical/bond WAN alias).
+    """
+    requested = str(interface or '').strip()
+
+    if not requested or requested == 'auto' or requested == '__active_wan__':
+        return False
+
+    try:
+        devices = cp.get('status/wan/devices') or {}
+
+        if not isinstance(devices, dict):
+            return False
+
+        for uid, device in devices.items():
+            if not isinstance(device, dict):
+                continue
+
+            info = device.get('info', {})
+            info = info if isinstance(info, dict) else {}
+            iface = str(info.get('iface', '') or '')
+
+            if uid == requested or iface == requested:
+                return str(info.get('type', '') or '') == 'sdwan'
+
+        return False
+
+    except Exception:
+        return False
+
+
 def get_model_capabilities(interface=''):
     """Return capabilities, validation status, and catalog restrictions.
 
@@ -7042,6 +7429,19 @@ def get_model_capabilities(interface=''):
             caps[
                 'engine_restrictions'
             ][engine_id] = defect
+
+    # SD-WAN tunnels are iPerf3-only for this phase. If the selected
+    # interface is an SD-WAN WAN, block Netperf via the existing engine
+    # restriction mechanism so the UI disables the combination.
+    if _interface_is_sdwan(interface):
+        caps['engine_restrictions']['netperf'] = {
+            'blocked': True,
+            'engine': 'netperf',
+            'message': (
+                'Netperf is not available for SD-WAN tunnel interfaces. '
+                'Use iPerf3 to test an SD-WAN tunnel.'
+            ),
+        }
 
     netperf_defect = caps[
         'engine_restrictions'
@@ -8710,16 +9110,107 @@ def run_netperf(interface='', duration=10, direction='both', include_latency=Fal
 _IPERF3_ROUTE_PREFIX = 'STWEB'
 
 
-def _iperf3_setup_source_route(device_uid, source_ip):
+
+def _resolve_sdwan_source_ip(sdwan_route_dev):
+    """Resolve the overlay local IPv4 + peer gateway for an SD-WAN tunnel.
+
+    The authoritative SD-WAN overlay addressing is exposed by the control
+    object control/sdwan_adv/user_mode_driver/interface/<info.uid>, using
+    local_ip (source address) and remote_ip (peer/default gateway).
+    status.ipinfo is NOT trusted for the overlay address.
+
+    No routing-table fallback is used: if the control object is absent,
+    malformed, or does not provide valid IPv4 local_ip/remote_ip, this
+    returns ('', '') and the caller must fail the SD-WAN test cleanly
+    rather than launching iPerf3 with only --bind-dev.
+
+    Args:
+        sdwan_route_dev: SD-WAN routing/control identity (info.uid).
+
+    Returns:
+        Tuple of (source_ip, gateway) as strings, or ('', '').
+    """
+    if not sdwan_route_dev:
+        return '', ''
+
+    try:
+        import ipaddress
+
+        driver = cp.get(
+            'control/sdwan_adv/user_mode_driver/interface/{}'.format(
+                sdwan_route_dev
+            )
+        )
+
+        if not isinstance(driver, dict):
+            cp.log(
+                'SD-WAN resolver: route_dev={} source=failed'.format(
+                    sdwan_route_dev
+                )
+            )
+            return '', ''
+
+        local_ip = str(driver.get('local_ip', '') or '').strip()
+        remote_ip = str(driver.get('remote_ip', '') or '').strip()
+
+        def _valid_ipv4(addr):
+            try:
+                return ipaddress.ip_address(addr).version == 4
+            except Exception:
+                return False
+
+        if (
+            local_ip
+            and remote_ip
+            and _valid_ipv4(local_ip)
+            and _valid_ipv4(remote_ip)
+        ):
+            return local_ip, remote_ip
+
+        cp.log(
+            'SD-WAN resolver: route_dev={} source=failed'.format(
+                sdwan_route_dev
+            )
+        )
+        return '', ''
+
+    except Exception as exc:
+        cp.log('SD-WAN source-IP resolution error: {}'.format(exc))
+        cp.log(
+            'SD-WAN resolver: route_dev={} source=failed'.format(
+                sdwan_route_dev
+            )
+        )
+        return '', ''
+
+
+def _iperf3_setup_source_route(
+    device_uid,
+    source_ip,
+    wan_type='',
+    explicit_gateway=''
+):
     """Create a temporary source-routing policy so iPerf3 traffic from
     source_ip egresses through the specified WAN device.
 
     Uses config/routing API to create a routing table + source-IP policy.
     NCOS routing policies are indexed by numeric position, not _id_.
 
+    For normal (physical) WANs the default route uses NCOS auto-gateway
+    discovery, exactly as before. For SD-WAN tunnel WANs NCOS cannot
+    auto-resolve a gateway for the WAN object, so the default route is built
+    with auto_gateway=False and an explicit gateway from the SD-WAN
+    control-plane local_ip/remote_ip values. In all cases the route 'dev'
+    is the selected WAN device_uid/WAN object key (for example,
+    'sdwan-hub0_wan'), never info.uid.
+
     Args:
-        device_uid: WAN device UID (e.g. 'ethernet-lan', 'mdm-bfa1a8e').
+        device_uid: WAN device UID / WAN object key. Used as the route 'dev'.
         source_ip: Source IPv4 address on that WAN.
+        wan_type: WAN device type. 'sdwan' uses an explicit gateway;
+            all other values preserve existing auto_gateway behavior.
+        explicit_gateway: Dynamically discovered SD-WAN peer/default
+            gateway, used only for SD-WAN tunnel WANs.
 
     Returns:
         Tuple of (table_id, policy_index) on success for later cleanup,
@@ -8729,19 +9220,51 @@ def _iperf3_setup_source_route(device_uid, source_ip):
     table_name = f'{_IPERF3_ROUTE_PREFIX}-{device_uid}'
     table_id = None
     policy_index = None
+    is_sdwan = (wan_type == 'sdwan')
     try:
-        # Define the route table: default route via device_uid
+        # Define the route table: default route via device_uid.
+        # Physical WANs keep NCOS auto-gateway discovery. SD-WAN
+        # cannot auto-resolve a gateway for the WAN object, so use the
+        # explicit peer gateway from the SD-WAN resolver.
+        default_route = {
+            "netallow": False,
+            "ip_network": "0.0.0.0/0",
+            "dev": device_uid,
+            "auto_gateway": True
+        }
+
+        if is_sdwan:
+            default_route["auto_gateway"] = False
+            default_route["gw"] = explicit_gateway
+
         route_table = {
             "name": table_name,
             "routes": [
-                {
-                    "netallow": False,
-                    "ip_network": "0.0.0.0/0",
-                    "dev": device_uid,
-                    "auto_gateway": True
-                }
+                default_route
             ]
         }
+
+        cp.log(
+            (
+                'iPerf3 source route: wan_type={} config_dev={} '
+                'gateway={} auto_gateway={} route_payload={}'
+            ).format(
+                wan_type or 'n/a',
+                device_uid,
+                explicit_gateway or 'n/a',
+                default_route["auto_gateway"],
+                json.dumps(default_route)
+            )
+        )
+
+        if is_sdwan and not explicit_gateway:
+            cp.log(
+                'iPerf3 source route: {} selected but no gateway '
+                'discovered; aborting source-route setup'.format(
+                    wan_type
+                )
+            )
+            return None, None
 
         # Check if the table already exists (from a previous interrupted run)
         existing_tables = _normalize_routing_list(
@@ -8775,6 +9298,54 @@ def _iperf3_setup_source_route(device_uid, source_ip):
         else:
             cp.log(f'iPerf3 source route: reusing existing table '
                    f'id={table_id}')
+
+        # For SD-WAN, verify the explicit default route became active in
+        # the live routing table (auto_gateway cannot supply one for this
+        # WAN object).
+        if is_sdwan:
+            try:
+                live_tables = cp.get('status/routing/table') or {}
+                overlay_default_active = False
+
+                if isinstance(live_tables, dict):
+                    for _tname, _entries in live_tables.items():
+                        if not isinstance(_entries, list):
+                            continue
+
+                        for _entry in _entries:
+                            if not isinstance(_entry, dict):
+                                continue
+
+                            _ip = str(
+                                _entry.get('ip_address', '') or ''
+                            ).strip()
+                            _gw = str(
+                                _entry.get('gateway', '') or ''
+                            ).strip()
+
+                            if (
+                                _ip in ('default', '0.0.0.0')
+                                and _gw == explicit_gateway
+                            ):
+                                overlay_default_active = True
+                                break
+
+                        if overlay_default_active:
+                            break
+
+                cp.log(
+                    'iPerf3 source route: {} default route active={} '
+                    'gw={}'.format(
+                        wan_type,
+                        overlay_default_active,
+                        explicit_gateway or 'n/a'
+                    )
+                )
+            except Exception as _rb_exc:
+                cp.log(
+                    'iPerf3 source route: {} route read-back '
+                    'warning: {}'.format(wan_type, _rb_exc)
+                )
 
         # Create the policy: source IP → table
         route_policy = {
@@ -9028,6 +9599,16 @@ def _iperf3_validate_active_wan_path():
         guard.get('is_primary_wan')
     )
 
+    wan_type = str(
+        guard.get('wan_type') or ''
+    ).strip()
+
+    sdwan_route_dev = str(
+        guard.get('sdwan_route_dev') or ''
+    ).strip()
+
+    is_sdwan = (wan_type == 'sdwan')
+
     table_id = guard.get(
         'source_route_table_id'
     )
@@ -9083,36 +9664,68 @@ def _iperf3_validate_active_wan_path():
                 )
             )
 
-        ipinfo = status.get(
-            'ipinfo',
-            {}
-        )
+        # SD-WAN does not expose the authoritative overlay source address
+        # via status.ipinfo. Re-run the same control-plane resolver used for
+        # the TCP test path and compare it with the selected source IP.
+        if is_sdwan:
+            (
+                current_ip,
+                current_gateway
+            ) = _resolve_sdwan_source_ip(sdwan_route_dev)
 
-        if not isinstance(ipinfo, dict):
-            return False, 'selected WAN IP state unavailable'
+            current_ip = str(current_ip or '').strip()
+            current_gateway = str(current_gateway or '').strip()
 
-        current_ip = str(
-            ipinfo.get(
-                'ip_address',
-                ''
-            ) or ''
-        ).strip()
-
-        if current_ip != source_ip:
-            return (
-                False,
-                'selected WAN source IP changed from {} to {}'.format(
-                    source_ip,
-                    current_ip or 'none'
+            cp.log(
+                (
+                    'SD-WAN pre-jitter validation: original_source_ip={} '
+                    'resolved_source_ip={} result={}'
+                ).format(
+                    source_ip or 'n/a',
+                    current_ip or 'none',
+                    'ok' if current_ip == source_ip else 'changed'
                 )
             )
 
-        current_gateway = str(
-            ipinfo.get(
-                'gateway',
-                ''
-            ) or ''
-        ).strip()
+            if current_ip != source_ip:
+                return (
+                    False,
+                    'selected WAN source IP changed from {} to {}'.format(
+                        source_ip,
+                        current_ip or 'none'
+                    )
+                )
+        else:
+            ipinfo = status.get(
+                'ipinfo',
+                {}
+            )
+
+            if not isinstance(ipinfo, dict):
+                return False, 'selected WAN IP state unavailable'
+
+            current_ip = str(
+                ipinfo.get(
+                    'ip_address',
+                    ''
+                ) or ''
+            ).strip()
+
+            if current_ip != source_ip:
+                return (
+                    False,
+                    'selected WAN source IP changed from {} to {}'.format(
+                        source_ip,
+                        current_ip or 'none'
+                    )
+                )
+
+            current_gateway = str(
+                ipinfo.get(
+                    'gateway',
+                    ''
+                ) or ''
+            ).strip()
 
         if (
             expected_gateway
@@ -9180,13 +9793,26 @@ def _iperf3_validate_active_wan_path():
                 'temporary source-routing table invalid'
             )
 
-        route_valid = any(
-            isinstance(route, dict)
-            and route.get('ip_network') == '0.0.0.0/0'
-            and route.get('dev') == device_uid
-            and bool(route.get('auto_gateway'))
-            for route in routes
-        )
+        if is_sdwan:
+            # SD-WAN temp routes use an explicit gateway
+            # (auto_gateway=False), since NCOS cannot auto-resolve a gateway
+            # for the SD-WAN WAN object.
+            route_valid = any(
+                isinstance(route, dict)
+                and route.get('ip_network') == '0.0.0.0/0'
+                and route.get('dev') == device_uid
+                and not route.get('auto_gateway')
+                and bool(str(route.get('gw') or '').strip())
+                for route in routes
+            )
+        else:
+            route_valid = any(
+                isinstance(route, dict)
+                and route.get('ip_network') == '0.0.0.0/0'
+                and route.get('dev') == device_uid
+                and bool(route.get('auto_gateway'))
+                for route in routes
+            )
 
         if not route_valid:
             return (
@@ -9949,6 +10575,26 @@ def _run_iperf3_phase(
             None
         )
     ):
+        # Diagnostic: on a non-zero return code, log the raw captured
+        # stdout/stderr (in addition to the parsed error below). Not logged
+        # on successful tests to avoid noise.
+        _raw_stdout = execution.get('stdout') or b''
+        _raw_stderr = execution.get('stderr') or b''
+
+        cp.log(
+            'iPerf3 {} stdout: {}'.format(
+                stage,
+                _raw_stdout.decode('utf-8', errors='replace').strip()
+            )
+        )
+
+        cp.log(
+            'iPerf3 {} stderr: {}'.format(
+                stage,
+                _raw_stderr.decode('utf-8', errors='replace').strip()
+            )
+        )
+
         error = _parse_iperf3_error(
             execution.get(
                 'stdout'
@@ -10666,309 +11312,333 @@ def _run_iperf3_udp_jitter_probe(
     server,
     port,
     bind_ip,
-    bind_dev=''
+    bind_dev='',
+    port_start=None,
+    port_end=None,
+    allow_bind_dev_fallback=False
 ):
-    """Run one non-fatal UDP probe and return iPerf3 jitter in ms."""
+    """Run a non-fatal UDP probe and return iPerf3 jitter in ms.
+
+    Supplemental to TCP throughput. Never changes TCP test status.
+
+    Two focused reliability behaviors:
+
+    1. --bind-dev fallback (PRIMARY PHYSICAL WAN only): if the probe fails
+       with the existing "Operation not permitted"/--bind-dev unsupported
+       condition, retry the SAME UDP port without --bind-dev, matching the
+       validated TCP fallback. This same-port retry does NOT consume another
+       UDP port attempt. Once --bind-dev is proven unsupported it stays
+       suppressed for ALL remaining port attempts. The caller decides
+       eligibility and passes allow_bind_dev_fallback explicitly; SD-WAN
+       never enables it because it is source-routed with bind_dev=''.
+
+    2. UDP port retry (max 3 DISTINCT ports, same server): if the server
+       returns a retryable listener/connection-refused condition, try
+       another candidate port from the same server's port range. Never
+       reruns TCP and never switches servers.
+    """
     global current_test
     global _active_iperf3_process
 
     probe_duration = 5
 
-    if not current_test.get(
-        'running'
-    ):
-        return None
+    def _run_one_udp_attempt(attempt_port, use_bind_dev):
+        """Run one UDP probe attempt.
 
-    healthy, detail = (
-        _iperf3_validate_active_wan_path()
-    )
+        Returns (jitter_ms, retry_reason, bind_dev_denied):
+          jitter_ms       float on success, else None
+          retry_reason    non-empty listener/connection-refused reason when
+                          another UDP port may be attempted, else ''
+          bind_dev_denied True when the failure was the --bind-dev
+                          "Operation not permitted" condition
+        """
+        if not current_test.get('running'):
+            return None, '', False
 
-    if not healthy:
-        cp.log(
-            'iPerf3 jitter probe skipped because selected WAN '
-            'path changed or became unavailable: {}'.format(
-                detail
-            )
-        )
-
-        return None
-
-    with test_lock:
-        current_test[
-            'progress'
-        ] = {
-            'stage':
-                'jitter',
-            'percent':
-                0,
-            'message':
-                'Measuring jitter...'
-        }
-
-    command = [
-        iperf3_bin,
-        '-c',
-        server,
-        '-p',
-        str(port),
-        '-u',
-        '-b',
-        '1M',
-        '-t',
-        str(probe_duration),
-        '-J',
-        '-4'
-    ]
-
-    if bind_ip:
-        command.extend([
-            '-B',
-            bind_ip
-        ])
-
-    if bind_dev:
-        command.extend([
-            '--bind-dev',
-            bind_dev
-        ])
-
-    cp.log(
-        'iPerf3 jitter cmd: {}'.format(
-            ' '.join(
-                command
-            )
-        )
-    )
-
-    proc = None
-
-    try:
-        proc = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-
-        with _iperf3_process_lock:
-            _active_iperf3_process = proc
-
-        # Preserve Stop-button behavior if cancellation happened while
-        # the subprocess was being registered.
-        with test_lock:
-            cancel_requested = not current_test.get(
-                'running'
-            )
-
-        if cancel_requested:
-            try:
-                proc.terminate()
-            except Exception:
-                pass
-
-        try:
-            stdout, stderr = proc.communicate(
-                timeout=probe_duration + 15
-            )
-
-        except subprocess.TimeoutExpired:
-            try:
-                proc.kill()
-            except Exception:
-                pass
-
-            try:
-                proc.communicate()
-            except Exception:
-                pass
-
-            cp.log(
-                'iPerf3 jitter probe timed out; jitter unavailable'
-            )
-
-            return None
-
-        with test_lock:
-            cancel_requested = not current_test.get(
-                'running'
-            )
-
-        if cancel_requested:
-            return None
-
-        if proc.returncode != 0:
-            try:
-                error = _parse_iperf3_error(
-                    stdout,
-                    stderr
-                )
-            except Exception:
-                error = (
-                    stderr.decode(
-                        'utf-8',
-                        errors='replace'
-                    ).strip()
-                    if stderr
-                    else 'unknown error'
-                )
-
-            cp.log(
-                'iPerf3 jitter probe unavailable: {}'.format(
-                    error
-                )
-            )
-
-            return None
-
-        healthy, detail = (
-            _iperf3_validate_active_wan_path()
-        )
+        healthy, detail = _iperf3_validate_active_wan_path()
 
         if not healthy:
             cp.log(
-                'iPerf3 jitter result discarded because selected WAN '
-                'path changed during the probe: {}'.format(
-                    detail
-                )
+                'iPerf3 jitter probe skipped because selected WAN '
+                'path changed or became unavailable: {}'.format(detail)
             )
+            return None, '', False
 
-            return None
+        with test_lock:
+            current_test['progress'] = {
+                'stage': 'jitter',
+                'percent': 0,
+                'message': 'Measuring jitter...'
+            }
+
+        command = [
+            iperf3_bin,
+            '-c',
+            server,
+            '-p',
+            str(attempt_port),
+            '-u',
+            '-b',
+            '1M',
+            '-t',
+            str(probe_duration),
+            '-J',
+            '-4'
+        ]
+
+        if bind_ip:
+            command.extend(['-B', bind_ip])
+
+        if use_bind_dev and bind_dev:
+            command.extend(['--bind-dev', bind_dev])
+
+        cp.log('iPerf3 jitter cmd: {}'.format(' '.join(command)))
+
+        proc = None
 
         try:
-            data = json.loads(
-                stdout.decode(
-                    'utf-8'
-                )
+            proc = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
             )
 
-        except Exception as exc:
-            cp.log(
-                'iPerf3 jitter JSON unavailable: {}'.format(
-                    exc
-                )
-            )
+            with _iperf3_process_lock:
+                _active_iperf3_process = proc
 
-            return None
+            # Preserve Stop-button behavior if cancellation happened while
+            # the subprocess was being registered.
+            with test_lock:
+                cancel_requested = not current_test.get('running')
 
-        end = data.get(
-            'end',
-            {}
-        )
-
-        candidates = []
-
-        # iPerf3 UDP JSON structure can expose receiver jitter through
-        # the aggregate result and/or the per-stream UDP object.
-        for key in (
-            'sum',
-            'sum_received',
-            'sum_sent'
-        ):
-            obj = end.get(
-                key,
-                {}
-            )
-
-            if isinstance(
-                obj,
-                dict
-            ):
-                candidates.append(
-                    obj.get(
-                        'jitter_ms'
-                    )
-                )
-
-        streams = end.get(
-            'streams',
-            []
-        )
-
-        if (
-            isinstance(
-                streams,
-                list
-            )
-            and streams
-            and isinstance(
-                streams[0],
-                dict
-            )
-        ):
-            first_stream = streams[0]
-
-            for key in (
-                'udp',
-                'receiver',
-                'sender'
-            ):
-                obj = first_stream.get(
-                    key,
-                    {}
-                )
-
-                if isinstance(
-                    obj,
-                    dict
-                ):
-                    candidates.append(
-                        obj.get(
-                            'jitter_ms'
-                        )
-                    )
-
-        jitter_ms = None
-
-        for value in candidates:
-            if value is None:
-                continue
+            if cancel_requested:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
 
             try:
-                parsed = float(
-                    value
+                stdout, stderr = proc.communicate(
+                    timeout=probe_duration + 15
                 )
-            except (
-                TypeError,
-                ValueError
+
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+
+                try:
+                    proc.communicate()
+                except Exception:
+                    pass
+
+                cp.log(
+                    'iPerf3 jitter probe timed out; jitter unavailable'
+                )
+
+                return None, '', False
+
+            with test_lock:
+                cancel_requested = not current_test.get('running')
+
+            if cancel_requested:
+                return None, '', False
+
+            if proc.returncode != 0:
+                try:
+                    error = _parse_iperf3_error(stdout, stderr)
+                except Exception:
+                    error = (
+                        stderr.decode('utf-8', errors='replace').strip()
+                        if stderr
+                        else 'unknown error'
+                    )
+
+                bind_dev_denied = (
+                    use_bind_dev
+                    and bool(bind_dev)
+                    and 'Operation not permitted' in str(error or '')
+                )
+
+                # Retryable listener/connection-refused condition reuses the
+                # existing endpoint classifier (busy / connection refused /
+                # listener unavailable).
+                retry_reason = _iperf3_retryable_endpoint_reason(error)
+
+                cp.log(
+                    'iPerf3 jitter probe unavailable: {}'.format(error)
+                )
+
+                return None, retry_reason, bind_dev_denied
+
+            healthy, detail = _iperf3_validate_active_wan_path()
+
+            if not healthy:
+                cp.log(
+                    'iPerf3 jitter result discarded because selected WAN '
+                    'path changed during the probe: {}'.format(detail)
+                )
+                return None, '', False
+
+            try:
+                data = json.loads(stdout.decode('utf-8'))
+
+            except Exception as exc:
+                cp.log('iPerf3 jitter JSON unavailable: {}'.format(exc))
+                return None, '', False
+
+            end = data.get('end', {})
+
+            candidates = []
+
+            # iPerf3 UDP JSON structure can expose receiver jitter through
+            # the aggregate result and/or the per-stream UDP object.
+            for key in ('sum', 'sum_received', 'sum_sent'):
+                obj = end.get(key, {})
+
+                if isinstance(obj, dict):
+                    candidates.append(obj.get('jitter_ms'))
+
+            streams = end.get('streams', [])
+
+            if (
+                isinstance(streams, list)
+                and streams
+                and isinstance(streams[0], dict)
             ):
-                continue
+                first_stream = streams[0]
 
-            if parsed >= 0:
-                jitter_ms = round(
-                    parsed,
-                    3
+                for key in ('udp', 'receiver', 'sender'):
+                    obj = first_stream.get(key, {})
+
+                    if isinstance(obj, dict):
+                        candidates.append(obj.get('jitter_ms'))
+
+            jitter_ms = None
+
+            for value in candidates:
+                if value is None:
+                    continue
+
+                try:
+                    parsed = float(value)
+                except (TypeError, ValueError):
+                    continue
+
+                if parsed >= 0:
+                    jitter_ms = round(parsed, 3)
+                    break
+
+            if jitter_ms is None:
+                cp.log(
+                    'iPerf3 jitter probe completed but returned no '
+                    'jitter value'
                 )
-                break
+                return None, '', False
 
-        if jitter_ms is None:
+            cp.log('iPerf3 UDP jitter: {:.3f} ms'.format(jitter_ms))
+
+            return jitter_ms, '', False
+
+        except Exception as exc:
+            # Jitter is supplemental. It must never change TCP test status.
             cp.log(
-                'iPerf3 jitter probe completed but returned no jitter value'
+                'iPerf3 jitter probe failed non-fatally: {}'.format(exc)
+            )
+            return None, '', False
+
+        finally:
+            if proc is not None:
+                with _iperf3_process_lock:
+                    if _active_iperf3_process is proc:
+                        _active_iperf3_process = None
+
+    if not current_test.get('running'):
+        return None
+
+    # Bounded UDP port retry: at most 3 DISTINCT ports on the SAME server.
+    # The first attempt uses the TCP-success port, as today.
+    max_attempts = 3
+    attempted_ports = set()
+    current_port = port
+
+    # Effective bind mode across attempts. --bind-dev starts enabled only
+    # when the caller allows the fallback AND a bind_dev exists. Once proven
+    # unsupported it stays suppressed for every remaining port attempt.
+    use_bind_dev = bool(allow_bind_dev_fallback) and bool(bind_dev)
+
+    for attempt_number in range(max_attempts):
+        if not current_test.get('running'):
+            return None
+
+        if current_port is None:
+            break
+
+        attempted_ports.add(current_port)
+
+        jitter_ms, retry_reason, bind_dev_denied = _run_one_udp_attempt(
+            current_port,
+            use_bind_dev=use_bind_dev
+        )
+
+        # --bind-dev fallback (PRIMARY PHYSICAL WAN only): retry the SAME
+        # port without --bind-dev. This subprocess retry does NOT consume
+        # another UDP port attempt. SD-WAN never reaches here because the
+        # caller passes allow_bind_dev_fallback=False for it.
+        if (
+            jitter_ms is None
+            and bind_dev_denied
+            and allow_bind_dev_fallback
+        ):
+            cp.log(
+                '--bind-dev unsupported on this platform; retrying jitter '
+                'on the same port without it (primary WAN)'
             )
 
+            # Keep --bind-dev suppressed for ALL remaining port attempts.
+            use_bind_dev = False
+
+            jitter_ms, retry_reason, _ = _run_one_udp_attempt(
+                current_port,
+                use_bind_dev=False
+            )
+
+        if jitter_ms is not None:
+            return jitter_ms
+
+        # Only a retryable listener/connection-refused condition advances to
+        # another candidate UDP port on the same server.
+        if not retry_reason:
+            return None
+
+        next_port = None
+
+        if (
+            port_start is not None
+            and port_end is not None
+        ):
+            next_port = _choose_iperf3_unused_port(
+                port_start,
+                port_end,
+                attempted_ports
+            )
+
+        if next_port is None:
+            # No further candidate ports available in the range.
             return None
 
         cp.log(
-            'iPerf3 UDP jitter: {:.3f} ms'.format(
-                jitter_ms
+            'iPerf3 jitter port {} unavailable ({}), trying {}'.format(
+                current_port,
+                retry_reason,
+                next_port
             )
         )
 
-        return jitter_ms
+        current_port = next_port
 
-    except Exception as exc:
-        # Jitter is supplemental. It must never change TCP test status.
-        cp.log(
-            'iPerf3 jitter probe failed non-fatally: {}'.format(
-                exc
-            )
-        )
-
-        return None
-
-    finally:
-        if proc is not None:
-            with _iperf3_process_lock:
-                if _active_iperf3_process is proc:
-                    _active_iperf3_process = None
+    return None
 
 
 def run_iperf3(
@@ -11096,6 +11766,9 @@ def run_iperf3(
     selected_gateway = ''
     is_primary_wan = False
     matched_uid = ''
+    matched_type = ''
+    matched_info_uid = ''
+    normal_source_ip = ''
 
     primary_uid = (
         cp.get_wan_primary_device()
@@ -11156,7 +11829,59 @@ def run_iperf3(
                         )
 
                         matched_uid = uid
+                        matched_type = dev.get(
+                            'info',
+                            {}
+                        ).get(
+                            'type',
+                            ''
+                        )
+                        matched_info_uid = dev.get(
+                            'info',
+                            {}
+                        ).get(
+                            'uid',
+                            ''
+                        )
                         break
+
+            # Preserve the normal resolver result for logging. SD-WAN
+            # overrides this below with its authoritative overlay address.
+            normal_source_ip = bind_ip
+
+            # SD-WAN overlay: the authoritative source/gateway come from the
+            # SD-WAN control object, not status.ipinfo. Always resolve via
+            # the control plane and override any status-derived value.
+            if matched_type == 'sdwan':
+                (
+                    sdwan_source_ip,
+                    sdwan_gateway
+                ) = _resolve_sdwan_source_ip(matched_info_uid)
+
+                if sdwan_source_ip:
+                    bind_ip = sdwan_source_ip
+                    selected_gateway = sdwan_gateway or selected_gateway
+                else:
+                    bind_ip = ''
+                    selected_gateway = ''
+
+                cp.log(
+                    (
+                        'SD-WAN resolver: device_uid={} route_dev={} '
+                        'iface={} underlay={} local_ip={} gateway={}'
+                    ).format(
+                        matched_uid or 'n/a',
+                        matched_info_uid or 'n/a',
+                        bind_dev or 'n/a',
+                        _sdwan_underlay_uid(
+                            devices.get(matched_uid, {})
+                            if isinstance(devices, dict)
+                            else {}
+                        ) or 'n/a',
+                        bind_ip or 'n/a',
+                        selected_gateway or 'n/a'
+                    )
+                )
 
             if not bind_ip:
                 cp.log(
@@ -11192,16 +11917,70 @@ def run_iperf3(
     cp.log(
         (
             'iPerf3 WAN selection: requested={} '
-            'device_uid={} source_ip={} '
+            'device_uid={} wan_type={} '
+            'normal_source_ip={} final_source_ip={} '
             'primary_uid={} is_primary={}'
         ).format(
             interface or 'auto',
             matched_uid or 'n/a',
+            matched_type or 'n/a',
+            normal_source_ip or 'n/a',
             bind_ip or 'n/a',
             primary_uid or 'n/a',
             is_primary_wan
         )
     )
+
+    # SD-WAN fail-safe: running iPerf3 with only --bind-dev <overlay iface>
+    # (no source-IP bind) can crash the bundled binary (-11/SIGSEGV).
+    # If an SD-WAN tunnel failed to produce a valid source IP and gateway,
+    # abort cleanly before launching iPerf3. Physical WANs keep their
+    # existing "run without bind" behavior.
+    if matched_type == 'sdwan' and (
+        not bind_ip
+        or not selected_gateway
+    ):
+        message = (
+            'Unable to resolve SD-WAN source IP/gateway; '
+            'test not started.'
+        )
+
+        cp.log(
+            'iPerf3 SD-WAN test aborted: {} '
+            '(source_ip={} gateway={})'.format(
+                message,
+                bind_ip or 'none',
+                selected_gateway or 'none'
+            )
+        )
+
+        return {
+            'download_bps':
+                0,
+            'upload_bps':
+                0,
+            'download_bytes':
+                None,
+            'upload_bytes':
+                None,
+            'test_duration':
+                duration,
+            'server':
+                server,
+            'server_name':
+                (
+                    context.get(
+                        'server_name'
+                    )
+                    or server
+                ),
+            'download_port':
+                None,
+            'upload_port':
+                None,
+            'error':
+                message
+        }
 
     source_route_table_id = None
     source_route_policy_index = None
@@ -11219,7 +11998,11 @@ def run_iperf3(
             source_route_policy_index
         ) = _iperf3_setup_source_route(
             matched_uid,
-            bind_ip
+            bind_ip,
+            matched_type,
+            selected_gateway
+            if matched_type == 'sdwan'
+            else ''
         )
 
         if (
@@ -11354,6 +12137,10 @@ def run_iperf3(
             guard_source_ip,
         'gateway':
             guard_gateway,
+        'wan_type':
+            matched_type,
+        'sdwan_route_dev':
+            matched_info_uid,
         'is_primary_wan':
             bool(
                 guard_uid
@@ -11814,6 +12601,15 @@ def run_iperf3(
                 'running'
             )
         ):
+            # The --bind-dev fallback is safe ONLY for the primary PHYSICAL
+            # WAN. SD-WAN is source-routed and must never enter the
+            # bind-dev fallback path. Decide here, do not infer inside
+            # the jitter helper.
+            allow_bind_dev_fallback = (
+                is_primary_wan
+                and matched_type != 'sdwan'
+            )
+
             jitter_ms = _run_iperf3_udp_jitter_probe(
                 iperf3_bin,
                 locked_server,
@@ -11821,7 +12617,10 @@ def run_iperf3(
                     'port'
                 ),
                 bind_ip,
-                effective_bind_dev
+                effective_bind_dev,
+                locked_port_start,
+                locked_port_end,
+                allow_bind_dev_fallback
             )
 
             if jitter_ms is not None:
@@ -12277,9 +13076,32 @@ def run_test_thread(engine, params):
         # Carrier telemetry is optional and only applies to a WAN that has
         # positive cellular evidence. Satellite WANs may use an mdm-* UID,
         # but follow the Ethernet/non-cellular statistics path.
-        if _interface_is_cellular_wan(interface):
+        # Telemetry follows the selected WAN, except a cellular-backed
+        # SD-WAN tunnel, whose telemetry follows its dependent modem
+        # underlay. Test identity/history/interface remains the selection.
+        telemetry_info = _resolve_telemetry_interface(interface)
+        telemetry_interface = telemetry_info.get('telemetry_interface') or interface
+
+        if telemetry_info.get('is_sdwan'):
+            cp.log(
+                'SD-WAN telemetry underlay: '
+                'selected={} underlay={} underlay_type={} '
+                'cellular_telemetry={}'.format(
+                    telemetry_info.get('selected_uid') or 'n/a',
+                    telemetry_info.get('underlay_uid') or 'n/a',
+                    telemetry_info.get('underlay_type') or 'n/a',
+                    'enabled'
+                    if telemetry_info.get('cellular_enabled')
+                    else 'disabled'
+                )
+            )
+
+        if telemetry_info.get('cellular_enabled'):
             try:
-                carrier_collector = CarrierTelemetryCollector(interface)
+                # The collector polls the resolved telemetry interface (the
+                # modem underlay for SD-WAN), but the test result identity is
+                # unchanged and still recorded against the selected WAN.
+                carrier_collector = CarrierTelemetryCollector(telemetry_interface)
                 carrier_collector.start()
                 _active_carrier_collector = carrier_collector
             except Exception as e:
@@ -12522,8 +13344,13 @@ def run_test_thread(engine, params):
                     f'Test completed successfully. '
                     f'Download: {entry["download_mbps"]} Mbps, '
                     f'Upload: {entry["upload_mbps"]} Mbps.')
-            # Collect cellular telemetry
-            cellular = _collect_cellular_snapshot(interface)
+            # Collect cellular telemetry. For a cellular-backed SD-WAN, the
+            # snapshot must be read from the resolved modem underlay (same
+            # topology logic as the Live Card and CA telemetry), while the
+            # history/interface identity remains the selected SD-WAN tunnel.
+            cellular = _collect_cellular_snapshot(
+                _cellular_snapshot_interface(interface)
+            )
             if cellular:
                 entry['cellular'] = cellular
 
@@ -12623,8 +13450,13 @@ def run_test_thread(engine, params):
                     'upload_port'
                 ] = None
 
-            # Collect cellular telemetry
-            cellular = _collect_cellular_snapshot(interface)
+            # Collect cellular telemetry. For a cellular-backed SD-WAN, the
+            # snapshot must be read from the resolved modem underlay (same
+            # topology logic as the Live Card and CA telemetry), while the
+            # history/interface identity remains the selected SD-WAN tunnel.
+            cellular = _collect_cellular_snapshot(
+                _cellular_snapshot_interface(interface)
+            )
             if cellular:
                 entry['cellular'] = cellular
 
@@ -12854,6 +13686,11 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
             self.send_json(_add_ca_capabilities_to_history(history))
         elif self.path == '/api/interfaces':
             self.send_json(get_wan_interfaces())
+        elif self.path == '/api/primary_wan':
+            self.send_json({
+                'primary': _resolve_router_primary_wan(),
+                'steering_active': _traffic_steering_active(),
+            })
         elif self.path == '/api/engines':
             self.send_json(self.get_engines())
         elif self.path == '/api/router_info':
@@ -14185,9 +15022,17 @@ class SpeedtestHandler(SimpleHTTPRequestHandler):
                             'carrier_state': carriers,
                         }
                 return {'has_cellular': False}
-            # Specific interface requested
+            # Specific interface requested. The Live Card must follow the
+            # SAME topology logic as the completed-test telemetry: for a
+            # cellular-backed SD-WAN tunnel, resolve the dependent modem
+            # underlay and use it as the live telemetry SOURCE. The selected
+            # interface identity remains the SD-WAN tunnel; only the modem
+            # the snapshot is read from changes. Ethernet-backed SD-WAN and
+            # non-SD-WAN selections resolve to themselves (unchanged).
+            telemetry_iface = _cellular_snapshot_interface(iface)
+
             snapshot = _collect_cellular_snapshot(
-                iface,
+                telemetry_iface,
                 include_active_carriers=True
             )
             if not snapshot:
