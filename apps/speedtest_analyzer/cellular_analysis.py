@@ -151,6 +151,38 @@ def _normalize_pci(value):
     return match.group(0) if match else text
 
 
+# Canonical serving-cell source labels. All 5G-NR source aliases collapse to a
+# single NR source and all LTE source aliases collapse to a single LTE source
+# so that identical physical cells reported under different source labels (for
+# example "NR" from a live snapshot vs "NR_CELL_ID" from final cellular data)
+# produce ONE serving-cell identity key.
+_CANONICAL_NR_SOURCE = 'NR_CELL_ID'
+_CANONICAL_LTE_SOURCE = 'LTE'
+_NR_SOURCE_ALIASES = frozenset(
+    ('NR', 'NR_CELL_ID', 'NR5G', '5G', 'NR_CELLID', 'NRCELLID')
+)
+_LTE_SOURCE_ALIASES = frozenset(
+    ('LTE', '4G', 'CELL_ID', 'CELLID', 'EUTRAN', 'CELL')
+)
+
+
+def _canonical_cell_source(value):
+    """Canonicalize a serving-cell source label.
+
+    NR aliases -> 'NR_CELL_ID', LTE aliases -> 'LTE'. An unrecognized,
+    non-empty label is preserved (uppercased) so unknown technologies are
+    never silently merged. Empty -> 'CELL' (matches historical default).
+    """
+    text = _text(value).upper()
+    if not text:
+        return 'CELL'
+    if text in _NR_SOURCE_ALIASES:
+        return _CANONICAL_NR_SOURCE
+    if text in _LTE_SOURCE_ALIASES:
+        return _CANONICAL_LTE_SOURCE
+    return text
+
+
 def _serving_cell_from_cellular(cellular):
     if not isinstance(cellular, dict):
         return None
@@ -640,7 +672,7 @@ def _cell_key(cell):
     cell_id = _canonical_cell_id(cell.get('cell_id')) if isinstance(cell, dict) else ''
     if not cell_id:
         return _UNKNOWN_CELL_KEY
-    source = _text(cell.get('cell_id_source')).upper() or 'CELL'
+    source = _canonical_cell_source(cell.get('cell_id_source'))
     plmn = _normalize_plmn(cell.get('plmn')) or '?'
     return '%s|%s|%s' % (source, plmn, cell_id)
 
@@ -661,7 +693,7 @@ def _cell_key_parts(key):
         return None
 
     return (
-        _text(source).upper() or 'CELL',
+        _canonical_cell_source(source),
         _normalize_plmn(plmn) or '?',
         cell_id,
     )

@@ -2,7 +2,7 @@
 
 Engineering and advanced operational reference for the Cradlepoint Speedtest Analyzer SDK application.
 
-**Documentation version:** 1.1.4
+**Documentation version:** 1.1.6
 **Application release family:** 1.1.x
 **Firmware family currently documented:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
@@ -37,7 +37,7 @@ The documented application behavior uses several persistent or packaged data sou
 
 Application version information is carried in `package.ini`.
 
-The current branded application release is `1.1.4`. Speedtest Analyzer 1.1.4 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline. Release `1.1.4` adds Manual iPerf3 testing for connected individual SD-WAN tunnel interfaces, preserves cellular-underlay telemetry for cellular-backed tunnels, and removes WAN Bond as a selectable synthetic test target. Existing v1.1.3 GeoView, measurement telemetry, configuration, history, and reporting behavior is preserved.
+The current branded application release is `1.1.6`. Speedtest Analyzer 1.1.6 continues the engineering lineage of the unreleased Speed Test `2.7.6` development baseline and the 1.1.x feature family. Release `1.1.5` added live, read-only reconciliation of externally pushed NCM Group/Device canonical configuration so effective runtime configuration can hot-apply without a restart. Release `1.1.6` adds surgical R980-5GD / Private 5G Standalone compatibility improvements for carrier normalization, serving-cell identity, History 5G PCell fallback, Home PLMN, NSSAI, and NR-frequency telemetry. The history schema version remains unchanged; new cellular fields are additive and backward-compatible. Existing v1.1.4 SD-WAN tunnel testing, GeoView, measurement telemetry, configuration ownership, routing, history, and reporting behavior is preserved unless specifically documented otherwise.
 
 ## 2.2 Device validation catalog
 
@@ -1778,7 +1778,9 @@ Beginning with Speedtest Analyzer 1.0.0:
 
 | Release Family | Major Focus |
 |---|---|
-| **1.1.x — Cellular Analysis, GeoView, configuration, and measurement telemetry** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, scope-aware GeoView presentation with Local Only and Geolocation Services modes, site-wide OpenCellID resolution/cache/contribution workflows, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, the two-key NCM Group / Device configuration model introduced in v1.1.2, and v1.1.3 iPerf3 TCP RTT, retransmission, Jitter, and compact interval telemetry. |
+| **1.1.6 — Private 5G SA compatibility** | R980-5GD / Private 5G SA carrier normalization, canonical NR/LTE serving-cell identity, History NR-PCell fallback, `HM_PLMN`, NSSAI metadata, and NR DL/UL frequency enrichment while preserving the existing history schema and Cellular Analysis architecture. |
+| **1.1.5 — Live NCM configuration reconciliation** | Read-only background reconciliation of the canonical NCM Group / Device documents, exact-name App Data loading, revision plus content-fingerprint change detection, effective-config-only hot apply, fleet-safe poll jitter, and strict zero-write Group/Device safety boundaries. |
+| **1.1.x — Cellular Analysis, GeoView, configuration, measurement telemetry, and SD-WAN tunnel testing** | Historical serving-cell analysis, traffic-aware handoff preservation, selected-cell RF/radio-resource summaries, self-contained HTML/PDF-ready reporting, scope-aware GeoView presentation with Local Only and Geolocation Services modes, site-wide OpenCellID resolution/cache/contribution workflows, Google Site Address geocoding and interactive Maps JavaScript presentation, protected Device credentials, the two-key NCM Group / Device configuration model introduced in v1.1.2, v1.1.3 iPerf3 TCP RTT/retransmission/Jitter/interval telemetry, v1.1.4 Manual iPerf3 testing of connected individual SD-WAN tunnels, v1.1.5 live NCM canonical-config reconciliation, and v1.1.6 Private 5G SA normalization/metadata compatibility. |
 | **1.0.x — Speedtest Analyzer** | New product identity and visual branding, Test Center navigation, theme-aware SVG application mark, fresh SDK package identity, and continuation of the validated pre-release 2.7.6 runtime architecture. |
 | **2.7.x — Speed Test pre-release** | Public/User iPerf3 server architecture, bounded listener retry, endpoint Reliability, User Server editing, iPerf3 cancellation, History & Reports usability, expanded platform validation, and the 2.7.6 documentation split. |
 | **2.6.x** | External modem capability catalog, device-validation catalog, known-defect framework, WAN identity improvements, Active Primary WAN behavior, and expanded Netperf lifecycle protection. |
@@ -1792,6 +1794,46 @@ Beginning with Speedtest Analyzer 1.0.0:
 This section is the permanent engineering history for Speedtest Analyzer and its unreleased Speed Test development lineage.
 
 Speedtest Analyzer `1.0.0` was created from the validated Speed Test `2.7.6` development baseline before external publication. The version reset represents a product-brand and SDK-package identity reset rather than a rewrite of the throughput, routing, scheduling, telemetry, history, or server architectures.
+
+## v1.1.6
+
+Added targeted cellular normalization and presentation compatibility for the R980-5GD operating on an HPE Private 5G Standalone CBRS network. The release intentionally preserves the existing cellular architecture: it corrects ambiguous or platform-specific diagnostic representations at normalization boundaries rather than introducing a parallel Private-5G analysis path.
+
+- Added explicit carrier-name normalization with precedence `CARRID` -> `HOMECARRID` -> `CUR_PLMN` -> `Unknown`.
+- Treats empty, `none`, `n/a`, `unknown`, `--`, `not registered`, `not reported`, and `not available` values as unavailable, case-insensitively.
+- Does not infer a carrier from CBRS band, frequency, or any Private-5G-specific heuristic.
+- Canonicalized serving-cell source aliases at key-generation time so NR aliases collapse to one NR source and LTE aliases collapse to one LTE source.
+- Canonicalized band labels so values such as `Band n48`, `n48`, and `N48` identify the same normalized band.
+- Preserved true handoff detection because different ECI/NCI values remain different serving-cell identities.
+- Hardened 5G carrier parsing so invalid sentinel-only PCell records are treated as absent and carrier entries without identifying band/channel data are discarded.
+- Added a History fallback that synthesizes the normalized 5G SA serving primary into the 5G Carrier Aggregation table when NCOS reports valid NR serving-primary data but no usable explicit PCell aggregation object.
+- The synthesized row is a normal `PCell (Primary)` observation. One serving PCell remains one carrier and is not interpreted as active Carrier Aggregation.
+- Existing explicit PCell/SCell discovery and real secondary-carrier behavior remain unchanged.
+- Added `HM_PLMN` as an accepted Home PLMN diagnostic source alongside `HOME_PLMN` and `HOMEPLMN`; `CUR_PLMN` remains the current serving PLMN used for serving-cell identity.
+- Added additive `active_nssai` / `allowed_nssai` snapshot fields from `ACTIVE_NSSAI` / `ALLOWED_NSSAI`. The UI displays the active Slice only when present; NSSAI is not part of serving-cell identity and does not create slice-based grouping.
+- Added `DLFRQ_5G` / `ULFRQ_5G` as preferred 5G NR downlink/uplink frequency sources in the existing NR detail model.
+- Preserved the existing history schema version. Older history records simply lack the additive NSSAI/frequency fields and continue to normalize/analyze correctly.
+- The 5G SA PCell fallback is intentionally generic: any SA platform that reports valid NR serving fields without usable explicit PCell aggregation keys can benefit from the normalized serving-primary row.
+- Did not change interface naming, iPerf3 execution, WAN Guard, bonding behavior, Jitter probing, server retry, or GeoView location/resolution logic.
+- Focused cellular regression coverage validates carrier precedence, NR/LTE source-alias collapse, band normalization, single normalized NR-PCell fallback, one-PCell-not-CA semantics, `HM_PLMN`, NSSAI persistence, and legacy-history compatibility.
+- The established configuration-manager suite remains at its prior baseline; three unrelated GeoView provider-migration cases remain known failing and were not changed by v1.1.6.
+
+## v1.1.5
+
+Closed the runtime activation gap in the v1.1.2 two-layer configuration model. Before v1.1.5, canonical Group/Device App Data was loaded at startup and after local configuration mutations, but an NCM push arriving while the process was already running could remain unapplied until another local mutation or restart occurred.
+
+- Added a lightweight live canonical-config reconciler in `configuration_manager.py` and a background watcher thread in `speedtest_web.py`.
+- Each reconciliation cycle reads one App Data snapshot and resolves the exact `speedtest_analyzer_group` and `speedtest_analyzer_device` keys from that snapshot.
+- Exact-name loading avoids the SDK helper's loose/substring name-matching behavior for canonical configuration keys.
+- External change detection uses both the independent `(group_revision, device_revision)` token and a normalized canonical-content fingerprint.
+- Content fingerprinting ensures an externally re-pushed canonical document is detected even if its revision value was not incremented.
+- After a canonical change is detected, the manager recomputes the effective `DEVICE > GROUP > DEFAULT` configuration and compares its normalized effective fingerprint with the last applied runtime configuration.
+- The existing hot-reload callback runs only when the effective configuration actually changed. A lower-layer Group change hidden by a Device override therefore updates the reconciler baseline without causing an unnecessary runtime reload.
+- Reconciliation is strictly read-only with respect to canonical ownership: it never writes `speedtest_analyzer_group`, never creates/updates `speedtest_analyzer_device`, and never converts a Group-only device into a Device-managed device merely because reconciliation ran.
+- The reconciler is seeded once after normal startup initialization so the boot-applied canonical state is the baseline rather than being misclassified as a new external push.
+- Transient App Data read failures retain the last-known-good runtime state and leave the previous applied token/fingerprint intact so a later cycle can retry safely.
+- The watcher targets an average 30-second cadence with bounded 25-35 second jitter. Jitter affects only the next reconciliation poll time; Scheduled Test and cron firing semantics are unchanged.
+- Regression coverage includes revision-only/content-only detection, effective-change hot apply, apply-once/no-op behavior, Group-write prohibition, Device-key creation prohibition, and cumulative zero-write audits.
 
 ## v1.1.4
 
@@ -2988,3 +3030,194 @@ v1.1.3 iPerf3 telemetry validation included:
 - Scheduled iPerf3 Jitter execution.
 - CSV validation of `Latency_ms`, `Jitter_ms`, and `TCP_Retransmissions`.
 - Confirmation that successful TCP results remain successful independently of the supplemental Jitter phase.
+
+---
+
+# 21. Live NCM Canonical-Configuration Reconciliation (1.1.5)
+
+v1.1.5 extends the v1.1.2 two-layer configuration model so externally pushed canonical NCM configuration can become active while the application process remains running. The design deliberately reuses the existing Configuration Manager and hot-reload path rather than adding a second configuration authority.
+
+## 21.1 Previous runtime activation gap
+
+Before v1.1.5, the canonical Group and Device documents were reloaded when the application initialized and after local mutation workflows such as Device Save, Reset-to-Group, migration/convert, or Factory Reset. An NCM push could update App Data while the process was already running, but no background path compared that new canonical state with the configuration currently active in RAM.
+
+The result was an operational mismatch: NCM contained the new Group document while the scheduler and other runtime consumers could continue using the old effective configuration until a restart or another local mutation forced a reload.
+
+## 21.2 Single-snapshot exact-name loading
+
+The reconciler begins each cycle with one `cp.get_appdata()` snapshot and resolves the two canonical keys by exact name:
+
+- `speedtest_analyzer_group`
+- `speedtest_analyzer_device`
+
+This avoids ambiguous substring matching and ensures both layers are evaluated from the same App Data observation. The same layer validation and schema rules used by normal configuration loading remain authoritative.
+
+## 21.3 Revision and content change detection
+
+The last-applied reconciliation state tracks:
+
+- The independent `(group_revision, device_revision)` pair.
+- A normalized fingerprint of the canonical Group + Device documents.
+- A normalized fingerprint of the effective merged configuration.
+
+A canonical change is detected when either the revision pair changes or the canonical-content fingerprint changes. The content fingerprint is required because an administrator or external system can re-push different canonical content without incrementing the embedded revision.
+
+After detecting a canonical change, the manager recomputes the effective whole-section merge using the existing precedence:
+
+```text
+DEVICE > GROUP > DEFAULT
+```
+
+The hot-reload callback is invoked only when the effective fingerprint changes. For example, if NCM changes a Group section that is completely masked by a Device override, the reconciler records the new canonical baseline but does not restart/reinitialize runtime consumers unnecessarily.
+
+## 21.4 Ownership and write-safety boundaries
+
+Reconciliation is intentionally read-only.
+
+It does **not**:
+
+- Write or delete `speedtest_analyzer_group`.
+- Create, update, or delete `speedtest_analyzer_device` merely because an external change was detected.
+- Convert a Group-managed device into Device-managed state.
+- Increment Group or Device revisions.
+- Alter Scheduled Test cron timing semantics.
+
+When effective configuration changes, the reconciler invokes the same existing runtime hot-reload callback used by validated local apply paths. Canonical persistence ownership therefore remains unchanged.
+
+## 21.5 Startup seeding and read-failure behavior
+
+After normal startup configuration initialization, `seed_reconciler()` records the already-applied canonical token and fingerprints. This prevents the first background cycle from treating boot configuration as a newly arrived external change.
+
+If an App Data snapshot cannot be read successfully, the cycle retains the last-known-good runtime configuration and applied reconciliation baseline. No partial or default replacement is applied. A later cycle retries the read.
+
+## 21.6 Fleet-safe polling jitter
+
+The background watcher targets an average 30-second reconciliation interval, with each next sleep selected inside a bounded 25-35 second window.
+
+The jitter exists only to desynchronize fleets of routers that may have booted or received an application deployment together. It changes when the next App Data read occurs; it does not alter Scheduled Test execution, cron interpretation, test timing, or any persisted schedule value.
+
+## 21.7 Validation
+
+The v1.1.5 developer regression harness verifies:
+
+- External Group and Device revision detection.
+- Canonical-content change detection when revision is unchanged.
+- Effective-config fingerprint comparison.
+- Hot apply exactly once when runtime configuration changes.
+- No runtime reload when a canonical change is masked by higher-precedence configuration.
+- Zero writes/deletes to the Group key.
+- No Device-key creation from Group-only state.
+- Stable no-op behavior on unchanged subsequent cycles.
+
+---
+
+# 22. Private 5G SA Cellular Compatibility (1.1.6)
+
+v1.1.6 is a normalization and rendering compatibility release focused on R980-5GD telemetry observed on an HPE Private 5G Standalone CBRS network. It does not create a separate Private-5G analysis engine. The existing snapshot, Carrier Activity, Cellular Analysis, History, and GeoView models remain authoritative.
+
+## 22.1 Carrier-name normalization
+
+Some Private 5G SA modem diagnostics report:
+
+```text
+CARRID = Not registered
+HOMECARRID = CBRS Private Network
+```
+
+v1.1.6 selects the first usable carrier display value in this order:
+
+1. `CARRID`
+2. `HOMECARRID`
+3. `CUR_PLMN`
+4. `Unknown`
+
+The following values are treated as unavailable, case-insensitively:
+
+```text
+(empty)
+none
+n/a
+unknown
+--
+not registered
+not reported
+not available
+```
+
+This is a display normalization rule only. The application does not infer a carrier from n48, CBRS frequency, PLMN ownership, or any other heuristic.
+
+## 22.2 Serving-cell identity canonicalization
+
+The same physical NR serving cell can enter retained history through more than one telemetry path. Earlier normalization could preserve source aliases such as `NR` and `NR_CELL_ID` separately, and presentation variants such as `Band n48` and `n48` could contribute to duplicate keys.
+
+v1.1.6 canonicalizes these values at serving-cell key generation:
+
+- 5G NR source aliases collapse to one canonical NR source.
+- LTE source aliases collapse to one canonical LTE source.
+- NR band forms such as `Band n48`, `n48`, and `N48` normalize to `n48`.
+
+Identity remains anchored to the real serving identifiers. Different NR Cell IDs remain different cells, so true handoffs continue to produce serving-cell changes.
+
+For the validated R980 Private-5G history where Cell 482 / PLMN 315010 / TAC 1 / channel 638304 was previously duplicated only by source/band formatting, normalization produces one serving-cell identity and removes the phantom change.
+
+## 22.3 5G SA History PCell fallback
+
+A separate R980 diagnostic behavior exposed `ACTIVE_5G_PCELL = Not Registered` while valid NR serving-primary fields were available elsewhere. Earlier aggregation parsing treated that sentinel as a PCell object, producing an empty History row even though the summary/Peak path correctly knew the active n48 serving primary.
+
+v1.1.6 changes the aggregation normalization boundary:
+
+- Invalid sentinel-only PCell values are treated as absent.
+- Carrier entries without identifying band/channel data are discarded.
+- When a 5G SA record has a valid normalized serving primary but no usable explicit PCell aggregation record, the History aggregation model synthesizes that normalized NR primary as `PCell (Primary)`.
+
+The fallback reuses existing serving-primary data; it does not invent a secondary carrier. A single synthesized PCell therefore means **1 carrier**, not active Carrier Aggregation.
+
+When NCOS reports real PCell/SCell aggregation records, the existing component-carrier discovery remains authoritative.
+
+## 22.4 Home PLMN, NSSAI, and NR frequency fields
+
+The diagnostic candidate mapping adds the following low-risk fields:
+
+| Normalized field | NCOS diagnostic source | Use |
+|---|---|---|
+| Home PLMN | `HM_PLMN` in addition to `HOME_PLMN` / `HOMEPLMN` | Network metadata only. |
+| Active NSSAI | `ACTIVE_NSSAI` | Persisted additive history metadata; displayed as **Slice** when present. |
+| Allowed NSSAI | `ALLOWED_NSSAI` | Persisted additive history metadata. |
+| 5G DL frequency | `DLFRQ_5G` | Existing 5G NR downlink-frequency detail. |
+| 5G UL frequency | `ULFRQ_5G` | Existing 5G NR uplink-frequency detail. |
+
+`CUR_PLMN` remains the current serving PLMN used by serving-cell identity. Home PLMN does not replace it. NSSAI is not included in serving-cell identity and does not create slice-based grouping.
+
+## 22.5 History compatibility
+
+The history schema version is unchanged in v1.1.6.
+
+`active_nssai`, `allowed_nssai`, and the NR frequency values are additive. Older retained records that do not contain these fields remain valid and continue through the same analysis pipeline. The new 5G SA PCell fallback is also intentionally applicable to older records when they already contain enough normalized serving-primary data.
+
+## 22.6 Scope intentionally unchanged
+
+v1.1.6 does not change:
+
+- Friendly interface naming, including labels such as **R980 Internal - SIM1**.
+- iPerf3 execution or server retry behavior.
+- WAN Guard or source-routing policy.
+- Individual SD-WAN tunnel behavior.
+- WAN Bond exclusion from Speedtest Analyzer test targets.
+- Supplemental Jitter probing.
+- GeoView location resolution, cache, contribution, or map logic.
+- The overall Cellular Analysis UI structure.
+
+## 22.7 Validation
+
+Focused v1.1.6 cellular tests cover:
+
+- Carrier precedence and invalid-sentinel handling.
+- NR/LTE source-alias collapse.
+- NR band normalization.
+- Single normalized NR-PCell History fallback.
+- The rule that one PCell does not imply active CA.
+- `HM_PLMN` capture.
+- NSSAI persistence and legacy-history compatibility.
+
+The pre-existing configuration-manager suite remains at its established baseline. Three unrelated GeoView provider-migration cases remain known failing and are unchanged by this release.
+

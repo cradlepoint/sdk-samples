@@ -25,11 +25,17 @@ class FakeCp(object):
         self.store = {}          # name -> value (str)
         self.put_calls = []      # [(name, value), ...]
         self.delete_calls = []   # [name, ...]
+        # When True, the no-argument get_appdata() path raises, simulating a
+        # transient App Data read failure (used by the reconciliation
+        # last-known-good test).
+        self.fail_reads = False
 
     def log(self, *a, **k):
         pass
 
     def get_appdata(self, name=''):
+        if self.fail_reads and not name:
+            raise RuntimeError('simulated App Data read failure')
         # No name -> full entry list (exact-match loader uses this path).
         if not name:
             return [{'name': n, 'value': v, '_id_': n}
@@ -1825,6 +1831,347 @@ except ValueError:
     _bad_rejected = True
 check('geo migrate: unknown provider still rejected (fails closed)',
       _bad_rejected)
+
+
+# ===========================================================================
+# LIVE EXTERNAL NCM RECONCILIATION (background canonical-config watcher)
+# ===========================================================================
+# Reproduces the real fleet scenario: STA is already running when NCM pushes a
+# new speedtest_analyzer_group (or an external actor changes
+# speedtest_analyzer_device). The background reconciler must detect the
+# canonical change, recompute effective config, and hot-apply it live WITHOUT
+# a reboot/app-restart and WITHOUT the web UI being open -- while never writing
+# Group and never fabricating a Device key.
+#
+# These tests drive config_mgr.reconcile_once() directly (one deterministic
+# cycle, no threads). A counting hot-reload callback proves exactly-once /
+# zero hot reloads. reconcile_once() returns a ReconcileReport with:
+#   .changed        canonical revision/fingerprint changed since last apply
+#   .hot_reloaded   the effective config changed and runtime was hot-applied
+#   .read_error     a transient App Data read failure occurred this cycle
+#   .old_group_revision / .new_group_revision
+#   .old_device_revision / .new_device_revision
+
+_rc = {'count': 0, 'last': None}
+
+
+def _rc_cb(effective):
+    _rc['count'] += 1
+    _rc['last'] = effective
+
+
+def _running_from_effective(effective):
+    """Mimic the web layer's live-apply running derivation (is_startup=False).
+
+    The web hot-reload callback derives schedule_config['running'] via
+    compute_schedule_running(enabled, autostart, is_startup=_config_startup_apply).
+    A live NCM reconciliation is NOT a boot event (_config_startup_apply is
+    False), so the test mirrors that exact derivation here.
+    """
+    sched = (effective or {}).get('schedule', {}) if isinstance(
+        effective, dict) else {}
+    return cm.compute_schedule_running(
+        bool(sched.get('enabled')), bool(sched.get('autostart')),
+        is_startup=False)
+
+
+# --- A. Group arrives after startup (the exact customer repro) --------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+# 1-3. Start with no canonical config; initialize; default schedule inactive.
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+boot_sched = cm.get_effective_config().get('schedule', {})
+check('reconcile A: fresh start -> default schedule disabled',
+      boot_sched.get('enabled') is False)
+check('reconcile A: fresh start -> not running at boot',
+      _running_from_effective(cm.get_effective_config()) is False)
+# 4. Externally inject a Group with a newer revision + an enabled schedule.
+gsched = {'enabled': True, 'autostart': False, 'engine': 'netperf',
+          'cron': '0 * * * *', 'params': {}}
+put_group({'schedule': dict(gsched)}, 7)
+_group_writes_before_A = len(writes_to(GROUP))
+# 5. Run one reconciliation cycle.
+rep = cm.reconcile_once()
+# 6. Effective schedule becomes Group-sourced.
+eff_A = cm.get_effective_config()
+check('reconcile A: change detected', rep.changed is True)
+check('reconcile A: hot reload applied once', _rc['count'] == 1)
+check('reconcile A: hot_reloaded flag true', rep.hot_reloaded is True)
+check('reconcile A: effective schedule now Group-sourced (enabled)',
+      eff_A['schedule']['enabled'] is True and
+      eff_A['schedule']['cron'] == '0 * * * *')
+check('reconcile A: new_group_revision reported (7)',
+      rep.new_group_revision == 7 and rep.old_group_revision == 0)
+# 7. Runtime scheduler becomes active (live-apply running semantics).
+check('reconcile A: runtime scheduler becomes active (running=true)',
+      _running_from_effective(eff_A) is True)
+# 8. No Device key written.
+check('reconcile A: NO Device key written',
+      stored_device_doc() is None and len(writes_to(DEVICE)) == 0)
+check('reconcile A: NO Group write/delete',
+      len(writes_to(GROUP)) == _group_writes_before_A and
+      not any(d == GROUP for d in fake_cp.delete_calls))
+cm.register_hot_reload(None)
+
+
+# --- B. Group update changes active schedule --------------------------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': '0 * * * *',
+                        'params': {}}}, 3)
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+# Externally replace with revision N+1 and a DIFFERENT schedule.
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'iperf3', 'cron': '*/15 * * * *',
+                        'params': {'server_source': 'public'}}}, 4)
+rep = cm.reconcile_once()
+eff_B = cm.get_effective_config()
+check('reconcile B: change detected (group 3 -> 4)',
+      rep.changed is True and rep.old_group_revision == 3 and
+      rep.new_group_revision == 4)
+check('reconcile B: hot-applied exactly once', _rc['count'] == 1)
+check('reconcile B: new effective schedule active',
+      eff_B['schedule']['engine'] == 'iperf3' and
+      eff_B['schedule']['cron'] == '*/15 * * * *')
+# A second identical cycle must do nothing (idempotent).
+rep2 = cm.reconcile_once()
+check('reconcile B: second cycle is a no-op (no re-apply)',
+      rep2.changed is False and _rc['count'] == 1)
+cm.register_hot_reload(None)
+
+
+# --- C. Group changes but Device override wins ------------------------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+# Device overrides schedule; Group also has schedule.
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'OLD-G', 'params': {}}}, 2)
+put_device({'schedule': {'enabled': True, 'autostart': False,
+                         'engine': 'iperf3', 'cron': 'DEV',
+                         'params': {'server_source': 'public'}}}, 5)
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+eff_C_before = cm.get_effective_config()
+# Group schedule changes (bump group revision) but Device still overrides it.
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'NEW-G', 'params': {}}}, 3)
+rep = cm.reconcile_once()
+eff_C_after = cm.get_effective_config()
+check('reconcile C: canonical change detected (group 2 -> 3)',
+      rep.changed is True and rep.new_group_revision == 3)
+check('reconcile C: effective schedule UNCHANGED (Device override wins)',
+      eff_C_after['schedule']['cron'] == 'DEV' and
+      eff_C_before['schedule']['cron'] == 'DEV')
+check('reconcile C: NO unnecessary hot reload (effective unchanged)',
+      rep.hot_reloaded is False and _rc['count'] == 0)
+check('reconcile C: stored token advanced so no repeat work next cycle',
+      cm.reconcile_once().changed is False and _rc['count'] == 0)
+check('reconcile C: NO Device key written by reconciliation',
+      len(writes_to(DEVICE)) == 0)
+cm.register_hot_reload(None)
+
+
+# --- D. Device config changes externally ------------------------------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+put_device({'outputs': ['a']}, 1)
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+# External actor (not the normal app Save path) moves the Device key forward.
+put_device({'outputs': ['b', 'c']}, 2)
+rep = cm.reconcile_once()
+eff_D = cm.get_effective_config()
+check('reconcile D: external Device change detected (device 1 -> 2)',
+      rep.changed is True and rep.old_device_revision == 1 and
+      rep.new_device_revision == 2)
+check('reconcile D: effective applied (outputs updated)',
+      eff_D['outputs'] == ['b', 'c'] and rep.hot_reloaded is True and
+      _rc['count'] == 1)
+check('reconcile D: reconciliation itself performed NO writes',
+      len(writes_to(DEVICE)) == 0 and len(fake_cp.delete_calls) == 0)
+cm.register_hot_reload(None)
+
+
+# --- E. App Data read failure -> retain last-known-good ---------------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'GOOD', 'params': {}}}, 9)
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+good_effective = cm.get_effective_config()
+# This cycle cannot read App Data at all.
+fake_cp.fail_reads = True
+rep = cm.reconcile_once()
+check('reconcile E: read failure reported', rep.read_error is True)
+check('reconcile E: no change claimed on read failure', rep.changed is False)
+check('reconcile E: NO hot reload on read failure', _rc['count'] == 0)
+check('reconcile E: last-known-good runtime config retained',
+      cm.get_effective_config() == good_effective)
+check('reconcile E: effective NOT overwritten with defaults',
+      cm.get_effective_config()['schedule']['cron'] == 'GOOD')
+# Next successful cycle (still revision 9) reconciles cleanly as a no-op.
+fake_cp.fail_reads = False
+rep2 = cm.reconcile_once()
+check('reconcile E: recovery cycle is a clean no-op (nothing changed)',
+      rep2.read_error is False and rep2.changed is False and
+      _rc['count'] == 0)
+# And a genuine change after recovery is applied normally.
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'NEWER', 'params': {}}}, 10)
+rep3 = cm.reconcile_once()
+check('reconcile E: change after recovery is applied',
+      rep3.changed is True and rep3.hot_reloaded is True and
+      _rc['count'] == 1 and
+      cm.get_effective_config()['schedule']['cron'] == 'NEWER')
+cm.register_hot_reload(None)
+
+
+# --- F. No-op poll ----------------------------------------------------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'G', 'params': {}}}, 4)
+put_device({'outputs': ['x']}, 6)
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+_writes_before_F = len(fake_cp.put_calls)
+_deletes_before_F = len(fake_cp.delete_calls)
+rep = cm.reconcile_once()
+rep_b = cm.reconcile_once()
+check('reconcile F: unchanged revisions -> no change',
+      rep.changed is False and rep_b.changed is False)
+check('reconcile F: zero hot reloads', _rc['count'] == 0)
+check('reconcile F: zero writes', len(fake_cp.put_calls) == _writes_before_F)
+check('reconcile F: zero deletes',
+      len(fake_cp.delete_calls) == _deletes_before_F)
+cm.register_hot_reload(None)
+
+
+# --- G. Startup semantics unchanged -----------------------------------------
+# enabled=true / autostart=false at application startup remains enabled but NOT
+# running (boot semantics are untouched by the reconciler).
+reset_state()
+check('reconcile G: startup enabled+no-autostart -> enabled',
+      cm.compute_schedule_running(True, False, is_startup=True) is False)
+# The persisted intent remains enabled; only the runtime running is suppressed
+# at boot. Prove the effective schedule stays enabled through initialize().
+put_device({'schedule': {'enabled': True, 'autostart': False,
+                         'engine': 'netperf', 'cron': 'B', 'params': {}}}, 1)
+cm.initialize()
+cm.seed_reconciler()
+boot_eff = cm.get_effective_config()
+check('reconcile G: persisted enabled preserved at startup',
+      boot_eff['schedule']['enabled'] is True)
+check('reconcile G: boot running derivation = enabled AND autostart = False',
+      cm.compute_schedule_running(
+          boot_eff['schedule']['enabled'],
+          boot_eff['schedule']['autostart'], is_startup=True) is False)
+
+
+# --- H. Live external apply semantics ---------------------------------------
+# enabled=true / autostart=false delivered AFTER startup becomes running=true,
+# because a live NCM reconciliation uses interactive/apply semantics, not boot.
+reset_state()
+cm.register_hot_reload(_rc_cb)
+cm.initialize()           # fresh: nothing running
+cm.seed_reconciler()
+_rc['count'] = 0
+check('reconcile H: nothing running before Group arrives',
+      _running_from_effective(cm.get_effective_config()) is False)
+put_group({'schedule': {'enabled': True, 'autostart': False,
+                        'engine': 'netperf', 'cron': '0 * * * *',
+                        'params': {}}}, 1)
+rep = cm.reconcile_once()
+eff_H = cm.get_effective_config()
+check('reconcile H: live apply detected + hot reloaded',
+      rep.changed is True and rep.hot_reloaded is True and _rc['count'] == 1)
+check('reconcile H: enabled=true/autostart=false delivered live -> running',
+      eff_H['schedule']['enabled'] is True and
+      eff_H['schedule']['autostart'] is False and
+      _running_from_effective(eff_H) is True)
+cm.register_hot_reload(None)
+
+
+# --- I. No Group writes (reconciliation never mutates Group) ----------------
+reset_state()
+cm.register_hot_reload(_rc_cb)
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'G1', 'params': {}}}, 1)
+cm.initialize()
+cm.seed_reconciler()
+# A whole series of external Group changes + cycles.
+for _rev, _cron in ((2, 'G2'), (3, 'G3'), (4, 'G4')):
+    put_group({'schedule': {'enabled': True, 'autostart': True,
+                            'engine': 'netperf', 'cron': _cron,
+                            'params': {}}}, _rev)
+    cm.reconcile_once()
+check('reconcile I: reconciliation performed ZERO Group writes',
+      len(writes_to(GROUP)) == 0)
+check('reconcile I: reconciliation performed ZERO Group deletes',
+      not any(d == GROUP for d in fake_cp.delete_calls))
+check('reconcile I: reconciliation never created a Device key from Group',
+      stored_device_doc() is None and len(writes_to(DEVICE)) == 0)
+cm.register_hot_reload(None)
+
+
+# --- J. Same revision, changed Group content --------------------------------
+# NCM (or a manual edit) replaces the Group payload WITHOUT bumping
+# group_revision. Revision-only change detection would miss this; the canonical
+# content fingerprint must catch it.
+reset_state()
+cm.register_hot_reload(_rc_cb)
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'SCHED-A',
+                        'params': {}}}, 5)
+cm.initialize()
+cm.seed_reconciler()
+_rc['count'] = 0
+_j_group_writes_before = len(writes_to(GROUP))
+eff_J_before = cm.get_effective_config()
+check('reconcile J: baseline effective schedule is A',
+      eff_J_before['schedule']['cron'] == 'SCHED-A')
+# Replace the Group payload with a DIFFERENT schedule but keep revision == 5.
+put_group({'schedule': {'enabled': True, 'autostart': True,
+                        'engine': 'netperf', 'cron': 'SCHED-B',
+                        'params': {}}}, 5)
+# Sanity: the stored revision really is unchanged.
+check('reconcile J: group_revision deliberately unchanged (still 5)',
+      stored_group_doc()['group_revision'] == 5)
+rep = cm.reconcile_once()
+eff_J_after = cm.get_effective_config()
+check('reconcile J: canonical CONTENT change detected despite same revision',
+      rep.changed is True)
+check('reconcile J: revisions reported unchanged (5 -> 5)',
+      rep.old_group_revision == 5 and rep.new_group_revision == 5)
+check('reconcile J: effective config updated to schedule B',
+      eff_J_after['schedule']['cron'] == 'SCHED-B')
+check('reconcile J: hot reload applied exactly once',
+      rep.hot_reloaded is True and _rc['count'] == 1)
+check('reconcile J: NO Group writes',
+      len(writes_to(GROUP)) == _j_group_writes_before and
+      not any(d == GROUP for d in fake_cp.delete_calls))
+check('reconcile J: NO Device key written',
+      stored_device_doc() is None and len(writes_to(DEVICE)) == 0)
+# Second unchanged cycle is a clean no-op.
+rep2 = cm.reconcile_once()
+check('reconcile J: second unchanged cycle is a no-op',
+      rep2.changed is False and _rc['count'] == 1)
+cm.register_hot_reload(None)
+
+
+# Make sure fail_reads is off and no stray callback leaks into the AUDIT suite.
+fake_cp.fail_reads = False
+cm.register_hot_reload(None)
 
 
 # ===========================================================================

@@ -23964,6 +23964,16 @@
                 false
             );
 
+            // Private 5G network slice (NSSAI). Shown only when present so
+            // non-slice deployments are unaffected.
+            if (ok(c.active_nssai)) {
+                networkHtml += headerField(
+                    'Slice',
+                    c.active_nssai,
+                    false
+                );
+            }
+
             var servingHtml = '';
 
             servingHtml += servingField(
@@ -24126,6 +24136,18 @@
                                 : c.rsrq_5g,
                             ' dB'
                         )
+                    ],
+
+                    [
+                        'Downlink Freq',
+                        unit(c.dl_frequency_5g, ' MHz'),
+                        'dl_frequency_5g'
+                    ],
+
+                    [
+                        'Uplink Freq',
+                        unit(c.ul_frequency_5g, ' MHz'),
+                        'ul_frequency_5g'
                     ]
 
                 ]));

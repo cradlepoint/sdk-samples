@@ -2,6 +2,10 @@
 # make.py reads this file (named 'buildignore') to prune the package.
 # The Configuration Manager unit-test harness is not production runtime.
 test_configuration_manager.py
+# R980-5GD / Private 5G SA normalization test harness (development-only).
+test_cellular_r980_sa.py
+# Netperf stale shared-service cleanup unit-test harness (development-only).
+test_netperf_stale_cleanup.py
 # Developer scratch directory for throwaway validation harnesses.
 tmp/
 # Editor/backup scratch files must never ship in the package.

@@ -7,6 +7,7 @@ import re
 import sys
 import json
 import time
+import random
 import socket
 import socketserver
 import subprocess
@@ -995,13 +996,24 @@ _DIAG_FIELD_CANDIDATES = {
     ),
     'rf_channel_5g': ('CHANNEL_5G', 'RFCHANNEL_5G', 'NR_RFCHANNEL'),
     'phy_cell_id_5g': ('PHY_CELL_ID_5G', 'PCI_5G'),
+    # Preferred NR DL/UL carrier frequencies when the modem exposes them.
+    # These populate the existing frequency display path; they do not create
+    # a new UI section.
+    'dl_frequency_5g': ('DLFRQ_5G',),
+    'ul_frequency_5g': ('ULFRQ_5G',),
     # Tower / network
     'nr_cell_id': ('NR_CELL_ID',),
     'cell_id': ('CELL_ID',),
     'phy_cell_id': ('PHY_CELL_ID',),
     'tac': ('TAC', 'TRACKING_AREA_CODE'),
     'plmn': ('CUR_PLMN', 'CURRENT_PLMN'),
-    'home_plmn': ('HOME_PLMN', 'HOMEPLMN'),
+    # HM_PLMN is the R980-5GD home-PLMN key; added alongside the existing
+    # HOME_PLMN/HOMEPLMN aliases. This is distinct from CUR_PLMN (serving).
+    'home_plmn': ('HOME_PLMN', 'HOMEPLMN', 'HM_PLMN'),
+    # Private 5G network slice identifiers (3GPP NSSAI). Captured for display
+    # and history only; never used as part of serving-cell identity.
+    'active_nssai': ('ACTIVE_NSSAI',),
+    'allowed_nssai': ('ALLOWED_NSSAI',),
     'active_apn': ('ACTIVEAPN',),
     # Registration / radio state
     'emm_state': ('EMMSTATE',),
@@ -1024,6 +1036,68 @@ def _first_present(diagnostics, candidates, is_present):
     except Exception:
         pass
     return None
+
+
+# Values that NCOS/modems report for an unavailable carrier identity. Compared
+# case-insensitively after trimming. "not registered" is included because the
+# R980-5GD on HPE Private 5G SA reports CARRID="Not registered" while the real
+# carrier name is carried in HOMECARRID.
+_INVALID_CARRIER_VALUES = frozenset((
+    '',
+    'none',
+    'n/a',
+    'unknown',
+    '--',
+    'not registered',
+    'not reported',
+    'not available',
+))
+
+
+def _usable_carrier_value(value):
+    """Return a trimmed carrier string if usable, else ''.
+
+    A value is unusable when it is empty or one of the known
+    invalid/unavailable sentinels (case-insensitive).
+    """
+    if value is None:
+        return ''
+    text = str(value).strip()
+    if text.lower() in _INVALID_CARRIER_VALUES:
+        return ''
+    return text
+
+
+def _normalized_display_carrier(diagnostics):
+    """Resolve the display carrier name from modem diagnostics.
+
+    Precedence (first usable value wins):
+      a. CARRID
+      b. HOMECARRID
+      c. CUR_PLMN as a fallback display value when no carrier name exists
+      d. "Unknown"
+
+    This is intentionally generic. It does NOT infer a carrier from band
+    (e.g. n48) or from any private-network heuristic. On the R980-5GD /
+    HPE Private 5G SA input (CARRID="Not registered",
+    HOMECARRID="CBRS Private Network") this yields "CBRS Private Network".
+    """
+    if not isinstance(diagnostics, dict):
+        return 'Unknown'
+
+    carrid = _usable_carrier_value(diagnostics.get('CARRID'))
+    if carrid:
+        return carrid
+
+    home = _usable_carrier_value(diagnostics.get('HOMECARRID'))
+    if home:
+        return home
+
+    cur_plmn = _usable_carrier_value(diagnostics.get('CUR_PLMN'))
+    if cur_plmn:
+        return cur_plmn
+
+    return 'Unknown'
 
 
 def _scale_sinr(value):
@@ -1065,9 +1139,23 @@ def _parse_aggregation_cells(diagnostics):
     """
     cells = {}
     unmatched = {}
+
+    # Values that mean "no carrier here" for aggregation metrics. A modem may
+    # emit ACTIVE_5G_PCELL="Not Registered" with no accompanying band fields;
+    # that must NOT manufacture a phantom primary carrier. Compared
+    # case-insensitively after trimming.
+    _ca_invalid = {
+        '', 'none', 'n/a', 'unknown', '--',
+        'not registered', 'not reported', 'not available',
+    }
+
     try:
         for raw_key, value in diagnostics.items():
             if value is None or value == '':
+                continue
+            if str(value).strip().lower() in _ca_invalid:
+                # Treat sentinel values as absent so they neither populate a
+                # metric nor synthesize a carrier entry via setdefault.
                 continue
             key = str(raw_key).upper()
             match = _CA_KEY_RE.match(key)
@@ -1100,6 +1188,19 @@ def _parse_aggregation_cells(diagnostics):
             cell[out_key] = value
 
         service_mode = _determine_service_mode(diagnostics)
+
+        # Drop any discovered cell that carries no identifying radio data (no
+        # band and no channel) — e.g. a PCell key seen only via a now-filtered
+        # ACTIVE_*="Not Registered". Such an entry would render as band --,
+        # bandwidth --, channel --, 0 MHz and inflate the carrier count. A
+        # real serving primary with normalized band/bandwidth is handled by
+        # the synthesized-primary path in _collect_cellular_snapshot.
+        for cell_key in list(cells):
+            entry = cells[cell_key]
+            has_band = str(entry.get('band') or '').strip() != ''
+            has_channel = str(entry.get('channel') or '').strip() != ''
+            if not has_band and not has_channel:
+                del cells[cell_key]
 
         ordered = []
         # Primary first, then secondary cells in index order.
@@ -1245,6 +1346,12 @@ def _collect_cellular_snapshot(interface, include_active_carriers=False):
             if val is not None:
                 snapshot[out_key] = val
 
+        # Carrier display name uses explicit precedence so an unavailable
+        # CARRID (e.g. "Not registered" on Private 5G SA) falls back to
+        # HOMECARRID and then CUR_PLMN rather than showing a sentinel. The
+        # raw CARRID candidate mapping above is intentionally overridden here.
+        snapshot['carrier'] = _normalized_display_carrier(diagnostics)
+
         service_mode = _determine_service_mode(diagnostics)
 
         if service_mode:
@@ -1274,9 +1381,13 @@ def _collect_cellular_snapshot(interface, include_active_carriers=False):
             or _determine_service_mode(diagnostics)
         )
 
-        # Explicit NCOS PCell telemetry is preferred. Some platforms/states
-        # expose only SCells, so synthesize a primary only when needed.
-        if cells and not any(c.get('role') == 'P' for c in cells):
+        # Explicit NCOS PCell telemetry is preferred. Synthesize a primary
+        # whenever none of the discovered cells is a usable PCell. This covers
+        # both the SCell-only case AND the Private 5G SA case where the modem's
+        # only PCell signal was ACTIVE_5G_PCELL="Not Registered" (now filtered
+        # out), leaving valid RFBAND_5G/RFBANDWIDTH_5G/RFCHANNEL_5G serving
+        # data that must still render as the single NR primary.
+        if not any(c.get('role') == 'P' for c in cells):
             primary = None
 
             if service_mode == '5G SA':
@@ -1316,6 +1427,10 @@ def _collect_cellular_snapshot(interface, include_active_carriers=False):
                         'phy_cell_id': snapshot.get(
                             'phy_cell_id_5g'
                         ),
+                        # A synthesized SA primary IS the serving NR cell.
+                        # Give it a valid serving state so the History CA
+                        # table shows "Connected" rather than "--".
+                        'state': 'Connected',
                     }
 
             else:
@@ -2007,7 +2122,10 @@ def _serving_cell_snapshot(diagnostics):
         'pci': pci,
         'band': band,
         'channel': channel,
-        'carrier': first('CARRID'),
+        # Same CARRID -> HOMECARRID -> CUR_PLMN precedence as the snapshot
+        # carrier so the serving-cell carrier matches the Network display on
+        # Private 5G SA where CARRID is "Not registered".
+        'carrier': _normalized_display_carrier(diagnostics),
     }
 
     for key, value in values.items():
@@ -7481,8 +7599,10 @@ def get_model_capabilities(interface=''):
 # remain active after its intended duration, including tests started from
 # NCM or the local NCOS Diagnostics UI. Application-owned tests use their
 # requested duration plus a bounded grace period. Unknown pre-existing
-# jobs are respected unless NCOS progress shows they have exceeded a
-# conservative stale threshold.
+# jobs are respected until STA has observed the same active state unchanged
+# for a conservative stale threshold, measured by wall-clock elapsed time
+# (time.monotonic()) rather than NCOS-reported progress (which can stay at 0
+# forever on a hung service).
 _NETPERF_WATCHDOG_GRACE = 30
 _NETPERF_WATCHDOG_MAX = 600
 _NETPERF_FOREIGN_STALE_FALLBACK = 120
@@ -7633,14 +7753,92 @@ def _netperf_cancel_and_verify(reason='cleanup'):
     return False
 
 
+# Observation-based stale tracking for a pre-existing (foreign) Netperf job.
+#
+# NCOS `progress` is test-execution progress, NOT wall-clock age: a hung
+# service can sit at status=running, progress=0 forever. Comparing progress
+# against the stale threshold therefore never fires. Instead we track how long
+# STA has observed the SAME unchanged active Netperf state, measured with a
+# monotonic clock, and compare THAT elapsed time against the threshold.
+#
+# This state is module-level so it survives between scheduled runs (the app is
+# a resident HTTP server). If the process restarts, observation restarts from
+# zero, which is acceptable - safety over aggressive killing at startup.
+_netperf_foreign_observation = {
+    'first_seen_monotonic': None,
+    'fingerprint': None,
+}
+
+
+def _netperf_state_fingerprint(output):
+    """Build a change-detection fingerprint from verified NCOS fields only.
+
+    control/netperf/output exposes exactly: command, error, guid, progress,
+    results_path, status (verified live on NCOS). There is NO timestamp field
+    and NO run-id field, so none is used. The native per-run identifier is the
+    `-Z <hash>` token inside `command` (populated when a run completes). Any
+    meaningful change - status, progress, a new results_path, or a new -Z
+    token - produces a different fingerprint and resets the stale timer.
+    Polling the same unchanged values does not.
+    """
+    if not isinstance(output, dict):
+        return None
+
+    command = str(output.get('command', '') or '')
+    ztoken_match = re.search(r'-Z\s+(\S+)', command)
+    ztoken = ztoken_match.group(1) if ztoken_match else None
+
+    return (
+        str(output.get('status', '') or '').strip().lower(),
+        _netperf_progress_seconds(output),
+        output.get('results_path'),
+        ztoken,
+    )
+
+
+def _netperf_reset_foreign_observation():
+    """Clear foreign-job stale tracking (service inactive or reclaimed)."""
+    _netperf_foreign_observation['first_seen_monotonic'] = None
+    _netperf_foreign_observation['fingerprint'] = None
+
+
+def _netperf_observe_foreign_stale(output):
+    """Return seconds STA has observed this unchanged active foreign job.
+
+    Measures elapsed wall-clock time with time.monotonic(), independent of
+    NCOS-reported progress. The timer resets whenever the job's observable
+    state changes (meaningful progress/state change) and starts fresh the
+    first time a given active job is seen.
+
+    Returns:
+        Integer seconds the current active state has been unchanged.
+    """
+    fingerprint = _netperf_state_fingerprint(output)
+    now = time.monotonic()
+
+    first_seen = _netperf_foreign_observation['first_seen_monotonic']
+    if (
+        first_seen is None
+        or fingerprint != _netperf_foreign_observation['fingerprint']
+    ):
+        _netperf_foreign_observation['first_seen_monotonic'] = now
+        _netperf_foreign_observation['fingerprint'] = fingerprint
+        return 0
+
+    return int(now - first_seen)
+
+
 def _netperf_prepare_shared_service():
     """Ensure the router-wide Netperf service is safe for a new run.
 
-    A legitimate pre-existing job is left alone. A job becomes reclaimable
-    when its numeric NCOS progress exceeds either:
+    A legitimate pre-existing job is left alone while it keeps making
+    progress or changing state. A job becomes reclaimable only once STA has
+    observed the SAME unchanged active state for at least the stale threshold,
+    measured by wall-clock elapsed time (not NCOS-reported progress, which can
+    stay at 0 forever on a hung service).
 
-      * its native command duration plus the normal watchdog grace; or
-      * 120 seconds when NCOS does not expose the original duration.
+    The threshold is the job's native command duration plus the normal
+    watchdog grace when NCOS exposes the duration, otherwise 120 seconds.
 
     Returns:
         Tuple of (ready, message).
@@ -7656,6 +7854,9 @@ def _netperf_prepare_shared_service():
         return True, ''
 
     if not _netperf_is_active(output):
+        # No foreign job in flight - drop any observation we were tracking so
+        # the next pre-existing job starts its stale timer from scratch.
+        _netperf_reset_foreign_observation()
         return True, ''
 
     progress = _netperf_progress_seconds(
@@ -7677,31 +7878,21 @@ def _netperf_prepare_shared_service():
         stale_after = _NETPERF_FOREIGN_STALE_FALLBACK
         duration_source = 'native duration unavailable'
 
-    if (
-        progress is not None
-        and progress >= stale_after
-    ):
-        cp.log(
-            f'Netperf stale shared job detected: '
-            f'progress={progress}s stale_after={stale_after}s '
-            f'({duration_source}). Reclaiming service.'
-        )
+    # Elapsed wall-clock time STA has observed this exact active state without
+    # a meaningful change. This - not NCOS progress - is what ages a hung job
+    # past the stale threshold. A fresh observation (first sight or a changed
+    # fingerprint) returns 0, which also resets the protection timer.
+    was_tracking = (
+        _netperf_foreign_observation['first_seen_monotonic'] is not None
+    )
+    stale_elapsed = _netperf_observe_foreign_stale(output)
 
-        stopped = _netperf_cancel_and_verify(
-            'stale shared-job cleanup'
-        )
-
-        if stopped:
-            # Give NCOS a short settle window before rewriting
-            # the shared input/options state for our new test.
-            time.sleep(1)
-            return True, ''
-
-        return (
-            False,
-            'A stale Netperf job was detected but the native '
-            'service could not be stopped.'
-        )
+    # Normalized active status for logging. May be any of
+    # _NETPERF_ACTIVE_STATUSES (running/connecting/started), not just running.
+    status_text = (
+        str(output.get('status', '') or '').strip().lower()
+        or 'unknown'
+    )
 
     progress_text = (
         f'{progress}s'
@@ -7709,15 +7900,61 @@ def _netperf_prepare_shared_service():
         else 'unknown'
     )
 
+    if stale_elapsed >= stale_after:
+        cp.log(
+            f'Netperf existing job unchanged for {stale_elapsed}s; '
+            f'treating as stale/hung (progress={progress_text}, '
+            f'stale threshold={stale_after}s, {duration_source}).'
+        )
+        cp.log('Attempting cleanup of stale Netperf service')
+
+        stopped = _netperf_cancel_and_verify(
+            'stale shared-job cleanup'
+        )
+
+        # Whether cleanup succeeded or failed, this observation is finished:
+        # a surviving service will be re-observed fresh on the next preflight.
+        _netperf_reset_foreign_observation()
+
+        if stopped:
+            cp.log('Netperf stale-service cleanup succeeded')
+            # Give NCOS a short settle window before rewriting
+            # the shared input/options state for our new test.
+            time.sleep(1)
+            return True, ''
+
+        cp.log('Netperf stale-service cleanup failed; aborting test')
+
+        return (
+            False,
+            'A stale Netperf job was detected but the native '
+            'service could not be stopped.'
+        )
+
+    # Still within the protection window. Log meaningful transitions only
+    # (first detection, or when a state change restarted the timer) so a
+    # five-minute scheduler does not spam the log every cycle.
+    if not was_tracking:
+        cp.log(
+            'Netperf service already active: '
+            f'status={status_text} progress={progress_text}; '
+            'beginning stale observation'
+        )
+    elif stale_elapsed == 0:
+        cp.log(
+            'Netperf existing job changed state; '
+            'resetting stale observation'
+        )
+    else:
+        cp.log(
+            f'Netperf existing job unchanged for {stale_elapsed}s '
+            f'(stale threshold={stale_after}s); not interrupting'
+        )
+
     message = (
         'Netperf service is already active '
         f'(progress={progress_text}, '
         f'stale threshold={stale_after}s).'
-    )
-
-    cp.log(
-        message
-        + ' Existing job will not be interrupted.'
     )
 
     return False, message
@@ -18246,6 +18483,59 @@ def scheduler_thread():
         time.sleep(15)
 
 
+# Live reconciliation cadence. The scheduler loop runs every 15s and does real
+# work (test triggering + a periodic stats checkpoint). Reconciliation is
+# lighter but reads the canonical App Data snapshot each cycle (one read in the
+# common case), so it runs on a deliberately slower ~30s cadence: fleet Group
+# delivery tolerates tens of seconds of activation latency, the common case is
+# a cheap revision/fingerprint comparison with no recompute/hot-reload, and a
+# ~30s interval keeps NCOS CPU/memory pressure negligible on constrained
+# hardware.
+#
+# Fleet-safe jitter: devices in a fleet are frequently deployed, rebooted, or
+# firmware-updated together, so a FIXED 30s loop would phase-align their polls
+# and make ~20 routers hit the App Data subsystem at the same instant on every
+# cycle. Each sleep is therefore spread uniformly across a bounded window
+# centered on 30s (25-35s, i.e. 30 +/- 5s, ~17%). This preserves the same
+# average cadence and resource profile while desynchronizing the fleet, and it
+# is applied ONLY to WHEN the next poll runs -- never to schedule execution /
+# cron-firing semantics, which are unchanged.
+_CONFIG_RECONCILE_INTERVAL_SECONDS = 30
+_CONFIG_RECONCILE_JITTER_SECONDS = 5
+
+
+def _config_reconcile_sleep_seconds():
+    """Return the next reconcile sleep: 30s +/- up to 5s of fleet-safe jitter.
+
+    Uniform spread over [25, 35] keeps the long-run average at 30s while
+    desynchronizing routers that booted together.
+    """
+    low = _CONFIG_RECONCILE_INTERVAL_SECONDS - _CONFIG_RECONCILE_JITTER_SECONDS
+    high = _CONFIG_RECONCILE_INTERVAL_SECONDS + _CONFIG_RECONCILE_JITTER_SECONDS
+    return random.uniform(low, high)
+
+
+def config_reconcile_thread():
+    """Background watcher: detect + hot-apply external canonical config changes.
+
+    Owns the live NCM Group / Device reconciliation. Each cycle delegates to
+    config_mgr.reconcile_once(), which detects canonical revision/fingerprint
+    changes, recomputes effective config, and hot-applies ONLY when the
+    effective runtime configuration actually changed. The manager performs all
+    locking (config_mgr._config_lock) and never writes App Data, so this thread
+    simply paces the cycle and never holds schedule_lock across the apply (the
+    hot-reload callback acquires schedule_lock itself). A failed cycle is
+    logged and retried next interval; the manager retains last-known-good
+    runtime config on transient App Data read failures.
+    """
+    while True:
+        try:
+            config_mgr.reconcile_once()
+        except Exception as e:
+            cp.log(f'Config reconcile thread error: {e}')
+        time.sleep(_config_reconcile_sleep_seconds())
+
+
 cp.log('Starting...')
 cp.log('Speedtest Analyzer - WAN Performance Testing and Analysis')
 
@@ -18295,6 +18585,10 @@ try:
                                config_mgr.STATE_GROUP_WITH_DEVICE_OVERRIDES,
                                config_mgr.STATE_UPGRADE_REQUIRED):
         _validate_loaded_iperf3_schedule()
+    # Anchor the live reconciler to the boot-applied canonical configuration so
+    # the background watcher treats the already-applied Group/Device config as
+    # the baseline (not a brand-new external change) on its first cycle.
+    config_mgr.seed_reconciler()
 except Exception as _cfg_exc:
     cp.log('Configuration: initialize error: %s' % _cfg_exc)
 
@@ -18310,6 +18604,14 @@ elif schedule_config.get('enabled') and not schedule_config.get('autostart'):
 # Start scheduler thread
 sched_thread = Thread(target=scheduler_thread, daemon=True)
 sched_thread.start()
+
+# Start the live canonical-config reconciliation thread. This is the process's
+# own external-change watcher: it periodically asks the Configuration Manager
+# to detect NCM-delivered Group (or externally changed Device) App Data and
+# hot-apply it live, so an already-running STA activates a newly pushed Group
+# schedule without a reboot/app restart and without the web UI being open.
+reconcile_thread = Thread(target=config_reconcile_thread, daemon=True)
+reconcile_thread.start()
 
 
 
