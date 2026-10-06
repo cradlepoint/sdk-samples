@@ -562,6 +562,42 @@ def _validate_document(document, expected_type):
 # Exact-match App Data loader (§3)
 # ---------------------------------------------------------------------------
 
+class _AppdataReadError(Exception):
+    """Raised internally when the App Data list cannot be read/snapshotted."""
+
+
+def _snapshot_appdata():
+    """Return the full App Data entry list as ONE snapshot.
+
+    Raises ``_AppdataReadError`` when ``cp.get_appdata()`` raises or returns a
+    non-list. Callers that must distinguish a transient read failure from a
+    successful "key absent" (the reconciler) use this directly; the legacy
+    exact-match loader keeps its None-on-failure behavior for compatibility.
+    """
+    try:
+        entries = cp.get_appdata()
+    except Exception as exc:
+        raise _AppdataReadError(str(exc))
+    if not isinstance(entries, list):
+        raise _AppdataReadError('App Data did not return a list')
+    return entries
+
+
+def _exact_from_entries(entries, name):
+    """Return the raw value for ``name`` from a pre-fetched entry list.
+
+    Accepts an entry ONLY when ``entry['name'] == name`` exactly, mirroring the
+    exact-match contract so a single snapshot resolves every canonical key
+    consistently (no loose/substring matching). Returns None when absent.
+    """
+    if not isinstance(entries, list):
+        return None
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get('name') == name:
+            return entry.get('value')
+    return None
+
+
 def _get_appdata_exact(name):
     """Return the raw value for App Data ``name`` using EXACT name matching.
 
@@ -572,19 +608,11 @@ def _get_appdata_exact(name):
     None when no exactly-named entry exists.
     """
     try:
-        entries = cp.get_appdata()
-    except Exception as exc:
+        entries = _snapshot_appdata()
+    except _AppdataReadError as exc:
         cp.log('Config: error listing App Data: %s' % exc)
         return None
-
-    if not isinstance(entries, list):
-        # Defensive: some environments may already return a scalar for a name.
-        return None
-
-    for entry in entries:
-        if isinstance(entry, dict) and entry.get('name') == name:
-            return entry.get('value')
-    return None
+    return _exact_from_entries(entries, name)
 
 
 def _parse_json_value(raw):
@@ -604,12 +632,27 @@ def _parse_json_value(raw):
 # ---------------------------------------------------------------------------
 
 def _load_layer(layer):
-    """Load ONE canonical layer exactly. Returns a LayerLoad."""
+    """Load ONE canonical layer exactly. Returns a LayerLoad.
+
+    Reads the App Data snapshot once and resolves the layer from it.
+    """
     key = GROUP_KEY if layer == 'group' else DEVICE_KEY
+    raw = _get_appdata_exact(key)
+    return _load_layer_from(layer, raw)
+
+
+def _load_layer_from(layer, raw):
+    """Resolve ONE canonical layer from a pre-fetched raw value. Returns a
+    LayerLoad.
+
+    This is the pure parsing/validation/normalization core shared by the
+    snapshot path (reconciler) and the per-key loader (``_load_layer``), so a
+    single App Data snapshot can resolve both canonical keys with identical
+    semantics. ``raw`` is the exact-matched value (str/dict/list) or None.
+    """
     expected_type = (DOCUMENT_TYPE_GROUP if layer == 'group'
                      else DOCUMENT_TYPE_DEVICE)
 
-    raw = _get_appdata_exact(key)
     if raw in (None, ''):
         return LayerLoad(layer, 'absent')
 
@@ -658,6 +701,20 @@ def _load_layer(layer):
 def load_layers():
     """Load both canonical layers exactly. Returns (group_load, device_load)."""
     return _load_layer('group'), _load_layer('device')
+
+
+def load_layers_from(entries):
+    """Resolve both canonical layers from ONE App Data snapshot.
+
+    ``entries`` is a single ``cp.get_appdata()`` entry list. Both canonical
+    keys are exact-matched from the same snapshot so the Group and Device
+    layers are internally consistent (no second read can slip a change in
+    between the two). Returns (group_load, device_load).
+    """
+    group_raw = _exact_from_entries(entries, GROUP_KEY)
+    device_raw = _exact_from_entries(entries, DEVICE_KEY)
+    return (_load_layer_from('group', group_raw),
+            _load_layer_from('device', device_raw))
 
 
 # ---------------------------------------------------------------------------
@@ -1389,6 +1446,264 @@ def capture_revision_token(group_load=None, device_load=None):
     d = device_load.revision if (device_load.usable and
                                  device_load.revision is not None) else 0
     return RevisionToken(g, d)
+
+
+# ---------------------------------------------------------------------------
+# Live external NCM canonical-config reconciliation (background watcher)
+#
+# The two-layer model loads canonical App Data at startup and after every local
+# mutation (save/reset/convert/factory), but historically NOTHING re-read the
+# canonical keys while the app was already running. When NCM pushes a new
+# speedtest_analyzer_group to a device whose STA process is already up, the new
+# Group revision sits in App Data while the running effective config and the
+# scheduler keep using the old config -- no live activation. The manual
+# "Device Save then Reset-to-Group" worked only because it forced a mutation
+# through _reload_and_apply(). This reconciler closes that gap centrally: a
+# lightweight loop detects external canonical changes by the independent
+# group_revision/device_revision pair (plus a normalized effective fingerprint)
+# and hot-applies ONLY when the EFFECTIVE runtime configuration actually
+# changed. It NEVER writes speedtest_analyzer_group and NEVER creates/updates
+# speedtest_analyzer_device; it only reads canonical App Data and reinitializes
+# runtime via the existing hot-reload path.
+# ---------------------------------------------------------------------------
+
+# Remembered state of the LAST reconciliation/apply. Guarded by _config_lock.
+# _applied_token is the (group_revision, device_revision) pair that produced
+# the currently applied effective config -- kept for logging/diagnostics.
+# _applied_canonical_fingerprint is a normalized hash of the CANONICAL Group +
+# Device documents (not just revisions), so an externally re-pushed canonical
+# document is detected even when its revision was NOT bumped. _applied_
+# fingerprint is a normalized hash of the applied EFFECTIVE body so a lower-
+# layer change an override masks does not trigger an unnecessary runtime hot
+# reload. All are None until seed_reconciler() runs once after startup
+# initialize().
+_applied_token = None
+_applied_canonical_fingerprint = None
+_applied_fingerprint = None
+
+
+class ReconcileReport(object):
+    """Outcome of one reconcile_once() cycle.
+
+    changed       -> the CANONICAL configuration changed since the last apply:
+                     EITHER the revision pair moved OR the canonical fingerprint
+                     changed (an external Group/Device content change was
+                     detected, including a same-revision re-push).
+    hot_reloaded  -> the EFFECTIVE config changed and runtime was hot-applied.
+    read_error    -> App Data could not be read this cycle; last-known-good
+                     runtime config was retained and nothing was changed.
+    old_*/new_*   -> the group/device revisions before and after this cycle
+                     (diagnostics only; correctness does not rely on them).
+    """
+
+    def __init__(self, changed=False, hot_reloaded=False, read_error=False,
+                 old_group_revision=None, new_group_revision=None,
+                 old_device_revision=None, new_device_revision=None):
+        self.changed = changed
+        self.hot_reloaded = hot_reloaded
+        self.read_error = read_error
+        self.old_group_revision = old_group_revision
+        self.new_group_revision = new_group_revision
+        self.old_device_revision = old_device_revision
+        self.new_device_revision = new_device_revision
+
+
+def _effective_fingerprint(effective):
+    """Deterministic fingerprint of an EFFECTIVE config body.
+
+    Used to decide whether a detected canonical change actually alters the
+    effective runtime configuration. Reuses the deterministic serializer so
+    key ordering is stable; never logged (summaries only).
+    """
+    try:
+        return serialize_document(effective if isinstance(effective, dict)
+                                  else {})
+    except Exception:
+        # Fail safe: a non-serializable body forces a change to be observed
+        # rather than silently skipped.
+        return None
+
+
+def _canonical_fingerprint(group_load, device_load):
+    """Deterministic fingerprint of the CANONICAL Group + Device layers.
+
+    Captures the normalized authoritative documents (status + revision + config
+    body) for BOTH layers so change detection is driven by canonical CONTENT,
+    not revisions alone. An externally re-pushed Group/Device document whose
+    revision was not bumped still changes this fingerprint. Never logged.
+    """
+    def _layer_sig(load):
+        # Prefer the normalized/validated document when usable so cosmetic
+        # key-order or whitespace differences in the stored JSON do not cause
+        # false positives. Fall back to status for non-usable layers (absent/
+        # corrupt/older/newer) so transitions between them are still observed.
+        if load is None:
+            return {'status': 'absent'}
+        sig = {'status': load.status}
+        if load.document is not None:
+            sig['document'] = load.document
+        elif load.revision is not None:
+            sig['revision'] = load.revision
+        return sig
+
+    payload = {
+        'group': _layer_sig(group_load),
+        'device': _layer_sig(device_load),
+    }
+    try:
+        return serialize_document(payload)
+    except Exception:
+        # Fail safe: force a change to be observed rather than silently skipped.
+        return None
+
+
+def seed_reconciler():
+    """Record the currently applied canonical token + fingerprints.
+
+    Call ONCE after startup initialize() so the first reconcile_once() cycle
+    compares against the boot-applied configuration instead of treating the
+    already-applied Group/Device config as a brand-new change. Safe to call
+    again; it simply re-anchors to the current effective config. Reads one App
+    Data snapshot and resolves both layers from it.
+    """
+    global _applied_token, _applied_canonical_fingerprint, _applied_fingerprint
+    with _config_lock:
+        try:
+            entries = _snapshot_appdata()
+            group_load, device_load = load_layers_from(entries)
+        except _AppdataReadError as exc:
+            # Could not read at seed time: anchor to the already-applied
+            # effective config and a null canonical fingerprint so the first
+            # successful cycle reconciles. Do not fabricate "absent".
+            cp.log('Config reconcile: seed read error (%s); will reconcile on '
+                   'first successful cycle' % exc)
+            _applied_token = _applied_token or RevisionToken(0, 0)
+            _applied_canonical_fingerprint = None
+            _applied_fingerprint = _effective_fingerprint(
+                get_effective_config())
+            return
+        _applied_token = capture_revision_token(group_load, device_load)
+        _applied_canonical_fingerprint = _canonical_fingerprint(
+            group_load, device_load)
+        _applied_fingerprint = _effective_fingerprint(get_effective_config())
+        cp.log('Config reconcile: seeded (group_revision=%s '
+               'device_revision=%s)' % (_applied_token.group_revision,
+                                        _applied_token.device_revision))
+
+
+def reconcile_once():
+    """Run ONE canonical-config reconciliation cycle. Returns ReconcileReport.
+
+    Steps (all under _config_lock to stay race-free with save/reset/factory):
+      1. Take ONE App Data snapshot; on read failure retain last-known-good and
+         return read_error (no change, no hot reload, no writes).
+      2. Resolve BOTH canonical layers from that single snapshot and compute
+         the revision pair + a canonical content fingerprint.
+      3. Canonical change = (revision pair moved) OR (canonical fingerprint
+         changed). If neither changed -> no-op (cheap common path; the one
+         snapshot read is the only App Data access this cycle).
+      4. On a canonical change, recompute the EFFECTIVE config and compare its
+         fingerprint to the applied one.
+      5. Hot-apply via _reload_and_apply() ONLY when the effective fingerprint
+         changed (a lower-layer change masked by an override advances the
+         remembered state but does NOT restart runtime subsystems).
+      6. Advance the remembered token + fingerprints to the observed state.
+
+    This never writes or deletes any App Data key.
+    """
+    global _applied_token, _applied_canonical_fingerprint, _applied_fingerprint
+    with _config_lock:
+        if _applied_token is None:
+            # Not seeded yet (reconcile ran before seed_reconciler). Anchor to
+            # the current state without applying; the next cycle reconciles.
+            seed_reconciler()
+            tok = _applied_token or RevisionToken(0, 0)
+            return ReconcileReport(
+                changed=False,
+                old_group_revision=tok.group_revision,
+                new_group_revision=tok.group_revision,
+                old_device_revision=tok.device_revision,
+                new_device_revision=tok.device_revision)
+
+        old_token = _applied_token
+
+        # (1) ONE snapshot read for the whole cycle.
+        try:
+            entries = _snapshot_appdata()
+        except _AppdataReadError as exc:
+            cp.log('Config reconcile: App Data read error (%s); retaining '
+                   'last-known-good runtime config' % exc)
+            return ReconcileReport(
+                read_error=True,
+                old_group_revision=old_token.group_revision,
+                new_group_revision=old_token.group_revision,
+                old_device_revision=old_token.device_revision,
+                new_device_revision=old_token.device_revision)
+
+        # (2) Resolve both layers from the SAME snapshot.
+        group_load, device_load = load_layers_from(entries)
+        current_token = capture_revision_token(group_load, device_load)
+        current_canonical_fp = _canonical_fingerprint(group_load, device_load)
+
+        # (3) Canonical change = revision moved OR canonical content changed.
+        revision_changed = current_token != old_token
+        content_changed = (current_canonical_fp != _applied_canonical_fingerprint)
+        if not revision_changed and not content_changed:
+            # Nothing changed. Cheap common path: no recompute, no writes.
+            return ReconcileReport(
+                changed=False,
+                old_group_revision=old_token.group_revision,
+                new_group_revision=current_token.group_revision,
+                old_device_revision=old_token.device_revision,
+                new_device_revision=current_token.device_revision)
+
+        if revision_changed:
+            cp.log('Config reconcile: external canonical change detected '
+                   '(group_revision %s -> %s, device_revision %s -> %s)'
+                   % (old_token.group_revision, current_token.group_revision,
+                      old_token.device_revision,
+                      current_token.device_revision))
+        else:
+            cp.log('Config reconcile: external canonical content change '
+                   'detected with unchanged revisions (group_revision=%s '
+                   'device_revision=%s)' % (current_token.group_revision,
+                                            current_token.device_revision))
+
+        # (4) Recompute the effective config from the SAME snapshot's layers to
+        # see whether the canonical change alters the EFFECTIVE runtime config.
+        new_effective = compute_effective(_group_body(group_load),
+                                          _device_body(device_load))
+        new_eff_fp = _effective_fingerprint(new_effective)
+
+        hot_reloaded = False
+        if new_eff_fp is None or new_eff_fp != _applied_fingerprint:
+            # Effective config changed -> hot-apply live (interactive apply
+            # semantics; an enabled schedule starts running now, autostart only
+            # governs boot). _reload_and_apply re-reads authoritatively, caches,
+            # and fires the hot-reload callback (safely skipping it in error/
+            # unsupported states).
+            applied = _reload_and_apply()
+            new_eff_fp = _effective_fingerprint(applied.effective)
+            hot_reloaded = True
+            cp.log('Config reconcile: effective configuration changed; hot '
+                   'reload applied')
+        else:
+            # Lower-priority layer changed but an override keeps the effective
+            # config identical: advance remembered state WITHOUT restarting.
+            cp.log('Config reconcile: canonical change but effective '
+                   'configuration unchanged; no runtime hot reload')
+
+        # (6) Advance remembered state to the observed snapshot.
+        _applied_token = current_token
+        _applied_canonical_fingerprint = current_canonical_fp
+        _applied_fingerprint = new_eff_fp
+
+        return ReconcileReport(
+            changed=True, hot_reloaded=hot_reloaded,
+            old_group_revision=old_token.group_revision,
+            new_group_revision=current_token.group_revision,
+            old_device_revision=old_token.device_revision,
+            new_device_revision=current_token.device_revision)
 
 
 # ---------------------------------------------------------------------------

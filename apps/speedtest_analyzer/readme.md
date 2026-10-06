@@ -2,13 +2,37 @@
 
 Speedtest Analyzer provides web-based WAN performance testing and analysis for Cradlepoint routers with multiple test engines, per-WAN testing, scheduling, history, live cellular diagnostics, Carrier Activity, historical Cellular Analysis, scope-aware GeoView context, iPerf3 server management, endpoint reliability tracking, and reporting.
 
-**Version:** 1.1.4
+**Version:** 1.1.6
 **Firmware family tested:** NCOS 7.26.x
 **Architecture:** ARM64 (aarch64)
 
 > **Validation notice:** This app has been tested on the device models and firmware versions listed below. Other Cradlepoint models may work, but have not been fully validated. Results and feature behavior may vary.
 
 For implementation details, platform behavior, validation logic, Carrier Activity internals, source routing, Netperf lifecycle handling, persistence behavior, and the complete engineering changelog, see [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## Table of Contents
+
+- [What You Can Do](#what-you-can-do)
+- [Validated Platforms](#validated-platforms)
+- [Quick Start](#quick-start)
+- [Test Center](#test-center)
+- [Servers](#servers)
+- [Cellular Analysis](#cellular-analysis)
+  - [Site Cellular GeoView](#site-cellular-geoview)
+  - [Configure GeoView](#configure-geoview)
+  - [Optional Geolocation Services](#optional-geolocation-services)
+  - [Google API Key Setup](#google-api-key-setup)
+  - [OpenCellID Contributions](#opencellid-contributions)
+- [History & Reports](#history--reports)
+- [Outputs](#outputs)
+- [Settings and Configuration Management](#settings-and-configuration-management)
+- [Basic Troubleshooting](#basic-troubleshooting)
+- [Requirements](#requirements)
+- [Documentation](#documentation)
+- [Changelog — 1.x](#changelog--1x)
+- [Validation Scope](#validation-scope)
+
+> **Stable section links:** Existing README heading names used by the application are intentionally preserved. GitHub heading anchors such as [`#google-api-key-setup`](#google-api-key-setup) and [`#settings-and-configuration-management`](#settings-and-configuration-management) remain available for direct in-app links.
 
 ---
 
@@ -1220,6 +1244,31 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 # Changelog — 1.x
 
 The README keeps a concise, user-facing changelog for the current Speedtest Analyzer `1.1.x` release family. The complete engineering history, including the pre-release Speed Test 2.x development lineage, is maintained in [TECHNICAL_GUIDE.md](TECHNICAL_GUIDE.md).
+
+## v1.1.6
+
+- Improved **R980-5GD and Private 5G Standalone (SA)** cellular compatibility without redesigning the existing Cellular Analysis, Carrier Activity, history, or GeoView workflows.
+- Corrected carrier-name display when a modem reports `CARRID` as **Not registered** by using the first usable value from `CARRID`, `HOMECARRID`, and then `CUR_PLMN`; unavailable sentinel values are ignored instead of being shown as a carrier name.
+- Normalized 5G NR/LTE serving-cell source aliases and band labels at identity-generation time so equivalent values such as **n48**, **N48**, and **Band n48** map to the same serving cell instead of creating false duplicates or phantom serving-cell changes.
+- Improved the History **5G Carrier Aggregation** table when a 5G SA modem reports valid serving-primary data but no usable explicit PCell aggregation record. The normalized NR serving primary can now populate the PCell row instead of leaving an empty **Not Registered** entry.
+- A single serving PCell is still treated as **one carrier**, not as active Carrier Aggregation. Existing PCell/SCell discovery remains unchanged when real secondary carriers are reported.
+- Added support for `HM_PLMN` as an additional Home PLMN source while preserving `CUR_PLMN` for current serving-cell identity.
+- Added optional Private 5G **Slice** metadata from `ACTIVE_NSSAI` / `ALLOWED_NSSAI`; the Network details area shows the active slice only when NCOS reports it.
+- Added 5G NR downlink/uplink frequency enrichment from `DLFRQ_5G` and `ULFRQ_5G` using the existing 5G NR detail fields.
+- Kept the existing history schema version. The new NSSAI and NR-frequency fields are additive, and older history records continue to analyze normally.
+- Preserved interface naming, iPerf3 behavior, WAN Guard, SD-WAN tunnel handling, Jitter, server retry, and GeoView location logic.
+
+## v1.1.5
+
+- Added **live NCM canonical-configuration reconciliation** so an already-running Speedtest Analyzer instance can activate externally pushed NCM Group or Device configuration without requiring an application restart or router reboot.
+- Added a lightweight background watcher that periodically re-reads the canonical `speedtest_analyzer_group` and `speedtest_analyzer_device` App Data documents while the application is running.
+- Detects external changes using the independent Group/Device revisions plus normalized configuration fingerprints, including a re-pushed canonical document whose revision number was not incremented.
+- Hot-applies configuration only when the effective runtime configuration actually changes, so a Group change masked by an existing Device override does not cause an unnecessary runtime reload.
+- Preserves strict configuration ownership: reconciliation never writes the NCM Group document and never creates or updates the Device document. It only reads canonical App Data and uses the existing runtime hot-reload path.
+- Added exact-name canonical App Data loading from a single snapshot so Group and Device documents are resolved unambiguously rather than through loose/substring key matching.
+- Added fleet-safe polling jitter around the approximately 30-second reconciliation cadence to reduce synchronized App Data reads across routers deployed or rebooted together. Scheduled-test timing and cron semantics are unchanged.
+- Seeds the reconciler after startup initialization so the already-applied boot configuration becomes the baseline. Transient App Data read failures retain the last-known-good runtime configuration and retry on a later cycle.
+- Expanded configuration-manager regression coverage for external-change detection, revision/fingerprint behavior, apply-once behavior, and zero-write safety audits.
 
 ## v1.1.4
 
