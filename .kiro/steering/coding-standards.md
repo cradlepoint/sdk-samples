@@ -1,93 +1,110 @@
----
-inclusion: auto
-description: "Python 3.8 coding standards for Cradlepoint SDK apps"
----
 # Cradlepoint SDK Coding Standards
 
-Applications run on Cradlepoint routers using Python 3.8.
+The hard guardrails are in `core.md` (always loaded). This file is the detail behind them.
 
-## Python 3.8 Constraints
+## Python 3.8 / cppython
 
-- **NEVER use bitwise OR (|) for types** - Python 3.8 doesn't support `str | None` syntax
-- **NEVER pass parameters in onclick attributes** - quote escaping is error-prone, use data attributes and `this` instead
-- **ALWAYS use try/except** - never raise exceptions, catch and log them
-- **NEVER use random or generated data** - only use real data from router APIs, sensors, or external sources; if data is unavailable, use None or empty values
-- Use 4 spaces, follow PEP 8, keep lines under 100 chars
-- Never use bare `except:` clauses
+- No `str | None` — use `Optional[str]` from `typing`. No `match`/`case`. Avoid the walrus
+  operator in complex expressions.
+- 4 spaces, PEP 8, lines under 100 chars. Never a bare `except:` — catch `Exception`.
+- **Full SDK development docs**: `docs/NCOS_SDK_Developer_Guide.md` — SDK concepts, app
+  lifecycle, packaging, development practices.
 
-## SDK Developer Guide
+## App Lifecycle on the Router
 
-- **Full SDK development docs**: `docs/NCOS_SDK_Developer_Guide.md` — covers SDK concepts, app lifecycle, packaging, and development practices
+- **`start.sh` must invoke `cppython`** — that is the router's Python 3.8 interpreter.
+- **Log at boot** — `cp.log('Starting...')` as early as possible.
+- **Wait for connectivity** — `cp.wait_for_wan_connection()` if the app needs the internet.
+- **Persist application state** — save state so it survives reboots. Use a state file for runtime
+  state, or appdata for user-configurable values.
+- **`restart = true` in `package.ini` means the router RELAUNCHES the app whenever the process
+  exits** — a "run once then exit" app becomes a hot restart loop (observed relaunching every
+  ~2 seconds). This is dangerous for apps with external side effects: a provisioning app that
+  creates a cloud resource per run will hammer that API. One-shot apps must **never fall off the
+  end of `main()`** — finish the work, then park in a `while True: time.sleep(...)` loop
+  (optionally logging status), and do the same on unrecoverable errors so a failure idles instead
+  of spinning. Pair this with a state file so a genuine restart or reboot skips work already done.
 
-## Router Environment
+## Bundled Binaries
 
-- **No screen** - use `cp.log()` for all output (never print())
-- **No keyboard** - never use `input()` or `KeyboardInterrupt`
-- **Relative paths only** - use `tmp/`, never absolute like `/tmp`
-- **Create directories before writing** - use `os.makedirs('tmp', exist_ok=True)` before writing to tmp/
-- **Python is "cppython"** - start.sh must use `cppython`
-- **Static apps** - no .pyc or .so files, but statically linked ARM64 binaries ARE supported
-- **Bundled binaries lose execute permission** - tar extraction on the router does NOT preserve the execute bit. Always `os.chmod('binary', 0o755)` before first use. Check with `os.path.exists()` not `os.access(path, os.X_OK)`
-- **Boot logging** - `cp.log('Starting...')` ASAP at startup
-- **Wait for connectivity** - use `cp.wait_for_wan_connection()` if internet is needed
-- **NEVER modify packaged files** - Apps have digital signatures (MANIFEST.json). Router deletes app if any packaged file is modified. Write to NEW files only (e.g., `data.csv`, `logs/output.txt`)
-- **Persist application state** - Save state to survive reboots. Use a state file for runtime state, or appdata for user-configurable values
-- **NEVER write default values to appdata** - Writing defaults to appdata overrides group configs pushed from NCM. Instead, read appdata and use a default in code if the field is missing/empty. For required fields with no sensible default, log a warning and skip that feature
-- **Router architecture is ARM64 (aarch64) with musl libc** - when downloading binaries, use aarch64/arm64 versions, NOT x86_64
+- **Static apps** — no `.pyc` or `.so` files, but statically linked ARM64 binaries ARE supported.
+- **Bundled binaries lose the execute bit** — tar extraction on the router does not preserve it.
+  Always `os.chmod('binary', 0o755)` before first use. Check with `os.path.exists()`, not
+  `os.access(path, os.X_OK)`.
+- Router architecture is **ARM64 (aarch64) with musl libc** — download aarch64/arm64 builds,
+  never x86_64.
 
 ## Memory Management
 
-Routers have limited RAM. Fetching or holding large objects in a polling loop causes peak-memory spikes and fragmentation that add up over long unattended uptimes.
+Routers have limited RAM. Fetching or holding large objects in a polling loop causes peak-memory
+spikes and fragmentation that add up over long unattended uptimes.
 
-- **NEVER fetch large API trees in a polling loop** - use the most specific sub-path possible. E.g., use `cp.get('status/vpn/tunnels')` NOT `cp.get('status/vpn')` which returns massive config/policy text blobs. Same applies to `status/wan/devices/{id}/diagnostics` vs `status/wan/devices` (all devices). This also avoids the repeated JSON-parsing cost of turning a big blob into hundreds of Python objects every poll
-- **Don't accumulate data in global collections without bounds** - if tracking state in dicts/sets/lists, clean up entries for items that no longer exist. Cap collection sizes if unbounded growth is possible
-- **Prefer simple types over nested structures** - store only what you need (a string ID, a boolean flag) rather than caching entire API response dicts
-- **Don't hold onto previous poll results longer than needed** - if a variable holding a big API response outlives the loop iteration (e.g. stored on `self` or in a global), drop the reference once you're done with it. Reassigning a local variable each iteration already frees the old value, no explicit `del` needed
-- **Match poll interval to response size** - small responses (single values, short lists): 1-2s is fine. Medium responses (device status objects): 3-5s. Large trees (full WAN/VPN status): 10-30s or use `cp.register()` instead
-- **ALWAYS use `time.sleep()` in polling loops** - never spin-wait. A bare `while True` without sleep burns CPU and accelerates object allocation with no benefit
-- **Monitor `status/system/memory` for complex apps** - for apps that warrant a memory guard (see below), log available memory at startup and periodically during operation. A steady decline over hours indicates a leak. If your app gets OOM-killed, it vanishes from `status/system/sdk` with no log entry. Simple fixed-workload apps don't need this — just follow the allocation rules above
-- **Consider a memory guard based on app complexity** - NOT every app needs this. Skip it for simple apps with fixed-size workloads (polling a few small paths on a timer, no growing collections). DO include it when: the app processes variable-size data (client lists, VPN tunnels, log buffers), accumulates state over time, or runs unattended on fleet-deployed routers. The guard checks `memavailable` every 30-60s and takes action: at suggested thresholds of ~20% available, log a warning and shed load (clear caches, back off poll frequency); at ~10% available, `cp.alert()` to NCM and `sys.exit(0)` to self-restart. Tune these thresholds per app if needed. The router restarts apps with `auto_start=true`, reclaiming all leaked memory. This is better than letting the OOM killer decide what to kill
-
-## Local Development (Running on Your Computer)
-
-- **Apps can run locally** - `.venv/bin/python3 my_app/my_app.py` (Mac/Linux) or `.venv\Scripts\python my_app/my_app.py` (Windows) runs the app on your computer. cp.py auto-detects it's not on a router and uses HTTP REST to communicate with the dev router specified in `sdk_settings.ini`
-- **cp.get/put/post/delete work locally** - all API calls route through REST to the dev router
-- **cp.log() prints to stdout locally** - output goes to your terminal instead of syslog
-- **cp.alert() does NOT work locally** - logs the alert text to console but does not send to NCM
-- **cp.register()/cp.unregister() do NOT work locally** - event callbacks require the router's internal socket, no REST equivalent exists
-- **cp.decrypt() does NOT work locally** - returns None and logs a message
-- **Web servers bind to YOUR machine locally** - if your app runs an HTTP server, it binds to your computer's port, not the router's. LAN clients on the router cannot reach it
-- **Serial/GPIO not available locally** - these access your computer's hardware, not the router's
-- **Use local execution for fast iteration** - test API reads, data processing, and business logic locally, then deploy to router for final testing of alerts, events, web UIs, serial, and GPIO
-- **IMPORTANT: ALWAYS deploy after creating or modifying an app.** Run `.venv\Scripts\python make.py deploy {app_name}` (Windows) or `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) immediately after code changes. Do not ask — just deploy. See `workflow.md` for full details.
-
+- **NEVER fetch large API trees in a polling loop** — use the most specific sub-path possible.
+  Use `cp.get('status/vpn/tunnels')` NOT `cp.get('status/vpn')`, which returns massive
+  config/policy text blobs. Same for `status/wan/devices/{id}/diagnostics` vs `status/wan/devices`
+  (all devices). This also avoids re-parsing a big blob into hundreds of Python objects every poll.
+- **Don't accumulate data in global collections without bounds** — clean up entries for items that
+  no longer exist, and cap collection sizes where unbounded growth is possible.
+- **Prefer simple types over nested structures** — store a string ID or a boolean flag rather than
+  caching entire API response dicts.
+- **Don't hold previous poll results longer than needed** — if a variable holding a big response
+  outlives the loop iteration (stored on `self` or in a global), drop the reference when done.
+  Reassigning a local each iteration already frees the old value; no explicit `del` needed.
+- **Match poll interval to response size** — single values or short lists: 1–2 s. Device status
+  objects: 3–5 s. Large trees (full WAN/VPN status): 10–30 s, or use `cp.register()` instead.
+- **ALWAYS `time.sleep()` in polling loops** — a bare `while True` burns CPU and accelerates
+  object allocation for no benefit.
+- **Monitor `status/system/memory` for complex apps** — log available memory at startup and
+  periodically. A steady decline over hours indicates a leak. If the app is OOM-killed it vanishes
+  from `status/system/sdk` with no log entry. Simple fixed-workload apps don't need this.
+- **Consider a memory guard based on app complexity** — NOT every app needs one. Skip it for
+  simple apps with fixed-size workloads (polling a few small paths on a timer, no growing
+  collections). DO include it when the app processes variable-size data (client lists, VPN
+  tunnels, log buffers), accumulates state over time, or runs unattended on fleet-deployed
+  routers. The guard checks `memavailable` every 30–60 s: at ~20% available, log a warning and
+  shed load (clear caches, back off poll frequency); at ~10%, `cp.alert()` to NCM and
+  `sys.exit(0)` to self-restart. Tune thresholds per app. The router restarts apps with
+  `auto_start=true`, reclaiming all leaked memory — better than letting the OOM killer choose.
 
 ## Python Libraries and Dependencies
 
-- **Install libraries directly to app folder**: `.venv/bin/pip3 install -t path/to/app_folder library_name` (Mac/Linux) or `.venv\Scripts\pip install -t path/to/app_folder library_name` (Windows)
-- **Example**: `.venv/bin/pip3 install -t gpio_modem_control requests` (Mac/Linux) or `.venv\Scripts\pip install -t gpio_modem_control requests` (Windows)
-- **CRITICAL: No .pyc or .so files** - routers only support pure Python (.py) files
-- Libraries are packaged with the app and deployed to the router
-- Keep dependencies minimal - routers have limited storage
-- Test that libraries work on Python 3.8
-- **cppython is missing stdlib modules** - `pkg_resources`, `decimal`, `csv` are not available. Copy shims from existing apps (e.g., `decimal.py`, `csv.py`, `_csv.py` from 5GSpeed or Mobile_Site_Survey)
-- **CAVEAT: `_csv.py` shim is stub-only** - the `_csv.py` file from 5GSpeed/Mobile_Site_Survey has all functions as `pass` (return None). It only works on actual cppython where the real C `_csv` module takes precedence. `csv.writer()` and `csv.reader()` return None when the C module isn't loaded. **For simple CSV writing, use plain string concatenation** (`','.join(fields) + '\n'`) instead of `csv.writer`. Only use the csv shim if you need `DictReader`/`DictWriter` and are deploying to a real router
-- **cppython HAS these stdlib modules** - `threading`, `select`, `ssl`, `http.server`, `socket`, `configparser`, `zipfile`, `io`, `hashlib`, `hmac`, `base64`, `struct`, `uuid`, `json`, `logging`, `os`, `sys`, `time`, `xml.etree.ElementTree` — all work as expected
-- **`requests` is available system-wide on cppython** - do NOT bundle it in the app folder (pip install -t). Just `import requests` — it's pre-installed on the router. Bundling a local copy will shadow the system version and likely fail due to Python 3.8 incompatibility with newer urllib3
-- **`redis` is NOT available** - if a library depends on redis, make it conditional with try/except ImportError
-- **C-accelerated stdlib types cannot be monkey-patched** - `xml.etree.ElementTree.Element` is a C type on cppython. Cannot add methods or subclass it. If a library uses lxml-specific methods like `iterchildren()` or `clear(keep_tail=True)`, patch the library source directly
-- **lxml can be replaced with a pure Python shim** - `xml.etree.ElementTree` covers most lxml.etree usage. Key differences to patch in library source:
-  - Replace `elm.iterchildren()` with `iter(elm)` or `list(elm)`
-  - Replace `elm.clear(keep_tail=True)` with `tail=elm.tail; elm.clear(); elm.tail=tail`
-  - `etree.tostring()`: use `ET.tostring(elm, encoding='unicode').encode('utf-8')` to avoid unwanted `<?xml?>` declarations (lxml omits them by default, stdlib adds them with byte encodings). NEVER use `encoding='utf-8'` directly — it returns bytes WITH xml declaration
+- **Install into the app folder**: `.venv/bin/pip3 install -t path/to/app_folder library_name`
+  (Mac/Linux) or `.venv\Scripts\pip install -t path/to/app_folder library_name` (Windows).
+  Libraries are packaged with the app and deployed to the router. Keep them minimal — routers
+  have limited storage — and confirm they work on Python 3.8.
+- **No `.pyc` or `.so`** — routers only support pure Python.
+- **`requests` is available system-wide on cppython** — do NOT bundle it. Just `import requests`.
+  A bundled copy shadows the system version and will likely fail on Python 3.8 because of newer
+  urllib3.
+- **`redis` is NOT available** — make any dependency on it conditional with `try/except ImportError`.
+- **cppython is MISSING `pkg_resources`, `decimal`, and `csv`** — copy shims from an existing app
+  (`decimal.py`, `csv.py`, `_csv.py` from 5GSpeed or Mobile_Site_Survey).
+  - **CAVEAT: the `_csv.py` shim is stub-only** — every function is `pass` (returns None). It only
+    works on real cppython, where the C `_csv` module takes precedence; off-router,
+    `csv.writer()`/`csv.reader()` return None. **For simple CSV writing use plain string
+    concatenation** (`','.join(fields) + '\n'`). Only use the shim if you need
+    `DictReader`/`DictWriter` and are deploying to a real router.
+  - Libraries that use `pkg_resources` for versioning — hardcode the version string in
+    `__init__.py`.
+- **cppython HAS** `threading`, `select`, `ssl`, `http.server`, `socket`, `configparser`,
+  `zipfile`, `io`, `hashlib`, `hmac`, `base64`, `struct`, `uuid`, `json`, `logging`, `os`, `sys`,
+  `time`, `xml.etree.ElementTree` — all work as expected.
+- **C-accelerated stdlib types cannot be monkey-patched** — `xml.etree.ElementTree.Element` is a C
+  type on cppython: you cannot add methods or subclass it. If a library uses lxml-specific methods
+  like `iterchildren()` or `clear(keep_tail=True)`, patch the library source directly.
+- **lxml can be replaced with a pure Python shim** — `xml.etree.ElementTree` covers most
+  `lxml.etree` usage. Patch these in the library source:
+  - `elm.iterchildren()` → `iter(elm)` or `list(elm)`
+  - `elm.clear(keep_tail=True)` → `tail = elm.tail; elm.clear(); elm.tail = tail`
+  - `etree.tostring()` → `ET.tostring(elm, encoding='unicode').encode('utf-8')` to avoid an
+    unwanted `<?xml?>` declaration (lxml omits it; stdlib adds it with byte encodings). NEVER use
+    `encoding='utf-8'` directly — it returns bytes *with* the declaration.
   - `etree.XMLSyntaxError` → `xml.etree.ElementTree.ParseError`
-  - `etree.XMLPullParser` works on cppython — use for streaming XML parsing
-  - `etree.Element` is a C type — cannot add attributes/methods at runtime, cannot subclass
-- **Libraries using `pkg_resources` for versioning** - hardcode the version string directly in `__init__.py` instead
+  - `etree.XMLPullParser` works on cppython — use it for streaming XML parsing
 
 ## Error Handling
 
-Always wrap API calls in try/except and log errors:
+Wrap API calls and log the error:
 
 ```python
 try:
@@ -97,3 +114,26 @@ try:
 except Exception as e:
     cp.log(f"Error getting system status: {e}")
 ```
+
+## Local Development (Running on Your Computer)
+
+Apps can run on your machine: `.venv/bin/python3 my_app/my_app.py` (Mac/Linux) or
+`.venv\Scripts\python my_app\my_app.py` (Windows). `cp.py` detects it is not on a router and uses
+HTTP REST against the dev router in `sdk_settings.ini`.
+
+- **`cp.py` only finds `sdk_settings.ini` in the cwd and the cwd's PARENT.** For an app in
+  `apps/my_app/`, running from inside the app folder finds nothing, and every call fails with
+  `Invalid URL 'https:///api/...': No host supplied` while `wait_for_wan_connection()` spins until
+  it times out. **Run local tests from `apps/`**: `.venv/bin/python3 my_app/my_app.py`.
+- **Works locally**: `cp.get/put/post/delete` (via REST), and `cp.log()` prints to stdout.
+- **Does NOT work locally**: `cp.alert()` (logs to console, never reaches NCM),
+  `cp.register()`/`cp.unregister()` (needs the router's internal socket, no REST equivalent),
+  `cp.decrypt()` (returns None), serial, and GPIO.
+- **`cp.put()` returns a DIFFERENT envelope locally than on-router** — the on-router socket
+  returns `{'status': 'ok'|'error'|'timeout', 'data': ...}`; local REST returns
+  `{'success': True|False, 'data': ...}`. Code that only checks `success` silently treats every
+  on-router failure as success. **Check both keys.**
+- **Web servers bind to YOUR machine** — an app's HTTP server listens on your computer's port,
+  not the router's, so LAN clients behind the router cannot reach it.
+- **Use local runs for fast iteration** on API reads, data processing, and business logic. Deploy
+  to the router to test alerts, events, web UIs, serial, and GPIO.

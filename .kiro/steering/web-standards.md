@@ -1,7 +1,3 @@
----
-inclusion: auto
-description: "Web development standards for Cradlepoint SDK apps"
----
 # Web Development Standards
 
 - **ALWAYS use Python's built-in `http.server` module** - never use third-party web frameworks (Flask, Bottle, CherryPy, etc.). The native `http.server.HTTPServer` is available on cppython and has zero dependencies
@@ -15,12 +11,16 @@ description: "Web development standards for Cradlepoint SDK apps"
 - **Dynamic download filenames** - use router hostname and timestamp: `cp.get('config/system/system_id')` + `datetime.now().strftime('%Y%m%d_%H%M%S')`
 - **Light/dark mode** - use `data-theme` attribute on `<html>` element, persist with `localStorage.setItem('theme', 'light'|'dark')`, load on page init
 - **ES6+ JavaScript is fine** - arrow functions, template literals, const/let, async/await, destructuring all work in modern browsers that access the router UI
-- **NEVER pass parameters in onclick attributes** - Use HTML entities (&quot;) or data attributes instead
-- **For onclick with params**: Use `onclick="func(&quot;param1&quot;,&quot;param2&quot;)"` with &quot; entities, NOT escaped quotes
+- **NEVER pass raw parameters in onclick attributes** - quote escaping is error-prone. Prefer data attributes plus `this`. If you must inline arguments, use `&quot;` HTML entities (`onclick="func(&quot;a&quot;,&quot;b&quot;)"`), never backslash-escaped quotes
 - **Auto-refresh dashboards must preserve user input** - Save `document.activeElement.id` and `.value`, restore after innerHTML update
+- **A config field rebuilt from form inputs is silently blanked when those inputs are not rendered** - the usual pattern for "clearing a field should remove it" is to reset the collection to `{}`/`[]` and refill it from the DOM. The moment any part of that form is conditionally rendered (a column hidden by a mode toggle, a section only drawn for certain states, a second page not built yet), a save wipes stored values the user never saw. Two fixes, both worth having: reset only the fields that actually have inputs on the page, and prefer `display:none` over not rendering, so the inputs stay in the DOM and keep their values. The template's `.element-section` hides inactive sections rather than removing them, so a multi-page form can collect every page in one pass
+
 - Vanilla JavaScript, semantic HTML5, CSS Grid/Flexbox
 - CSS variables for theming, mobile-first responsive
 - **ALWAYS copy `static/` folder from `apps/templates/web_app_template` into new web apps** - this includes `css/style.css`, `js/script.js`, `libs/font-awesome.min.css`, `libs/jquery-3.5.1.min.js`, and `libs/webfonts/`. These are required for the design system to work
+- **The template's `script.js` calls `showElement('homepage')` on init, which strips `active` from EVERY `.element-section`** - if your page has no section with `id="homepage"`, all sections end up `display: none` and the content area renders completely blank while the header and sidebar look fine. Name your landing section `id="homepage"` (with `data-element="homepage"` on its nav item) rather than fighting the framework; the sidebar Homepage link targets the same id, so it then works too
+- **The template's `initTabs()` binds `.tab-btn` clicks once at page load, so dynamically generated tabs are dead** - if you build tabs after the initial render, add your own delegated click handler scoped to your container. Reuse the template's class names (`tab-navigation`, `tab-btn`, `tab-content`, `data-tab`) so the styling still comes from the design system
+- **`window.webAppTemplate.showToast(message, type, duration)` is available from the template**, but it needs a `<div class="toast-container" id="toast-container"></div>` in your HTML or it silently does nothing
 - **ALWAYS use `your_web_app.html` from `apps/templates/web_app_template` as the starting HTML** - copy it as `index.html` into your app, then modify the title, sidebar nav, and content sections. NEVER write HTML from scratch
 - **NEVER write custom CSS or include external stylesheets** - the template's `style.css` provides the complete design system (layout, colors, dark mode, components). Add app-specific styles in a `<style>` block or a separate file that supplements (not replaces) the template CSS
 - Proper error handling with try/catch

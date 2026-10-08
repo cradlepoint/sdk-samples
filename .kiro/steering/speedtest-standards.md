@@ -1,7 +1,7 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "**/*speed*,**/*iperf*,**/*netperf*"
-description: "Speedtest implementation standards for Cradlepoint SDK apps"
+fileMatchPattern: "**/*speed*,**/*iperf*,**/*netperf*,**/*ookla*"
+description: "Speedtest implementation: netperf (control/netperf, cp.speed_test), iPerf3, Ookla BYOB, per-interface and concurrent multi-modem testing, latency/jitter via TCP_RR"
 ---
 # Speedtest Implementation
 
@@ -76,15 +76,46 @@ def run_netperf():
 - **iPerf3 CAN run concurrent tests** - each subprocess uses `-B source_ip` and a different port from a configured range (e.g. `5201-5210`)
 - **For concurrent multi-modem**: Use Mobile_Site_Survey's `speedtest.py` wrapper which handles both Ookla (BYOB) and iPerf3 with port allocation
 
-### Netperf API (cp.speed_test):
+### Netperf API — `cp.speed_test()` (preferred):
 ```python
 result = cp.speed_test(
     interface='rmnet501',  # ifc_wan - routes test through this interface
     duration=10,           # seconds
     direction='both'       # 'recv', 'send', or 'both'
 )
-# Returns: {'download_bps': float, 'upload_bps': float, ...}
+# Returns: {'download_bps': float, 'upload_bps': float, 'interface': str, ...}
 ```
+
+### Netperf API — direct `control/netperf` (when you need options the helper omits):
+```python
+cp.put('control/netperf', {
+    "input": {
+        "options": {
+            "limit": {"size": 0, "time": 10},
+            "port": None, "fwport": None, "host": "",
+            "ifc_wan": "rmnet501",  # WAN interface to test through
+            "tcp": True, "udp": False,
+            "send": False, "recv": True, "rr": False
+        },
+        "tests": None
+    },
+    "run": 1
+})
+
+# Poll for completion:
+out = cp.get('control/netperf/output')
+# {"status": "complete", "results_path": "status/wan/devices/mdm-xxx/status/perf_results", ...}
+
+# Read results:
+results = cp.get('status/wan/devices/mdm-xxx/status/perf_results')
+# {"tcp_down": {"THROUGHPUT": "96.82", "THROUGHPUT_UNITS": "10^6bits/s", ...}}
+```
+
+- `ifc_wan`: iface name (e.g. `rmnet501`) — routes the test through a specific modem, no source routing needed
+- `recv: True, send: False` = download → results in `tcp_down`
+- `send: True, recv: False` = upload → results in `tcp_up`
+- `rr: True` = TCP request/response latency → results in `tcp_rr`
+- **Reset state between tests**: `cp.put('/state/system/netperf', {"run_count": 0})` then sleep 1s
 
 ### Netperf TCP RR (latency/jitter):
 Use `control/netperf` with `"rr": True` for latency measurement. See @speedtest_web for implementation.

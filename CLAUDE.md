@@ -1,253 +1,121 @@
 # Cradlepoint NCOS SDK — AI Coding Conventions
 
-This file defines coding standards, API reference, and workflow rules for building SDK applications on Ericsson Cradlepoint routers running NetCloud OS (NCOS).
+This repo builds SDK apps that run on Ericsson Cradlepoint routers (NCOS) under `cppython`, a
+**Python 3.8** interpreter on **ARM64/musl**. Apps live in `apps/{app_name}/`.
 
-**Detailed API documentation**: See `docs/ncos-api/` for full endpoint reference, response structures, and code examples.
+## Read these — they are the source of truth
 
----
+This file is a short entry point, not a copy. The full conventions live in `.kiro/steering/`,
+which is shared with Kiro and kept current. **Read the files relevant to your task before
+writing code.** Do not work from this summary alone.
 
-## Python 3.8 Constraints
+| Read this | For |
+|---|---|
+| `.kiro/steering/core.md` | the non-negotiables (also summarized below) |
+| `.kiro/steering/api-reference.md` | **API verification workflow**, `cp` module, gotcha index |
+| `.kiro/steering/coding-standards.md` | Python 3.8/cppython limits, libraries, memory, app lifecycle, local runs |
+| `.kiro/steering/workflow.md` | `make.py`, create/deploy/contribute, `sdk_settings.ini`, layout |
+| `.kiro/steering/web-standards.md` | `http.server`, ports, the web app template and design system |
+| `.kiro/steering/gps-standards.md` | GPS, NMEA, GNSS, RTK |
+| `.kiro/steering/speedtest-standards.md` | netperf, iPerf3, Ookla BYOB |
+| `.kiro/steering/container-standards.md` | Docker/containers (read before proposing one) |
+| `.kiro/steering/windows-notes.md` | Windows: exit code 1 is not a failure |
 
-- NEVER use `str | None` syntax — use `Optional[str]` from typing
-- NEVER use walrus operator (`:=`) in complex expressions
-- NEVER use `match`/`case` statements
-- Use 4 spaces, follow PEP 8, keep lines under 100 chars
-- Never use bare `except:` clauses — always catch specific exceptions or `Exception`
+Reference documentation, grep it rather than guessing:
 
----
+- `docs/ncos-api/` — API paths, response structures, `PATHS.md`, and **`gotchas.md`** (verified
+  surprises worth reading before debugging anything)
+- `docs/cp_methods_reference.md` — every `cp` helper signature
+- `docs/NCOS_SDK_Developer_Guide.md` — SDK concepts, app lifecycle, packaging
 
-## Router Environment
+Task procedures are in `.kiro/skills/{deploy,rtfm,learn,setup}/SKILL.md`. Read the matching one
+when the user asks to deploy, verify an API path, record a learning, or set up the environment.
 
-- **No screen** — use `cp.log()` for all output. Never use `print()`
-- **No keyboard** — never use `input()` or `KeyboardInterrupt`
-- **Relative paths only** — use `tmp/`, never `/tmp`
-- **Create directories before writing** — `os.makedirs('tmp', exist_ok=True)`
-- **Python is "cppython"** — `start.sh` must use `cppython`
-- **No .pyc or .so files** — only pure Python (.py) supported
-- **Boot logging** — `cp.log('Starting...')` immediately at startup
-- **Wait for connectivity** — use `cp.wait_for_wan_connection()` if internet needed
-- **NEVER modify packaged files** — router deletes app if any packaged file changes. Write to NEW files only
-- **NEVER write default values to appdata** — overrides NCM group configs. Read appdata, use code default if missing
-- **Architecture** — ARM64 (aarch64) with musl libc
+## Non-negotiables
 
----
+- **Python 3.8 only** — no `str | None` (use `Optional[str]`), no `match`/`case`.
+- **Never `print()`** — use `cp.log()`. The router has no screen, no keyboard, no `input()`.
+- **Catch, never raise** — wrap API calls in `try/except Exception` and log. No bare `except:`.
+- **Relative paths only** — `tmp/`, never `/tmp`. `os.makedirs('tmp', exist_ok=True)` first.
+- **Never modify a packaged file** — apps are signed (`MANIFEST.json`); the router deletes the app
+  if a packaged file changes. Write to new files only.
+- **Never overwrite `package.ini`, `start.sh`, or `cp.py`** — `make.py create` generates them.
+- **Never invent an API path or field.** Run the verification workflow in `api-reference.md`:
+  grep `docs/ncos-api/` → read the doc → check `/api/dtd/config/<path>` → test the live endpoint
+  with `curl -u admin:pass` → only use fields seen in a real response → then write code.
+  **Always REST with basic auth, never SSH for API validation.**
+- **Never invent a `cp` function name** — read `cp.py` or `docs/cp_methods_reference.md`.
+- **Never use random or placeholder data** — real data from router APIs, or `None`.
+- **Never write defaults to appdata** — that overrides NCM group config. Default in code instead.
+- **Never commit `sdk_settings.ini`**, and never print the router password.
+- **Never build or deploy a container without explicit user confirmation** — containers need an
+  Advanced license. Prefer an SDK app; a pure-Python dependency is not a reason to use a container.
 
-## CP Module Usage
+## Deploy after every change
 
-- Always `import cp` and use module-level functions
-- Never use EventingCSClient or CSClient classes
-- **Check cp.py for helper functions before using direct API calls**
-- **cp.get() returns data directly** — NOT wrapped in `{"success": true, "data": ...}`
-- **cp.get_appdata('field_name')** — ALWAYS pass a field name. Without args returns a LIST, not a dict
-- **cp.put_appdata(name, value)** — TWO separate string arguments, NOT a dict
-- Appdata stored at `config/system/sdk/appdata`
-
-### Key Helpers
-
-```python
-cp.log(msg)                          # Log (syslog on router, stdout local)
-cp.get('status/path')                # Read status/config tree
-cp.put('config/path', value)         # Write config/control
-cp.post('config/path/', value)       # Create new entries
-cp.delete('config/path/id')          # Delete entries
-cp.get_appdata('field')              # Read app config field
-cp.put_appdata('name', 'value')      # Write app config
-cp.wait_for_wan_connection()         # Block until WAN up
-cp.speed_test(interface, duration, direction)  # Netperf speed test
-cp.get_wan_profiles()                # WAN rules sorted by priority
-cp.get_sims()                        # List of modem UID strings
-cp.register('put', 'control/path', callback)  # Event callback (on-router only)
-```
-
----
-
-## NCOS API Reference
-
-Full docs at `docs/ncos-api/`. Key paths:
-
-### Status (read-only)
-- `status/wan/connection_state` → `'connected'` or `'disconnected'`
-- `status/wan/devices` → dict keyed by device name, each has `info`, `status`, `diagnostics`
-- `status/wan/primary_device` → device name string
-- `status/system` → cpu (fractions, not %), memory (bytes), uptime (seconds), temperature (°C)
-- `status/lan/clients` → list of `{ip_address, mac, hostname}` — NO bandwidth data here
-- `status/client_usage` → `{enabled, stats: [{mac, ip, up_bytes, down_bytes, ...}]}`
-- `status/gps/nmea` → array of NMEA sentence strings
-- `status/firewall` → conntrack entries, state_entry_count
-- `status/mount` → `{disk_usage: {total_bytes, free_bytes}}`
-
-### Config (persistent settings)
-- `config/wan/rules2` → WAN profiles (list of dicts with `_id_`, trigger_string, priority, disabled)
-- `config/qos` → `{enabled, queues, rules}` — MUST put entire object, NO MAC support in rules
-- `config/security/zfw/filter_policies` → firewall policies (must put entire rules array)
-- `config/system/system_id` → router hostname
-- `config/lan` → LAN network config array
-
-### Control (actions)
-- `control/system/reboot` → PUT 1 to reboot
-- `control/gpio/LED_SS_0` → PUT 0/1
-- `control/ping/start` → PUT `{host, num}`
-- `control/netperf` → speed test (see docs/ncos-api/control/)
-
-### REST API format
-- REST returns wrapped: `{"success": true, "data": ...}`
-- REST writes use form-encoded `data=` parameter, NOT JSON body
-- `curl -k -u admin:pass -X PUT "https://ROUTER/api/config/path" -d 'data={"key":"val"}'`
-
-### DTD (schema verification)
 ```bash
-curl -s -u admin:pass http://router/api/dtd/config/path | python3 -m json.tool
+.venv/bin/python3 make.py deploy {app_name}      # Mac/Linux
+.venv\Scripts\python make.py deploy {app_name}   # Windows
 ```
 
----
+Do not ask first. `deploy` purges, builds, installs, and starts the app — never call
+`make.py install` directly. Omit the name to use `app_name` from `sdk_settings.ini`. Every repo
+command runs through the venv interpreter. Other subcommands: `create`, `status`, `start`, `stop`,
+`uninstall`, `clean`, `contribute`, `setup`.
 
-## Key Gotchas
+Judge success by printed output and **check log timestamps** — the router's log buffer holds
+entries from earlier deploys, so only lines stamped after this deploy mean anything.
 
-- `status/lan/clients` has NO rx_bytes/tx_bytes — use `status/client_usage`
-- QoS rules do NOT support MAC addresses — only IP via lipaddr/lmask
-- Firewall conntrack: track by `id` field to avoid counting stale connections
-- ARP dump interface names have trailing digits — strip before lookup
-- Firewall filter policies require full rules array put
-- Cert creation is async — wait ~5 seconds after `cp.put('control/certmgmt/ca', {...})`
-- `cp.register` callback receives 3 args: `(path, value, args)` — do NOT use `*args`
-- `cp.register()` for control tree MUST use `'put'` (lowercase) — `'set'`/`'PUT'` silently fails
-- Do NOT `cp.put()` before `cp.register()` — causes socket desync
-- Control tree keys persist across redeploys — keep path names stable
-- REST API returns masked `$0$` password hashes — only SDK socket returns real `$3$` hashes
-- SCP remote path MUST be `/app_upload` (no trailing slash)
-- `requests` is pre-installed on cppython — do NOT bundle it
-- Signal diagnostics use UPPERCASE keys: `DBM`, `RSRP`, `SINR`, `CARRID`, `RAD_IF`
+## Easy things to get wrong
 
----
+These are the summary versions. Each has fuller detail in the file named.
 
-## Web Development
+- **Statically linked ARM64 binaries ARE supported** — the "pure Python only" rule is about `.pyc`
+  and `.so`, not bundled executables. Binaries lose the execute bit during tar extraction on the
+  router, so `os.chmod(path, 0o755)` before first use. (`coding-standards.md`)
+- **`restart = true` in `package.ini` makes the router relaunch the app whenever the process
+  exits** — a run-once app becomes a hot restart loop every ~2 seconds. One-shot apps must never
+  fall off the end of `main()`; park in `while True: time.sleep(...)`. (`coding-standards.md`)
+- **`requests` is pre-installed on cppython — do not bundle it.** `pkg_resources`, `decimal`, and
+  `csv` are missing and need shims; `redis` is unavailable. Install libraries with
+  `pip3 install -t path/to/app_folder name`. (`coding-standards.md`)
+- **Never fetch large API trees in a polling loop** — use the most specific sub-path, and always
+  `time.sleep()`. Routers have limited RAM. (`coding-standards.md`)
+- **`cp.get()` returns data directly**; raw REST wraps it in `{"success": ..., "data": ...}`.
+  `cp.put()` returns a *different* envelope locally than on-router — check both `status` and
+  `success`. (`api-reference.md`, `coding-standards.md`)
+- **A config PUT can return `ok` and apply nothing** — partial dict PUTs merge rather than replace,
+  and unsupported paths can report success. Read the value back before trusting a write.
+  (`docs/ncos-api/gotchas.md`)
+- **Which modem signal keys exist depends on the live radio technology, not the modem** — 5G SA
+  reports only `RSRP_5G`/`RSRQ_5G`/`SINR_5G` with no `DBM`; LTE reports only the LTE set; 5G NSA
+  reports both. Re-read the available keys each poll. (`docs/ncos-api/gotchas.md`)
+- **`status/lan/clients` has no byte counters** — use `status/client_usage`. (`api-reference.md`)
+- **Container deploys are form-encoded, not a JSON body** — `-d 'data={...}'`. Named volumes need
+  `driver: local`. Use Compose `"2.4"`. (`container-standards.md`)
+- **Developer Mode is enabled in NetCloud Manager**, under Tools → Developer Mode Devices — never
+  in the router's local admin UI. (`workflow.md`)
 
-- ALWAYS use Python's built-in `http.server` — never Flask, Bottle, etc.
-- Default port: 8000
-- ALWAYS set `SO_REUSEADDR` before binding
-- Run HTTPServer in a daemon thread: `Thread(target=server.serve_forever, daemon=True).start()`
-- Vanilla JavaScript (ES6+ fine), semantic HTML5, CSS Grid/Flexbox
-- Serve all assets locally — no external CDNs
-- For LAN client access: firewall must allow Primary LAN Zone → Router Zone forwarding
-- NEVER pass parameters in onclick attributes — use data attributes
+## Web apps
 
----
+Use Python's built-in `http.server` — never Flask, Bottle, or any third-party framework. Copy
+`your_web_app.html` and the `static/` folder from `apps/templates/web_app_template` rather than
+writing HTML or CSS from scratch. Default port 8000, set `SO_REUSEADDR`, run the server in a
+daemon thread. LAN clients reaching a router port requires firewall zone forwarding. Full rules and
+the template's known traps are in `web-standards.md`.
 
-## Third-Party Libraries
+## Project layout
 
-- Install to app folder: `.venv/bin/pip install -t path/to/app_folder library_name`
-- Only pure Python (.py) — no .pyc, .so, .pyd
-- Must work on Python 3.8
-- `requests` already on router — don't bundle
-- `redis` not available — make conditional
-- cppython missing: `pkg_resources`, `decimal`, `csv`
-- cppython has: `threading`, `select`, `ssl`, `http.server`, `socket`, `configparser`, `zipfile`, `io`, `hashlib`, `hmac`, `base64`, `struct`, `uuid`, `json`, `logging`, `os`, `sys`, `time`, `xml.etree.ElementTree`
-
----
-
-## Speedtest
-
-- NO Ookla license for SDK apps — never bundle/distribute
-- Engine priority: Ookla (BYOB) → Netperf (built-in) → iPerf3 (user server)
-- Default: `cp.speed_test(interface='rmnet501', duration=10, direction='both')`
-- Netperf CANNOT run concurrent tests — test modems sequentially
-- Ookla/iPerf3 CAN run concurrent with source IP binding
-
----
-
-## GPS and NMEA
-
-- Use `pynmeagps` for parsing — never write custom parsers
-- Install fresh via pip, never copy from another app
-- `$PCPTMINR` is proprietary Cradlepoint — catch "Unknown msgID" and skip
-- Speed from knots: `speed_kmh = msg.spd * 1.852`
-
----
-
-## Docker / Containers
-
-- **Prefer SDK apps over containers** — SDK apps are smaller, use fewer resources, and are included with all device licenses at no extra cost
-- **Use containers only when needed**: Linux packages/apps, root access, or client-device-like behavior on a LAN IP through the firewall
-- **Containers require an Advanced license** — costs more than the standard license
-- Deploy via REST: POST to `/api/config/container/projects/`
-- Use Compose version `"2.4"` (not v3)
-- Named volumes MUST have `driver: local`
-- Use `restart: unless-stopped` (not `always`)
-- NO `network_mode: host` — use `ports:` instead
-- Resource limits supported: `mem_limit: 512m`, `cpus: 2`, `shm_size: "1gb"` (Compose v2.4 service-level syntax)
-- Use alpine-based images
-
----
-
-## Project Structure
-
-```
+```text
 apps/{app_name}/
-├── package.ini          # Metadata (uuid, version, vendor, tags)
-├── cp.py                # CP module (auto-generated, never modify)
+├── package.ini          # Metadata with uuid, version, vendor, tags
+├── cp.py                # CP module copy (never modify)
 ├── {app_name}.py        # Main logic
 ├── start.sh             # Uses cppython (never modify)
-├── readme.md            # Usage and appdata fields
+├── readme.md            # Usage and appdata fields (document every field)
+├── static/              # Web assets, if applicable
 └── METADATA/            # Build signatures (auto-generated)
 ```
 
----
-
-## Build & Deploy
-
-```bash
-# Setup
-python3 make.py setup
-
-# Create new app
-.venv/bin/python3 make.py create {app_name}
-
-# Deploy (purge → build → install → show logs)
-.venv/bin/python3 make.py deploy {app_name}
-
-# Other commands
-.venv/bin/python3 make.py status {app_name}
-.venv/bin/python3 make.py stop {app_name}
-.venv/bin/python3 make.py uninstall {app_name}
-```
-
-- If no app_name given, uses `app_name` from `sdk_settings.ini`
-- NEVER use `make.py install` directly — always use `deploy`
-- NEVER overwrite `package.ini`, `start.sh`, or `cp.py` after creation
-
----
-
-## API Verification Workflow
-
-Before writing code that uses an API path:
-
-1. Search docs: `grep -r "keyword" docs/ncos-api/ --include="*.md"`
-2. Check DTD: `curl -s -u admin:pass http://router/api/dtd/config/path`
-3. Test with curl: `curl -s -u admin:pass http://router/api/status/path`
-4. Only use fields that actually exist in the response
-5. Then write code
-
----
-
-## Error Handling
-
-Always wrap API calls:
-
-```python
-try:
-    data = cp.get('status/system')
-    if data:
-        # process
-except Exception as e:
-    cp.log(f"Error: {e}")
-```
-
----
-
-## Local Development
-
-- Run locally: `.venv/bin/python3 my_app/my_app.py`
-- cp.get/put/post/delete work via REST to dev router
-- cp.log() prints to stdout
-- cp.register(), cp.alert(), cp.decrypt() do NOT work locally
-- Web servers bind to YOUR machine, not the router
+Subdirectories with Python modules work; include `__init__.py` in each package. Do not move an app
+after `make.py create` — that path is where CI looks.

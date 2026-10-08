@@ -1,84 +1,88 @@
----
-inclusion: auto
-description: "Cradlepoint SDK development workflow and prompt shortcuts"
----
 # Cradlepoint SDK Development Workflow
 
-## Web Apps
-
-When building a web app, load and follow `web-standards.md` for the template and design system.
+All commands run through the venv interpreter: `.venv/bin/python3` (Mac/Linux) or
+`.venv\Scripts\python` (Windows). The examples below use the Mac/Linux form.
 
 ## Use Specs for New Apps
 
-When building a new SDK app (not a quick script), use a Kiro Spec to plan before coding:
-1. Define requirements — what APIs, what UI, what data
-2. Design — break into tasks, identify API paths needed
-3. Follow the API Verification Workflow (in `api-reference.md`) — verify all API paths exist before implementation
+For a new SDK app (not a quick script), use a Kiro Spec to plan before coding:
+
+1. Requirements — what APIs, what UI, what data
+2. Design — break into tasks, identify the API paths needed
+3. Verify — run the API Verification Workflow (`api-reference.md`) on every path **before**
+   implementation
 4. Implement — work through tasks step by step
 
-This prevents the "code first, debug later" cycle. Start a spec with: "Create a spec for [app description]".
+This prevents the code-first/debug-later cycle. Start with: "Create a spec for [app description]".
 
-## Python Environment
+## make.py commands
 
-Use the project's virtual environment for all commands:
-- Windows: `.venv\Scripts\python make.py ...`
-- Mac/Linux: `.venv/bin/python3 make.py ...`
+```bash
+.venv/bin/python3 make.py create {app_name}      # scaffold from apps/templates/app_template/
+.venv/bin/python3 make.py deploy {app_name}      # purge → build → install → start → logs
+.venv/bin/python3 make.py status {app_name}
+.venv/bin/python3 make.py start {app_name}
+.venv/bin/python3 make.py stop {app_name}
+.venv/bin/python3 make.py uninstall {app_name}
+.venv/bin/python3 make.py clean {app_name}       # remove build artifacts
+.venv/bin/python3 make.py contribute {app_name}  # open a PR upstream (interactive)
+```
 
-### Environment setup — use setup_env.py
+- Omit `{app_name}` and make.py uses `app_name` from `sdk_settings.ini`.
+- **Apps are found by name, case-insensitively** — repo root first, then `apps/`. The name you
+  type does not have to match the folder's case.
+- **`install` and `deploy` also accept a `.tar.gz`** — `make.py install "My_App v1.0.0.tar.gz"`
+  installs that exact file with no rebuild. Useful for a package someone sent you, where the
+  archive name and extracted folder name differ in case.
 
-If `.venv` is missing, imports fail, or `sdk_settings.ini` still has placeholder values,
-run the setup script rather than fixing things by hand:
-- Windows: `python setup_env.py`
-- Mac/Linux: `python3 setup_env.py`
+## Create App
 
-Flags: `-y` (no prompts), `--quiet` (only report problems), `--configure` (router settings
-only), `--skip-router` (venv only), `--no-check` (skip the router connection test),
-`--router-ip/--router-username/--router-password` (set settings without prompting).
+`make.py create {app_name}` generates every required file into `./apps/{app_name}/` and prints
+the path. **Do not move the app afterwards** — that is already where the repo keeps apps and where
+CI looks, so it is ready to contribute as-is. Only the user decides when and where to move an app.
 
-`setup_env.py -y` is also the fastest way to verify the router is reachable and in
-Developer Mode before deploying. The **Setup Dev Environment** manual hook and the
-`/setup` steering file both drive this flow.
+After creation, modify only `{app_name}.py` and `readme.md`. The rest is generated correctly.
 
-### Session-start environment check
+Before writing any app code: run the API Verification Workflow (`api-reference.md`), and
+**ask the user about unknowns** rather than assuming requirements, data formats, or behavior.
 
-The **Check Environment** session-start hook runs `setup_env.py --hook`, which creates
-`.venv` and installs `requirements.txt` when they are missing. Read its output before
-touching the environment:
+## Deploy
 
-- `kiro-env: ready ...` — everything is in place. Do NOT run `setup_env.py` again.
-- `kiro-env: PROBLEM — ...` — setup could not finish. Follow the `KIRO —` line in the same
-  output and tell the user in plain language. Do not try to build or deploy until it is fixed.
-- No `kiro-env:` line at all — Python is missing entirely, or the hook did not run.
-- Lines like `python: command not found` or a Microsoft Store message ahead of the
-  `kiro-env:` line are the interpreter probe (`python3`, then `python`, then `py -3`).
-  Ignore them; only the `kiro-env:` lines are meaningful.
+**Always deploy after creating or modifying an app. Do not ask — just run it.**
 
-## Saved Prompt Shortcuts
+```bash
+.venv/bin/python3 make.py deploy {app_name}
+```
 
-- **When user says "rtfm"** - Load `.kiro/steering/rtfm.md` (Read The Fantastic Manual - API verification workflow)
-- **When user says "learn"** - Load `.kiro/steering/learn.md` (Update rules and docs based on what was learned)
-- **When user says "deploy"** - Load `.kiro/steering/deploy.md` (Deploy app to router workflow)
+`deploy` purges old apps, builds the package, installs it, and starts the app
+(`auto_start=true` in `package.ini`). No need to run `clean`, `install`, or `start` separately,
+and no need to delete old `.tar.gz` files first.
 
-## Auto-Deploy
+- **Never use `make.py install` directly** — always `deploy`.
+- **`deploy` output is sufficient verification** — if the logs show the app started (e.g.
+  "Starting app_name", "Web server started"), do not re-run `status` or `logs`.
+- **Check log timestamps.** `deploy` prints `HH:MM:SS` on each log line. The router's log buffer
+  holds entries from previous deploys, so only trust lines timestamped *after* you ran the deploy.
+  Lines without recent timestamps are stale.
+- An SCP "lost connection" during install is normal — the router drops the SSH connection once it
+  has the file.
 
-**ALWAYS deploy after creating or modifying an app.** After any code change to an app's Python files, automatically run:
+**On Windows, `Exit Code: 1` is reported for EVERY command and is never a failure signal.** Judge
+success only by printed output (`Purge successful`, `Package ... created`, `"state": "started"`).
+Never retry, re-diagnose, or ask the user for guidance because of exit code 1. Full explanation
+and the per-operation success strings are in `windows-notes.md` (load on request).
 
-- Windows: `.venv\Scripts\python make.py deploy {app_name}`
-- Mac/Linux: `.venv/bin/python3 make.py deploy {app_name}`
+## Developer Mode
 
-If no `{app_name}` is specified, make.py uses the `app_name` from `sdk_settings.ini`.
+**Developer Mode is enabled in NetCloud Manager, NOT on the router's local admin UI.**
+NCM → Tools → Developer Mode Devices → add the device.
 
-Do NOT ask the user if they want to deploy — just do it.
+Never tell users to enable Developer Mode on the router itself — there is no such setting there.
 
 ## Configuration Files
 
-- **NEVER make up configuration formats** - always reference actual files like @sdk_settings.ini
-- **ALWAYS check sdk_settings.ini before deploying** - if it contains default password (mypassword), warn the user to update it first
-- **sdk_settings.ini is git-ignored** - it holds router credentials and must never be committed. `setup_env.py` and `make.py` create it automatically from `sdk_settings.ini.example` when missing, so never tell the user to copy the example by hand
-- **NEVER print or echo the router password** in responses or commit messages
-- **Edit sdk_settings.ini in place** - keep the `key=value` format (no spaces around `=`) and only change the `[sdk]` values
+`sdk_settings.ini` holds the dev router credentials:
 
-### sdk_settings.ini format:
 ```ini
 [sdk]
 app_name=your_app_name
@@ -87,139 +91,48 @@ dev_client_username=admin
 dev_client_password=your_password
 ```
 
-Default/placeholder values that indicate unconfigured settings:
-- dev_client_password=mypassword
+- **Never make up a config format** — read the actual file (`@sdk_settings.ini`).
+- **Check it before deploying.** If `dev_client_password` is still `mypassword` (or empty), tell
+  the user to update it first.
+- **It is git-ignored** and must never be committed. `setup_env.py` and `make.py` create it from
+  `sdk_settings.ini.example` automatically, so never tell the user to copy the example by hand.
+- **Edit in place** with `str_replace`, keeping `key=value` (no spaces around `=`), and change
+  only `[sdk]` values. Never print or echo the password.
+
+If `.venv` is missing, imports fail, or settings are still placeholders, use the `setup` skill
+rather than fixing things by hand. `setup_env.py -y` is also the fastest way to confirm the router
+is reachable and in Developer Mode before deploying.
 
 ## Project Structure
 
 ```text
 apps/{app_name}/
 ├── package.ini          # Metadata with uuid, version, vendor, tags
-├── cp.py               # CP module copy
-├── {app_name}.py       # Main logic
-├── start.sh            # Uses cppython
-├── readme.md           # Usage and appdata fields
-├── static/             # Web assets (if applicable)
-└── mylib/              # Subdirectories with Python modules work fine
+├── cp.py                # CP module copy
+├── {app_name}.py        # Main logic
+├── start.sh             # Uses cppython
+├── readme.md            # Usage and appdata fields
+├── static/              # Web assets (if applicable)
+└── mylib/               # Subdirectories with Python modules work fine
 ```
 
-Apps live in `apps/`, where `make.py create` puts them. That is also where the CI checks look, so an app is ready to contribute without being relocated first. **Do not move apps** — leave them where `create` put them. Only the user decides when and where to move an app.
+**Multi-file apps work** — subdirectories with Python modules (e.g. `taky/taky/cot/`) import
+normally. Include `__init__.py` in each package directory.
 
-Tags (in package.ini): connectivity, monitoring, networking, integrations, gpio, vehicle, security, web, tools, examples, speedtest, mqtt, etc.
-
-- **Multi-file apps work** - apps can have subdirectories with Python modules (e.g., `taky/taky/cot/`). Imports work normally. Include `__init__.py` in each package directory
-- **make.py finds apps by name, case-insensitively** - `build`, `install`, `deploy`, `clean` search the repo root first, then `apps/`. The name you type does not have to match the folder's case; make.py normalizes to the on-disk folder name
-- **`make.py install` / `deploy` accept a .tar.gz file** - pass a package file name to install that exact file with no rebuild (e.g. `make.py install "My_App v1.0.0.tar.gz"`). Useful for app packages sent by someone else, where the archive name and the extracted folder name differ in case
-
-## Create App
-
-```bash
-# Windows:
-.venv\Scripts\python make.py create {app_name}
-# Mac/Linux:
-.venv/bin/python3 make.py create {app_name}
-```
-
-This generates all required files from `apps/templates/app_template/` into `./apps/{app_name}/`, and prints that path when it finishes. **Do not move the app after creation** — it is already where the repo keeps apps and where CI expects it. The `make.py` commands (`build`, `deploy`, etc.) find apps by name at both the repo root and `apps/`, so older apps still sitting at the root keep working.
-
-**CRITICAL: Before writing ANY app code:**
-1. **Follow the API Verification Workflow** in `api-reference.md` — search docs, read, check DTD, test endpoint, verify fields, THEN code
-2. **ASK USER for unknowns** — never assume requirements, data formats, or behavior
-3. **If no router available** — still search and read docs before coding
-
-**After creation, only modify the main {app_name}.py file and readme.md** - all other files are generated correctly.
-
-**NEVER overwrite package.ini, start.sh, or cp.py after creation** - these are auto-generated and correct.
-
-**ALWAYS deploy after creating or modifying an app** - use `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows) immediately after code changes.
-
-## Developer Mode
-
-**Developer Mode is enabled in NetCloud Manager, NOT on the router's local admin UI.**
-
-To enable: Log in to NCM → Tools page → Developer Mode Devices tab → add the device.
-
-**NEVER tell users to enable Developer Mode on the router itself** — there is no such setting in the router's local UI.
-
-## Deploy to Router
-
-**ALWAYS use make.py deploy** - `.venv/bin/python3 make.py deploy {app_name}` (Mac/Linux) or `.venv\Scripts\python make.py deploy {app_name}` (Windows)
-
-If no `{app_name}` is specified, make.py uses the `app_name` from `sdk_settings.ini`.
-
-This handles:
-- Purging old apps
-- Building the app package
-- Installing the new version
-- Starting the app (auto_start=true in package.ini)
-- Showing status and logs
-
-**Just run `make.py deploy`** - no need to run `make.py clean` or remove old tar.gz files first. It handles everything. The app auto-starts after install, so there's no need to run `make.py start` either.
-
-**NEVER use make.py install directly** - always use `make.py deploy` for deployment.
-
-**deploy output is sufficient** - if logs show app started successfully (e.g., "Starting app_name", "Web server started"), DO NOT run status or logs commands again. The deployment verification is already complete.
-
-**ALWAYS check log timestamps after deploy** - deploy shows timestamps (HH:MM:SS) on each log line. Only trust logs with timestamps AFTER you ran the deploy. The router log buffer contains old entries from previous deploys — if you see logs without recent timestamps, they are stale and do not reflect the current deploy.
-
-### Windows: Exit Code 1 is expected — do NOT treat as failure
-
-**CRITICAL: On this Windows machine, `Exit Code: 1` is reported for ALL commands (not just make.py). This is a terminal wrapper artifact. NEVER treat it as a failure signal.**
-
-Rules:
-1. **NEVER retry a command solely because of Exit Code: 1.** The command ran.
-2. **NEVER ask the user for guidance** because of Exit Code: 1. Just continue.
-3. **NEVER get stuck in a loop** retrying the same command — if a command produces output (even partial), it executed.
-4. **If a command produces NO output and Exit Code: 1**, assume it ran successfully and move on. Only investigate if subsequent steps prove something is wrong.
-5. **Judge success ONLY by printed output**, not exit code:
-   - **Purge**: look for "Purge successful"
-   - **Build/Package**: look for "Package {app_name} v{x}.{y}.{z}.tar.gz created"
-   - **Install**: look for "Installing {archive} to {ip}..." (SCP connection drop after upload is normal)
-   - **Deploy**: successful if purge message appears (build+install follow but output may be swallowed)
-   - **Status**: look for `"state": "started"` in the JSON response
-   - **Any Python script**: look for the expected print output
-6. **Output may be partially swallowed** — the terminal sometimes only shows the first print statement from a multi-step operation. This is normal. The remaining steps still executed.
-7. **Character-by-character echo is cosmetic noise** — the terminal replays typed characters in the output. Ignore the garbled repeated text before the actual output.
-
-If the output shows success messages but `Exit Code: 1`, the operation succeeded. Do NOT retry, diagnose, or report failure based solely on exit code. **Move forward.**
+`package.ini` tags: connectivity, monitoring, networking, integrations, gpio, vehicle, security,
+web, tools, examples, speedtest, mqtt, etc.
 
 ## Contribute an App Upstream
 
-```bash
-# Windows:
-.venv\Scripts\python make.py contribute {app_name}
-# Mac/Linux:
-.venv/bin/python3 make.py contribute {app_name}
-```
-
-Submits one app to `cradlepoint/sdk-samples` as a pull request: CI preflight, branch off
-upstream, staged-file confirmation, commit, fork, push, PR.
+`make.py contribute {app_name}` submits one app to `cradlepoint/sdk-samples` as a pull request:
+CI preflight, branch off upstream, staged-file confirmation, commit, fork, push, PR.
 
 - **Clone the canonical repo directly, do not fork first** — `origin` stays pointed at
-  `cradlepoint/sdk-samples` so `git pull` never needs a fork sync. `contribute` creates the
-  fork on demand and adds it as a *second* remote named `fork`
-- **`contribute` is interactive** — it prompts for confirmation, a commit message, and PR
-  text. Do not run it unattended or from a hook
-- **Never suggest committing an app by hand unless the user asks** — `contribute` stages only
-  the app folder. A manual `git add -A` would sweep in unrelated working-tree changes
+  `cradlepoint/sdk-samples` so `git pull` never needs a fork sync. `contribute` creates the fork
+  on demand and adds it as a *second* remote named `fork`.
+- **It is interactive** — prompts for confirmation, a commit message, and PR text. Do not run it
+  unattended or from a hook.
+- **Never suggest committing an app by hand unless the user asks** — `contribute` stages only the
+  app folder, where a manual `git add -A` would sweep in unrelated working-tree changes.
 - **It needs the GitHub CLI** — offers to download it into `.gh/` (git-ignored) on first run,
-  then `gh auth login --web` for a one-time browser code. Falls back to a browser-driven fork
-  and PR if the user declines
-
-## Other Commands
-
-```bash
-# Windows:
-.venv\Scripts\python make.py status {app_name}     # Check app status
-.venv\Scripts\python make.py start {app_name}      # Start app
-.venv\Scripts\python make.py stop {app_name}       # Stop app
-.venv\Scripts\python make.py uninstall {app_name}  # Remove app
-.venv\Scripts\python make.py clean {app_name}      # Remove build artifacts
-
-# Mac/Linux:
-.venv/bin/python3 make.py status {app_name}
-.venv/bin/python3 make.py start {app_name}
-.venv/bin/python3 make.py stop {app_name}
-.venv/bin/python3 make.py uninstall {app_name}
-.venv/bin/python3 make.py clean {app_name}
-```
+  then `gh auth login --web`. Falls back to a browser-driven fork and PR if the user declines.

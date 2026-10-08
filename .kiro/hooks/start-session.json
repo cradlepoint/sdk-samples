@@ -10,15 +10,6 @@
         "command": "python3 setup_env.py --hook || python setup_env.py --hook || py -3 setup_env.py --hook || echo kiro-env: PROBLEM - no Python interpreter was found on PATH. KIRO - tell the user to install Python from https://www.python.org/downloads/ - on Windows they must check Add python.exe to PATH during install - then reopen Kiro. Do not try to build or deploy apps until then."
       },
       "timeout": 600
-    },
-    {
-      "name": "Load Steering Files",
-      "trigger": "SessionStart",
-      "description": "Loads all steering files with inclusion: auto at session start.",
-      "action": {
-        "type": "agent",
-        "prompt": "Activate the following steering files using the disclose_context tool: api-reference, coding-standards, meta, web-standards, workflow"
-      }
     }
   ]
 }
