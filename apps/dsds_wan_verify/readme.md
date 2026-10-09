@@ -3,6 +3,10 @@
 Connectivity verification and automatic failover for **Dual SIM Dual Standby (DSDS)** modems,
 with a web UI on port 8000.
 
+<img width="1634" height="923" alt="image" src="https://github.com/user-attachments/assets/b6b7587e-dcee-44f8-b1b8-a88dca6e4854" />
+<img width="1634" height="923" alt="image" src="https://github.com/user-attachments/assets/7315c5be-e936-4f26-b402-de33c775fd72" />
+<img width="1634" height="923" alt="image" src="https://github.com/user-attachments/assets/91ea9fad-41fc-4fd9-bc28-f6e3aa7ef3d4" />
+
 The app watches the SIM slot currently carrying traffic and, when it fails, switches to the
 other slot. Each slot can be checked three ways, and each check is switchable per slot:
 
