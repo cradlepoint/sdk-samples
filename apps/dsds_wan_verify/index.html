@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSDS WAN Verify</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="static/css/app.css" />
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title">DSDS WAN Verify</h1>
+                    <span class="app-version" id="app-version"></span>
+                </div>
+                <div class="header-actions">
+                    <span class="dwv-live" id="live-status" title="Monitor status">
+                        <i class="fas fa-circle-notch"></i> <span id="live-status-text">connecting…</span>
+                    </span>
+                    <button type="button" class="header-icon-btn" id="help-btn" title="Help">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <button type="button" class="header-icon-btn" id="info-btn" title="Device Info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <aside class="sidebar" id="app-sidebar">
+                <div class="sidebar-header">
+                    <h2><a href="#" id="homepage-link" style="color: inherit; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-sim-card"></i> <span class="sidebar-label">DSDS</span></a></h2>
+                    <button type="button" class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <!-- The template's script.js calls showElement('homepage') on init and
+                             the sidebar Homepage link targets the same id, so the dashboard
+                             uses id="homepage" to stay in step with both. -->
+                        <li><a href="#homepage" class="nav-item active" data-element="homepage"><i class="fas fa-gauge-high"></i> Dashboard</a></li>
+                        <li><a href="#tests" class="nav-item" data-element="tests"><i class="fas fa-network-wired"></i> Connectivity Tests</a></li>
+                        <li><a href="#signal" class="nav-item" data-element="signal"><i class="fas fa-signal"></i> Signal Thresholds</a></li>
+                        <li><a href="#history" class="nav-item" data-element="history"><i class="fas fa-clock-rotate-left"></i> Event Log</a></li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+
+                    <!-- ============ DASHBOARD (id must be "homepage"; see nav above) ============ -->
+                    <section class="element-section active" id="homepage">
+                        <h2 class="section-title">Dashboard</h2>
+
+                        <div class="control-panel dwv-statusbar">
+                            <div class="panel-content">
+                                <div class="dwv-statusbar-row">
+                                    <div class="dwv-statusbar-main">
+                                        <span class="dwv-statusbar-label">Monitor</span>
+                                        <strong id="monitor-status">loading…</strong>
+                                    </div>
+                                    <div class="dwv-statusbar-stats" id="monitor-stats"></div>
+                                    <div class="dwv-statusbar-actions">
+                                        <button type="button" class="btn btn-warning" id="switch-btn">
+                                            <i class="fas fa-right-left"></i> Switch SIM Now
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Preferred SIM lives here rather than on a config page:
+                                     it is one live choice about where traffic should sit, and
+                                     it applies the moment it is clicked. Writing it as a
+                                     two-way choice is also what makes an equal-priority
+                                     config impossible through the UI. -->
+                                <div class="dwv-statusbar-row dwv-preferred-row" id="preferred-sim"></div>
+                                <p class="dwv-hint" id="failover-hint"></p>
+                                <!-- Shown when no slot has any test enabled (nothing can fail,
+                                     so nothing moves), or while a failback holdoff is running. -->
+                            </div>
+                        </div>
+
+                        <div class="dwv-slot-grid" id="slot-cards">
+                            <div class="dwv-empty"><div class="spinner-circle"></div><p>Looking for DSDS modems…</p></div>
+                        </div>
+                    </section>
+
+                    <!-- ============ CONNECTIVITY TESTS (ping + HTTP) ============ -->
+                    <section class="element-section" id="tests">
+                        <h2 class="section-title">Connectivity Tests</h2>
+                        <p class="dwv-lead">
+                            Ping and HTTP checks, configured per SIM slot and off until you enable them.
+                            Both only run while that slot is the connected one &mdash; a DSDS modem can have
+                            only one slot online at a time, so there is no way to probe the standby slot.
+                            Signal is the only test that works on both slots; it lives on
+                            <strong>Signal Thresholds</strong>.
+                        </p>
+                        <div id="test-forms">
+                            <div class="dwv-empty"><div class="spinner-circle"></div><p>Loading slots…</p></div>
+                        </div>
+                        <div class="dwv-actions-bar">
+                            <button type="button" class="btn btn-primary" id="save-tests-btn">
+                                <i class="fas fa-save"></i> Save Configuration
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="clear-tests-btn"
+                                    title="Delete every IP Verify test this app created">
+                                <i class="fas fa-trash"></i> Remove App's IP Verify Tests
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- ============ SIGNAL THRESHOLDS ============ -->
+                    <section class="element-section" id="signal">
+                        <h2 class="section-title">Signal Thresholds</h2>
+                        <p class="dwv-lead">
+                            One threshold per SIM slot: <em>the level at which this slot is no longer worth
+                            using</em>. Signal is the only test that works on a <em>disconnected</em> slot,
+                            because a DSDS modem keeps reporting live diagnostics for the standby one, so the
+                            same number decides when to leave a slot and whether the other one is any better
+                            before paying ~30 seconds of downtime for a switch.
+                        </p>
+                        <div id="signal-forms">
+                            <div class="dwv-empty"><div class="spinner-circle"></div><p>Loading slots…</p></div>
+                        </div>
+                        <div class="dwv-actions-bar">
+                            <button type="button" class="btn btn-primary" id="save-signal-btn">
+                                <i class="fas fa-save"></i> Save Configuration
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- ============ HISTORY ============ -->
+                    <section class="element-section" id="history">
+                        <h2 class="section-title">Event Log</h2>
+                        <div class="results-panel">
+                            <div class="panel-header"><h2><i class="fas fa-clock-rotate-left"></i> Recent Events</h2></div>
+                            <div class="results-container">
+                                <div class="results-content" id="history-list">
+                                    <p class="text-secondary">No events yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="dwv-hint">
+                            This list lives in memory and resets when the app restarts. The router's own
+                            system log keeps a durable copy of every message.
+                        </p>
+                    </section>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="help-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fas fa-question-circle"></i> Help</h2>
+                <button type="button" class="modal-close" id="help-modal-close" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="help-modal-body">
+                <div class="modal-loading"><div class="spinner-circle"></div><p>Loading help...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> Device Info</h2>
+                <button type="button" class="modal-close" id="info-modal-close" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="info-modal-body">
+                <div class="modal-loading"><div class="spinner-circle"></div><p>Loading info...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/js/script.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+</html>

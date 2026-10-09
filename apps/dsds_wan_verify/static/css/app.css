@@ -1,0 +1,498 @@
+/* dsds_wan_verify - app-specific styles.
+   Supplements static/css/style.css; it does not replace any of it.
+   All colors come from the design system's CSS variables so light and
+   dark themes stay in sync. */
+
+.dwv-lead {
+    color: var(--text-secondary);
+    max-width: 70ch;
+    margin-bottom: 1.25rem;
+}
+
+.dwv-hint {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin: 0.65rem 0 0;
+    line-height: 1.5;
+}
+
+.dwv-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2.5rem 1rem;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
+}
+
+/* --- header live badge --- */
+.dwv-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.dwv-live.ok { color: var(--success-color); border-color: var(--success-color); }
+.dwv-live.warn { color: var(--warning-color); border-color: var(--warning-color); }
+.dwv-live.bad { color: var(--danger-color); border-color: var(--danger-color); }
+.dwv-live.busy i { animation: dwv-spin 1.2s linear infinite; }
+
+@keyframes dwv-spin { to { transform: rotate(360deg); } }
+
+/* --- status bar --- */
+/* The design system gives .control-panel a 200px min-height, which suits a
+   panel with a header and a body but leaves ~107px of dead space under this
+   single-row strip. Overridden here rather than in style.css so the Event
+   Log panel keeps the floor. */
+.dwv-statusbar {
+    margin-bottom: 1.25rem;
+    min-height: 0;
+}
+
+.dwv-statusbar .panel-content { padding: 1rem 1.5rem; }
+
+/* The failover hint is only populated when no slot has a test enabled.
+   Empty, it still contributes its margin-top. */
+.dwv-statusbar .dwv-hint:empty { display: none; }
+
+.dwv-statusbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+}
+
+.dwv-statusbar-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 14rem; flex: 1 1 18rem; }
+.dwv-statusbar-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-light); }
+.dwv-statusbar-main strong { font-size: 1rem; line-height: 1.4; }
+
+.dwv-statusbar-stats { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+.dwv-stat { display: flex; flex-direction: column; gap: 0.1rem; }
+.dwv-stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-light); }
+.dwv-stat-value { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.dwv-statusbar-actions { margin-left: auto; }
+
+/* --- slot cards --- */
+.dwv-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    gap: 1.25rem;
+}
+
+.dwv-slot-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius, 10px);
+    background: var(--bg-primary);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.dwv-slot-card.is-active { border-color: var(--success-color); box-shadow: 0 0 0 1px var(--success-color); }
+.dwv-slot-card.is-switching { border-color: var(--warning-color); box-shadow: 0 0 0 1px var(--warning-color); }
+.dwv-slot-card.is-failing { border-color: var(--danger-color); box-shadow: 0 0 0 1px var(--danger-color); }
+
+.dwv-slot-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dwv-slot-title { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 0; }
+.dwv-slot-name { font-weight: 650; font-size: 1.02rem; }
+.dwv-slot-sub { font-size: 0.78rem; color: var(--text-secondary); }
+
+.dwv-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-end; }
+
+.dwv-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    white-space: nowrap;
+}
+
+.dwv-badge.ok { color: var(--success-color); border-color: var(--success-color); }
+.dwv-badge.warn { color: var(--warning-color); border-color: var(--warning-color); }
+.dwv-badge.bad { color: var(--danger-color); border-color: var(--danger-color); }
+.dwv-badge.info { color: var(--info-color, var(--primary-color)); border-color: var(--info-color, var(--primary-color)); }
+.dwv-badge.primary { color: var(--primary-color); border-color: var(--primary-color); }
+
+.dwv-slot-body { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 1rem; }
+
+.dwv-kv { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.8rem; font-size: 0.84rem; }
+.dwv-kv dt { color: var(--text-light); white-space: nowrap; }
+.dwv-kv dd { margin: 0; font-variant-numeric: tabular-nums; word-break: break-word; }
+
+.dwv-section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-light);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+}
+
+/* --- signal metric rows --- */
+.dwv-metrics { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.dwv-metric {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.84rem;
+}
+
+.dwv-metric-name {
+    color: var(--text-secondary);
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+/* The slot's threshold for this metric, on the metric's own row. As a
+   separate line below the bar it sat between two metrics and read as if
+   it belonged to the next one down. */
+.dwv-metric-limit {
+    font-size: 0.72rem;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.dwv-metric-value { font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.dwv-metric-value.bad { color: var(--danger-color); }
+.dwv-metric-value.ok { color: var(--success-color); }
+
+.dwv-metric-track {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.dwv-metric-fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--success-color); }
+.dwv-metric-fill.warn { background: var(--warning-color); }
+.dwv-metric-fill.bad { background: var(--danger-color); }
+
+
+/* --- test result rows --- */
+.dwv-tests { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.dwv-test {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.84rem;
+    flex-wrap: wrap;
+}
+
+.dwv-test-icon { width: 1rem; text-align: center; flex: 0 0 auto; }
+.dwv-test-icon.ok { color: var(--success-color); }
+.dwv-test-icon.bad { color: var(--danger-color); }
+.dwv-test-icon.unknown { color: var(--text-light); }
+.dwv-test-target { font-family: var(--font-mono, monospace); word-break: break-all; }
+.dwv-test-note { color: var(--text-secondary); font-size: 0.78rem; }
+
+/* --- per-slot tabs --- */
+.dwv-slot-tabs { flex-wrap: wrap; }
+
+.dwv-slot-tabs .tab-btn {
+    flex: 0 1 auto;
+    min-width: 12rem;
+    gap: 0.45rem;
+    border-right: 1px solid var(--border-color);
+}
+
+.dwv-tab-sub { opacity: 0.75; font-weight: 400; }
+
+.dwv-tab-dot { font-size: 0.5rem; color: var(--success-color); }
+.tab-btn.active .dwv-tab-dot { color: #fff; }
+
+.dwv-slot-panes {
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md, 8px) var(--radius-md, 8px);
+    padding: 1.25rem;
+    background: var(--bg-primary);
+}
+
+/* --- per-slot config forms --- */
+.dwv-slot-form { margin-bottom: 0; }
+
+/* --- collapsible test sections --- */
+.dwv-collapse-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 1.25rem;
+}
+
+.dwv-collapse {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.dwv-collapse.is-open { border-color: var(--primary-color); }
+
+.dwv-collapse-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition, 0.15s ease);
+}
+
+.dwv-collapse-bar:hover { background: rgba(79, 70, 229, 0.08); }
+
+.dwv-collapse-bar:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}
+
+.dwv-collapse.is-open .dwv-collapse-bar {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dwv-collapse-caret {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    color: var(--text-light);
+    transition: transform 0.15s ease;
+}
+
+.dwv-collapse.is-open .dwv-collapse-caret {
+    transform: rotate(90deg);
+    color: var(--primary-color);
+}
+
+.dwv-collapse-title {
+    flex: 0 0 auto;
+    font-weight: 650;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+}
+
+.dwv-collapse-title i { color: var(--primary-color); }
+
+.dwv-collapse-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dwv-collapse-summary.off { color: var(--text-light); font-style: italic; }
+.dwv-collapse-summary.warn { color: var(--warning-color); }
+
+.dwv-collapse-body { padding: 1rem 0.9rem 1.1rem; }
+
+.dwv-collapse-body .dwv-fieldset { margin-top: 0; }
+
+@media (max-width: 720px) {
+    .dwv-collapse-bar { flex-wrap: wrap; }
+    .dwv-collapse-summary { text-align: left; white-space: normal; flex-basis: 100%; }
+    .dwv-slot-tabs .tab-btn { min-width: 0; flex: 1 1 100%; }
+}
+
+.dwv-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.9rem 1.1rem;
+}
+
+/* auto-fit stretches a lone field across the whole row, which makes a
+   two-digit count look like a free-text box. */
+.dwv-form-grid-narrow { grid-template-columns: repeat(auto-fit, 15rem); }
+
+.dwv-fieldset {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.9rem 1rem 1rem;
+    margin-top: 1rem;
+}
+
+.dwv-fieldset > legend {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 0 0.4rem;
+}
+
+/* A callout for the one or two facts on a page that cause real trouble
+   when missed - the secondary's threshold wanting to be lower, and what
+   the failback holdoff is for. Distinct from .dwv-hint, which is the
+   ordinary explanatory voice. */
+.dwv-note {
+    margin: 0.85rem 0 0;
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    border-left: 3px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.dwv-note i { margin-right: 0.35rem; }
+.dwv-note.primary { border-left-color: var(--primary-color); }
+
+.dwv-note.warn {
+    color: var(--warning-color);
+    border-left-color: var(--warning-color);
+}
+
+.dwv-bullets { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.dwv-bullets li { margin-bottom: 0.3rem; }
+
+/* --- preferred SIM: a segmented two-way choice on the dashboard --- */
+.dwv-preferred-row {
+    gap: 1.5rem;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.dwv-preferred-row:empty { display: none; margin: 0; padding: 0; border: none; }
+
+.dwv-seg-group { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+.dwv-seg-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-light);
+    font-weight: 700;
+}
+
+.dwv-seg {
+    display: inline-flex;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+.dwv-seg-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 650;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dwv-seg-btn + .dwv-seg-btn { border-left: 1px solid var(--border-color); }
+.dwv-seg-btn:hover:not(.active):not(:disabled) { background: rgba(79, 70, 229, 0.08); }
+.dwv-seg-btn:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+
+.dwv-seg-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.dwv-seg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.dwv-seg-sub { font-weight: 400; font-size: 0.78rem; opacity: 0.8; }
+.dwv-seg-flag { color: var(--warning-color); }
+
+.dwv-tab-star { color: var(--primary-color); font-size: 0.7rem; }
+/* The active tab's background IS the primary colour, so the star has to
+   inherit there or it disappears into it. */
+.tab-btn.active .dwv-tab-star { color: inherit; }
+
+/* --- a divided-off group of settings inside a slot form --- */
+.dwv-subsection {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Only the preferred slot is ever a failback target, so on any other
+   slot the failback option and its holdoff would do nothing. Hidden
+   rather than dimmed, since a visible-but-inert control is exactly the
+   kind of thing that gets set and then trusted. The inputs stay in the
+   DOM, so stored values survive a save and reappear if the preferred SIM
+   is switched. */
+.dwv-subsection.is-gate-off { display: none; }
+
+.dwv-threshold-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.dwv-threshold-table th,
+.dwv-threshold-table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.dwv-threshold-table th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); font-weight: 700; }
+.dwv-threshold-table td:first-child { white-space: nowrap; }
+.dwv-threshold-table input { width: 6.5rem; }
+.dwv-threshold-table .dwv-live-val { color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dwv-threshold-table tr.is-present td:first-child { font-weight: 650; }
+
+.dwv-actions-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.dwv-inline-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
+.dwv-inline-result { font-size: 0.82rem; color: var(--text-secondary); }
+.dwv-inline-result.ok { color: var(--success-color); }
+.dwv-inline-result.bad { color: var(--danger-color); }
+
+/* --- history --- */
+.dwv-event { display: flex; gap: 0.75rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border-color); font-size: 0.86rem; }
+.dwv-event:last-child { border-bottom: none; }
+.dwv-event-ago { color: var(--text-light); white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 5.5rem; }
+.dwv-event.warn .dwv-event-text { color: var(--warning-color); }
+.dwv-event.error .dwv-event-text { color: var(--danger-color); }
+
+@media (max-width: 640px) {
+    .dwv-statusbar-actions { margin-left: 0; width: 100%; }
+    .dwv-statusbar-actions .btn { width: 100%; }
+    .dwv-metric { grid-template-columns: 7rem 1fr auto; }
+}
