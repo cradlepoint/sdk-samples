@@ -1,5 +1,7 @@
 # rtk_compare
 
+<img width="1634" height="848" alt="image" src="https://github.com/user-attachments/assets/774a5e7b-56f6-41a6-8edd-eb2e3a6a7665" />
+
 Records the **pre-correction** and **RTK-corrected** GNSS positions side by
 side once per second, writes every sample to a CSV file, and serves a web UI
 that plots both tracks on a map colour-coded by fix quality.
