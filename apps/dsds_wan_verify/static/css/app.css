@@ -216,8 +216,26 @@
 .dwv-test-target { font-family: var(--font-mono, monospace); word-break: break-all; }
 .dwv-test-note { color: var(--text-secondary); font-size: 0.78rem; }
 
+/* --- the two configuration pages ---
+   These carry far more controls than the dashboard, and the design
+   system's generous section spacing pushed the settings themselves below
+   the fold on a short window. Tightened here only, and only the spacing:
+   .dwv-dense is on #tests and #signal, so the dashboard keeps the full
+   treatment. */
+.dwv-dense > .section-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.6rem;
+}
+
+.dwv-dense > .dwv-lead { margin-bottom: 0.9rem; }
+
 /* --- per-slot tabs --- */
-.dwv-slot-tabs { flex-wrap: wrap; }
+/* .dwv-slot-panes is drawn as the continuation of the tab strip
+   (border-top: none, corners only on the bottom), so the design
+   system's 1.5rem gap both separated them visually and cost a chunk of
+   vertical space. */
+.dwv-slot-tabs { flex-wrap: wrap; margin-bottom: 0; }
 
 .dwv-slot-tabs .tab-btn {
     flex: 0 1 auto;
@@ -235,7 +253,7 @@
     border: 1px solid var(--border-color);
     border-top: none;
     border-radius: 0 0 var(--radius-md, 8px) var(--radius-md, 8px);
-    padding: 1.25rem;
+    padding: 1rem 1.1rem 1.1rem;
     background: var(--bg-primary);
 }
 
@@ -246,8 +264,8 @@
 .dwv-collapse-stack {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    margin-top: 1.25rem;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
 }
 
 .dwv-collapse {
@@ -325,8 +343,6 @@
 
 .dwv-collapse-body { padding: 1rem 0.9rem 1.1rem; }
 
-.dwv-collapse-body .dwv-fieldset { margin-top: 0; }
-
 @media (max-width: 720px) {
     .dwv-collapse-bar { flex-wrap: wrap; }
     .dwv-collapse-summary { text-align: left; white-space: normal; flex-basis: 100%; }
@@ -337,26 +353,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     gap: 0.9rem 1.1rem;
-}
-
-/* auto-fit stretches a lone field across the whole row, which makes a
-   two-digit count look like a free-text box. */
-.dwv-form-grid-narrow { grid-template-columns: repeat(auto-fit, 15rem); }
-
-.dwv-fieldset {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 0.9rem 1rem 1rem;
-    margin-top: 1rem;
-}
-
-.dwv-fieldset > legend {
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    padding: 0 0.4rem;
 }
 
 /* A callout for the one or two facts on a page that cause real trouble
@@ -384,6 +380,92 @@
 
 .dwv-bullets { margin: 0.5rem 0 0; padding-left: 1.25rem; }
 .dwv-bullets li { margin-bottom: 0.3rem; }
+
+/* --- folded-away rationale ---
+   The configuration pages carry a lot of "why is this the default"
+   explanation. Inline, it pushed the actual settings off the bottom of
+   the screen, so it lives behind a native <details> instead: one click,
+   no JS, and nothing to restore across a form rebuild. */
+.dwv-why { margin-top: 0.6rem; }
+
+.dwv-why > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 0.25rem 0;
+    list-style: none;
+    user-select: none;
+}
+
+/* Safari still draws the default disclosure triangle without this. */
+.dwv-why > summary::-webkit-details-marker { display: none; }
+
+.dwv-why > summary:hover { color: var(--primary-color); }
+
+.dwv-why > summary:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.dwv-why > summary i { color: var(--text-light); }
+.dwv-why[open] > summary i,
+.dwv-why > summary:hover i { color: var(--primary-color); }
+
+.dwv-why-body {
+    border-left: 2px solid var(--border-color);
+    padding: 0.1rem 0 0.2rem 0.85rem;
+    margin-top: 0.3rem;
+    max-width: 78ch;
+}
+
+/* First child would otherwise add the .dwv-hint top margin inside an
+   already-indented block. */
+.dwv-why-body > *:first-child { margin-top: 0.35rem; }
+
+/* --- a row of toggles, instead of one per line --- */
+.dwv-toggle-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem 2.25rem;
+    margin-bottom: 0.5rem;
+}
+
+/* A label and a short input side by side, for a value small enough that
+   a full .form-field row would be mostly empty space. */
+.dwv-inline-field { display: flex; align-items: center; gap: 0.5rem; }
+
+.dwv-inline-field > label {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: help;
+}
+
+.dwv-inline-field > input { width: 4.5rem; }
+
+/* Wrapper around a toggle that may be gated off. .toggle-switch is
+   display:flex, so an inline span around it would split the inline box;
+   inline-flex keeps it a single sizing box in the row. */
+.dwv-gate { display: inline-flex; }
+
+/* Only the preferred slot is ever a failback target, so on any other
+   slot the failback toggle and its holdoff would do nothing. Hidden
+   rather than dimmed, since a visible-but-inert control is exactly the
+   kind of thing that gets configured and then trusted. The inputs stay
+   in the DOM, so stored values survive a save and reappear if the
+   preferred SIM is switched over.
+   Both selectors carry two classes so they outrank the base rule above
+   and .form-field, which would otherwise win on specificity. */
+.dwv-gate.is-gate-off,
+.form-field.is-gate-off { display: none; }
 
 /* --- preferred SIM: a segmented two-way choice on the dashboard --- */
 .dwv-preferred-row {
@@ -446,27 +528,15 @@
    inherit there or it disappears into it. */
 .tab-btn.active .dwv-tab-star { color: inherit; }
 
-/* --- a divided-off group of settings inside a slot form --- */
-.dwv-subsection {
-    margin-top: 1.1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-}
-
-/* Only the preferred slot is ever a failback target, so on any other
-   slot the failback option and its holdoff would do nothing. Hidden
-   rather than dimmed, since a visible-but-inert control is exactly the
-   kind of thing that gets set and then trusted. The inputs stay in the
-   DOM, so stored values survive a save and reappear if the preferred SIM
-   is switched. */
-.dwv-subsection.is-gate-off { display: none; }
-
 .dwv-threshold-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
 .dwv-threshold-table th,
-.dwv-threshold-table td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.dwv-threshold-table td { padding: 0.28rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
 .dwv-threshold-table th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); font-weight: 700; }
 .dwv-threshold-table td:first-child { white-space: nowrap; }
-.dwv-threshold-table input { width: 6.5rem; }
+/* The design system's 0.75rem input padding makes each of the seven
+   metric rows ~50px tall, which is 350px of table before anything else
+   on the page. Tighter padding here only, inside the table. */
+.dwv-threshold-table input { width: 6.5rem; padding: 0.35rem 0.6rem; }
 .dwv-threshold-table .dwv-live-val { color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dwv-threshold-table tr.is-present td:first-child { font-weight: 650; }
 

@@ -278,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
             verify.remove_all_managed()
             MON._reconcile_signature = None
             with MON.lock:
-                MON.owned_tests = {}
+                MON.armed_tests = {}
                 MON.ping_results = {}
             self._json({'ok': True})
         except Exception as e:
@@ -345,9 +345,17 @@ def main():
 
     # Only tests that can *fail* a slot count as arming it. A failback
     # minimum on its own just gates where the app may move to.
-    configured = [key for key, cfg in MON.conf['slots'].items()
-                  if cfg.get('ping_enabled') or cfg.get('http_enabled')
-                  or cfg.get('signal_enabled')]
+    #
+    # Walked over the DISCOVERED slots rather than over MON.conf['slots'],
+    # which only lists slots that have something stored in appdata. Ping
+    # and signal are on by default, so a router with nothing stored is
+    # fully armed while that dict is empty - reading the dict directly
+    # would report "no tests enabled" on exactly the fresh install where
+    # the defaults are doing the work.
+    configured = [key for key in (slots or {})
+                  if any(appconfig.slot_config(MON.conf, key).get(flag)
+                         for flag in ('ping_enabled', 'http_enabled',
+                                      'signal_enabled'))]
     if configured:
         cp.log('Failover is armed for slot(s) %s. A switch costs ~30s of '
                'downtime, so it only fires after a configured test fails '

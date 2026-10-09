@@ -82,6 +82,7 @@ entry there before acting on anything in this list.
 
 **IP Verify**
 - A test bound to a disconnected WAN reports `pass: false`, not "no result"
+- Disabling an identity leaves its stale `pass` in `status/ipverify` forever — track what you armed
 - `wan_trigger_field` has no `sim` option, and there is no HTTP test type
 - Identity `name` allows only `[a-zA-Z0-9_-]` — replace dots with underscores
 - Any write to IP Verify config restarts the poller and blanks every test's result

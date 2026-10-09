@@ -20,13 +20,22 @@ slot is no longer worth using", and it does three jobs:
 
 1. **Failover** - while the slot is connected, drop below it for
    `signal_fail_threshold` consecutive readings and the app moves away.
-2. **Tiebreak** - if the slot the app would move to has also breached,
-   neither slot is worth having, so a signal breach alone does not
-   switch; `priority` decides where traffic sits. That is what stops the
-   app bouncing between two weak slots.
+2. **Destination gate** - the app will not switch to a slot on signal
+   alone unless that slot *demonstrates* it clears its own threshold.
+   A slot reporting none of the metrics its threshold is set on fails
+   the gate: an unverifiable threshold is not a satisfied threshold, and
+   without that rule a slot with no coverage at all would look like an
+   improvement over a merely weak one. When neither slot clears its own
+   threshold there is no better place to be, so `priority` decides where
+   traffic sits. That is what stops the app bouncing between two weak
+   slots.
 3. **Failback gate** - with `signal_failback_enabled`, the app returns to
    a strictly higher priority slot once that slot comes back above its
    own threshold.
+
+Jobs 2 and 3 both read "no reading" as a reason *not* to move, while job
+1 reads it as a reason not to leave. That asymmetry is deliberate: the
+app acts on evidence in whichever direction keeps traffic where it is.
 
 The deliberate asymmetry is in what *can* be tested. Connectivity (ping
 and HTTP) is only measurable on the slot that is connected, while signal
@@ -47,6 +56,17 @@ That timer only exists on the slot the app would fail back *to*, which
 with two slots is the preferred one. Leaving the secondary moves traffic
 to the preferred slot, and nothing pulls it back off a higher-priority
 slot on its own, so the secondary has no return to hold off.
+
+The timer is also **overridden** the moment the slot carrying traffic
+fails its own connectivity tests. The holdoff is an argument about
+*uncertainty* - do not return to a slot whose link cannot be checked
+from standby - and that argument only stands while the current slot
+works. Once both slots have failed, waiting means parking traffic on a
+link known to be broken in order to avoid one merely unverified, so the
+app moves anyway. With neither SIM in service it will alternate roughly
+every settle + ~30s; that is the intended behavior, because it means
+whichever slot regains service first is picked up within a couple of
+minutes instead of after the full holdoff.
 """
 
 import threading
@@ -69,6 +89,19 @@ POLL_INTERVAL = 2
 # outage rather than the brief gap in the middle of a SIM switch.
 NO_ACTIVE_GRACE = 20
 
+# How often to check whether the stored config changed underneath the
+# app. Config is normally reloaded on the spot when the web UI saves it,
+# but appdata can also be edited from the router UI, pushed by an NCM
+# group, deleted outright, or written over REST - none of which call back
+# into the app. Without this poll the app would keep running the config
+# it read at startup and the web UI would keep showing it, which looks
+# exactly like the save silently failing.
+#
+# Only the raw appdata string is fetched for the comparison, and the
+# config is reparsed only when it actually differs, so this costs one
+# small read every interval.
+CONFIG_CHECK_INTERVAL = 10
+
 
 def _describe_failing(failing):
     """Render (metric, value_or_None, threshold) triples for a message.
@@ -87,9 +120,18 @@ class Monitor(object):
         self.lock = threading.RLock()
         # Lets a worker thread abandon its retry sleep on shutdown.
         self.stop_event = stop_event or threading.Event()
-        self.conf = appconfig.load()
+        # The raw appdata text the current config was parsed from, kept
+        # so an external change can be spotted by comparison rather than
+        # by reparsing and diffing the whole structure.
+        self._conf_raw = appconfig.read_raw() or ''
+        self.conf = appconfig.load_from(self._conf_raw)
+        self._last_conf_check = time.time()
         self.slots = {}
-        self.owned_tests = {}
+        # (slot_key, target) -> identity _id_ for the IP Verify tests
+        # confirmed enabled on the router. NOT every test the app owns -
+        # a disabled test's stale verdict lingers in status/ipverify, so
+        # results are only ever read for what is actually armed.
+        self.armed_tests = {}
         self.ping_results = {}
         self.http_results = {}
         self._http_running = set()
@@ -131,6 +173,16 @@ class Monitor(object):
                 del self.history[:len(self.history) - HISTORY_LIMIT]
         cp.log(text)
 
+    def _label(self, slot_key):
+        """Friendly label for a slot key, usable after the slot is gone.
+
+        dsds.slot_label() renders '? / ?' for an unknown slot, which is
+        worse than the key itself in a message about a slot that has been
+        removed, so fall back to the key when it is not discovered.
+        """
+        slot = self.slots.get(slot_key)
+        return dsds.slot_label(slot) if slot else str(slot_key)
+
     def _priority(self, slot_key):
         """Configured priority for a slot. Lower number = higher priority."""
         try:
@@ -165,11 +217,52 @@ class Monitor(object):
         return self._is_higher_priority(slot_key, sibling)
 
     def reload_config(self):
+        """Re-read config from appdata right now.
+
+        Called after the web UI saves. The raw text is kept alongside the
+        parsed config so _maybe_reload_config() does not then see its own
+        write as an external change and reload a second time.
+        """
+        raw = appconfig.read_raw()
         with self.lock:
-            self.conf = appconfig.load()
+            if raw is not None:
+                self._conf_raw = raw
+            self.conf = appconfig.load_from(self._conf_raw)
+            self._last_conf_check = time.time()
             # Force the next tick to re-push IP Verify config.
             self._reconcile_signature = None
         return self.conf
+
+    def _maybe_reload_config(self):
+        """Pick up a config change made outside the app.
+
+        Appdata can be edited from the router UI, pushed by an NCM group,
+        written over REST, or deleted - none of which tell the app. Only
+        the stored string is read here; the config is reparsed solely
+        when it differs, because reparsing also clears the IP Verify
+        signature and that forces a rewrite of the router's test config.
+        """
+        now = time.time()
+        if now - self._last_conf_check < CONFIG_CHECK_INTERVAL:
+            return
+        self._last_conf_check = now
+        raw = appconfig.read_raw()
+        # None means the read failed, which is not the same as "nothing
+        # is stored" - treating it as empty would drop every slot back to
+        # defaults over a transient error.
+        if raw is None or raw == self._conf_raw:
+            return
+        with self.lock:
+            self._conf_raw = raw
+            self.conf = appconfig.load_from(raw)
+            self._reconcile_signature = None
+        if raw.strip():
+            self.event('Configuration changed outside the web UI; reloaded '
+                       'from appdata')
+        else:
+            self.event('The %s appdata entry is gone, so every SIM slot is '
+                       'back on the app\'s built-in defaults'
+                       % appconfig.APPDATA_FIELD, 'warn')
 
     # -- evaluation ------------------------------------------------------
 
@@ -315,9 +408,14 @@ class Monitor(object):
         with self.lock:
             self.failback_hold_slot = slot_key
             self.failback_hold_until = time.time() + seconds
-        cp.log('Holding off failback to %s for %ds: the app left it because '
-               'its connectivity tests failed, and signal alone cannot tell '
-               'whether that is fixed' % (slot_key, seconds))
+        # An event, not just a log line: this is the one piece of state
+        # that can keep traffic on the secondary SIM for an hour, so it
+        # needs to be visible in the UI's Event Log, not only in the
+        # router's system log.
+        self.event('Holding off failback to %s for %ds: the app left it '
+                   'because its connectivity tests failed, and signal alone '
+                   'cannot tell whether that is fixed'
+                   % (self._label(slot_key), seconds))
 
     def _clear_failback_hold(self, why=None):
         with self.lock:
@@ -325,13 +423,27 @@ class Monitor(object):
             self.failback_hold_slot = None
             self.failback_hold_until = 0.0
         if held and why:
-            cp.log('Cleared the failback holdoff on %s: %s' % (held, why))
+            self.event('Cleared the failback holdoff on %s: %s'
+                       % (self._label(held), why))
 
     def _failback_hold_remaining(self, slot_key):
         """Seconds left before `slot_key` may be failed back to."""
         if self.failback_hold_slot != slot_key:
             return 0
         return max(0, int(self.failback_hold_until - time.time()))
+
+    # What an unreported metric means, per context. The two directions
+    # are not symmetric: the app will not leave a slot on a metric it
+    # cannot read, and will not move to one either, so the same missing
+    # reading is ignored in one context and decisive in the other.
+    _UNKNOWN_EFFECT = {
+        'failover': 'not counted as a breach, so it will not move the app '
+                    'off this slot',
+        'destination': 'so this slot cannot show it is any better, and the '
+                       'app will not switch to it on signal alone',
+        'failback': 'so this slot cannot show it has recovered, and the app '
+                    'will not fail back to it on signal alone',
+    }
 
     def _warn_unknown_metrics(self, key, metrics, context='failover'):
         for metric in metrics:
@@ -341,10 +453,11 @@ class Monitor(object):
             self._warned_metrics.add(token)
             slot = self.slots.get(key) or {}
             cp.log('%s: %s %s threshold configured but the slot is not '
-                   'reporting that metric (radio is %s) - ignoring it'
+                   'reporting that metric (radio is %s) - %s'
                    % (key, metric, context,
                       slot.get('service_detail') or slot.get('service_type')
-                      or 'unknown'))
+                      or 'unknown',
+                      self._UNKNOWN_EFFECT.get(context, 'ignoring it')))
 
     # -- switching -------------------------------------------------------
 
@@ -532,10 +645,10 @@ class Monitor(object):
             for key, entry in desired.items())))
 
         if signature != self._reconcile_signature:
-            owned, verified = verify.reconcile_ping_tests(desired, active_key)
-            if owned is not None:
+            armed, verified = verify.reconcile_ping_tests(desired, active_key)
+            if armed is not None:
                 with self.lock:
-                    self.owned_tests = owned
+                    self.armed_tests = armed
                 # Only cache the signature once the router confirms the
                 # writes landed. Caching an unapplied state would leave
                 # the standby slot's test armed forever, since nothing
@@ -552,15 +665,17 @@ class Monitor(object):
                         self.settle_until, time.time() + worst + 2)
         elif not desired:
             with self.lock:
-                self.owned_tests = {}
+                self.armed_tests = {}
 
-        if self.owned_tests:
-            results = verify.read_ping_results(self.owned_tests)
-            with self.lock:
-                self.ping_results = results
-        else:
-            with self.lock:
-                self.ping_results = {}
+        # armed_tests holds only the identities confirmed enabled on the
+        # router, which with DSDS is at most the connected slot's. The
+        # standby slot therefore gets no entry and reads as "no result" -
+        # necessary because the router leaves a disabled test's last
+        # verdict sitting in status/ipverify, so reading it would report
+        # a disconnected slot's ping as passing.
+        results = verify.read_ping_results(self.armed_tests)
+        with self.lock:
+            self.ping_results = results
 
     # -- memory guard ----------------------------------------------------
 
@@ -596,6 +711,10 @@ class Monitor(object):
     # -- main tick -------------------------------------------------------
 
     def tick(self):
+        # First, so an external config change is in effect for the rest
+        # of this tick rather than one poll later.
+        self._maybe_reload_config()
+
         slots = dsds.discover_slots()
         with self.lock:
             self.slots = slots
@@ -800,33 +919,71 @@ class Monitor(object):
         # consulted at all and the move always happens.
         must_move = conn_failed or not active.get('connected')
 
-        if not must_move:
+        # A forced move overrides a failback holdoff on the destination.
+        # The holdoff exists to stop the app returning to a slot whose
+        # *connectivity* it cannot judge from standby - but that argument
+        # only holds while the slot it is standing on still works. Once
+        # this slot has failed too, waiting buys nothing: the app would
+        # be sitting on a link it knows is broken to avoid one it merely
+        # cannot verify.
+        #
+        # Cleared here rather than relying on do_switch() clearing it on
+        # arrival, so the dashboard stops counting down the moment the
+        # decision is made instead of ~30 seconds later, and so the
+        # reason appears in the event log.
+        #
+        # This is what makes the app keep hunting when neither SIM has
+        # service. It will alternate roughly every settle + ~30s, which
+        # is deliberate: whichever slot regains service first is picked
+        # up within a couple of minutes, where honouring the holdoff
+        # could leave traffic parked on a dead slot for the full hour.
+        if must_move and self.failback_hold_slot == target_key:
+            self._clear_failback_hold(
+                'the app is now on %s and that slot has failed too, so '
+                'returning to a link it cannot verify beats staying on one '
+                'it knows is broken' % dsds.slot_label(active))
+
+        if not must_move and self._has_signal_test(target_cfg):
             # Signal-only degradation: the link still works, so a switch
             # has to be an improvement to be worth ~30s of downtime.
-            # Compared against the destination's OWN threshold, which is
-            # what lets the secondary slot be held to a lower bar.
-            breaches, unknown = self._signal_breaches(target, target_cfg)
-            if self._has_signal_test(target_cfg):
-                self._warn_unknown_metrics(target_key, unknown, 'destination')
-            if breaches:
-                # Neither slot is above its threshold, so there is no
-                # better place to be. Priority decides where traffic
-                # sits, which is what stops the app bouncing between two
-                # weak slots - every switch would otherwise look like an
-                # improvement from whichever slot it was standing on.
+            #
+            # The destination has to *demonstrate* it clears its own
+            # threshold, which is what lets the secondary slot be held to
+            # a different bar. Judged with _meets_threshold() rather than
+            # by looking for breaches, because a slot reporting NONE of
+            # the metrics its threshold is set on produces no breaches at
+            # all - so a breach test alone would read "no evidence" as
+            # "no problem" and switch to a slot with no signal whatsoever.
+            # An unverifiable threshold is not a satisfied threshold.
+            thresholds = target_cfg.get('signal_thresholds') or {}
+            ok, failing = self._meets_threshold(target, thresholds)
+            _, unknown = self._compare_signal(target, thresholds)
+            self._warn_unknown_metrics(target_key, unknown, 'destination')
+            if not ok:
+                # The destination is no better than where we are, so
+                # there is no better place to be. Priority decides where
+                # traffic sits, which is what stops the app bouncing
+                # between two weak slots - every switch would otherwise
+                # look like an improvement from whichever slot it was
+                # standing on.
+                measured = [f for f in failing if f[1] is not None]
+                if measured:
+                    detail = 'is below its own threshold too (%s)' \
+                        % _describe_failing(failing)
+                else:
+                    detail = 'is not reporting %s at all, so it cannot show ' \
+                        'it is any better' \
+                        % ', '.join(sorted(f[0] for f in failing))
                 if not self._is_higher_priority(target_key, active['key']):
                     self.status_text = \
-                        'on %s - %s, but %s is below its own threshold too ' \
-                        '(%s), so priority keeps traffic here' % (
-                            dsds.slot_label(active), reason,
-                            dsds.slot_label(target),
-                            _describe_failing(breaches))
+                        'on %s - %s, but %s %s; priority keeps traffic here' \
+                        % (dsds.slot_label(active), reason,
+                           dsds.slot_label(target), detail)
                     return
-                self.event('Both slots are below their signal thresholds (%s '
-                           'is at %s), so neither is worth having; moving '
-                           'from %s to the preferred %s'
-                           % (dsds.slot_label(target),
-                              _describe_failing(breaches),
+                self.event('Neither slot clears its signal threshold - %s %s '
+                           '- so neither is worth having; moving from %s to '
+                           'the preferred %s'
+                           % (dsds.slot_label(target), detail,
                               dsds.slot_label(active),
                               dsds.slot_label(target)), 'warn')
 

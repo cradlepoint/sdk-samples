@@ -14,13 +14,21 @@ choosing which *tests* are enabled, not which slots exist.
 Defaults are applied in code and never written back to appdata, because
 writing defaults would override a group config pushed from NCM.
 
-Most defaults are flat values in SLOT_DEFAULTS. `priority` is the one
-exception: it is derived from the slot's SIM number by
-default_priority(), so SIM 1 outranks SIM 2 without being configured.
-Use slot_defaults(slot_key) rather than copying SLOT_DEFAULTS directly.
+Most defaults are flat values in SLOT_DEFAULTS. Two are derived from the
+slot's SIM number instead, by default_priority() and
+default_signal_failback(), so SIM 1 outranks SIM 2 and is the slot the
+app returns to without either being configured. Always use
+slot_defaults(slot_key) rather than copying SLOT_DEFAULTS directly - it
+also deep-copies the mutable defaults, which a shallow dict() would
+share between every slot.
 
-All three tests (ping, HTTP, signal) are **off** by default. A slot with
-no test enabled can never produce a verdict, so the app will not move it.
+Ping and signal are **on** by default, because the out-of-the-box
+defaults are meant to be a working DSDS failover setup rather than an
+inert one: both slots ping 8.8.8.8, both carry a signal threshold, and
+SIM 1 returns to service when its signal recovers. HTTP stays off, since
+it has no sensible default URL. Turn a test off per slot to disable it;
+a slot with no test enabled can never produce a verdict, so the app will
+not move off it.
 
 Signal used to carry three threshold sets per slot and now carries one,
 `signal_thresholds`. A config written against any of the older layouts
@@ -63,7 +71,7 @@ SLOT_DEFAULTS = {
     # active slot, so it has time to finish registering and get a stable
     # route. A DSDS switch itself takes ~30s; this is the quiet period
     # *after* that.
-    'settle_seconds': 45,
+    'settle_seconds': 20,
 
     # How the ping verdict and the HTTP verdict combine.
     #   'all' - every enabled test type must pass (default). An HTTP test
@@ -73,8 +81,11 @@ SLOT_DEFAULTS = {
     'test_combine': 'all',
 
     # --- Ping test (run by the router's IP Verify subsystem) ---
-    'ping_enabled': False,
-    'ping_targets': [],
+    # On by default against a public resolver, so a fresh install
+    # actually verifies the link instead of sitting inert. Only the
+    # connected slot's test is ever armed.
+    'ping_enabled': True,
+    'ping_targets': ['8.8.8.8'],
     # 'all' = failed only when every target fails; 'any' = one is enough.
     'ping_fail_mode': 'all',
     'ping_interval': 10,
@@ -97,19 +108,46 @@ SLOT_DEFAULTS = {
     #   1. Failover - while this slot is connected, drop below it for
     #      signal_fail_threshold consecutive readings and the app moves
     #      away.
-    #   2. Tiebreak - when the connected slot has breached and this one
-    #      has too, neither slot is worth having, so the app does not
-    #      switch on signal alone; `priority` decides where traffic sits.
-    #      That is what stops it bouncing between two weak slots.
+    #   2. Destination gate - the app will not switch to this slot on
+    #      signal alone unless the slot DEMONSTRATES it clears this
+    #      threshold. A slot reporting none of these metrics fails the
+    #      gate, because an unverifiable threshold is not a satisfied
+    #      one. When neither slot clears its own threshold there is no
+    #      better place to be, so `priority` decides where traffic sits -
+    #      which is what stops the app bouncing between two weak slots.
     #   3. Failback gate - see signal_failback_enabled below.
     #
-    # Set the SECONDARY slot's threshold LOWER than the primary's.
-    # Equal numbers mean a weak-signal area breaches both at once, and
-    # rule 2 then pins traffic to the primary, so the secondary never
-    # gets used. A lower bar keeps it available exactly when the primary
-    # has become marginal.
-    'signal_enabled': False,
-    'signal_thresholds': {},
+    # Job 2 is why leaving this set EMPTY on the secondary slot is a bad
+    # idea: with no threshold there is nothing for the destination to
+    # demonstrate, so a signal failure on the primary moves traffic to
+    # the secondary unconditionally - even with no coverage there at all.
+    #
+    # The defaults are EQUAL on both slots, and that is deliberate. Both
+    # slots are then held to the same "is this usable" bar, so a signal
+    # failover only fires when the destination is genuinely usable. The
+    # case a lower secondary bar is meant to cover - a weak area that
+    # breaches both slots, where job 2 pins traffic to the primary and
+    # the secondary never gets used - is already covered by the ping
+    # test, which is on by default: a connectivity failure moves traffic
+    # without consulting the destination's signal at all.
+    #
+    # Lower the secondary's bar only if ping and HTTP are both off, so
+    # signal is the only test, and accept that the app may then move to a
+    # measurably weaker slot - each slot is compared against its own bar,
+    # never against the other slot's reading. Do not set it so low that
+    # it cannot be breached: RSRP below roughly -140 dBm is past what
+    # modems report, which makes the threshold equivalent to having none
+    # and brings back the problem in the paragraph above.
+    #
+    # The values are conventional "cell edge" numbers rather than ones
+    # tuned for any deployment: RSRP -100 dBm is the usual poor/very-poor
+    # boundary on LTE, and RSRP_5G -120 dBm is much lower because 5G NR
+    # stays usable well past where LTE RSRP would be written off. Both
+    # families are set because a slot reports only the ones its current
+    # radio technology uses, and a metric that is not reported is ignored
+    # for job 1 rather than failed.
+    'signal_enabled': True,
+    'signal_thresholds': {'RSRP': -100.0, 'RSRP_5G': -120.0},
     'signal_fail_threshold': 3,
 
     # Proactively return to this slot once its signal comes back above
@@ -122,6 +160,11 @@ SLOT_DEFAULTS = {
     #
     # Possible at all only because a DSDS modem keeps reporting live
     # diagnostics for the standby slot; there is no way to ping it.
+    #
+    # The value here is only the fallback. The real default is derived
+    # per slot by default_signal_failback(), which turns it on for SIM 1
+    # alone - the slot that is preferred by default, and so the only one
+    # the app would ever proactively return to.
     'signal_failback_enabled': False,
 
     # Seconds to wait before failing back to this slot after the app left
@@ -144,6 +187,12 @@ SLOT_DEFAULTS = {
     # connection. In those cases the signal threshold is a live, readable
     # measure of whether coming back is sensible, so a timer would only
     # delay a return that is already properly gated.
+    #
+    # Overridden outright once the slot carrying traffic fails its own
+    # connectivity tests. The wait is an argument about uncertainty, and
+    # it only stands while the current slot still works; with both slots
+    # failing, honouring it would park traffic on a link known to be
+    # broken to avoid one that is merely unverified.
     'failback_holdoff_seconds': 3600,
 
     # --- HTTP test (run by the app) ---
@@ -204,6 +253,23 @@ _LEGACY_THRESHOLD_KEYS = ('signal_failover_thresholds',
 _LEGACY_SIGNAL_ENABLED_KEYS = ('signal_failover_enabled',)
 
 
+def _sim_number(slot_key):
+    """SIM number from a slot key, or None if it cannot be read.
+
+    Slot keys look like '<port>|<sim>' ('int1|sim1'), so the number comes
+    off the trailing digits of the sim half.
+    """
+    if not isinstance(slot_key, str) or '|' not in slot_key:
+        return None
+    digits = ''.join(c for c in slot_key.rsplit('|', 1)[1] if c.isdigit())
+    if not digits:
+        return None
+    try:
+        return int(digits)
+    except (TypeError, ValueError):
+        return None
+
+
 def default_priority(slot_key):
     """Default priority for a slot, derived from its SIM number.
 
@@ -217,28 +283,45 @@ def default_priority(slot_key):
     expectation and the only default under which failback works without
     being configured first.
 
-    Slot keys look like '<port>|<sim>' ('int1|sim1'), so the number comes
-    off the trailing digits of the sim half. Anything unparseable falls
-    back to SLOT_DEFAULTS['priority'].
+    Anything unparseable falls back to SLOT_DEFAULTS['priority'].
     """
-    fallback = SLOT_DEFAULTS['priority']
-    if not isinstance(slot_key, str) or '|' not in slot_key:
-        return fallback
-    digits = ''.join(c for c in slot_key.rsplit('|', 1)[1] if c.isdigit())
-    if not digits:
-        return fallback
-    try:
-        low, high = _SLOT_BOUNDS['priority']
-        return max(low, min(high, int(digits)))
-    except (TypeError, ValueError):
-        return fallback
+    number = _sim_number(slot_key)
+    if number is None:
+        return SLOT_DEFAULTS['priority']
+    low, high = _SLOT_BOUNDS['priority']
+    return max(low, min(high, number))
+
+
+def default_signal_failback(slot_key):
+    """Whether signal failback is on by default for this slot.
+
+    True for SIM 1 only. Failback is read exclusively on the slot that
+    outranks its sibling, and SIM 1 is the slot default_priority() makes
+    preferred, so turning it on anywhere else would be a setting with no
+    effect. An unparseable key gets the flat default.
+    """
+    number = _sim_number(slot_key)
+    if number is None:
+        return SLOT_DEFAULTS['signal_failback_enabled']
+    return number == 1
 
 
 def slot_defaults(slot_key=None):
-    """A fresh defaults dict, with the per-slot priority applied."""
+    """A fresh defaults dict, with the SIM-derived defaults applied.
+
+    The list and dict defaults are copied, not referenced. A plain
+    dict(SLOT_DEFAULTS) is shallow, so every slot would share one
+    ping_targets list and one signal_thresholds dict - and
+    slot_config() hands this straight to the monitor and the web UI for
+    a slot that has never been configured.
+    """
     cfg = dict(SLOT_DEFAULTS)
+    cfg['ping_targets'] = list(SLOT_DEFAULTS['ping_targets'])
+    cfg['signal_thresholds'] = dict(SLOT_DEFAULTS['signal_thresholds'])
+    cfg['http_expect_status'] = list(SLOT_DEFAULTS['http_expect_status'])
     if slot_key is not None:
         cfg['priority'] = default_priority(slot_key)
+        cfg['signal_failback_enabled'] = default_signal_failback(slot_key)
     return cfg
 
 
@@ -282,19 +365,22 @@ def _clean_thresholds(raw):
 def _clean_slot(raw, slot_key=None):
     """Apply defaults and validation to one slot's config.
 
-    `slot_key` only selects the default priority for a slot that has
-    never had one stored; an explicit stored value always wins.
+    `slot_key` only selects the SIM-derived defaults for a slot that has
+    never had them stored; an explicit stored value always wins.
     """
     cfg = slot_defaults(slot_key)
     if not isinstance(raw, dict):
         return cfg
 
-    for key, default in SLOT_DEFAULTS.items():
+    for key in SLOT_DEFAULTS:
         if key not in raw:
             continue
         value = raw[key]
         if key in _SLOT_BOOL_KEYS:
-            cfg[key] = _as_bool(value, default)
+            # cfg[key], not `default`: signal_failback_enabled's default
+            # is derived from the SIM number, so the flat value would
+            # discard that for an unparseable stored value.
+            cfg[key] = _as_bool(value, cfg[key])
         elif key in _SLOT_BOUNDS:
             # Falls back to cfg[key], not `default`, so an unparseable
             # stored priority lands on this slot's own default rather
@@ -344,13 +430,24 @@ def _clean_slot(raw, slot_key=None):
 
     # One threshold set now, carried over from whichever of the older
     # split fields a stored config happens to use.
-    thresholds = _clean_thresholds(cfg.get('signal_thresholds'))
-    if not thresholds:
+    #
+    # Keyed on *presence* in `raw`, not on the cleaned set being empty.
+    # The default set is non-empty, so "cfg is empty" no longer means
+    # "nothing is stored" - testing that way would let the default mask
+    # a legacy config and skip the migration entirely. An explicitly
+    # stored empty set is also honoured, which is how clearing every
+    # metric in the UI turns the threshold off.
+    if 'signal_thresholds' in raw:
+        cfg['signal_thresholds'] = _clean_thresholds(raw['signal_thresholds'])
+    else:
+        migrated = None
         for legacy in _LEGACY_THRESHOLD_KEYS:
-            thresholds = _clean_thresholds(raw.get(legacy))
-            if thresholds:
-                break
-    cfg['signal_thresholds'] = thresholds
+            if legacy in raw:
+                migrated = _clean_thresholds(raw[legacy])
+                if migrated:
+                    break
+        if migrated is not None:
+            cfg['signal_thresholds'] = migrated
 
     # The enable flag is only migrated when the new one is absent
     # entirely, so an explicit `false` from a current client is not
@@ -365,20 +462,45 @@ def _clean_slot(raw, slot_key=None):
     return cfg
 
 
-def load():
-    """Read config from appdata, applying defaults for anything missing.
+def read_raw():
+    """The stored appdata string, or '' when there is nothing stored.
 
-    Returns {'slots': {slot_key: {...}}}.
+    Separate from load() so a caller can cheaply tell whether the config
+    *changed* without reparsing it. The monitor polls this so an edit
+    made outside the app - the appdata entry deleted from the router UI,
+    an NCM group push, a REST call - is picked up without a restart.
+
+    Returns None on a read error, which is NOT the same as '': deleting
+    the entry on the strength of a failed read, or reporting the config
+    as wiped because the socket hiccuped, would both be wrong.
     """
-    raw = {}
     try:
         value = cp.get_appdata(APPDATA_FIELD)
-        if value and isinstance(value, str) and value.strip():
-            raw = json.loads(value)
     except Exception as e:
-        cp.log('Could not parse %s appdata, using defaults: %s'
-               % (APPDATA_FIELD, e))
-        raw = {}
+        cp.log('Could not read %s appdata: %s' % (APPDATA_FIELD, e))
+        return None
+    if value is None:
+        # The field does not exist. Normal on a fresh install, and what
+        # is seen after the entry is deleted from the router.
+        return ''
+    return value if isinstance(value, str) else ''
+
+
+def load_from(raw_text):
+    """Parse a stored appdata string into config, applying defaults.
+
+    Returns {'slots': {slot_key: {...}}}. A slot missing from the result
+    is not unconfigured - slot_config() falls back to slot_defaults() for
+    anything not listed here.
+    """
+    raw = {}
+    if raw_text and raw_text.strip():
+        try:
+            raw = json.loads(raw_text)
+        except Exception as e:
+            cp.log('Could not parse %s appdata, using defaults: %s'
+                   % (APPDATA_FIELD, e))
+            raw = {}
     if not isinstance(raw, dict):
         raw = {}
 
@@ -388,6 +510,14 @@ def load():
         slots[key] = _clean_slot(value, key)
 
     return {'slots': slots}
+
+
+def load():
+    """Read config from appdata, applying defaults for anything missing.
+
+    Returns {'slots': {slot_key: {...}}}.
+    """
+    return load_from(read_raw() or '')
 
 
 def save(conf):

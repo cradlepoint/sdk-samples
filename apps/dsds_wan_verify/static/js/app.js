@@ -631,6 +631,24 @@
         });
     }
 
+    // --- folded-away explanation -----------------------------------
+
+    // The reasoning behind a group of settings, collapsed by default.
+    //
+    // These pages are dense with judgement calls - why both tests have
+    // to pass, why the secondary's threshold wants to be lower, what the
+    // failback holdoff is actually guarding against - and spelling all
+    // of that out inline pushed the settings themselves off the bottom
+    // of the screen. A native <details> keeps the text one click away
+    // with no extra JS and no state to preserve across a form rebuild,
+    // since it is closed on every render.
+    function why(title, bodyHtml) {
+        return '<details class="dwv-why">' +
+            '<summary><i class="fas fa-circle-question"></i> ' + title + '</summary>' +
+            '<div class="dwv-why-body">' + bodyHtml + '</div>' +
+        '</details>';
+    }
+
     // --- shared form field builders --------------------------------
 
     function fieldBuilder(slot) {
@@ -666,12 +684,7 @@
 
         var pingBody = '' +
             b.toggle('ping_enabled', 'Run a ping test on this slot') +
-            '<p class="dwv-hint">' +
-                'Performed by the router\'s IP Verify subsystem, bound to this slot\'s WAN device. ' +
-                'Only the connected slot\'s test is armed; the other slot\'s test is disabled so a ' +
-                'standby slot never reports a misleading failure.' +
-            '</p>' +
-            '<div class="form-field" style="margin-top:0.75rem">' +
+            '<div class="form-field" style="margin-top:0.5rem">' +
                 '<label for="' + b.id('ping_targets') + '">Targets (one per line, up to 8)</label>' +
                 '<textarea class="form-input" rows="3" id="' + b.id('ping_targets') + '" ' +
                     'data-slot="' + esc(key) + '" data-key="ping_targets" ' +
@@ -688,22 +701,45 @@
                 b.field('ping_interval', 'Interval (s)', 'number', 'min="1" max="3600"') +
                 b.field('ping_retry_count', 'Retries (0-5)', 'number', 'min="0" max="5"') +
                 b.field('ping_retry_interval', 'Retry interval (5-30s)', 'number', 'min="5" max="30"') +
-                b.field('ping_pkt_per_try', 'Packets per try', 'number', 'min="1" max="255"') +
-                b.field('ping_pkt_size', 'Packet size (&ge;36)', 'number', 'min="36" max="1500"') +
-                b.field('ping_pkt_timeout', 'Packet timeout (0.1s units)', 'number', 'min="1" max="255"') +
-            '</div>';
+            '</div>' +
+            // The three packet-mechanics fields are real IP Verify
+            // settings (config/ipverify/ping), but the router's own
+            // defaults suit almost every case, so they are folded away
+            // rather than competing with the fields that get changed.
+            why('Packet options', '' +
+                '<div class="dwv-form-grid">' +
+                    b.field('ping_pkt_per_try', 'Echo requests per attempt', 'number',
+                            'min="1" max="255"') +
+                    b.field('ping_pkt_size', 'Packet size, bytes (&ge;36)', 'number',
+                            'min="36" max="1500"') +
+                    b.field('ping_pkt_timeout', 'Per-packet timeout (tenths of a second)',
+                            'number', 'min="1" max="255"') +
+                '</div>' +
+                '<p class="dwv-hint">' +
+                    '<strong>Echo requests per attempt</strong> is IP Verify\'s own ' +
+                    '<code>pkt_per_try</code>: how many ICMP echo requests one attempt sends, ' +
+                    'where the attempt passes if any of them is answered. It is separate from ' +
+                    '<strong>Retries</strong>, which is how many further attempts IP Verify ' +
+                    'makes before it reports a failure. Leave it at 1 and let the retries do ' +
+                    'the work unless the path is lossy enough that single packets get dropped ' +
+                    'routinely.' +
+                '</p>' +
+                '<p class="dwv-hint">' +
+                    'Per-packet timeout is in <em>tenths of a second</em>, so 10 means 1.0s. ' +
+                    'Packet size has a hard floor of 36 bytes on the router.' +
+                '</p>') +
+            why('How the ping test is run', '' +
+                '<p class="dwv-hint">' +
+                    'Performed by the router\'s IP Verify subsystem, bound to this slot\'s WAN ' +
+                    'device, so the tests also show up under the router\'s own Connection ' +
+                    'Manager. Only the connected slot\'s test is armed &mdash; the standby ' +
+                    'slot\'s is disabled, because a test bound to a disconnected device reports ' +
+                    'a hard failure that is indistinguishable from a real outage.' +
+                '</p>');
 
         var httpBody = '' +
             b.toggle('http_enabled', 'Run an HTTP test on this slot') +
-            '<p class="dwv-hint">' +
-                'Performed by the app, with the socket\'s source address bound to this slot\'s WAN IP. ' +
-                'IP Verify has no HTTP test type, so this one is not visible in the router UI. ' +
-                'Only runs while this slot is connected. A failure is retried before it counts, so ' +
-                'worst case a verdict takes ' +
-                '<strong>(retries + 1) \u00d7 timeout + retries \u00d7 retry interval</strong> &mdash; ' +
-                'keep that under the interval.' +
-            '</p>' +
-            '<div class="dwv-form-grid" style="margin-top:0.75rem">' +
+            '<div class="dwv-form-grid" style="margin-top:0.5rem">' +
                 '<div class="form-field" style="grid-column:1/-1">' +
                     '<label for="' + b.id('http_url') + '">URL</label>' +
                     '<input type="text" class="form-input" id="' + b.id('http_url') + '" ' +
@@ -736,10 +772,42 @@
                     '<i class="fas fa-vial"></i> Test Now' +
                 '</button>' +
                 '<span class="dwv-inline-result" data-http-result="' + esc(key) + '"></span>' +
+            '</div>' +
+            why('How the HTTP test is run', '' +
+                '<p class="dwv-hint">' +
+                    'Performed by the app, with the socket\'s source address bound to this ' +
+                    'slot\'s WAN IP. IP Verify has no HTTP test type, so this one does not ' +
+                    'appear anywhere in the router UI. It runs only while this slot is ' +
+                    'connected.' +
+                '</p>' +
+                '<p class="dwv-hint">' +
+                    'A failure is retried before it counts, so the worst case for a verdict is ' +
+                    '<strong>(retries + 1) \u00d7 timeout + retries \u00d7 retry interval</strong>. ' +
+                    'Keep that under the interval or the next run starts while the last one is ' +
+                    'still going.' +
+                '</p>');
+
+        // The holdoff only delays a proactive failback *to* this slot,
+        // and only the preferred slot is ever a failback target. On the
+        // secondary the field is hidden rather than dimmed, since a
+        // visible-but-inert control is exactly what gets set and then
+        // trusted. It stays in the DOM so the stored value survives a
+        // save and reappears if the preferred SIM is switched over.
+        var holdoffField = '<div class="form-field' +
+            (preferred ? '' : ' is-gate-off') + '" data-gate="failback-holdoff">' +
+            '<label for="' + b.id('failback_holdoff_seconds') + '">' +
+                'Failback holdoff (s)</label>' +
+            '<input type="number" class="form-input" min="0" max="86400" ' +
+                'id="' + b.id('failback_holdoff_seconds') + '" ' +
+                'data-slot="' + esc(key) + '" data-key="failback_holdoff_seconds" ' +
+                'value="' + esc(cfg.failback_holdoff_seconds) + '">' +
             '</div>';
 
         return '' +
         '<div class="dwv-slot-form" data-test-form="' + esc(key) + '">' +
+            // One row, so every slot-level setting is on screen at once
+            // rather than separated by the paragraphs that used to
+            // explain them.
             '<div class="dwv-form-grid">' +
                 '<div class="form-field">' +
                     '<label for="' + b.id('test_combine') + '">Ping and HTTP together</label>' +
@@ -748,55 +816,52 @@
                         '<option value="any"' + (cfg.test_combine === 'any' ? ' selected' : '') + '>Either passing is enough</option>' +
                     '</select>' +
                 '</div>' +
-                b.field('settle_seconds', 'Settle time after this slot connects (s)', 'number', 'min="0" max="900"') +
+                b.field('settle_seconds', 'Settle time after connecting (s)', 'number',
+                        'min="0" max="900"') +
+                holdoffField +
             '</div>' +
-            '<p class="dwv-hint" style="margin-top:0">' +
-                'An HTTP test usually exists to catch what ping cannot &mdash; a captive portal, broken ' +
-                'DNS, or a path that drops everything except ICMP &mdash; so <em>Both must pass</em> is ' +
-                'the default. Choose <em>Either</em> when the endpoint is less reliable than the link ' +
-                'itself.' +
+            '<p class="dwv-hint" style="margin-top:0.5rem">' +
+                'A failing result is acted on immediately &mdash; each test retries internally ' +
+                'first' +
+                (preferred ? '.'
+                           : '. The secondary SIM has no failback holdoff.') +
             '</p>' +
-            '<p class="dwv-hint">' +
-                'Each test confirms its own failures through its own retries, so one failing result is ' +
-                'acted on straight away. <strong>Settle time</strong> is what stops the app bouncing ' +
-                'back: for that long after this slot connects, all of its results are ignored &mdash; ' +
-                'signal included &mdash; giving it time to register, get DNS, and settle its routes. The ' +
-                'switch itself takes about 30 seconds on top of this.' +
-            '</p>' +
-
-            // The holdoff delays a proactive failback *to* this slot, and
-            // only the preferred slot is ever a failback target. Hidden
-            // rather than dimmed on the secondary, but kept in the DOM so
-            // the stored value survives a save and comes back if the
-            // preferred SIM is switched over.
-            '<div class="dwv-subsection' + (preferred ? '' : ' is-gate-off') + '" ' +
-                 'data-gate="failback-holdoff">' +
-                '<div class="dwv-form-grid dwv-form-grid-narrow">' +
-                    b.field('failback_holdoff_seconds',
-                            'Failback holdoff after a connectivity failure (s)', 'number',
-                            'min="0" max="86400"') +
-                '</div>' +
-                '<p class="dwv-note">' +
-                    '<i class="fas fa-hourglass-half"></i> <strong>Failback holdoff</strong> covers the one ' +
-                    'flap a signal threshold cannot. If this slot has strong signal but a broken link, the ' +
-                    'app fails over, then immediately sees good signal here and comes back &mdash; and ' +
-                    'ping and HTTP cannot run on a standby slot to contradict that. So after leaving this ' +
-                    'slot on a <em>connectivity</em> failure, the app waits this long before returning to ' +
-                    'it. Set 0 to disable the wait.' +
+            why('Why these settings exist', '' +
+                '<p class="dwv-hint">' +
+                    '<strong>Both must pass</strong> is the default because an HTTP test is ' +
+                    'usually added to catch what ping cannot &mdash; a captive portal, broken ' +
+                    'DNS, or a path that drops everything except ICMP. Choose <em>Either</em> ' +
+                    'when the endpoint is less reliable than the link itself.' +
                 '</p>' +
                 '<p class="dwv-hint">' +
-                    'Deliberately not applied when the app left on low signal or a lost connection: signal ' +
-                    'is readable on a standby slot, so the threshold already decides whether coming back ' +
-                    'makes sense. <strong>Switch SIM Now</strong> on the dashboard clears an active hold.' +
+                    '<strong>Settle time</strong> is what stops the app bouncing straight back. ' +
+                    'For that long after this slot connects, every one of its results is ' +
+                    'ignored, signal included, giving it time to register, get DNS, and settle ' +
+                    'its routes. The switch itself costs about 30 seconds on top.' +
                 '</p>' +
-            '</div>' +
-            (preferred ? '' :
-                '<p class="dwv-note primary">' +
-                    '<i class="fas fa-circle-info"></i> There is no <strong>failback holdoff</strong> on ' +
-                    'this slot. It is the <strong>secondary</strong> SIM, and the app only fails back to ' +
-                    'the preferred one &mdash; leaving this slot puts traffic on the preferred SIM, which ' +
-                    'nothing moves off on its own, so there is no return to delay.' +
-                '</p>') +
+                (preferred
+                    ? '<p class="dwv-hint">' +
+                          '<strong>Failback holdoff</strong> covers the one flap a signal ' +
+                          'threshold cannot. A slot with strong signal but a broken link looks ' +
+                          'permanently ready to return to, and ping and HTTP cannot run on a ' +
+                          'standby slot to say otherwise &mdash; so without a wait the app ' +
+                          'would return, fail again, and leave again indefinitely. It applies ' +
+                          'only after a <em>connectivity</em> failure: when the app leaves on ' +
+                          'low signal or a lost connection, the threshold is live evidence that ' +
+                          'already gates the return. Set 0 to disable it.' +
+                      '</p>' +
+                      '<p class="dwv-hint">' +
+                          'The holdoff is overridden as soon as the other slot fails its own ' +
+                          'connectivity tests, since waiting would then park traffic on a link ' +
+                          'known to be broken to avoid one that is merely unverified. ' +
+                          '<strong>Switch SIM Now</strong> on the dashboard also clears it.' +
+                      '</p>'
+                    : '<p class="dwv-hint">' +
+                          'This is the <strong>secondary</strong> SIM, so it has no failback ' +
+                          'holdoff: leaving it puts traffic on the preferred slot, and nothing ' +
+                          'moves traffic off a higher-priority slot on its own, so there is no ' +
+                          'return to delay.' +
+                      '</p>')) +
 
             '<div class="dwv-collapse-stack">' +
                 collapseSection(key, 'ping', 'fa-satellite-dish', 'Ping Test', pingBody) +
@@ -813,73 +878,105 @@
 
         return '' +
         '<div class="dwv-slot-form" data-signal-form="' + esc(slot.key) + '">' +
-            b.toggle('signal_enabled', 'Use a signal threshold on this slot') +
+            // Both toggles on one row, with the threshold table directly
+            // under them, so the whole of this page's configuration is
+            // visible without scrolling. The reasoning sits in the
+            // collapsed block at the bottom.
+            '<div class="dwv-toggle-row">' +
+                b.toggle('signal_enabled', 'Use a signal threshold on this slot') +
+                // Only the preferred slot is ever a failback target, so
+                // on any other slot this is hidden rather than drawn as
+                // a setting with no effect. It stays in the DOM so the
+                // stored value survives a save and reappears if the
+                // preferred SIM is switched over.
+                '<span class="dwv-gate' + (preferred ? '' : ' is-gate-off') + '" ' +
+                      'data-gate="failback">' +
+                    b.toggle('signal_failback_enabled',
+                             'Return here when its signal recovers') +
+                '</span>' +
+                // On the same row as the toggles rather than in its own
+                // grid: it is a two-digit count, and a full-width row
+                // for it pushed two of the seven threshold rows off the
+                // bottom of a short window.
+                '<div class="dwv-inline-field">' +
+                    '<label for="' + b.id('signal_fail_threshold') + '" ' +
+                           'title="Consecutive readings below the threshold before the app ' +
+                                  'acts, at the ' + (state.pollInterval || 2) + 's poll rate">' +
+                        'Consecutive readings</label>' +
+                    '<input type="number" class="form-input" min="1" max="100" ' +
+                        'id="' + b.id('signal_fail_threshold') + '" ' +
+                        'data-slot="' + esc(slot.key) + '" data-key="signal_fail_threshold" ' +
+                        'value="' + esc(cfg.signal_fail_threshold) + '">' +
+                '</div>' +
+            '</div>' +
+            thresholdTable(slot, 'signal_thresholds', 'Threshold') +
             '<p class="dwv-hint">' +
-                'One threshold per slot, meaning <em>the level at which this slot is no longer ' +
-                'worth using</em>. The app reads it three ways, so the number only has to be ' +
-                'decided once:' +
+                'Blank means ignore that metric. A slot reports only the metrics its current ' +
+                'radio technology uses &mdash; 5G SA the 5G variants, LTE the LTE ones, 5G NSA ' +
+                'both &mdash; and anything <em>not reported</em> is ignored rather than failed, ' +
+                'so it is safe to set both families.' +
             '</p>' +
-            '<ul class="dwv-hint dwv-bullets">' +
-                '<li><strong>Leaving</strong> &mdash; while this slot is connected and drops ' +
-                    'below the threshold, the app moves off it.</li>' +
-                '<li><strong>Arriving</strong> &mdash; the app will not fail over <em>to</em> ' +
-                    'this slot on signal alone while it is below its own threshold.</li>' +
-                '<li><strong>Both weak</strong> &mdash; if neither slot is above its threshold ' +
-                    'there is no better place to be, so the app does not switch on signal and ' +
-                    'the <strong>Preferred SIM</strong> on the dashboard decides where traffic ' +
-                    'sits. That is what stops it bouncing between two weak slots.</li>' +
-            '</ul>' +
             '<p class="dwv-note' + (preferred ? '' : ' primary') + '">' +
                 '<i class="fas fa-circle-info"></i> ' +
                 (preferred
-                    ? 'This is the <strong>preferred</strong> SIM. Set the <em>other</em> slot\'s ' +
-                      'threshold lower than this one.'
-                    : 'This is the <strong>secondary</strong> SIM, so set its threshold ' +
-                      '<strong>lower</strong> than the preferred slot\'s.') +
-                ' Equal numbers mean a weak-signal area breaches both at once, and the ' +
-                'both-weak rule above then pins traffic to the preferred SIM &mdash; so the ' +
-                'secondary never gets used. A lower bar keeps it available exactly when the ' +
-                'preferred SIM has gone marginal.' +
+                    ? 'This is the <strong>preferred</strong> SIM.'
+                    : 'This is the <strong>secondary</strong> SIM.') +
+                ' Keep a threshold here even if you never want this slot left on signal ' +
+                'alone: it is also what the app checks <em>before</em> switching to this ' +
+                'slot. With it blank there is nothing to check, so a signal failure on the ' +
+                'other slot moves traffic here even with no coverage at all.' +
             '</p>' +
-            '<div class="dwv-form-grid dwv-form-grid-narrow">' +
-                b.field('signal_fail_threshold', 'Consecutive readings before acting', 'number',
-                        'min="1" max="100"') +
-            '</div>' +
-            '<p class="dwv-hint" style="margin-top:0">' +
-                'Signal has no retry concept of its own, so the reading count at the ' +
-                (state.pollInterval || 2) + 's poll rate is what keeps a single dip from ' +
-                'triggering a ~30 second switch. It applies when leaving a slot and when ' +
-                'failing back to one.' +
-            '</p>' +
-            '<p class="dwv-hint">' +
-                'Leave a metric blank to ignore it. Which metrics a slot reports depends on the ' +
-                'radio technology it is using right now: 5G SA reports only the 5G variants, LTE ' +
-                'only the LTE ones, and 5G NSA reports both. Metrics marked <em>not reported</em> ' +
-                'are ignored at runtime rather than treated as a failure, so set values on both ' +
-                'families if the slot can use either.' +
-            '</p>' +
-            thresholdTable(slot, 'signal_thresholds', 'Threshold') +
-
-            // Only the preferred slot is ever a failback target, so this
-            // is hidden rather than drawn as a setting with no effect.
-            // Kept in the DOM so the stored value survives a save and
-            // reappears if the preferred SIM is switched over.
-            '<div class="dwv-subsection' + (preferred ? '' : ' is-gate-off') + '" ' +
-                 'data-gate="failback">' +
-                b.toggle('signal_failback_enabled',
-                         'Return to this slot when its signal recovers') +
+            why('How the threshold is read', '' +
                 '<p class="dwv-hint">' +
-                    'With this on, the app switches back to this slot once it climbs above the ' +
-                    'threshold again, even though the slot carrying traffic is passing all of ' +
-                    'its own tests. Possible only because a DSDS modem keeps reporting live ' +
-                    'diagnostics for the standby slot &mdash; there is no way to ping it.' +
+                    'One number per slot, meaning <em>the level at which this slot is no longer ' +
+                    'worth using</em>, and the app reads it three ways:' +
+                '</p>' +
+                '<ul class="dwv-hint dwv-bullets">' +
+                    '<li><strong>Leaving</strong> &mdash; while this slot is connected and ' +
+                        'drops below the threshold, the app moves off it.</li>' +
+                    '<li><strong>Arriving</strong> &mdash; the app will not fail over ' +
+                        '<em>to</em> this slot on signal alone unless it <em>proves</em> it ' +
+                        'is above its own threshold. A slot reporting none of these metrics ' +
+                        'fails that check, so a slot with no coverage never looks like an ' +
+                        'improvement over a merely weak one.</li>' +
+                    '<li><strong>Both weak</strong> &mdash; if neither slot clears its own ' +
+                        'threshold there is no better place to be, so the app does not switch ' +
+                        'on signal and the <strong>Preferred SIM</strong> on the dashboard ' +
+                        'decides where traffic sits. That is what stops it bouncing between ' +
+                        'two weak slots.</li>' +
+                '</ul>' +
+                '<p class="dwv-hint">' +
+                    'The defaults are the same on both slots on purpose, so each is held to ' +
+                    'the same "is this usable" bar and a signal switch only happens when the ' +
+                    'destination is genuinely usable. A weak area that breaches both slots is ' +
+                    'handled by the <strong>ping test</strong> instead: a connectivity ' +
+                    'failure moves traffic without consulting the destination\'s signal at ' +
+                    'all. Only lower this slot\'s bar below the other\'s if ping and HTTP are ' +
+                    'both off, and accept that the app may then move to a measurably weaker ' +
+                    'slot &mdash; each slot is compared against its own bar, never against ' +
+                    'the other slot\'s reading.' +
                 '</p>' +
                 '<p class="dwv-hint">' +
-                    '<i class="fas fa-circle-info"></i> With it off, the app still returns here ' +
-                    'when the <em>other</em> slot fails; it just will not move on signal ' +
-                    'recovery alone.' +
+                    '<strong>Consecutive readings</strong> is the only retry signal has: at the ' +
+                    (state.pollInterval || 2) + 's poll rate it keeps a single dip from ' +
+                    'triggering a ~30 second switch. It applies both when leaving a slot and ' +
+                    'when failing back to one.' +
                 '</p>' +
-            '</div>' +
+                (preferred
+                    ? '<p class="dwv-hint">' +
+                          '<strong>Return here when its signal recovers</strong> switches back ' +
+                          'to this slot once it climbs above the threshold again, even while ' +
+                          'the slot carrying traffic is passing all of its own tests. That is ' +
+                          'possible only because a DSDS modem keeps reporting live diagnostics ' +
+                          'for the standby slot &mdash; there is no way to ping it. With it ' +
+                          'off, the app still returns here when the <em>other</em> slot fails; ' +
+                          'it just will not move on signal recovery alone.' +
+                      '</p>'
+                    : '<p class="dwv-hint">' +
+                          'Signal failback is not offered on the secondary SIM. The app only ' +
+                          'proactively returns to the preferred slot, so the option would have ' +
+                          'no effect here.' +
+                      '</p>')) +
         '</div>';
     }
 

@@ -95,14 +95,17 @@
                     </section>
 
                     <!-- ============ CONNECTIVITY TESTS (ping + HTTP) ============ -->
-                    <section class="element-section" id="tests">
+                    <!-- dwv-dense tightens the section spacing: this page has to fit a
+                         tab strip, a settings row and two test sections, and the design
+                         system's default heading margins pushed all of it off a short
+                         window. -->
+                    <section class="element-section dwv-dense" id="tests">
                         <h2 class="section-title">Connectivity Tests</h2>
+                        <!-- Kept to one line on purpose. The page's job is to show the
+                             settings; the reasoning behind them lives in the collapsed
+                             "why" blocks on each slot, and in full in the Help modal. -->
                         <p class="dwv-lead">
-                            Ping and HTTP checks, configured per SIM slot and off until you enable them.
-                            Both only run while that slot is the connected one &mdash; a DSDS modem can have
-                            only one slot online at a time, so there is no way to probe the standby slot.
-                            Signal is the only test that works on both slots; it lives on
-                            <strong>Signal Thresholds</strong>.
+                            Ping and HTTP checks per SIM slot, run only on the connected slot.
                         </p>
                         <div id="test-forms">
                             <div class="dwv-empty"><div class="spinner-circle"></div><p>Loading slots…</p></div>
@@ -119,14 +122,11 @@
                     </section>
 
                     <!-- ============ SIGNAL THRESHOLDS ============ -->
-                    <section class="element-section" id="signal">
+                    <section class="element-section dwv-dense" id="signal">
                         <h2 class="section-title">Signal Thresholds</h2>
                         <p class="dwv-lead">
-                            One threshold per SIM slot: <em>the level at which this slot is no longer worth
-                            using</em>. Signal is the only test that works on a <em>disconnected</em> slot,
-                            because a DSDS modem keeps reporting live diagnostics for the standby one, so the
-                            same number decides when to leave a slot and whether the other one is any better
-                            before paying ~30 seconds of downtime for a switch.
+                            Per SIM slot: <em>the level at which that slot is no longer worth
+                            using</em>. The only test that works on a disconnected slot.
                         </p>
                         <div id="signal-forms">
                             <div class="dwv-empty"><div class="spinner-circle"></div><p>Loading slots…</p></div>

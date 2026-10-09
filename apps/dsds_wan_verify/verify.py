@@ -15,6 +15,11 @@ ping that is enforced by enabling only the active slot's identity: a test
 bound to a *disconnected* device does not sit idle, it reports a hard
 `pass: false` that is indistinguishable from a real outage. For HTTP the
 app simply skips slots that are not connected.
+
+Disabling an identity stops the test running, but it does **not** clear
+the test's entry from `status/ipverify` - the last `pass` value stays
+there indefinitely. So the app tracks which identities it has armed and
+reads results only for those; see read_ping_results().
 """
 
 import http.client
@@ -129,15 +134,23 @@ def reconcile_ping_tests(desired, active_key):
     for slots whose ping test is enabled in app config.
 
     Only the identity for `active_key` is left enabled. Every other
-    managed identity is disabled, which removes its key from
-    status/ipverify entirely - that is what makes "the test only runs
-    while that SIM is connected" literally true, instead of the test
-    running and reporting a misleading failure.
+    managed identity is disabled, which stops it running - that is what
+    makes "the test only runs while that SIM is connected" literally
+    true, instead of the test running and reporting a misleading
+    failure.
 
-    Returns (owned, verified):
-      owned    - dict of (slot_key, target) -> identity _id_ for the
-                 tests this app owns, or None if the router config could
-                 not be read at all.
+    Returns (armed, verified):
+      armed    - dict of (slot_key, target) -> identity _id_ for the
+                 tests that are **confirmed enabled on the router**, and
+                 so actually running. None if the router config could not
+                 be read at all.
+
+                 Deliberately not "every test this app owns": disabling
+                 an identity does NOT remove its key from
+                 status/ipverify, it freezes the last verdict there (see
+                 read_ping_results), so the only safe way to tell a live
+                 result from a stale one is to know which identity is
+                 armed.
       verified - False when a write could not be confirmed, telling the
                  caller to try again rather than cache this state as
                  applied.
@@ -160,7 +173,7 @@ def reconcile_ping_tests(desired, active_key):
         for target in entry['targets']:
             wanted[identity_name(key, target)] = (key, target, entry)
 
-    owned = {}
+    armed = {}
     stale_identities = []
     stale_tests = []
     seen = set()
@@ -211,18 +224,25 @@ def reconcile_ping_tests(desired, active_key):
         # report success while applying nothing, and silently trusting it
         # here would leave the standby slot's test armed - which reads as
         # a hard failure and is indistinguishable from a real outage.
-        if identity.get('enabled') is not want_enabled:
+        #
+        # The read-back value is also what decides whether this test goes
+        # into `armed`, so a write that did not land makes the app ignore
+        # that test's results rather than act on them.
+        is_enabled = bool(identity.get('enabled'))
+        if is_enabled is not want_enabled:
             cp.put('config/identities/ipverify/%d/enabled' % idx, want_enabled)
-            readback = cp.get('config/identities/ipverify/%d/enabled' % idx)
-            if bool(readback) is not want_enabled:
+            readback = bool(cp.get('config/identities/ipverify/%d/enabled' % idx))
+            if readback is not want_enabled:
                 cp.log('Could not set %s enabled=%s (reads back as %r) - '
                        'will retry' % (name, want_enabled, readback))
                 verified = False
             else:
                 cp.log('IP Verify test %s %s' % (
                     name, 'armed' if want_enabled else 'disarmed'))
+            is_enabled = readback
 
-        owned[(key, target)] = identity.get('_id_')
+        if is_enabled:
+            armed[(key, target)] = identity.get('_id_')
 
     # Arrays shift on delete, so remove highest index first. Identities go
     # before the tests they point at.
@@ -236,14 +256,15 @@ def reconcile_ping_tests(desired, active_key):
     for name, (key, target, entry) in wanted.items():
         if name in seen:
             continue
+        want_enabled = (key == active_key)
         identity_id = _create_ping_test(
-            name, entry['slot'], target, entry['cfg'], key == active_key)
-        if identity_id:
-            owned[(key, target)] = identity_id
-        else:
+            name, entry['slot'], target, entry['cfg'], want_enabled)
+        if not identity_id:
             verified = False
+        elif want_enabled:
+            armed[(key, target)] = identity_id
 
-    return owned, verified
+    return armed, verified
 
 
 def _create_ping_test(name, slot, target, cfg, enabled):
@@ -303,16 +324,34 @@ def remove_all_managed():
         cp.log('Removed %d managed IP Verify test(s)' % len(drop_identities))
 
 
-def read_ping_results(owned):
-    """Read status/ipverify for this app's tests.
+def read_ping_results(armed):
+    """Read status/ipverify for the tests that are currently armed.
 
-    Returns slot_key -> {target: True|False|None}, where None means "no
-    result": either the identity is disabled (the key is absent from
-    status/ipverify entirely) or the router's poller has not produced a
-    verdict yet (`pass` is the empty string). Those two cases are both
-    "don't know", and neither may be counted as a failure.
+    `armed` must contain **only** identities confirmed enabled on the
+    router - what reconcile_ping_tests() returns. A disabled identity's
+    results are not read at all, and a slot with no armed test simply
+    does not appear in the output, which the callers read as "no result".
+
+    **Disabling an identity does NOT remove its key from
+    status/ipverify.** Verified on an R2400 running 7.25: the entry stays
+    and keeps the `pass` value from when the test last ran, frozen -
+    `{"pass": true}` on a SIM that has been on standby for an hour. It
+    loses its `name` field, which is the only visible difference, and
+    that is far too incidental to key behavior off.
+
+    So a key present in status/ipverify means nothing about whether the
+    test is running, and reading it for a disconnected DSDS slot reports
+    that slot's ping as passing when the slot cannot carry a packet. That
+    is why this takes the armed set rather than everything the app owns.
+
+    Returns slot_key -> {target: True|False|None}. None means the
+    router's poller has not produced a verdict yet (`pass` is the empty
+    string, typically just after a config write restarted it). That is
+    "don't know" and must never be counted as a failure.
     """
     out = {}
+    if not armed:
+        return out
     try:
         statuses = cp.get('status/ipverify') or {}
     except Exception as e:
@@ -321,7 +360,7 @@ def read_ping_results(owned):
     if not isinstance(statuses, dict):
         return out
 
-    for (key, target), identity_id in owned.items():
+    for (key, target), identity_id in armed.items():
         entry = statuses.get(identity_id)
         value = entry.get('pass') if isinstance(entry, dict) else None
         out.setdefault(key, {})[target] = value if isinstance(value, bool) else None
