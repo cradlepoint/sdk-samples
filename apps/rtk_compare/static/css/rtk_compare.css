@@ -1,0 +1,476 @@
+/* rtk_compare — app specific styles.
+   Supplements static/css/style.css (the template design system); it does not
+   replace any of it. Only tokens defined by style.css are used here. */
+
+/* ---- header identity (router name + NCOS version) ---- */
+.header-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.header-identity-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-identity-item i {
+    color: var(--primary-color);
+    opacity: 0.85;
+}
+
+.header-identity-sep {
+    opacity: 0.45;
+}
+
+@media (max-width: 900px) {
+    .header-identity {
+        display: none;
+    }
+}
+
+/* ---- page heading with actions ---- */
+.rtk-page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.rtk-page-head .section-title {
+    margin-bottom: 0;
+}
+
+.rtk-page-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* ---- banner ---- */
+.rtk-banner {
+    margin: 1rem 0 0;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--warning-color);
+    background: var(--chip-surface);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.rtk-banner.rtk-banner-error {
+    border-left-color: var(--danger-color);
+}
+
+/* ---- stat tiles ---- */
+.rtk-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+.rtk-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.85rem 1rem;
+    background: var(--card-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    min-width: 0;
+}
+
+.rtk-tile-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+/* The value and sub lines have reserved height and never wrap, so a tile
+   keeps the same size as its contents change once a second. Without this the
+   whole tile row resizes whenever a label gets longer or shorter. */
+.rtk-tile-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+    min-height: 1.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rtk-tile-sub {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    min-height: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rtk-tile.rtk-tile-accent {
+    border-left: 4px solid var(--primary-color);
+}
+
+/* ---- map ---- */
+.rtk-map-card {
+    background: var(--card-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.rtk-map-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0 0.25rem 0.6rem;
+}
+
+.rtk-map-toggles {
+    display: flex;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+}
+
+.rtk-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.rtk-check input {
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+.rtk-map-buttons {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.rtk-map-buttons .btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.rtk-map-buttons .rtk-toggle-on {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.rtk-map-wrap {
+    position: relative;
+    width: 100%;
+    height: 460px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--panel-surface);
+    border: 1px solid var(--border-color);
+}
+
+#rtk-map {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+}
+
+#rtk-map.rtk-dragging {
+    cursor: grabbing;
+}
+
+.rtk-map-scale,
+.rtk-map-readout,
+.rtk-map-attrib {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.82);
+    color: #1f2937;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+}
+
+body[data-theme="dark"] .rtk-map-scale,
+body[data-theme="dark"] .rtk-map-readout,
+body[data-theme="dark"] .rtk-map-attrib {
+    background: rgba(17, 24, 39, 0.8);
+    color: #e5e7eb;
+}
+
+.rtk-map-scale {
+    left: 0.6rem;
+    bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.rtk-map-scale-bar {
+    height: 4px;
+    width: 60px;
+    border: 1px solid currentColor;
+    border-top: none;
+}
+
+.rtk-map-readout {
+    left: 0.6rem;
+    top: 0.6rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.rtk-map-attrib {
+    right: 0.6rem;
+    bottom: 0.6rem;
+}
+
+/* ---- legend ---- */
+.rtk-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    padding: 0.7rem 0.25rem 0.1rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.rtk-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.rtk-legend-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.rtk-legend-dot.rtk-legend-pre {
+    border-radius: 2px;
+}
+
+.rtk-legend-item.rtk-legend-muted {
+    opacity: 0.45;
+}
+
+.rtk-legend-acc {
+    opacity: 0.65;
+    font-size: 0.72rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Pre-correction label: the legend's grey square plus plain text, used
+   instead of a quality-coloured badge because pre points are plotted in one
+   flat colour regardless of their GGA quality. */
+.rtk-pre-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
+/* ---- key/value blocks ---- */
+.rtk-kv {
+    display: flex;
+    flex-direction: column;
+}
+
+.rtk-kv-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px dashed var(--border-color);
+    font-size: 0.86rem;
+}
+
+.rtk-kv-row:last-child {
+    border-bottom: none;
+}
+
+.rtk-kv-row > span:first-child {
+    color: var(--text-secondary);
+    flex: 0 0 auto;
+}
+
+.rtk-kv-row > strong,
+.rtk-kv-row > code {
+    text-align: right;
+    word-break: break-all;
+    color: var(--text-primary);
+}
+
+.rtk-kv-row code {
+    font-size: 0.74rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---- tables ---- */
+.rtk-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.rtk-table-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.rtk-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.rtk-table th,
+.rtk-table td {
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.rtk-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--panel-surface);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    z-index: 1;
+}
+
+.rtk-table td.rtk-num {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.rtk-table tbody tr.rtk-row-selected {
+    background: var(--chip-surface);
+}
+
+/* ---- chips ---- */
+.rtk-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.rtk-chip {
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    background: var(--chip-surface);
+    border: 1px solid var(--border-color);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+}
+
+/* ---- quality badge + distribution bars ---- */
+.rtk-badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.rtk-dist-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr 5.5rem;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.25rem 0;
+    font-size: 0.8rem;
+}
+
+.rtk-dist-track {
+    height: 9px;
+    border-radius: 999px;
+    background: var(--chip-surface);
+    overflow: hidden;
+}
+
+.rtk-dist-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width var(--transition);
+}
+
+.rtk-dist-value {
+    text-align: right;
+    color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---- misc ---- */
+.rtk-grid-2 {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.rtk-span-2 {
+    grid-column: 1 / -1;
+}
+
+.rtk-empty {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.rtk-note {
+    margin-top: 0.6rem;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+}
+
+/* Always-present recording line: reserving its height stops the page from
+   shifting on the first poll when the filename arrives. */
+#recording-file-note {
+    margin: 0.75rem 0 0;
+    min-height: 1.1rem;
+}
+
+.rtk-ok {
+    color: var(--success-color);
+}
+
+.rtk-warn {
+    color: var(--warning-color);
+}
+
+.rtk-bad {
+    color: var(--danger-color);
+}
