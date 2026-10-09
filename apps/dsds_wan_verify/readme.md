@@ -210,22 +210,4 @@ switch. Keep the zone forward scoped to trusted networks.
   visible. This is why a connectivity-caused failover uses the failback holdoff.
 - **No switching when nothing is connected.** If both slots are down, NCOS drives recovery and
   the app waits.
-
----
-
-## Deploy
-
-```bash
-.venv/bin/python3 make.py deploy dsds_wan_verify     # Mac/Linux
-.venv\Scripts\python make.py deploy dsds_wan_verify  # Windows
-```
-
-## Local development
-
-```bash
-# From the repo's apps/ directory, so cp.py can find ../sdk_settings.ini
-.venv/bin/python3 dsds_wan_verify/dsds_wan_verify.py
-```
-
-The web UI binds to your machine's port 8000 while reading and writing the dev router over REST.
-HTTP tests fail locally; ping, discovery, config, and switching all work.
+g, and switching all work.
