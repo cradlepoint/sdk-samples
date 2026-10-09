@@ -97,34 +97,50 @@ See `dead_reckoning/` for a working usage example.
 
 ### RTK NMEA Source
 
-If RTK/NTRIP is configured, higher-accuracy NMEA data is available at:
+If RTK/NTRIP is configured, the higher-accuracy corrected GGA is available at:
 
 ```
-GET /api/status/rtk/ntrip/rtk_sentence
+GET /api/status/rtk/gnss/fix_sentence
 ```
 
 Returns a single GNGGA string (not an array):
 ```
-"$GNGGA,144817.000,3236.9529285,N,09653.9311163,W,2,6,1.82,207.161,M,-23.749,M,0003,0174*7E"
+"$GNGGA,152426.000,4340.3868042,N,11617.5251588,W,2,19,0.68,808.596,M,-18.584,M,0002,1607*40"
 ```
 
-Other useful fields in `status/rtk/ntrip/`:
-| Field | Type | Description |
-|-------|------|-------------|
-| `rtk_sentence` | string | Single GNGGA with RTK-corrected position |
-| `rtk_quality` | string | e.g. "RTK_DIFFERENTIAL" |
-| `connected` | boolean | NTRIP connection status |
-| `last_gga_reminder` | string | Last GGA sent to NTRIP caster |
-| `error_detail` | string | Connection error details if any |
+**The old flat `status/rtk/ntrip/*` and `status/rtk/rtcm_*` paths do not
+exist.** The tree is grouped into `correction_source`, `corrections`, `gnss`
+and `mqtt` — see **[rtk.md](rtk.md)** for every field, verified on an R2400
+running NCOS 7.26.81.
 
-Parent `status/rtk/` also has:
-| Field | Type | Description |
-|-------|------|-------------|
-| `enabled` | boolean | RTK feature enabled |
-| `mqtt_connected` | boolean | MQTT connection status |
-| `rtcm_dropped` | integer | Dropped RTCM messages |
-| `rtcm_queued` | integer | Queued RTCM messages |
-| `rtcm_total` | integer | Total RTCM messages received |
+Quick map from the old names to the current ones:
+
+| Old (does not exist) | Current |
+|---|---|
+| `status/rtk/ntrip/rtk_sentence` | `status/rtk/gnss/fix_sentence` |
+| `status/rtk/ntrip/rtk_quality` | `status/rtk/gnss/fix_quality` |
+| `status/rtk/ntrip/connected` | `status/rtk/correction_source/state` |
+| `status/rtk/ntrip/last_gga_reminder` | `status/rtk/correction_source/detail/last_gga_sent` |
+| `status/rtk/ntrip/error_detail` | `status/rtk/correction_source/error` |
+| `status/rtk/rtcm_total` | `status/rtk/corrections/frames_total` |
+| `status/rtk/rtcm_dropped` | `status/rtk/corrections/frames_dropped` |
+| `status/rtk/rtcm_queued` | `status/rtk/corrections/frames_queued` |
+| `status/rtk/mqtt_connected` | `status/rtk/mqtt/connected` |
+
+#### Pre-correction vs corrected position
+
+`status/gps/fix`, `status/gps/nmea` and `status/rtk/gnss` all carry the
+**RTK-corrected** position. The only place the **uncorrected** modem GNSS
+solution is exposed is the per-device subtree:
+
+```
+status/gps/devices/{mdm_uid}/nmea   -> $GPGGA with quality 1 (autonomous)
+status/rtk/gnss/fix_sentence        -> $GNGGA with quality 2 / 4 / 5 (RTK)
+```
+
+Both update at 1 Hz. Discover `{mdm_uid}` at runtime: several entries can exist
+under `status/gps/devices` and the non-GNSS ones are `{}`. See
+`apps/rtk_compare/` for a working comparison app.
 
 ### Proprietary NMEA Sentences
 

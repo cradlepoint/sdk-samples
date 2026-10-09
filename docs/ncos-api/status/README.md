@@ -13,6 +13,7 @@ Runtime status information. **Not persisted** to NVRAM; created at runtime by ro
 | status/hotspot | [hotspot.md](hotspot.md) |
 | status/firewall | [firewall.md](firewall.md) |
 | status/gps | [gps.md](gps.md) |
+| status/rtk | [rtk.md](rtk.md) |
 | status/container | [container.md](container.md) |
 | status/ecm | [ecm.md](ecm.md) |
 | status/apdisc | [apdisc.md](apdisc.md) ⚠ |

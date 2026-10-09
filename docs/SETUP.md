@@ -111,11 +111,16 @@ What API endpoints does #Mobile_Site_Survey use?
 
 ## Workflow Commands
 
+Type `/` in chat to see these, or just say the word.
+
 | Command | Description |
 |---------|-------------|
-| **deploy** | Deploy app to router using `make.py deploy` |
-| **learn** | Update rules/docs based on what was learned |
-| **rtfm** | Verify API paths/fields with curl before coding |
+| `/deploy` | Deploy app to router using `make.py deploy`, then verify it started |
+| `/rtfm` | Verify API paths/fields against docs, DTD, and the live router before coding |
+| `/learn` | Update rules/docs based on what was learned |
+| `/setup` | Rebuild `.venv`, set router credentials, check Developer Mode |
+
+All four accept an argument, e.g. `/deploy my_app` or `/rtfm status/wan/devices`.
 
 ## Troubleshooting
 
