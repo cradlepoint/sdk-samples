@@ -16,7 +16,7 @@ not appear unless a binary is present. As shipped that means **Netperf** and
 |---|---|---|
 | **Ookla** | your own licensed binary | There is **no Ookla license for SDK apps**, so no binary is bundled or distributed with this app and it is never required. If you have your own license, add `ookla`, `speedtest` or `speedtest-cli` to the app directory before packaging; it then appears in the dropdown and becomes the default. The only engine that produces a results image URL. Pinned to each WAN with `-i <wan_ip>`. |
 | **Netperf** | nothing | Built into NCOS and driven through `cp.speed_test()`, with latency and jitter from netperf's own TCP_RR test. No server, no binary, no configuration. Pinned to each WAN through its `ifc_wan` option, so **no source routing is added to the router config**. netperf cannot run concurrent tests — it is a single shared router resource — so modems are measured one at a time and a multi-modem survey takes proportionally longer. |
-| **iPerf3** | your own iperf3 server | Uses the bundled `iperf3-arm64v8` binary. Pinned to each WAN with `-B <wan_ip>` plus `--bind-dev <iface>`, falling back to `-B` alone where `--bind-dev` is not permitted. The only engine whose test parameters are configurable — see **iPerf3 test options** below. Latency and jitter are derived from the TCP round-trip stats iperf3 reports for the sending side. |
+| **iPerf3** | your own iperf3 server | Uses the bundled `iperf3-arm64v8` binary. Pinned to each WAN with `-B <wan_ip>` plus `--bind-dev <iface>`, falling back to `-B` alone where `--bind-dev` is not permitted. The only engine whose test parameters are configurable — see **iPerf3 test options** below. Latency is measured by pinging the iperf3 server before the transfer starts, and jitter from the spread of those pings. |
 
 **iPerf3 test options** — selecting the iPerf3 engine reveals a **Test Options**
 group. Each field maps to one iperf3 flag and is passed straight through to the
@@ -39,10 +39,11 @@ logged and ignored rather than breaking the test.
 
 Sizes accept a plain byte count or a `K`, `M` or `G` suffix, matching iperf3.
 
-**iPerf3 and UDP** — UDP changes what can be measured. There are no TCP
-round-trip stats, so **Latency is left empty**, but iperf3 reports jitter and
-datagram loss directly and those are used instead: jitter lands in the `Jitter`
-column and loss is written to the router log per test. Throughput is taken from
+**iPerf3 and UDP** — UDP changes what can be measured. `Latency` is unaffected,
+coming from the pre-transfer ping either way. iperf3 reports datagram jitter and
+loss directly, and the jitter it measures is used in place of the ping spread:
+jitter lands in the `Jitter` column and loss is written to the router log per
+test. Throughput is taken from
 the receiving side in both directions, so it reflects datagrams that actually
 arrived. One thing to watch: **iperf3 caps an unrestricted UDP test at
 1 Mbit/s**, which reads as a terrible link rather than a missing setting, so set
@@ -195,12 +196,20 @@ change stays interpretable. `Server` is the target that was measured against —
 `host:port` for iPerf3, the selected server for Ookla, and **blank for netperf**,
 which picks its own server internally. Neither field is sent to `server_url`.
 
-`Latency` and `Jitter` are both in milliseconds, and every engine measures them
-itself: netperf from a TCP_RR test (`RT_LATENCY` and `STDDEV_LATENCY`), Ookla
-from its ping stage, iPerf3 from the TCP round-trip times it reports for the
-sending side. A cell is left empty if the engine could not measure it — most
-often with **iPerf3 over UDP**, which has no round-trip stats, so `Latency` is
-blank while `Jitter` is still filled in from UDP's own measurement.
+`Latency` and `Jitter` are both in milliseconds. **`Latency` is always an idle
+measurement**, taken on a quiet link rather than during the transfer: netperf
+from its TCP_RR test (`RT_LATENCY` and `STDDEV_LATENCY`), which runs after the
+throughput runs, Ookla from its ping stage, and iPerf3 from a short ping to the
+iperf3 server before any data moves. A cell is left empty if the engine could not
+measure it.
+
+iperf3 also reports round-trip times sampled from its own sending socket *while*
+it is saturating the link. Those are **not** used for `Latency`. They typically
+run several times higher — a link that pings at 12 ms often reports around 90 ms
+— because they include the queueing delay the test itself causes. That gap is
+bufferbloat rather than the latency of the path, so it is written to the router
+log alongside the idle figure and left out of the CSV.
+
 `Results Image` is only populated by the Ookla engine.
 
 The payload sent to `server_url` is unchanged from v3.2 — jitter is a

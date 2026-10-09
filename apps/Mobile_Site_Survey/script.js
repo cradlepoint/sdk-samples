@@ -162,6 +162,7 @@ class MobileSiteSurvey {
             const config = await response.json();
             this.populateForm(config);
             this.updateResults(config.results);
+            this.updateTestStats(config);
             this.updateTotalDataUsed(config.total_data_used_mb);
             this.showToast('Configuration loaded successfully', 'success');
         } catch (error) {
@@ -308,20 +309,18 @@ class MobileSiteSurvey {
         if (results && results !== this.lastResults) {
             document.getElementById('results').value = results;
             this.lastResults = results;
-            
-            // Update test count and last test time
-            this.updateTestStats(results);
         }
     }
 
-    updateTestStats(results) {
-        if (results) {
-            // Count test runs by looking for timestamp patterns
-            const testMatches = results.match(/\d{1,2}:\d{2}:\d{2}\s+\d{1,2}\/\d{1,2}\/\d{4}/g);
-            if (testMatches) {
-                this.testCount = testMatches.length;
-                this.lastTestTime = testMatches[testMatches.length - 1];
-            }
+    updateTestStats(config) {
+        // Both values come from the backend. Counting timestamps in the results
+        // text does not work: that panel is a capped, newest-first buffer, so the
+        // count stops climbing once it fills and its trailing timestamp is the
+        // oldest retained entry rather than the latest test.
+        if (config && typeof config.test_count === 'number') {
+            this.testCount = config.test_count;
+            // Null after a clear, so this follows the backend down as well as up.
+            this.lastTestTime = config.last_test_time || null;
         }
 
         document.getElementById('test-count').textContent = this.testCount;
@@ -400,7 +399,7 @@ class MobileSiteSurvey {
             this.lastResults = '';
             this.testCount = 0;
             this.lastTestTime = null;
-            this.updateTestStats('');
+            this.updateTestStats(null);
             
             this.showToast('Results cleared successfully', 'success');
         } catch (error) {
@@ -481,6 +480,7 @@ class MobileSiteSurvey {
 
             const config = await response.json();
             this.updateResults(config.results);
+            this.updateTestStats(config);
             this.updateStatusIndicators();
             this.updateSurveyStatus(config);
             this.updateTotalDataUsed(config.total_data_used_mb);

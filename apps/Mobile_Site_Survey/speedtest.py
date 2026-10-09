@@ -28,11 +28,25 @@ never the default because only the user can supply its server address:
            Pinned to a WAN with "-B <source_ip>" plus "--bind-dev <iface>" (the
            pattern used by the speedtest_web app), falling back to "-B" alone
            where --bind-dev is not permitted. Note -B needs an IP address, not
-           an interface name. Latency and jitter are derived from the TCP
-           round-trip stats iperf3 reports for the sending side.
+           an interface name. Latency comes from the caller's latency_probe,
+           pinged against the iperf3 server before any data moves, and jitter
+           from the spread of those same pings (or, for UDP, from iperf3's own
+           datagram jitter).
 
 Every engine measures its own latency and jitter. They are left as None only
 when the engine could not measure them.
+
+LATENCY IS AN IDLE MEASUREMENT
+
+    Every engine reports latency measured on a quiet link, before or apart from
+    the transfer: iPerf3 uses the pre-transfer ping, netperf its TCP_RR test,
+    which runs after the throughput runs, and Ookla its ping stage.
+
+    iperf3 also reports TCP round-trip times sampled from the sending socket
+    *while* it is saturating the link. Those run several times higher - a link
+    that pings at 12 ms typically reports around 90 ms - because they include the
+    queueing delay the test itself causes. That is bufferbloat, not the latency
+    of the path, so it is logged for reference and never reported as the latency.
 
 USAGE:
     import speedtest
@@ -67,11 +81,12 @@ IPERF3 TEST OPTIONS:
       no_delay       disable Nagle (TCP)     -N
       zero_copy      sendfile() (TCP)        -Z
 
-    UDP changes what can be measured. There are no TCP round-trip stats, so
-    latency comes back None, but iperf3 reports jitter and datagram loss
-    directly and those are used instead. iperf3 also caps an unrestricted UDP
-    test at 1 Mbit/s, so a bandwidth target is effectively required for UDP -
-    configure() logs a warning when one is missing.
+    UDP changes what can be measured. Latency is unaffected, coming from the
+    ping either way, but there are no TCP round-trip stats so no saturated
+    reading is logged. iperf3 reports datagram jitter and loss directly, and the
+    jitter it measures is used in place of the ping spread. iperf3 also caps an
+    unrestricted UDP test at 1 Mbit/s, so a bandwidth target is effectively
+    required for UDP - configure() logs a warning when one is missing.
 """
 
 import cp
@@ -615,33 +630,35 @@ def _to_float(value):
         return None
 
 
-def _iperf3_rtt(data):
-    """Derive (latency_ms, jitter_ms) from an iperf3 TCP result.
+def _iperf3_saturated_rtt(data):
+    """Mean round-trip time, in ms, measured while the transfer filled the link.
 
-    iperf3 only reports TCP round-trip times for the sending side, so this is
-    populated by the upload run and is absent on platforms where iperf3 cannot
-    read tcp_info. Jitter is approximated as (max_rtt - min_rtt) / 2, matching
-    how the netperf engine in the speedtest_web app approximates it.
+    From the TCP_INFO mean_rtt iperf3 reports for the sending socket, so it is
+    only available on the upload run and only where the platform lets iperf3 read
+    tcp_info.
+
+    This is NOT the reported latency. It is sampled while the test is saturating
+    the link, so it includes the queueing delay the test itself causes and runs
+    several times higher than the idle path - a link that pings at 12 ms
+    typically reports around 90 ms here. That gap is bufferbloat, which is worth
+    logging but is not what "latency" means on a site survey. The reported figure
+    comes from the pre-transfer ping instead.
     """
     streams = ((data or {}).get('end') or {}).get('streams') or []
-    means, mins, maxes = [], [], []
+    means = []
     for stream in streams:
         if not isinstance(stream, dict):
             continue
         sender = stream.get('sender') or {}
-        for key, bucket in (('mean_rtt', means), ('min_rtt', mins),
-                            ('max_rtt', maxes)):
-            try:
-                value = float(sender.get(key))
-            except (TypeError, ValueError):
-                continue
-            if value > 0:
-                bucket.append(value)
-    latency = sum(means) / len(means) / 1000.0 if means else None
-    jitter = None
-    if mins and maxes:
-        jitter = (max(maxes) - min(mins)) / 2 / 1000.0
-    return latency, jitter
+        try:
+            value = float(sender.get('mean_rtt'))
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            means.append(value)
+    if not means:
+        return None
+    return sum(means) / len(means) / 1000.0
 
 
 # =============================================================================
@@ -659,11 +676,16 @@ class Speedtest:
             results when the control tree does not report a results path.
         duration: Seconds per direction. Leave unset to let iPerf3 use its
             configured duration; the other engines always use DEFAULT_DURATION.
+        latency_probe: Callable taking a hostname and returning a dict with
+            'avg', 'min', 'max' and 'loss', used by the iPerf3 engine to measure
+            latency on an idle link before the transfer. Without it the iPerf3
+            engine reports no latency, because its only other source is the
+            round-trip time under load, which is not the same measurement.
     """
 
     def __init__(self, config=None, source_address=None, interface='', device='',
                  timeout=None, duration=None, secure=False,
-                 shutdown_event=None):
+                 shutdown_event=None, latency_probe=None):
         self.config = config or {}
         self._source_address = source_address
         self._interface = interface or ''
@@ -675,6 +697,13 @@ class Speedtest:
         self._timeout = timeout
         self._secure = secure
         self._shutdown_event = shutdown_event
+        self._latency_probe = latency_probe
+        # Kept on the instance so a caller can still read the probe when the
+        # transfer itself fails. The probe runs before any data moves, so its
+        # result is valid even when nothing transferred.
+        self.probe_stats = {}
+        self.probed_latency = None
+        self.probed_jitter = None
         self.results = None
         self.closest = []
         self.engine = get_engine()
@@ -882,6 +911,12 @@ class Speedtest:
         # parameters even if the user saves new settings mid-survey.
         options = get_iperf3_options()
 
+        # Latency is measured here, before any transfer starts, so it reflects the
+        # idle path. Probing once for the whole port walk keeps it that way: a
+        # retry on the next port would otherwise be pinged after the previous
+        # attempt had already put traffic on the link.
+        ping_stats = self._probe_latency(server)
+
         tried = set()
         last_error = 'no port was attempted'
         for _ in range(port_end - port_start + 1):
@@ -891,7 +926,8 @@ class Speedtest:
             tried.add(port)
             try:
                 results, error = self._iperf3_on_port(binary, server, port,
-                                                      options)
+                                                      options,
+                                                      ping_stats=ping_stats)
             finally:
                 _release_port(port)
             if results:
@@ -910,7 +946,34 @@ class Speedtest:
         raise Exception(f'iPerf3 failed on every port in {port_start}-{port_end} '
                         f'for {server}: {last_error}')
 
-    def _iperf3_on_port(self, binary, server, port, options):
+    def _probe_latency(self, server):
+        """Ping the iPerf3 server before the transfer. Returns the probe dict.
+
+        The caller supplies the probe, so the app's existing ping code is reused
+        rather than duplicated here. A missing or failing probe yields an empty
+        dict, which leaves latency blank - deliberately, because the alternative
+        is iperf3's round-trip time measured under load, and that answers a
+        different question.
+        """
+        if not self._latency_probe:
+            cp.log('No latency probe supplied - iPerf3 will report no latency')
+            return {}
+        try:
+            stats = self._latency_probe(server) or {}
+        except Exception as e:
+            cp.log(f'Exception probing latency to {server}: {e}')
+            return {}
+        self.probe_stats = dict(stats)
+        average = stats.get('avg')
+        minimum, maximum = stats.get('min'), stats.get('max')
+        if average is not None:
+            cp.log(f'Latency to {server}: {average} ms (idle, before transfer)')
+        self.probed_latency = average
+        if minimum is not None and maximum is not None:
+            self.probed_jitter = round((maximum - minimum) / 2, 1)
+        return self.probe_stats
+
+    def _iperf3_on_port(self, binary, server, port, options, ping_stats=None):
         """Run download then upload on one port.
 
         Returns (results, error). results is None when the port produced no
@@ -918,10 +981,22 @@ class Speedtest:
         """
         download_bps, upload_bps = 0, 0
         bytes_received, bytes_sent = 0, 0
-        latency, jitter = None, None
         error = None
         udp = options['protocol'] == PROTOCOL_UDP
         down_stats, up_stats = {}, {}
+
+        # Latency always comes from the pre-transfer ping. iperf3's own RTT is
+        # measured under load and is only logged, never reported as the latency.
+        probe = ping_stats or {}
+        latency = probe.get('avg')
+        ping_min, ping_max = probe.get('min'), probe.get('max')
+        saturated_latency = None
+        # TCP has no jitter measurement of its own, so the spread of those same
+        # pings stands in for it. UDP overwrites this below with the datagram
+        # jitter iperf3 measures directly, which is a truer figure.
+        jitter = None
+        if ping_min is not None and ping_max is not None:
+            jitter = round((ping_max - ping_min) / 2, 1)
 
         # Download first: reverse mode, the server sends to us.
         download, error = self._iperf3_direction(binary, server, port, options,
@@ -951,25 +1026,45 @@ class Speedtest:
                                            'sum_sent')
             else:
                 up_stats = sent
-                # RTT stats are only reported for the sending side, so the
-                # upload run is where latency and jitter come from.
-                latency, jitter = _iperf3_rtt(upload)
+                # The upload run is where the router is the sender, so its own
+                # kernel measured the RTT while filling the uplink. That is the
+                # saturated reading; fall back to the download run only if the
+                # upload reported nothing.
+                saturated_latency = _iperf3_saturated_rtt(upload)
+                if saturated_latency is None:
+                    saturated_latency = _iperf3_saturated_rtt(download)
             upload_bps = int(up_stats.get('bits_per_second') or 0)
         else:
             error = upload_error
             cp.log(f'iPerf3 upload failed on {server}:{port}: {upload_error}')
 
         if udp:
-            # UDP carries no TCP round-trip stats, so latency stays None, but
-            # iperf3 measures jitter directly. The download figure is measured
-            # locally by this client, so prefer it over the server's report.
-            jitter = _to_float(down_stats.get('jitter_ms'))
-            if jitter is None:
-                jitter = _to_float(up_stats.get('jitter_ms'))
+            # iperf3 measures UDP datagram jitter directly, which beats the ping
+            # spread used for TCP, so it wins where available. The download
+            # figure is measured locally by this client, so prefer it over the
+            # server's report. Latency still comes from the ping.
+            udp_jitter = _to_float(down_stats.get('jitter_ms'))
+            if udp_jitter is None:
+                udp_jitter = _to_float(up_stats.get('jitter_ms'))
+            if udp_jitter is not None:
+                jitter = udp_jitter
             self._log_udp_loss(server, port, down_stats, up_stats)
 
         if not download_bps and not upload_bps:
             return None, error or 'no data transferred'
+
+        # Logged, not reported. The gap between the two is bufferbloat, which is
+        # useful to see in the log without changing what the Latency column means.
+        if saturated_latency is not None:
+            saturated_latency = round(saturated_latency, 1)
+            if latency is not None:
+                cp.log(f'Latency to {server}: {latency} ms idle, '
+                       f'{saturated_latency} ms saturated '
+                       f'(+{round(saturated_latency - latency, 1)} ms of '
+                       f'queueing under load)')
+            else:
+                cp.log(f'Latency to {server}: {saturated_latency} ms saturated '
+                       f'(no idle ping available, so not reported)')
 
         self.results = SpeedtestResults(
             download=download_bps, upload=upload_bps, ping=latency, jitter=jitter,
