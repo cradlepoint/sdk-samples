@@ -82,6 +82,12 @@ def add_history_entry(opts, summary):
 def build_client_command(binary, opts):
     """Build iperf3 client command from options."""
     cmd = [binary, '-c', opts['host'], '-J']
+    # Force IPv4 unless the target is an IPv6 literal. iperf3 resolves both A
+    # and AAAA and prefers IPv6; a router WAN that hands out an IPv6 address
+    # and default route but does not actually pass IPv6 traffic (seen on
+    # cellular) makes the connect hang silently until the test times out.
+    if ':' not in opts['host']:
+        cmd.append('-4')
     if opts.get('port') and opts['port'] != 5201:
         cmd += ['-p', str(opts['port'])]
     if opts.get('protocol') == 'udp':
@@ -267,27 +273,30 @@ def run_test(opts):
             with output_lock:
                 current_output += '\nServer stopped.\n'
         else:
-            # Client mode: collect all output, parse JSON at end
-            stdout_data = b''
-            while True:
-                line = proc.stdout.readline()
-                if not line and proc.poll() is not None:
-                    break
-                if line:
-                    stdout_data += line
-                    decoded = line.decode('utf-8', errors='replace')
-                    with output_lock:
-                        current_output += decoded
+            # Client mode: with -J, iperf3 emits one JSON blob at the end, so
+            # drain stdout AND stderr together via communicate(). readline()
+            # looping on stdout alone can busy-spin or hang, and loses stderr
+            # (where connection errors are written). Give it the test duration
+            # plus headroom so a stuck connection cannot hang forever.
+            with output_lock:
+                current_output = 'Running test...\n'
 
-            # Get any remaining output
-            remaining, stderr = proc.communicate(timeout=5)
-            if remaining:
-                stdout_data += remaining
+            timeout = int(opts.get('duration', 10) or 10) + 20
+            try:
+                stdout_data, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout_data, stderr = proc.communicate()
                 with output_lock:
-                    current_output += remaining.decode('utf-8', errors='replace')
+                    test_error = ('Test timed out after %ds (server unreachable '
+                                  'or not responding).' % timeout)
+                    test_summary = None
+                    current_output = (test_error + '\n')
+                return
 
             # Parse JSON results
-            full_output = stdout_data.decode('utf-8', errors='replace')
+            full_output = (stdout_data or b'').decode('utf-8', errors='replace')
+            stderr_text = (stderr or b'').decode('utf-8', errors='replace').strip()
             summary = parse_json_results(full_output)
 
             with output_lock:
@@ -317,12 +326,18 @@ def run_test(opts):
                     add_history_entry(opts, summary)
                     cp.log(f"iPerf3 result: {summary.get('bandwidth_raw', '--')}")
                 else:
-                    test_error = 'Failed to parse iperf3 output.'
-                    if stderr:
-                        err_text = stderr.decode('utf-8', errors='replace').strip()
-                        if err_text:
-                            test_error += f' stderr: {err_text}'
-                            current_output += f'\nSTDERR: {err_text}\n'
+                    # No parseable JSON. The real reason is almost always on
+                    # stderr (connection refused, host unreachable, bad flag).
+                    if stderr_text:
+                        test_error = stderr_text
+                        current_output = stderr_text + '\n'
+                    elif full_output.strip():
+                        test_error = 'Could not parse iperf3 output.'
+                        current_output = full_output
+                    else:
+                        test_error = ('No output from iperf3 (server unreachable '
+                                      'or connection refused).')
+                        current_output = test_error + '\n'
 
     except subprocess.TimeoutExpired:
         with output_lock:

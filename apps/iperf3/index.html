@@ -77,7 +77,7 @@
                 <nav class="sidebar-nav">
                     <ul class="nav-list" id="nav-list">
                         <li>
-                            <a href="#" class="nav-item active" data-element="run-test">
+                            <a href="#" class="nav-item active" data-element="homepage">
                                 <i class="fas fa-play-circle"></i> Run Test
                             </a>
                         </li>
@@ -94,7 +94,7 @@
                 <div class="content-panel" id="content-panel">
 
                     <!-- Run Test Section -->
-                    <section class="element-section active" id="run-test">
+                    <section class="element-section active" id="homepage">
                         <h2 class="section-title">Run iPerf3 Test</h2>
 
                         <!-- Status Banner -->
@@ -301,22 +301,14 @@
                                                 <span>Upload</span>
                                             </div>
                                         </div>
-<<<<<<< HEAD
                                         <div class="status-indicator" id="result-jitter" style="display:none;">
-=======
-                                        <div class="status-indicator" id="result-jitter">
->>>>>>> afc4abbf54dd7867171f447eca2a08f0fd0489ad
                                             <span class="status-indicator-icon" style="color: var(--color-warning);"><i class="fas fa-wave-square"></i></span>
                                             <div class="status-indicator-text">
                                                 <strong id="result-jitter-val">--</strong>
                                                 <span>Jitter</span>
                                             </div>
                                         </div>
-<<<<<<< HEAD
                                         <div class="status-indicator" id="result-loss" style="display:none;">
-=======
-                                        <div class="status-indicator" id="result-loss">
->>>>>>> afc4abbf54dd7867171f447eca2a08f0fd0489ad
                                             <span class="status-indicator-icon" style="color: var(--color-danger);"><i class="fas fa-exclamation-triangle"></i></span>
                                             <div class="status-indicator-text">
                                                 <strong id="result-loss-val">--</strong>
@@ -324,10 +316,7 @@
                                             </div>
                                         </div>
                                     </div>
-<<<<<<< HEAD
                                     <p id="udp-note" style="display:none; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);"><i class="fas fa-info-circle"></i> Jitter and packet loss are only reported for UDP tests.</p>
-=======
->>>>>>> afc4abbf54dd7867171f447eca2a08f0fd0489ad
                                 </div>
                                 <div id="results-output" style="background: var(--bg-tertiary); border-radius: 6px; padding: 1rem; font-family: monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap; color: var(--text-primary);">Waiting for test...</div>
                             </div>
@@ -379,11 +368,7 @@
     <div id="toast-container"></div>
     <script src="static/js/script.js"></script>
     <script>
-    // Force show run-test section on load (override template script.js homepage behavior)
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.element-section').forEach(function(s) { s.classList.remove('active'); });
-        document.getElementById('run-test').classList.add('active');
-    });
+    // Landing section is id="homepage", so the template's showElement('homepage') lands here.
 
     // Mode switching
     document.querySelectorAll('input[name="mode"]').forEach(function(radio) {
@@ -405,7 +390,7 @@
             document.querySelectorAll('.element-section').forEach(function(s) { s.classList.remove('active'); });
             document.getElementById(target).classList.add('active');
             // Re-check status when navigating back to Run Test
-            if (target === 'run-test') { checkRunningState(); }
+            if (target === 'homepage') { checkRunningState(); }
             if (target === 'history') { loadHistory(); }
         });
     });
@@ -490,14 +475,11 @@
         document.getElementById('result-upload-val').textContent = s.upload || '--';
         document.getElementById('result-jitter-val').textContent = s.jitter || '--';
         document.getElementById('result-loss-val').textContent = s.loss || '--';
-<<<<<<< HEAD
         // Show jitter/loss cards only for UDP (when they have real values)
         var hasUdpData = s.jitter && s.jitter !== '--';
         document.getElementById('result-jitter').style.display = hasUdpData ? '' : 'none';
         document.getElementById('result-loss').style.display = hasUdpData ? '' : 'none';
         document.getElementById('udp-note').style.display = hasUdpData ? 'none' : '';
-=======
->>>>>>> afc4abbf54dd7867171f447eca2a08f0fd0489ad
     }
 
     function resetButtons() {
