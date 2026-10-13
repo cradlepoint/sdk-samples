@@ -157,34 +157,39 @@ server sent rather than padding or truncating digits, so `0.17 m` becomes
 centimetres, metres and kilometres the same way. CSV output is always in metres.
 
 Buttons for **Download CSV** and **Clear History** appear on both the Live Map
-and Recent Samples pages. Clearing empties the in-memory history and resets
-today's recording file, then starts recording again into it.
+and Recent Samples pages. Clearing empties the in-memory history and resets the
+current recording file, then keeps recording into it. The **Recordings** page
+lists every CSV on the router with its size and modified time, and a Download
+button for each.
 
 ## CSV output
 
 Recordings are written to the `data/` subdirectory of the app, named:
 
 ```
-RTK Compare - HOSTNAME - MM-DD-YYYY.csv
+RTK Compare - HOSTNAME - MM-DD-YYYY HH-MM-SS.csv
 ```
 
-`HOSTNAME` is the router name from `config/system/system_id`, and the date is
-the day the recording **started**.
+`HOSTNAME` is the router name from `config/system/system_id`, and the date and
+time are when the recording **started**.
 
-**File selection happens when a recording starts, not while it runs:**
+**A new file is created every time the app starts:**
 
-* A recording starts when the app starts and again when you clear the history.
-* If no file exists for today, a new one is created with a header row.
-* If a file for today already exists, it is continued — the app appends rather
-  than creating a second file for the same day.
+* A recording starts when the app launches. Each start mints a new, uniquely
+  named file (the start timestamp makes it unique even across same-day
+  restarts) and writes a header row.
 * The active file is never re-evaluated mid-run, so a recording that crosses
-  midnight keeps writing to the file it started in. Nothing is interrupted and
-  no file is rolled over at 00:00. A multi-day continuous run therefore lands
-  in one file named for the day it began.
+  midnight keeps writing to the file it started in. Nothing is rolled over at
+  00:00 — a multi-day continuous run lands in one file named for when it began.
+* Clearing the history truncates the active file back to its header row and
+  keeps recording into the same file.
 
-There is **no size cap** — the file grows for as long as the recording runs.
-At 1 Hz that is roughly 20 MB per day, so keep an eye on router storage for
-long unattended runs.
+**Up to 1 GB of recordings are kept under `data/`.** Before each new recording
+starts, and roughly once a minute while one runs, the app totals the size of
+every `RTK Compare … .csv` file in `data/` and, if it exceeds 1 GB, deletes the
+oldest files until it fits again. The file currently being written is never
+deleted, so a single recording larger than the whole budget still records. At
+1 Hz each file grows by roughly 20 MB per day.
 
 One row per GNSS epoch, with these columns:
 
@@ -212,7 +217,8 @@ east/north frame using a latitude-corrected metres-per-degree conversion.
 Accuracy estimates come from the `$PCPTMINR` sentence in `status/gps/nmea`.
 
 The active filename is shown on the Live Map page and on the Analytics page,
-and the Download CSV button serves the active file under that same name.
+and the Download CSV button serves the active file under that same name. The
+Recordings page lists all files and downloads any one of them by name.
 
 `data/` is excluded from the app package via `buildignore`. It has to be,
 because the router deletes an app whose packaged files have been modified, and
@@ -237,9 +243,11 @@ overridden.
 | GET | `/api/points?since=N` | Compact history tuples newer than sequence `N` |
 | GET | `/api/info` | Router name, model, NCOS version, app version, NTRIP profile, colour legend |
 | GET | `/api/legend` | Fix-quality colour legend only |
+| GET | `/api/files` | List all recordings in `data/` (name, size, mtime) plus the size budget |
 | GET | `/api/history.csv` | Download the active recording under its on-disk name |
+| GET | `/api/download?file=NAME` | Download a specific recording by name (validated against the file list) |
 | GET | `/api/help` | This readme |
-| POST | `/api/clear` | Reset today's recording file and the in-memory history |
+| POST | `/api/clear` | Reset the current recording file and the in-memory history |
 
 ## Requirements
 

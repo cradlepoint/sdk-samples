@@ -879,6 +879,11 @@
             if (button) { button.addEventListener('click', clearHistory); }
         });
 
+        var recordingsRefresh = byId('recordings-refresh');
+        if (recordingsRefresh) {
+            recordingsRefresh.addEventListener('click', loadRecordings);
+        }
+
         // The canvas has no layout while its section is hidden, so redraw as
         // soon as navigation brings the map back into view.
         var navTargets = [byId('homepage-link')].concat(
@@ -889,13 +894,139 @@
                 window.setTimeout(requestDraw, 0);
             });
         });
+
+        // Refresh the recordings list whenever its page is opened, so a file
+        // deleted by the size cap or a new one from a restart shows up.
+        var recordingsNav = document.querySelector('.nav-item[data-element="recordings"]');
+        if (recordingsNav) {
+            recordingsNav.addEventListener('click', function () {
+                window.setTimeout(loadRecordings, 0);
+            });
+        }
+
+        bindMobileNav();
+    }
+
+    // -------------------------------------------------------- mobile nav
+
+    // On phones the sidebar is an off-canvas drawer. The hamburger opens it,
+    // and it closes on backdrop tap, Escape, or picking any destination (a
+    // nav item or the Live Map link in the drawer header), so it never sits
+    // open covering the page after navigation.
+    function setNavOpen(open) {
+        var sidebar = byId('app-sidebar');
+        var backdrop = byId('rtk-nav-backdrop');
+        var toggle = byId('rtk-nav-toggle');
+        if (!sidebar) { return; }
+        sidebar.classList.toggle('rtk-nav-open', open);
+        if (backdrop) { backdrop.classList.toggle('rtk-nav-open', open); }
+        if (toggle) { toggle.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+    }
+
+    // Publish the live header height so the drawer and backdrop can sit
+    // exactly below it. The header is sticky and its height varies with
+    // viewport width, so a fixed pixel offset would clip or gap the drawer.
+    function syncHeaderHeight() {
+        var header = document.querySelector('.app-header');
+        if (!header) { return; }
+        var height = Math.round(header.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--rtk-header-h', height + 'px');
+    }
+
+    function bindMobileNav() {
+        syncHeaderHeight();
+        window.addEventListener('resize', syncHeaderHeight);
+        window.addEventListener('orientationchange', syncHeaderHeight);
+        var toggle = byId('rtk-nav-toggle');
+        var backdrop = byId('rtk-nav-backdrop');
+        var sidebar = byId('app-sidebar');
+        if (toggle) {
+            toggle.addEventListener('click', function () {
+                var open = !byId('app-sidebar').classList.contains('rtk-nav-open');
+                setNavOpen(open);
+            });
+        }
+        if (backdrop) {
+            backdrop.addEventListener('click', function () { setNavOpen(false); });
+        }
+        if (sidebar) {
+            // Any link inside the drawer (nav items plus the header's Live Map
+            // link) is a destination, so close the drawer once one is tapped.
+            sidebar.addEventListener('click', function (event) {
+                if (event.target.closest('a')) { setNavOpen(false); }
+            });
+        }
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') { setNavOpen(false); }
+        });
+    }
+
+    // ---------------------------------------------------------- recordings
+
+    function loadRecordings() {
+        var body = byId('recordings-body');
+        var usage = byId('recordings-usage');
+        if (!body) { return; }
+        fetch('api/files')
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                renderRecordings(data, body, usage);
+            })
+            .catch(function () {
+                body.innerHTML = '<tr><td colspan="4" class="rtk-empty">' +
+                    'Could not load recordings.</td></tr>';
+            });
+    }
+
+    function renderRecordings(data, body, usage) {
+        var files = (data && data.files) || [];
+        if (!files.length) {
+            body.innerHTML = '<tr><td colspan="4" class="rtk-empty">' +
+                'No recordings yet.</td></tr>';
+            if (usage) { usage.textContent = ''; }
+            return;
+        }
+        var total = 0;
+        var rows = files.map(function (file) {
+            total += file.bytes || 0;
+            var activeTag = file.active
+                ? ' <span class="rtk-badge">active</span>' : '';
+            var url = 'api/download?file=' + encodeURIComponent(file.name);
+            // data-label values drive the stacked-card labels on mobile; the
+            // file and action cells opt out via their own classes.
+            return '<tr>' +
+                '<td class="rtk-cell-file"><code>' + escapeHtml(file.name) +
+                '</code>' + activeTag + '</td>' +
+                '<td data-label="Size">' + fmtBytes(file.bytes) + '</td>' +
+                '<td data-label="Modified">' + escapeHtml(fmtEpoch(file.mtime)) + '</td>' +
+                '<td class="rtk-cell-action">' +
+                '<a class="btn btn-secondary btn-sm" href="' + url + '">' +
+                '<i class="fas fa-download"></i> Download</a></td>' +
+                '</tr>';
+        }).join('');
+        body.innerHTML = rows;
+        if (usage) {
+            var cap = (data && data.max_bytes) || 0;
+            usage.textContent = fmtBytes(total) + ' used of ' +
+                fmtBytes(cap) + ' across ' + files.length +
+                (files.length === 1 ? ' file.' : ' files.');
+        }
+    }
+
+    function fmtEpoch(seconds) {
+        if (!isNum(seconds)) { return '\u2014'; }
+        try {
+            return new Date(seconds * 1000).toLocaleString();
+        } catch (err) {
+            return '\u2014';
+        }
     }
 
     function clearHistory() {
         var name = (state.stats && state.stats.csv_name) || 'the recording file';
         var message = 'Clear all recorded location history?\n\n' +
             'This empties "' + name + '" on the router and the in-memory ' +
-            'history, then starts a fresh recording for today. ' +
+            'history, then keeps recording to the same file. ' +
             'Download the CSV first if you want to keep it.';
         if (!window.confirm(message)) { return; }
         fetch('api/clear', { method: 'POST' })
@@ -978,7 +1109,8 @@
         if (note) {
             note.innerHTML = name
                 ? 'Recording to <code>' + escapeHtml(name) +
-                  '</code> \u2014 one file per day, kept open across midnight.'
+                  '</code> \u2014 a new file starts each time the app launches. ' +
+                  'See the Recordings page to download past files.'
                 : '';
         }
     }
@@ -1572,7 +1704,11 @@
         loadInfo().then(function () {
             poll();
             window.setInterval(poll, POLL_MS);
+            // The version string lands in the header after this resolves,
+            // which can change the header height; re-measure for the drawer.
+            syncHeaderHeight();
         });
+        loadRecordings();
     }
 
     if (document.readyState === 'loading') {

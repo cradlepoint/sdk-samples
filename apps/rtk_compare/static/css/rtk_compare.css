@@ -474,3 +474,318 @@ body[data-theme="dark"] .rtk-map-attrib {
 .rtk-bad {
     color: var(--danger-color);
 }
+
+/* ---- recordings page ---- */
+.rtk-cell-action {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.76rem;
+    line-height: 1.2;
+}
+
+/* The "active" tag next to the file currently being written. The base
+   .rtk-badge sets white text but no background, so give it an accent fill. */
+#recordings-table .rtk-badge {
+    margin-left: 0.4rem;
+    background: var(--accent-color, #2563eb);
+    vertical-align: middle;
+}
+
+/* =========================================================================
+   Mobile / touch
+   This app is commonly opened on a phone, so below the template's 768px
+   breakpoint the map shrinks, controls grow to a comfortable tap size, and
+   the wide data tables either scroll with momentum or reflow into cards.
+   Only tokens from style.css are used; nothing here overrides the template's
+   own responsive sidebar/grid rules, it only supplements them.
+   ========================================================================= */
+
+/* Momentum scrolling for every horizontally scrolling table on iOS. */
+.rtk-table-wrap {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Hamburger button and nav backdrop live in the markup at all sizes but are
+   only shown on mobile, where the sidebar becomes a slide-in drawer. */
+.rtk-nav-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.3rem;
+    padding: 0.35rem 0.55rem;
+    margin-right: 0.25rem;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    line-height: 1;
+}
+
+.rtk-nav-toggle:hover {
+    background: var(--chip-surface);
+}
+
+.rtk-nav-backdrop {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    /* Mobile navigation: the sidebar is an off-canvas drawer that slides in
+       over the content rather than a full-width block stacked above it. By
+       default it is parked just off the left edge and takes no layout space,
+       so the map sits at the very top of the page. The hamburger in the
+       header opens it; a dimming backdrop sits behind it. This overrides the
+       template's own mobile rule that turns the sidebar into a 100%-width
+       in-flow block. */
+    .rtk-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    /* Keep the mobile header to a single compact row (hamburger | title |
+       actions) instead of letting it wrap to ~160px tall. The identity line
+       is already hidden below 900px, so only these three groups remain. */
+    .header-content {
+        flex-wrap: nowrap;
+        gap: 0.75rem;
+        padding: 0.6rem 0.9rem;
+    }
+
+    .logo-section {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    #app-title {
+        font-size: 1.4rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .header-actions {
+        gap: 0.35rem;
+        flex: 0 0 auto;
+    }
+
+    .app-main {
+        flex-direction: column;
+    }
+
+    /* The drawer and its backdrop are anchored below the header using the
+       live header height (set on :root by JS), so a header that wraps or
+       changes size never clips the drawer's top. */
+    .sidebar {
+        position: fixed;
+        top: var(--rtk-header-h, 73px);
+        left: 0;
+        width: 82%;
+        max-width: 320px;
+        height: calc(100vh - var(--rtk-header-h, 73px));
+        max-height: none;
+        border-right: 1px solid var(--border-color);
+        border-bottom: none;
+        box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.35));
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 60;
+    }
+
+    .sidebar.rtk-nav-open {
+        transform: translateX(0);
+    }
+
+    /* The sidebar's own collapse chevron is a desktop affordation; on mobile
+       the hamburger and backdrop drive the drawer, so hide it. */
+    .sidebar .sidebar-toggle {
+        display: none;
+    }
+
+    /* The template trims sidebar-header top padding; restore a comfortable
+       tap area now that it is a drawer header. */
+    .sidebar-header {
+        padding: 1rem 1.25rem;
+    }
+
+    .content-area {
+        margin-left: 0;
+        padding: 1rem;
+    }
+
+    .rtk-nav-backdrop {
+        display: block;
+        position: fixed;
+        inset: var(--rtk-header-h, 73px) 0 0 0;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 55;
+    }
+
+    .rtk-nav-backdrop.rtk-nav-open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Page heading and its action buttons stack, and the buttons go
+       full-width so they are easy to hit with a thumb. */
+    .rtk-page-head {
+        align-items: stretch;
+    }
+
+    .rtk-page-actions {
+        width: 100%;
+    }
+
+    .rtk-page-actions .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding: 0.6rem 0.75rem;
+    }
+
+    /* A phone screen is portrait; a 460px map leaves no room for anything
+       else, so cap it to a fraction of the viewport instead. */
+    .rtk-map-wrap {
+        height: 60vh;
+        min-height: 260px;
+    }
+
+    /* Map toolbar: toggles above, buttons below, both full width. The map
+       control buttons become equal-width so they present larger targets. */
+    .rtk-map-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .rtk-map-toggles {
+        gap: 0.6rem 1rem;
+    }
+
+    .rtk-map-buttons {
+        justify-content: space-between;
+    }
+
+    .rtk-map-buttons .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+        padding: 0.5rem 0.5rem;
+    }
+
+    /* Touch targets: checkboxes and the fix-quality legend read small on a
+       phone; nudge them up to a more tappable/legible size. */
+    .rtk-check {
+        font-size: 0.9rem;
+    }
+
+    .rtk-check input {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    .rtk-legend {
+        gap: 0.5rem 1rem;
+        font-size: 0.82rem;
+    }
+
+    /* Recordings table reflows into stacked cards: each row becomes a block,
+       each cell shows its column name from data-label, and the Download
+       button spans the card width. Column headers are hidden since each cell
+       now carries its own label. */
+    #recordings-table thead {
+        display: none;
+    }
+
+    #recordings-table,
+    #recordings-table tbody,
+    #recordings-table tr,
+    #recordings-table td {
+        display: block;
+        width: 100%;
+    }
+
+    #recordings-table tr {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        margin-bottom: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        background: var(--card-surface);
+    }
+
+    #recordings-table td {
+        border-bottom: 1px dashed var(--border-color);
+        white-space: normal;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.5rem 0;
+    }
+
+    #recordings-table td:last-child {
+        border-bottom: none;
+    }
+
+    /* The column name, injected from the cell's data-label attribute. */
+    #recordings-table td::before {
+        content: attr(data-label);
+        color: var(--text-secondary);
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        flex: 0 0 auto;
+    }
+
+    #recordings-table td code {
+        word-break: break-all;
+        text-align: right;
+    }
+
+    /* The file cell carries no label (the filename is self-evident) and sits
+       on its own line; the Download button fills the card width. */
+    #recordings-table td.rtk-cell-file {
+        display: block;
+    }
+
+    #recordings-table td.rtk-cell-file::before {
+        content: none;
+    }
+
+    #recordings-table td.rtk-cell-action {
+        text-align: center;
+    }
+
+    #recordings-table td.rtk-cell-action::before {
+        content: none;
+    }
+
+    #recordings-table td.rtk-cell-action .btn {
+        width: 100%;
+        padding: 0.55rem 0.75rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Very small phones: let the stat tiles pack two-up rather than one giant
+   column, and ease the content padding so cards use the full width. */
+@media (max-width: 480px) {
+    .rtk-tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .rtk-tile {
+        padding: 0.7rem 0.8rem;
+    }
+
+    .rtk-tile-value {
+        font-size: 1.1rem;
+    }
+
+    .rtk-map-wrap {
+        height: 55vh;
+    }
+}

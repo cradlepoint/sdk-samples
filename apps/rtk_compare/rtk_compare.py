@@ -57,9 +57,27 @@ MAX_INTERVAL = 60.0
 # app appends to would make the router delete the app on a signature check.
 DATA_DIR = 'data'
 CSV_PREFIX = 'RTK Compare'
-CSV_DATE_FORMAT = '%m-%d-%Y'
+# A new recording starts every time the app launches, so the filename needs
+# the start time (not just the date) to stay unique across same-day restarts.
+CSV_DATETIME_FORMAT = '%m-%d-%Y %H-%M-%S'
+
+# Total size budget for everything under data/. When appending a row would
+# push the directory past this, the oldest recordings are deleted (never the
+# active file) until it fits again. 1 GB leaves ample room on these routers
+# while still bounding unattended growth.
+DATA_DIR_MAX_BYTES = 1024 * 1024 * 1024
 
 ERROR_LOG_REPEAT_SECONDS = 60
+
+# Cap on how long to block for NTP before the first recording. Long enough to
+# cover a cold boot's sync, short enough that an offline router still starts
+# recording (under a possibly-wrong date) rather than hanging indefinitely.
+NTP_WAIT_TIMEOUT = 300
+
+# How many appended rows between data/ size-budget checks. At 1 Hz this is
+# roughly once a minute, often enough to bound growth without stat-ing the
+# whole directory every sample.
+DISK_CHECK_ROWS = 60
 
 DEVICE_RESCAN_SECONDS = 30
 MEMORY_CHECK_SECONDS = 60
@@ -485,12 +503,21 @@ def sanitize_for_filename(value):
 
 
 def csv_filename(router_name, when=None):
-    """Build the recording filename: 'RTK Compare - HOST - MM-DD-YYYY.csv'."""
-    stamp = time.strftime(CSV_DATE_FORMAT,
+    """Build the recording filename for a new run.
+
+    'RTK Compare - HOST - MM-DD-YYYY HH-MM-SS.csv'. The time component makes
+    each app start produce a distinct file, even on same-day restarts.
+    """
+    stamp = time.strftime(CSV_DATETIME_FORMAT,
                           time.localtime(time.time() if when is None else when))
     return '{} - {} - {}.csv'.format(CSV_PREFIX,
                                      sanitize_for_filename(router_name),
                                      stamp)
+
+
+def is_recording_file(name):
+    """True if a filename looks like one of this app's recordings."""
+    return name.startswith(CSV_PREFIX) and name.endswith('.csv')
 
 
 def utc_offset_string(timestamp):
@@ -530,6 +557,7 @@ class Sampler(object):
         self.csv_bytes = 0
         self.csv_writable = False
         self.rows_written = 0
+        self._rows_since_disk_check = 0
 
         self.started_at = time.time()
         self.cleared_at = None
@@ -551,30 +579,33 @@ class Sampler(object):
 
     # -- CSV ---------------------------------------------------------------
 
-    def open_recording(self, truncate=False):
-        """Select the recording file for today and make it the active one.
+    def open_recording(self, new_file=True):
+        """Create and make active a fresh recording file.
 
-        Called when a recording starts (app start, and again on clear) and
-        never from the sample loop, so a run that crosses midnight keeps
-        writing to the file it started in instead of being interrupted.
-        A day that already has a file is continued rather than replaced.
+        Called when a recording starts (app start, and again on clear), never
+        from the sample loop, so a run that crosses midnight keeps writing to
+        the file it started in. Each call mints a new uniquely named file
+        (prefix + host + start timestamp) rather than continuing a prior one,
+        so every app start begins a clean recording. ``new_file=False`` reuses
+        the current name to truncate the active file in place (used by clear).
         """
-        name = csv_filename(self.router_name)
+        if new_file or not self.csv_name:
+            name = csv_filename(self.router_name)
+        else:
+            name = self.csv_name
         path = os.path.join(self.data_dir, name)
         try:
             os.makedirs(self.data_dir, exist_ok=True)
             existed = os.path.isfile(path)
-            if existed and not truncate:
-                cp.log('Continuing recording {}'.format(name))
-            else:
-                with open(path, 'w') as handle:
-                    handle.write(','.join(CSV_HEADER) + '\n')
-                cp.log('{} recording {}'.format(
-                    'Reset' if existed else 'Started', name))
+            with open(path, 'w') as handle:
+                handle.write(','.join(CSV_HEADER) + '\n')
+            cp.log('{} recording {}'.format(
+                'Reset' if existed else 'Started', name))
             self.csv_name = name
             self.csv_path = path
             self.csv_bytes = os.path.getsize(path)
             self.csv_writable = True
+            self._enforce_disk_cap()
             return True
         except Exception as error:
             self.csv_name = name
@@ -584,8 +615,86 @@ class Sampler(object):
                 name, error))
             return False
 
+    def list_recordings(self):
+        """Return recording files as dicts, newest first.
+
+        Each entry: name, bytes, mtime (epoch), active (the live file).
+        Only files this app produced are listed; anything else in data/ is
+        ignored so a stray file can never be served or deleted.
+        """
+        entries = []
+        try:
+            for name in os.listdir(self.data_dir):
+                if not is_recording_file(name):
+                    continue
+                full = os.path.join(self.data_dir, name)
+                try:
+                    stat = os.stat(full)
+                except OSError:
+                    continue
+                if not os.path.isfile(full):
+                    continue
+                entries.append({
+                    'name': name,
+                    'bytes': stat.st_size,
+                    'mtime': int(stat.st_mtime),
+                    'active': name == self.csv_name,
+                })
+        except (IOError, OSError):
+            return []
+        entries.sort(key=lambda item: item['mtime'], reverse=True)
+        return entries
+
+    def _enforce_disk_cap(self):
+        """Delete the oldest recordings until data/ fits the size budget.
+
+        The active file is never deleted - a single recording larger than the
+        whole budget still records rather than erasing itself. Called whenever
+        a new file is opened and periodically as the active file grows.
+        """
+        try:
+            files = []
+            total = 0
+            for name in os.listdir(self.data_dir):
+                if not is_recording_file(name):
+                    continue
+                full = os.path.join(self.data_dir, name)
+                try:
+                    stat = os.stat(full)
+                except OSError:
+                    continue
+                if not os.path.isfile(full):
+                    continue
+                total += stat.st_size
+                files.append((stat.st_mtime, name, full, stat.st_size))
+        except (IOError, OSError):
+            return
+
+        if total <= DATA_DIR_MAX_BYTES:
+            return
+
+        files.sort(key=lambda item: item[0])  # oldest first
+        for _mtime, name, full, size in files:
+            if total <= DATA_DIR_MAX_BYTES:
+                break
+            if name == self.csv_name:
+                continue  # never remove the file currently being written
+            try:
+                os.remove(full)
+                total -= size
+                cp.log('Removed old recording {} to stay under {} MB'.format(
+                    name, DATA_DIR_MAX_BYTES // (1024 * 1024)))
+            except OSError as error:
+                self._record_error('Could not remove {}: {}'.format(name, error))
+
     def _append_csv(self, row):
-        """Append one row. There is no size cap; the file grows until cleared."""
+        """Append one row, then keep data/ under the total size budget.
+
+        The active file keeps growing (its history is never truncated); the
+        budget is held by deleting older recordings. The cap check only runs
+        every DISK_CHECK_ROWS appends so a 1 Hz loop is not stat-ing the whole
+        directory every second.
+        """
         try:
             line = ','.join(row) + '\n'
             with open(self.csv_path, 'a') as handle:
@@ -596,11 +705,17 @@ class Sampler(object):
         except Exception as error:
             self.csv_writable = False
             self._record_error('CSV append failed: {}'.format(error))
+            return
+
+        self._rows_since_disk_check += 1
+        if self._rows_since_disk_check >= DISK_CHECK_ROWS:
+            self._rows_since_disk_check = 0
+            self._enforce_disk_cap()
 
     def clear_history(self):
-        """Empty the in-memory history and reset today's recording file."""
+        """Empty the in-memory history and reset the current recording file."""
         with self.lock:
-            if not self.open_recording(truncate=True):
+            if not self.open_recording(new_file=False):
                 return False
             self.history.clear()
             self.latest = None
@@ -1322,6 +1437,10 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             elif path == '/api/help':
                 self._send_bytes(read_help_text().encode('utf-8'),
                                  'text/plain; charset=utf-8')
+            elif path == '/api/files':
+                self._send_json({'files': self.sampler.list_recordings(),
+                                 'max_bytes': DATA_DIR_MAX_BYTES,
+                                 'active': self.sampler.csv_name})
             elif path in ('/api/history.csv', '/api/download'):
                 self._serve_csv()
             elif path.startswith('/static/'):
@@ -1395,6 +1514,24 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             pass
         return default
 
+    def _query_str(self, key, default=''):
+        """Return a URL-decoded query parameter, or default if absent."""
+        try:
+            from urllib.parse import unquote
+        except ImportError:  # pragma: no cover - cppython has urllib.parse
+            unquote = lambda text: text
+        try:
+            query = self.path.split('?', 1)[1] if '?' in self.path else ''
+            for part in query.split('&'):
+                if not part:
+                    continue
+                name, _, value = part.partition('=')
+                if name == key:
+                    return unquote(value.replace('+', ' '))
+        except IndexError:
+            pass
+        return default
+
     def _send_bytes(self, body, content_type, extra_headers=None):
         self.send_response(200)
         self.send_header('Content-Type', content_type)
@@ -1436,13 +1573,35 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self._send_bytes(body, content_type)
 
     def _serve_csv(self):
-        """Download the active recording under its real on-disk name."""
+        """Download a recording by name, or the active file when unspecified.
+
+        The ?file= value is validated against the on-disk recording list so a
+        crafted name cannot escape data/ or read an unrelated file: only a
+        basename matching one this app produced and currently present is
+        served.
+        """
         sampler = self.sampler
-        filename = sampler.csv_name or csv_filename(sampler.router_name)
+        requested = self._query_str('file')
+
+        if requested:
+            name = os.path.basename(requested)
+            known = {entry['name'] for entry in sampler.list_recordings()}
+            if name not in known:
+                self.send_error(404)
+                return
+            full = os.path.join(sampler.data_dir, name)
+            filename = name
+        else:
+            full = sampler.csv_path
+            filename = sampler.csv_name or csv_filename(sampler.router_name)
+
         try:
-            with open(sampler.csv_path, 'rb') as handle:
+            with open(full, 'rb') as handle:
                 body = handle.read()
         except (IOError, OSError):
+            if requested:
+                self.send_error(404)
+                return
             body = (','.join(CSV_HEADER) + '\n').encode('utf-8')
         self._send_bytes(body, 'text/csv; charset=utf-8',
                          {'Content-Disposition':
@@ -1541,6 +1700,20 @@ def main():
     router_name = device_info.get('router_name') or 'router'
     if router_name == 'N/A':
         router_name = 'router'
+
+    # The recording filename embeds the local date (MM-DD-YYYY), stamped the
+    # moment the Sampler opens its file. Right after boot the clock can be
+    # unsynced (defaulting to 1970 or a stale date) until NTP catches up, which
+    # would name the file for the wrong day. Wait for NTP first so the first
+    # recording lands under the correct date. The timeout keeps a router that
+    # never syncs (offline, no NTP) from hanging here forever - it falls
+    # through and records under whatever date the clock reports.
+    cp.log('Waiting for NTP time sync before starting recording...')
+    if cp.wait_for_ntp(timeout=NTP_WAIT_TIMEOUT):
+        cp.log('NTP time synced')
+    else:
+        cp.log('WARNING: NTP not synced after {}s - recording filename may '
+               'carry an incorrect date'.format(NTP_WAIT_TIMEOUT))
 
     try:
         sampler = Sampler(interval, max_points, router_name)

@@ -14,6 +14,10 @@
     <div class="app-container">
         <header class="app-header">
             <div class="header-content">
+                <button type="button" class="rtk-nav-toggle" id="rtk-nav-toggle"
+                        aria-label="Menu" aria-controls="app-sidebar" aria-expanded="false">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="logo-section">
                     <h1 id="app-title">RTK Compare</h1>
                     <span class="app-version" id="app-version"></span>
@@ -43,6 +47,8 @@
             </div>
         </header>
 
+        <div class="rtk-nav-backdrop" id="rtk-nav-backdrop"></div>
+
         <main class="app-main">
             <aside class="sidebar" id="app-sidebar">
                 <div class="sidebar-header">
@@ -68,6 +74,11 @@
                                 <i class="fas fa-table"></i> Recent Samples
                             </a>
                         </li>
+                        <li class="nav-parent">
+                            <a href="#recordings" class="nav-item" data-element="recordings">
+                                <i class="fas fa-folder-open"></i> Recordings
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </aside>
@@ -77,6 +88,33 @@
 
                     <!-- ============ LIVE MAP ============ -->
                     <section class="element-section active" id="homepage">
+                        <div class="rtk-map-card">
+                            <div class="rtk-map-toolbar">
+                                <div class="rtk-map-toggles">
+                                    <label class="rtk-check"><input type="checkbox" id="layer-post" checked> Corrected points</label>
+                                    <label class="rtk-check"><input type="checkbox" id="layer-post-track" checked> Corrected track</label>
+                                    <label class="rtk-check"><input type="checkbox" id="layer-pre" checked> Pre-correction points</label>
+                                    <label class="rtk-check"><input type="checkbox" id="layer-pre-track" checked> Pre-correction track</label>
+                                    <label class="rtk-check"><input type="checkbox" id="layer-basemap" checked> Street basemap</label>
+                                </div>
+                                <div class="rtk-map-buttons">
+                                    <button type="button" class="btn btn-text" id="map-fit" title="Fit all points"><i class="fas fa-expand"></i> Fit</button>
+                                    <button type="button" class="btn btn-text rtk-toggle-on" id="map-follow" title="Keep the latest fix centred"><i class="fas fa-crosshairs"></i> Follow</button>
+                                    <button type="button" class="btn btn-text" id="map-zoom-in" title="Zoom in"><i class="fas fa-plus"></i></button>
+                                    <button type="button" class="btn btn-text" id="map-zoom-out" title="Zoom out"><i class="fas fa-minus"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="rtk-map-wrap">
+                                <canvas id="rtk-map"></canvas>
+                                <div class="rtk-map-scale"><div class="rtk-map-scale-bar" id="map-scale-bar"></div><span id="map-scale-text">&mdash;</span></div>
+                                <div class="rtk-map-readout" id="map-readout">&mdash;</div>
+                                <div class="rtk-map-attrib" id="map-attrib">&copy; OpenStreetMap contributors</div>
+                            </div>
+
+                            <div class="rtk-legend" id="rtk-legend"></div>
+                        </div>
+
                         <div class="rtk-page-head">
                             <h2 class="section-title">Pre vs Post Correction</h2>
                             <div class="rtk-page-actions">
@@ -124,33 +162,6 @@
                                 <span class="rtk-tile-value" id="stat-samples">0</span>
                                 <span class="rtk-tile-sub" id="stat-samples-sub">&mdash;</span>
                             </div>
-                        </div>
-
-                        <div class="rtk-map-card">
-                            <div class="rtk-map-toolbar">
-                                <div class="rtk-map-toggles">
-                                    <label class="rtk-check"><input type="checkbox" id="layer-post" checked> Corrected points</label>
-                                    <label class="rtk-check"><input type="checkbox" id="layer-post-track" checked> Corrected track</label>
-                                    <label class="rtk-check"><input type="checkbox" id="layer-pre" checked> Pre-correction points</label>
-                                    <label class="rtk-check"><input type="checkbox" id="layer-pre-track" checked> Pre-correction track</label>
-                                    <label class="rtk-check"><input type="checkbox" id="layer-basemap" checked> Street basemap</label>
-                                </div>
-                                <div class="rtk-map-buttons">
-                                    <button type="button" class="btn btn-text" id="map-fit" title="Fit all points"><i class="fas fa-expand"></i> Fit</button>
-                                    <button type="button" class="btn btn-text rtk-toggle-on" id="map-follow" title="Keep the latest fix centred"><i class="fas fa-crosshairs"></i> Follow</button>
-                                    <button type="button" class="btn btn-text" id="map-zoom-in" title="Zoom in"><i class="fas fa-plus"></i></button>
-                                    <button type="button" class="btn btn-text" id="map-zoom-out" title="Zoom out"><i class="fas fa-minus"></i></button>
-                                </div>
-                            </div>
-
-                            <div class="rtk-map-wrap">
-                                <canvas id="rtk-map"></canvas>
-                                <div class="rtk-map-scale"><div class="rtk-map-scale-bar" id="map-scale-bar"></div><span id="map-scale-text">&mdash;</span></div>
-                                <div class="rtk-map-readout" id="map-readout">&mdash;</div>
-                                <div class="rtk-map-attrib" id="map-attrib">&copy; OpenStreetMap contributors</div>
-                            </div>
-
-                            <div class="rtk-legend" id="rtk-legend"></div>
                         </div>
 
                         <div class="element-grid rtk-grid-2">
@@ -266,7 +277,39 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <p class="rtk-note">Showing the 200 most recent in-memory samples. The CSV download contains the full recorded history.</p>
+                            <p class="rtk-note">Showing the 200 most recent in-memory samples. The CSV download contains the current recording.</p>
+                        </div>
+                    </section>
+
+                    <!-- ============ RECORDINGS ============ -->
+                    <section class="element-section" id="recordings">
+                        <div class="rtk-page-head">
+                            <h2 class="section-title">Recordings</h2>
+                            <div class="rtk-page-actions">
+                                <button type="button" class="btn btn-text" id="recordings-refresh" title="Refresh list">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <p class="rtk-note" id="recordings-note">
+                            A new CSV file starts each time the app launches. Up to 1&nbsp;GB of
+                            recordings are kept on the router; the oldest are removed automatically
+                            as needed.
+                        </p>
+                        <div class="element-example">
+                            <div class="rtk-table-wrap">
+                                <table class="rtk-table" id="recordings-table">
+                                    <thead>
+                                        <tr>
+                                            <th>File</th><th>Size</th><th>Modified</th><th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recordings-body">
+                                        <tr><td colspan="4" class="rtk-empty">Loading&hellip;</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="rtk-note" id="recordings-usage"></p>
                         </div>
                     </section>
 
