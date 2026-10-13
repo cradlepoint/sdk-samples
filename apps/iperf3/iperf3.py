@@ -182,45 +182,43 @@ def parse_json_results(json_str):
     }
 
     end = data.get('end', {})
+    test_start = data.get('start', {}).get('test_start', {})
+    reverse = bool(test_start.get('reverse'))
+    bidir = bool(test_start.get('bidir'))
 
-    # TCP results
-    sum_sent = end.get('sum_sent', {})
-    sum_received = end.get('sum_received', {})
+    # sum_sent / sum_received are the SAME flow measured at each end, not
+    # upload vs download. Report the receiver side (what actually arrived).
+    # The flow runs client->server unless -R; --bidir adds a second flow in
+    # the *_bidir_reverse keys. UDP on older iperf3 only has 'sum'.
+    def received(suffix=''):
+        return end.get('sum_received' + suffix) or end.get('sum' + suffix) or {}
 
-    if sum_sent.get('bits_per_second') is not None:
-        summary['upload'] = format_bits(sum_sent['bits_per_second'])
-        summary['transfer'] = format_bytes(sum_sent.get('bytes', 0))
-        summary['bandwidth_raw'] = summary['upload']
+    forward = received()
+    if bidir:
+        flows = {'upload': forward, 'download': received('_bidir_reverse')}
+    elif reverse:
+        flows = {'download': forward}
+    else:
+        flows = {'upload': forward}
 
-    if sum_received.get('bits_per_second') is not None:
-        summary['download'] = format_bits(sum_received['bits_per_second'])
-        if summary['transfer'] == '--':
-            summary['transfer'] = format_bytes(sum_received.get('bytes', 0))
-        summary['bandwidth_raw'] = summary['download']
+    total_bytes = 0
+    for direction, flow in flows.items():
+        if flow.get('bits_per_second') is not None:
+            summary[direction] = format_bits(flow['bits_per_second'])
+            total_bytes += flow.get('bytes', 0)
+    if total_bytes:
+        summary['transfer'] = format_bytes(total_bytes)
 
-    # UDP results
-    sum_udp = end.get('sum', {})
-    if sum_udp.get('bits_per_second') is not None:
-        bw = format_bits(sum_udp['bits_per_second'])
-        summary['upload'] = bw
-        summary['bandwidth_raw'] = bw
-        summary['transfer'] = format_bytes(sum_udp.get('bytes', 0))
+    # History keeps one number: download for download/bidir, else upload.
+    summary['bandwidth_raw'] = (summary['download']
+                                if summary['download'] != '--'
+                                else summary['upload'])
 
-    if sum_udp.get('jitter_ms') is not None:
-        summary['jitter'] = f"{sum_udp['jitter_ms']:.3f} ms"
-
-    if sum_udp.get('lost_percent') is not None:
-        summary['loss'] = f"{sum_udp['lost_percent']:.2f}%"
-
-    # Bidirectional results
-    streams = end.get('streams', [])
-    for stream in streams:
-        sender = stream.get('sender', {})
-        receiver = stream.get('receiver', {})
-        if sender.get('bits_per_second') is not None:
-            summary['upload'] = format_bits(sender['bits_per_second'])
-        if receiver.get('bits_per_second') is not None:
-            summary['download'] = format_bits(receiver['bits_per_second'])
+    # UDP jitter/loss come from the receiver of the primary (forward) flow.
+    if forward.get('jitter_ms') is not None:
+        summary['jitter'] = f"{forward['jitter_ms']:.3f} ms"
+    if forward.get('lost_percent') is not None:
+        summary['loss'] = f"{forward['lost_percent']:.2f}%"
 
     return summary
 

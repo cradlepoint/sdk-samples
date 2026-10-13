@@ -473,6 +473,9 @@
         document.getElementById('results-summary').style.display = '';
         document.getElementById('result-download-val').textContent = s.download || '--';
         document.getElementById('result-upload-val').textContent = s.upload || '--';
+        // Only show the direction(s) the test actually measured
+        document.getElementById('result-download').style.display = (s.download && s.download !== '--') ? '' : 'none';
+        document.getElementById('result-upload').style.display = (s.upload && s.upload !== '--') ? '' : 'none';
         document.getElementById('result-jitter-val').textContent = s.jitter || '--';
         document.getElementById('result-loss-val').textContent = s.loss || '--';
         // Show jitter/loss cards only for UDP (when they have real values)
