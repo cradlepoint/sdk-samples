@@ -1154,9 +1154,17 @@
                         document.getElementById('result-latency').textContent = r.latency_ms.toFixed(2);
                         document.getElementById('latency-card').style.display = '';
                     }
+                    var jitterCard = document.getElementById('jitter-card');
+                    var jitterVal = document.getElementById('result-jitter');
                     if (r.jitter_ms != null) {
-                        document.getElementById('result-jitter').textContent = r.jitter_ms.toFixed(2);
-                        document.getElementById('jitter-card').style.display = '';
+                        jitterVal.textContent = r.jitter_ms.toFixed(2);
+                        jitterVal.title = '';
+                        jitterCard.style.display = '';
+                    } else if (r.include_latency && r.engine === 'iperf3') {
+                        // Jitter was requested but the UDP pass could not get it.
+                        jitterVal.textContent = 'n/a';
+                        jitterVal.title = r.jitter_note || 'Jitter unavailable';
+                        jitterCard.style.display = '';
                     }
                     if (r.ping_ms != null && !r.latency_ms) {
                         document.getElementById('result-latency').textContent = r.ping_ms.toFixed(1);
@@ -1165,6 +1173,7 @@
                     var meta = r.engine.toUpperCase();
                     if (r.server) meta += ' | ' + r.server;
                     if (r.isp) meta += ' | ' + r.isp;
+                    if (r.jitter_ms == null && r.jitter_note) meta += ' | jitter: ' + r.jitter_note;
                     document.getElementById('result-meta').textContent = meta;
                     bar.style.width = '100%';
                     bar.style.background = 'var(--success-color)';
@@ -1261,7 +1270,13 @@
                     html += '<td>' + r.download_mbps + '</td>';
                     html += '<td>' + r.upload_mbps + '</td>';
                     html += '<td>' + (r.latency_ms != null ? r.latency_ms : (r.ping_ms != null ? r.ping_ms : '--')) + '</td>';
-                    html += '<td>' + (r.jitter_ms != null ? r.jitter_ms : '--') + '</td>';
+                    if (r.jitter_ms != null) {
+                        html += '<td>' + r.jitter_ms + '</td>';
+                    } else if (r.jitter_note) {
+                        html += '<td title="' + String(r.jitter_note).replace(/"/g, '&quot;') + '">n/a</td>';
+                    } else {
+                        html += '<td>--</td>';
+                    }
                     html += '<td>' + (r.interface || '--') + '</td>';
                     html += '<td>' + serverInfo + '</td>';
                     html += '<td>' + (r.duration ? r.duration + 's' : '--') + '</td>';

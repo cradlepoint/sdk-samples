@@ -523,53 +523,92 @@ def _iperf3_rtt_ms(data):
     return None
 
 
+def _iperf3_udp_pass(iperf3_bin, server, port, run_secs, rate_mbps, bind_ip,
+                     bind_dev, reverse):
+    """One UDP iperf3 attempt. Returns (jitter_ms, loss_percent, note).
+
+    jitter_ms/loss_percent are floats on success, else None. note is None on
+    success or a short human-readable reason on failure. reverse=True measures
+    the downstream (server->router) direction; reverse=False the upstream.
+    """
+    cmd = [iperf3_bin, '-c', server, '-p', str(port),
+           '-t', str(run_secs), '-u', '-b', f'{rate_mbps}M', '-J', '-4']
+    if reverse:
+        cmd.append('-R')
+    if bind_ip:
+        cmd.extend(['-B', bind_ip])
+    if bind_dev:
+        cmd.extend(['--bind-dev', bind_dev])
+    direction = 'reverse' if reverse else 'forward'
+    cp.log(f'iPerf3 UDP jitter cmd ({direction}): {" ".join(cmd)}')
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    try:
+        stdout, stderr = proc.communicate(timeout=run_secs + 20)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        cp.log(f'iPerf3 UDP jitter {direction} run timed out')
+        return None, None, 'UDP jitter test timed out'
+    if proc.returncode != 0:
+        err = _parse_iperf3_error(stdout, stderr)
+        cp.log(f'iPerf3 UDP jitter {direction} run failed: {err}')
+        return None, None, f'server rejected UDP ({err})'
+    try:
+        data = _iperf3_json(stdout)
+    except json.JSONDecodeError as e:
+        cp.log(f'iPerf3 UDP jitter {direction} JSON error: {e}')
+        return None, None, 'could not parse UDP result'
+    summary = data.get('end', {}).get('sum', {})
+    jitter = summary.get('jitter_ms')
+    loss = summary.get('lost_percent')
+    jitter = float(jitter) if jitter is not None else None
+    loss = float(loss) if loss is not None else None
+    if jitter is None:
+        return None, None, 'server returned no jitter figure'
+    cp.log(f'iPerf3 UDP jitter ({direction}): {jitter} ms, loss: {loss}%')
+    return jitter, loss, None
+
+
 def _run_iperf3_udp_jitter(iperf3_bin, server, port, duration, bind_ip,
                            bind_dev, target_bps):
-    """Run a short reverse UDP pass to measure downstream jitter.
+    """Measure jitter with a short UDP pass. Returns (jitter, loss, note).
 
-    TCP carries no jitter figure, so this needs its own run. Returns
-    (jitter_ms, loss_percent), either of which may be None.
+    TCP carries no jitter figure, so this needs its own run. Tries a reverse
+    (downstream) pass first, then falls back to a forward (upstream) pass, since
+    some servers accept only one direction. note is None on success or a short
+    reason the value is unavailable, so the UI can tell the user why.
 
     The send rate is derived from the measured TCP throughput and clamped, so a
-    slow link is not swamped and a fast link is not under-sampled.
+    slow link is not swamped and a fast link is not under-sampled. The run is
+    kept short (jitter stabilises quickly) to avoid stressing busy servers.
     """
     try:
-        rate_mbps = 10
+        rate_mbps = 5
         if target_bps and target_bps > 0:
-            rate_mbps = int(max(1, min(500, (target_bps * 0.8) / 1000000)))
-        cmd = [iperf3_bin, '-c', server, '-p', str(port),
-               '-t', str(int(duration or 10)), '-u', '-b', f'{rate_mbps}M',
-               '-R', '-J', '-4']
-        if bind_ip:
-            cmd.extend(['-B', bind_ip])
-        if bind_dev:
-            cmd.extend(['--bind-dev', bind_dev])
-        cp.log(f'iPerf3 UDP jitter cmd: {" ".join(cmd)}')
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        try:
-            stdout, stderr = proc.communicate(timeout=int(duration or 10) + 30)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.communicate()
-            cp.log('iPerf3 UDP jitter run timed out')
-            return None, None
-        if proc.returncode != 0:
-            # Many public iperf3 servers refuse UDP. Not fatal.
-            cp.log(f'iPerf3 UDP jitter run failed: '
-                   f'{_parse_iperf3_error(stdout, stderr)}')
-            return None, None
-        data = _iperf3_json(stdout)
-        summary = data.get('end', {}).get('sum', {})
-        jitter = summary.get('jitter_ms')
-        loss = summary.get('lost_percent')
-        jitter = float(jitter) if jitter is not None else None
-        loss = float(loss) if loss is not None else None
-        cp.log(f'iPerf3 UDP jitter: {jitter} ms, loss: {loss}%')
-        return jitter, loss
+            rate_mbps = int(max(1, min(100, (target_bps * 0.5) / 1000000)))
+        # Jitter converges fast; a long run only loads the server for no gain.
+        run_secs = int(min(5, max(2, duration or 5)))
+
+        jitter, loss, note = _iperf3_udp_pass(
+            iperf3_bin, server, port, run_secs, rate_mbps, bind_ip,
+            bind_dev, reverse=True)
+        if jitter is not None:
+            return jitter, loss, None
+
+        # Reverse refused/empty — try the upstream direction before giving up.
+        reverse_note = note
+        if current_test['running']:
+            time.sleep(1)
+            jitter, loss, note = _iperf3_udp_pass(
+                iperf3_bin, server, port, run_secs, rate_mbps, bind_ip,
+                bind_dev, reverse=False)
+            if jitter is not None:
+                return jitter, loss, None
+        return None, None, reverse_note or note or 'UDP jitter unavailable'
     except Exception as e:
         cp.log(f'iPerf3 UDP jitter error: {e}')
-        return None, None
+        return None, None, f'UDP jitter error: {e}'
 
 
 def run_iperf3(server, duration=10, interface='', port=5201, size=0,
@@ -815,13 +854,15 @@ def _run_iperf3_on_port(iperf3_bin, server, port, duration, bind_ip, bind_dev=''
             with test_lock:
                 current_test['progress'] = {'stage': 'latency', 'percent': 0}
             time.sleep(2)
-            jitter_ms, loss_pct = _run_iperf3_udp_jitter(
+            jitter_ms, loss_pct, jitter_note = _run_iperf3_udp_jitter(
                 iperf3_bin, server, port, duration, bind_ip, bind_dev,
                 results['download_bps'])
             if jitter_ms is not None:
                 results['jitter_ms'] = jitter_ms
             if loss_pct is not None:
                 results['loss_percent'] = loss_pct
+            if jitter_note:
+                results['jitter_note'] = jitter_note
 
         cp.log(f'iPerf3 complete on port {port}: DL={results["download_bps"]/1e6:.2f}Mbps '
                f'UL={results["upload_bps"]/1e6:.2f}Mbps')
@@ -1058,6 +1099,7 @@ def run_test_thread(engine, params):
                 'jitter_ms': (round(result['jitter_ms'], 2)
                               if result.get('jitter_ms') is not None
                               else None),
+                'jitter_note': result.get('jitter_note'),
                 'loss_percent': (round(result['loss_percent'], 2)
                                  if result.get('loss_percent') is not None
                                  else None),
