@@ -134,6 +134,15 @@
                                             <input type="number" id="server-port" class="search-input" value="5201" min="1" max="65535" style="width:100%;">
                                         </div>
                                     </div>
+                                    <div class="form-row" style="margin-top: 1rem;">
+                                        <div>
+                                            <label for="source-ip">Source IP (bind)</label>
+                                            <select id="source-ip" class="search-input" style="width:100%;">
+                                                <option value="">Auto (default route)</option>
+                                            </select>
+                                            <span style="font-size: 0.78rem; color: var(--text-secondary);">Bind the test to a LAN or WAN interface IP (iperf3 -B).</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -259,7 +268,9 @@
                                         </div>
                                         <div>
                                             <label for="bind-address">Bind Address</label>
-                                            <input type="text" id="bind-address" class="search-input" placeholder="0.0.0.0 (all interfaces)" style="width:100%;">
+                                            <select id="bind-address" class="search-input" style="width:100%;">
+                                                <option value="">All interfaces (0.0.0.0)</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -403,6 +414,7 @@
         if (mode === 'client') {
             opts.host = document.getElementById('server-host').value.trim();
             opts.port = parseInt(document.getElementById('server-port').value) || 5201;
+            opts.source_ip = document.getElementById('source-ip').value;
             opts.protocol = document.querySelector('input[name="protocol"]:checked').value;
             opts.direction = document.querySelector('input[name="direction"]:checked').value;
             opts.duration = parseInt(document.getElementById('duration').value) || 10;
@@ -556,6 +568,32 @@
         }).catch(function() {});
     }
 
+    function loadSourceIps() {
+        fetch('/api/ips').then(function(r) { return r.json(); }).then(function(data) {
+            var ips = (data && data.ips) || [];
+            var clientSel = document.getElementById('source-ip');
+            var serverSel = document.getElementById('bind-address');
+            // Preserve any current selection across refreshes
+            var clientVal = clientSel.value;
+            var serverVal = serverSel.value;
+            clientSel.innerHTML = '<option value="">Auto (default route)</option>';
+            serverSel.innerHTML = '<option value="">All interfaces (0.0.0.0)</option>';
+            ips.forEach(function(entry) {
+                var o1 = document.createElement('option');
+                o1.value = entry.ip;
+                o1.textContent = entry.label + ' (' + entry.ip + ')';
+                clientSel.appendChild(o1);
+                var o2 = document.createElement('option');
+                o2.value = entry.ip;
+                o2.textContent = entry.label + ' (' + entry.ip + ')';
+                serverSel.appendChild(o2);
+            });
+            clientSel.value = clientVal;
+            serverSel.value = serverVal;
+        }).catch(function() {});
+    }
+
+    loadSourceIps();
     loadHistory();
     checkRunningState();
     </script>

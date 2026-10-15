@@ -24,6 +24,7 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 
 **Client Mode Options:**
 - Host and port of the remote iPerf3 server
+- Source IP (bind) — bind the test to a specific LAN or WAN interface IP (iperf3 `-B`). The dropdown is populated from the router's LAN networks and connected WAN devices. "Auto" lets the OS pick via the default route.
 - Protocol: TCP, UDP, or SCTP
 - Direction: Upload, Download (-R), or Bidirectional (--bidir)
 - Duration, parallel streams, report interval
@@ -31,7 +32,7 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 - MSS, ToS/DSCP, TCP no-delay, zero-copy, omit first second
 
 **Server Mode:**
-- Listen port and bind address
+- Listen port and bind address (dropdown of LAN/WAN interface IPs, or all interfaces)
 - Runs continuously until manually stopped (accepts multiple client connections)
 
 **Results Panel:**
@@ -53,6 +54,7 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 | `/api/stop` | POST | Stop a running test or server |
 | `/api/status` | GET | Get current test status and output |
 | `/api/history` | GET | Get all test history |
+| `/api/ips` | GET | Get bindable LAN/WAN source IPs for the Source IP dropdown |
 | `/api/history/clear` | POST | Clear all history |
 | `/api/export/csv` | GET | Download history as CSV |
 | `/api/export/html` | GET | Download history as HTML report |

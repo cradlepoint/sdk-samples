@@ -38,6 +38,51 @@ def find_iperf3():
     return None
 
 
+def get_source_ips():
+    """Collect bindable local IPs (LAN networks and connected WAN devices).
+
+    Returns a list of {'ip', 'label'} dicts. iperf3 -B binds the client/server
+    socket to one of these local addresses so the test egresses a chosen
+    interface. Only IPv4 addresses are returned (the client command forces -4).
+    """
+    ips = []
+    seen = set()
+
+    def add(ip, label):
+        if ip and ':' not in ip and ip not in seen:
+            seen.add(ip)
+            ips.append({'ip': ip, 'label': label})
+
+    # LAN networks: status/lan/networks/<name>/info has name + ip_address
+    try:
+        networks = cp.get('status/lan/networks') or {}
+        for net in networks.values():
+            info = net.get('info', {}) if isinstance(net, dict) else {}
+            add(info.get('ip_address'), 'LAN: ' + (info.get('name') or 'LAN'))
+    except Exception as e:
+        cp.log(f'Error reading LAN networks: {e}')
+
+    # WAN devices: status/wan/devices/<id>/status.ipinfo.ip_address (only when
+    # connected). Label with the device product/type so the user can tell SIMs
+    # and ethernet WANs apart.
+    try:
+        devices = cp.get('status/wan/devices') or {}
+        for dev in devices.values():
+            if not isinstance(dev, dict):
+                continue
+            status = dev.get('status', {})
+            if status.get('connection_state') != 'connected':
+                continue
+            ip = status.get('ipinfo', {}).get('ip_address')
+            info = dev.get('info', {})
+            name = info.get('product') or info.get('type') or 'WAN'
+            add(ip, 'WAN: ' + name)
+    except Exception as e:
+        cp.log(f'Error reading WAN devices: {e}')
+
+    return ips
+
+
 def load_history():
     """Load test history from disk."""
     try:
@@ -82,6 +127,10 @@ def add_history_entry(opts, summary):
 def build_client_command(binary, opts):
     """Build iperf3 client command from options."""
     cmd = [binary, '-c', opts['host'], '-J']
+    # Bind to a chosen local source IP (LAN or WAN) so the test egresses that
+    # interface. -B must come before other options.
+    if opts.get('source_ip'):
+        cmd += ['-B', opts['source_ip']]
     # Force IPv4 unless the target is an IPv6 literal. iperf3 resolves both A
     # and AAAA and prefers IPv6; a router WAN that hands out an IPv6 address
     # and default route but does not actually pass IPv6 traffic (seen on
@@ -447,6 +496,8 @@ class Iperf3Handler(http.server.SimpleHTTPRequestHandler):
             self.api_status()
         elif self.path == '/api/history':
             self.api_history()
+        elif self.path == '/api/ips':
+            self.api_ips()
         elif self.path == '/api/export/csv':
             self.api_export_csv()
         elif self.path == '/api/export/html':
@@ -560,6 +611,9 @@ class Iperf3Handler(http.server.SimpleHTTPRequestHandler):
     def api_history(self):
         history = load_history()
         self.send_json({'history': history})
+
+    def api_ips(self):
+        self.send_json({'ips': get_source_ips()})
 
     def api_clear_history(self):
         save_history([])
