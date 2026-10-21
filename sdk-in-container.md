@@ -1,8 +1,8 @@
 # Running an NCOS SDK Application in a Container
 
-## 1. Add a Dockerfile to your app folder
+## 1. Add a Dockerfile to your SDK app folder
 
-Swap `my_app.py` for your app's entry point.
+Swap `my_app.py` for your app's entry point, and save as `Dockerfile` in your SDK app folder:
 
 ```dockerfile
 FROM python:3.11-slim
