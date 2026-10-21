@@ -2,14 +2,14 @@
 
 ## 1. Add a Dockerfile to your app folder
 
+Swap `my_app.py` for your app's entry point.
+
 ```dockerfile
 FROM python:3.11-slim
 WORKDIR /app
 COPY . .
 CMD ["python", "-u", "my_app.py"]
 ```
-
-Swap `my_app.py` for your app's entry point.
 
 ## 2. Build and push to Docker Hub
 
