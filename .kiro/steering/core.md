@@ -14,7 +14,9 @@ lives in the topic files listed at the bottom.
 - **Relative paths only** — `tmp/`, never `/tmp`. `os.makedirs('tmp', exist_ok=True)` first.
 - **Never modify a packaged file** — apps are signed (`MANIFEST.json`); the router deletes the
   app if a packaged file changes. Write to new files only.
-- **Never overwrite `package.ini`, `start.sh`, or `cp.py`** — `make.py create` generates them correctly.
+- **Never overwrite `package.ini` or `start.sh`** — `make.py create` generates them correctly.
+- **Never change `cp.py` or `ncm.py`** — these are shared libraries that must stay as-is. Treat
+  them as read-only: import and call them, never edit, patch, or regenerate them.
 - **Never invent an API path or field** — run the API Verification Workflow in `api-reference` first.
 - **Never invent a `cp` function name** — read `cp.py`.
 - **Never use random or placeholder data** — real data from router APIs, or `None`.
