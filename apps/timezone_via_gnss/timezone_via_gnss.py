@@ -184,7 +184,7 @@ if __name__ == "__main__":
         # Invert the timezone value for system config
         inverted_timezone = timezone['data'].replace('-', '+') if timezone['data'].startswith('-') else f"-{timezone['data']}"
         cp.put('config/system/timezone', inverted_timezone)
-        cp.log(f"Timezone offset set applied and saved to SDK Data")
+        cp.log(f"Timezone offset applied and saved to SDK Data")
         notify_message = f"Timezone automatically set to {timezone['data']}"
     else:
         cp.post_appdata('timezone_offset', '+0')
