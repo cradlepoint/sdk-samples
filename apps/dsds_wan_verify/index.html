@@ -61,8 +61,6 @@
 
                     <!-- ============ DASHBOARD (id must be "homepage"; see nav above) ============ -->
                     <section class="element-section active" id="homepage">
-                        <h2 class="section-title">Dashboard</h2>
-
                         <div class="control-panel dwv-statusbar">
                             <div class="panel-content">
                                 <div class="dwv-statusbar-row">
@@ -77,15 +75,18 @@
                                         </button>
                                     </div>
                                 </div>
+                                <!-- Directly under the Monitor status: shown when no slot has
+                                     any test enabled (nothing can fail, so nothing moves), or
+                                     while a failback holdoff is running. It belongs with the
+                                     monitor state it explains, not below the Preferred SIM
+                                     control. -->
+                                <p class="dwv-hint" id="failover-hint"></p>
                                 <!-- Preferred SIM lives here rather than on a config page:
                                      it is one live choice about where traffic should sit, and
                                      it applies the moment it is clicked. Writing it as a
                                      two-way choice is also what makes an equal-priority
                                      config impossible through the UI. -->
                                 <div class="dwv-statusbar-row dwv-preferred-row" id="preferred-sim"></div>
-                                <p class="dwv-hint" id="failover-hint"></p>
-                                <!-- Shown when no slot has any test enabled (nothing can fail,
-                                     so nothing moves), or while a failback holdoff is running. -->
                             </div>
                         </div>
 
@@ -100,7 +101,6 @@
                          system's default heading margins pushed all of it off a short
                          window. -->
                     <section class="element-section dwv-dense" id="tests">
-                        <h2 class="section-title">Connectivity Tests</h2>
                         <!-- Kept to one line on purpose. The page's job is to show the
                              settings; the reasoning behind them lives in the collapsed
                              "why" blocks on each slot, and in full in the Help modal. -->
@@ -123,7 +123,6 @@
 
                     <!-- ============ SIGNAL THRESHOLDS ============ -->
                     <section class="element-section dwv-dense" id="signal">
-                        <h2 class="section-title">Signal Thresholds</h2>
                         <p class="dwv-lead">
                             Per SIM slot: <em>the level at which that slot is no longer worth
                             using</em>. The only test that works on a disconnected slot.
@@ -140,7 +139,6 @@
 
                     <!-- ============ HISTORY ============ -->
                     <section class="element-section" id="history">
-                        <h2 class="section-title">Event Log</h2>
                         <div class="results-panel">
                             <div class="panel-header"><h2><i class="fas fa-clock-rotate-left"></i> Recent Events</h2></div>
                             <div class="results-container">

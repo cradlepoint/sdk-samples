@@ -33,7 +33,21 @@ import cp
 import dsds
 import monitor as monitor_mod
 
-PORT = 8000
+DEFAULT_PORT = 8000
+
+# Optional appdata override for the web server port. A standalone appdata
+# field rather than part of the per-slot config JSON, because the port is
+# an app-wide deployment setting (it may collide with another SDK app or a
+# service on the router) and keeping it separate lets it be set from an
+# NCM group without touching the failover config. Field name:
+#   dsds_wan_verify_port = "8080"
+PORT_APPDATA_FIELD = 'dsds_wan_verify_port'
+
+# The resolved port the web server actually bound to, filled in at
+# startup by _resolve_port(). Used in log messages so they report the
+# real port, not the default.
+PORT = DEFAULT_PORT
+
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _STATIC_DIR = os.path.join(_SCRIPT_DIR, 'static')
 
@@ -285,6 +299,40 @@ class Handler(BaseHTTPRequestHandler):
             self._json({'error': str(e)}, 500)
 
 
+def _resolve_port():
+    """Port for the web server: the appdata override, or the default.
+
+    Reads the standalone appdata field dsds_wan_verify_port. An unset,
+    empty, non-numeric, or out-of-range value falls back to DEFAULT_PORT
+    rather than failing to start, so a bad override never leaves the app
+    with no web UI. Ports below 1024 are rejected because the app does
+    not run privileged; 8000 is the documented default.
+    """
+    try:
+        raw = cp.get_appdata(PORT_APPDATA_FIELD)
+    except Exception as e:
+        cp.log('Could not read %s appdata, using default port %d: %s'
+               % (PORT_APPDATA_FIELD, DEFAULT_PORT, e))
+        return DEFAULT_PORT
+    if raw is None or str(raw).strip() == '':
+        return DEFAULT_PORT
+    try:
+        port = int(str(raw).strip())
+    except (TypeError, ValueError):
+        cp.log('Ignoring non-numeric %s appdata value %r; using default '
+               'port %d' % (PORT_APPDATA_FIELD, raw, DEFAULT_PORT))
+        return DEFAULT_PORT
+    if not (1024 <= port <= 65535):
+        cp.log('Ignoring out-of-range %s appdata value %d (must be '
+               '1024-65535); using default port %d'
+               % (PORT_APPDATA_FIELD, port, DEFAULT_PORT))
+        return DEFAULT_PORT
+    if port != DEFAULT_PORT:
+        cp.log('Web server port overridden to %d via %s appdata'
+               % (port, PORT_APPDATA_FIELD))
+    return port
+
+
 def serve():
     global SERVER
     try:
@@ -314,8 +362,14 @@ def _handle_signal(signum, frame):
 
 
 def main():
-    global MON
+    global MON, PORT
     cp.log('Starting dsds_wan_verify v%s...' % _app_version())
+
+    # Resolve the web server port before the server thread starts, so the
+    # override takes effect and every later log line reports the real
+    # port. Changing it takes an app restart; it is a deployment setting,
+    # not a live control.
+    PORT = _resolve_port()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:

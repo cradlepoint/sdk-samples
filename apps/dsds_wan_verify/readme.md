@@ -89,11 +89,34 @@ right after switching to it. A freshly connected slot legitimately fails tests f
 while it registers on the carrier, so this is the main guard against the modem flapping back and
 forth. Lower it only if you want faster reactions and accept the flapping risk.
 
+**Ping test arming.** The app keeps the ping test disarmed while the modem is switching slots and
+for a few seconds after a slot connects, then arms it only on the connected slot. A DSDS slot
+reports `connected` a moment before its route is usable, and a ping test left running through the
+switch fails on the slot that lost its route - which is why an early-armed test used to flash a
+failure and log `retry_fail` right as a slot came up. With the test armed only once the route is
+ready, the first result is a real one.
+
 **Failback holdoff** (default 1 hour) prevents one specific flap: a slot with strong signal but a
 broken link looks fine from standby, so the app would otherwise return to it, fail, and repeat.
-After the app leaves a slot because its *connectivity* tests failed, it waits this long before
-returning. If the slot carrying traffic then fails too, the app returns early rather than sit on
-a dead link.
+The holdoff is armed in two cases, both of which signal cannot judge from standby:
+
+- The app leaves a slot because its own *connectivity* tests failed.
+- Something **outside the app** — NCOS, a reboot, or an admin elsewhere — moves traffic off the
+  preferred slot. A bad APN, lost registration, or a carrier-side drop makes NCOS fail the modem
+  over on its own, and from standby that slot still reports healthy signal, so without the holdoff
+  the app would immediately fail back into the slot the network just dropped and loop.
+
+After the holdoff is armed the app waits this long before returning. If the slot carrying traffic
+then fails too, the app returns early rather than sit on a dead link.
+
+**Suspended slots are not switch targets.** A SIM that fails to register — most often a bad APN —
+is parked by NCOS on a suspended backoff timer (`suspended (N secs)`) before it returns to
+`standby`. The modem accepts a switch request aimed at a suspended slot but never completes it, so
+the app will not switch to a slot while it is suspended; it waits for the slot to return to
+standby first. If a switch is requested and the modem does not begin switching within a few
+seconds (the slot summaries normally change almost immediately), the app treats the switch as
+failed, logs it, and retries once the target is switchable again rather than waiting out the full
+switch timeout.
 
 ---
 
@@ -108,6 +131,16 @@ Settings are stored as JSON in the appdata field **`dsds_wan_verify`**, shaped a
 `{"slots": {...}}` — everything is per SIM slot. You normally set these through the web UI; this
 table is for reference. Out-of-range values are clamped, not rejected. The app picks up external
 changes (NCM push, REST, manual edit, or deletion) within about 10 seconds without a restart.
+
+### Web server port
+
+The web UI listens on **port 8000** by default. To change it, set a separate appdata field
+**`dsds_wan_verify_port`** to the port number as a string, e.g. `8080`. This is a standalone field
+(not part of the `dsds_wan_verify` config JSON) so it can be pushed from an NCM group on its own.
+The value must be 1024–65535; anything unset, empty, non-numeric, or out of range falls back to
+8000 and is logged. **The port is read once at startup**, so changing it takes an app restart —
+unlike the per-slot config, it is not reloaded live. Remember to open the new port in the Zone
+Firewall forward (see [LAN access](#lan-access)).
 
 ### Per slot (`slots["<port>|<sim>"]`, e.g. `slots["int1|sim1"]`)
 
@@ -174,7 +207,7 @@ higher-is-better, so `-85` beats `-110`.
 
 | Page | Contents |
 |---|---|
-| Dashboard | Status, counters, the **Preferred SIM** selector, manual **Switch SIM Now**, and a card per slot with state, signal, and test results. |
+| Dashboard | Status, counters, the **Preferred SIM** selector, manual **Switch SIM Now**, and a card per slot with state, signal, and test results. When a failback holdoff is active it shows a **Failback hold** counter in the status bar, a **Failback hold** badge with the remaining time on the held slot's card, and an explanatory banner — all counting down as the hold expires. |
 | Connectivity Tests | One tab per slot: how ping and HTTP combine, settle time, failback holdoff, and the ping/HTTP settings. **Test Now** runs an ad-hoc HTTP check. |
 | Signal Thresholds | One tab per slot: the enable and failback toggles, reading count, and the threshold table with live values. |
 | Event Log | In-memory log of switches, failures, and config reloads. |
@@ -218,4 +251,3 @@ switch. Keep the zone forward scoped to trusted networks.
   visible. This is why a connectivity-caused failover uses the failback holdoff.
 - **No switching when nothing is connected.** If both slots are down, NCOS drives recovery and
   the app waits.
-g, and switching all work.

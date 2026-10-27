@@ -102,6 +102,26 @@ NO_ACTIVE_GRACE = 20
 # small read every interval.
 CONFIG_CHECK_INTERVAL = 10
 
+# After a switch attempt that did not start (the modem did not act on the
+# request - usually because the target was suspended), wait this long
+# before trying that target again. Without it, a target stuck in a
+# suspended backoff would be re-attempted every POLL_INTERVAL. Short
+# enough that a target returning to standby is picked up promptly, long
+# enough not to hammer the modem. switch_target_blocked() already screens
+# out a target still reporting suspended, so this only covers the race
+# where it went suspended between the pre-check and the PUT.
+SWITCH_RETRY_COOLDOWN = 15
+
+# How long after a slot first reports 'connected' to wait before arming
+# its IP Verify ping test. A DSDS slot flips to 'connected' a beat before
+# its route and source IP are usable, so a test enabled that instant
+# fires a probe with nowhere to go and logs an immediate failure. This is
+# a short readiness delay for the route to come up - NOT the post-switch
+# settle window (settle_seconds), which governs when the app trusts a
+# slot's own results and is far longer. A few seconds is plenty; the
+# probe just needs the interface routable.
+PING_ARM_DELAY = 5
+
 
 def _describe_failing(failing):
     """Render (metric, value_or_None, threshold) triples for a message.
@@ -162,6 +182,11 @@ class Monitor(object):
         self._reconcile_signature = None
         self._no_active_since = None
         self._no_active_logged = False
+        # target slot_key -> earliest time a switch to it may be retried,
+        # after an attempt that did not start. Cleared on a completed
+        # switch. Keeps a suspended target from being re-attempted every
+        # poll while still retrying promptly once the cooldown passes.
+        self._switch_retry_after = {}
 
     # -- helpers ---------------------------------------------------------
 
@@ -380,12 +405,29 @@ class Monitor(object):
 
     # -- failback holdoff ------------------------------------------------
 
-    def _hold_failback(self, slot_key):
-        """Start the post-connectivity-failure wait on `slot_key`.
+    def _hold_failback(self, slot_key, cause='connectivity', detail=None):
+        """Start the failback holdoff on `slot_key`.
 
-        Called only for a failover the connectivity tests caused. A
-        failover on signal or a lost connection deliberately sets no
-        timer, because the threshold is then a live measurement that
+        `detail` is the modem's own error text for the slot when known
+        (e.g. "CPPM failed: carrier reject"). It replaces the vague stock
+        explanation in the event, so the log says exactly why the slot
+        could not be used.
+
+        Armed for the two moves signal cannot judge from standby:
+
+        * `cause='connectivity'` - the app left this slot because its own
+          ping/HTTP tests failed. Those tests cannot run from standby, so
+          signal would say "come back" regardless.
+        * `cause='system'` - NCOS (or a reboot, or an admin elsewhere)
+          moved traffic off this slot without the app deciding to. The
+          app cannot see *why* NCOS left - a bad APN that suspends the
+          SIM looks exactly like healthy signal from standby - so the
+          same flap applies: signal alone would pull traffic straight
+          back into a slot the network just rejected. This is the case
+          behind a SIM going into a suspended backoff after a bad APN.
+
+        A failover on low signal or a lost connection deliberately sets
+        no timer, because the threshold is then a live measurement that
         already decides whether returning makes sense.
 
         Only ever armed on a slot the app would proactively fail back
@@ -408,14 +450,22 @@ class Monitor(object):
         with self.lock:
             self.failback_hold_slot = slot_key
             self.failback_hold_until = time.time() + seconds
+        # Prefer the modem's own error text - it names the real reason
+        # (e.g. "CPPM failed: carrier reject") instead of a stock phrase.
+        if detail:
+            why = detail
+        elif cause == 'system':
+            why = 'something outside the app moved traffic off it'
+        elif cause == 'failed-switch':
+            why = 'a switch to it failed'
+        else:
+            why = 'its connectivity tests failed'
         # An event, not just a log line: this is the one piece of state
         # that can keep traffic on the secondary SIM for an hour, so it
         # needs to be visible in the UI's Event Log, not only in the
         # router's system log.
-        self.event('Holding off failback to %s for %ds: the app left it '
-                   'because its connectivity tests failed, and signal alone '
-                   'cannot tell whether that is fixed'
-                   % (self._label(slot_key), seconds))
+        self.event('Holding off failback to %s for %ds: %s'
+                   % (self._label(slot_key), seconds, why))
 
     def _clear_failback_hold(self, why=None):
         with self.lock:
@@ -431,6 +481,18 @@ class Monitor(object):
         if self.failback_hold_slot != slot_key:
             return 0
         return max(0, int(self.failback_hold_until - time.time()))
+
+    def _hold_status_text(self, active, held):
+        """One consistent status line for an active failback holdoff.
+
+        Short on purpose: the slot and the remaining time, nothing more.
+        `active` is the connected slot (or None when the modem is still
+        settling), `held` is the slot key being held off.
+        """
+        waiting = self._failback_hold_remaining(held)
+        prefix = 'on %s - ' % dsds.slot_label(active) if active else ''
+        return '%sholding off failback to %s for %dm %ds' % (
+            prefix, self._label(held), waiting // 60, waiting % 60)
 
     # What an unreported metric means, per context. The two directions
     # are not symmetric: the app will not leave a slot on a metric it
@@ -487,8 +549,37 @@ class Monitor(object):
             target = slots.get(target_key) if target_key else None
             if not target:
                 return False, 'no sibling slot found on port %s' % current.get('port')
-            if target.get('nosim'):
-                return False, 'sibling slot %s has no SIM' % dsds.slot_label(target)
+            # The failback holdoff is authoritative for EVERY automatic
+            # switch to the held slot, not just the proactive failback
+            # path. An earlier version only gated _maybe_failback(), so a
+            # retry after a 'did not start' attempt could still fire a
+            # switch to the held slot while the hold was plainly active -
+            # which is how the dashboard ended up showing "switch in
+            # progress" and "failback hold 59m" at the same time. Hold
+            # until failback: refuse the switch while the hold runs.
+            # Manual switches bypass it, as the operator asked explicitly.
+            if not manual:
+                hold_left = self._failback_hold_remaining(target_key)
+                if hold_left:
+                    return False, 'failback to %s is held for another %ds' \
+                        % (dsds.slot_label(target), hold_left)
+            # A suspended target (bad APN / registration backoff) or one
+            # with no SIM accepts the switch but never completes, so stop
+            # here rather than burning a ~30s attempt that can only time
+            # out. switch_target_blocked() returns the reason or None.
+            blocked = dsds.switch_target_blocked(target)
+            if blocked:
+                return False, blocked
+            # Back off a target whose last attempt did not start, so a
+            # momentary suspend between the pre-check and the PUT does not
+            # turn into a per-poll retry storm. Manual switches bypass
+            # this - the operator asked for it explicitly.
+            if not manual:
+                retry_after = self._switch_retry_after.get(target_key, 0)
+                if time.time() < retry_after:
+                    return False, '%s switch is cooling down for %ds after a ' \
+                        'failed attempt' % (dsds.slot_label(target),
+                                            int(retry_after - time.time()))
 
             self.switching = True
             self.status_text = 'switching to %s' % dsds.slot_label(target)
@@ -511,8 +602,16 @@ class Monitor(object):
                 self.failback_ok_counts = {}
                 self.http_results = {}
                 self._http_next_run = {}
+                # Drop the ping state too, so the dashboard shows the
+                # outgoing slot's test as "unknown" for the duration of
+                # the switch instead of its last (soon stale) verdict.
+                # Without this the pre-switch pass/fail lingers in the UI
+                # and the armed set until the next reconcile.
+                self.armed_tests = {}
+                self.ping_results = {}
 
-            ok, elapsed, slots = dsds.wait_for_switch(current['key'])
+            ok, elapsed, slots, fail_reason = dsds.wait_for_switch(
+                current['key'], target_key)
             new_active = dsds.active_slot(slots)
             settle = appconfig.slot_config(
                 self.conf, new_active['key'])['settle_seconds'] \
@@ -530,6 +629,8 @@ class Monitor(object):
                 self._last_active = new_active['key']
                 with self.lock:
                     self.active_since = time.time()
+                    # The switch landed, so any cooldown on it is spent.
+                    self._switch_retry_after.pop(new_active['key'], None)
                 # Any hold on the slot just arrived at is moot - the app
                 # is on it, so there is nothing to fail back to. Set a
                 # fresh hold on the one being left if connectivity is
@@ -547,8 +648,57 @@ class Monitor(object):
                 return True, 'switched to %s in %.0fs' % (
                     dsds.slot_label(new_active), elapsed)
 
-            self.event('Switch did not complete within %.0fs; no slot is '
-                       'connected' % elapsed, 'error')
+            # The modem's own error text for the target names the real
+            # reason the switch failed (e.g. "CPPM failed: carrier
+            # reject"), so pull it from the just-discovered slots and use
+            # it in every message rather than a vague stock phrase.
+            err = (slots.get(target_key) or {}).get('error_text')
+            err_suffix = ': %s' % err if err else ''
+
+            # Any failed switch arms the failback holdoff on the target.
+            # Whatever the exact failure - the modem never acted ('did
+            # not start'), the target went suspended ('target failed'),
+            # or it never connected in time ('timed out') - the target
+            # could not be brought up, which is precisely what the holdoff
+            # is for. Arming it here (rather than a short retry cooldown)
+            # is what makes the app hold until failback instead of
+            # re-attempting the dead slot every few seconds.
+            # _hold_failback() no-ops unless the target is the preferred
+            # slot with a holdoff configured, which is the only slot a
+            # proactive failback would ever retry; a failed *failover* to
+            # a non-preferred slot falls through to the short cooldown.
+            self._hold_failback(target_key, cause='failed-switch', detail=err)
+            if not self._failback_hold_remaining(target_key):
+                # No holdoff applied (target is not the preferred slot, or
+                # the holdoff is configured to 0), so fall back to the
+                # short cooldown so a failed failover is still retried.
+                with self.lock:
+                    self._switch_retry_after[target_key] = \
+                        time.time() + SWITCH_RETRY_COOLDOWN
+
+            if fail_reason == 'did not start':
+                self.event('Switch to %s did not start within %.0fs - the '
+                           'modem did not act on the request%s'
+                           % (dsds.slot_label(target), elapsed, err_suffix),
+                           'warn')
+                self.status_text = 'switch to %s did not start' \
+                    % dsds.slot_label(target)
+                return False, 'switch did not start within %.0fs' % elapsed
+
+            if fail_reason == 'target failed':
+                self.event('Switch to %s failed after %.0fs%s'
+                           % (dsds.slot_label(target), elapsed,
+                              err_suffix or ': the slot went suspended '
+                              'instead of connecting'), 'error')
+                self.status_text = 'switch to %s failed%s' % (
+                    dsds.slot_label(target),
+                    ' (%s)' % err if err else ' (suspended)')
+                return False, 'target %s failed to connect' \
+                    % dsds.slot_label(target)
+
+            self.event('Switch to %s did not complete within %.0fs%s'
+                       % (dsds.slot_label(target), elapsed, err_suffix),
+                       'error')
             self.status_text = 'switch timed out'
             return False, 'switch did not complete within %.0fs' % elapsed
         finally:
@@ -663,12 +813,19 @@ class Monitor(object):
                     self._reconcile_signature = signature
                     # A config write blanks every result; give the poller
                     # time to produce real verdicts before trusting them.
-                    worst = max(
-                        [e['cfg']['interval'] +
-                         e['cfg']['retry_count'] * e['cfg']['retry_interval']
-                         for e in desired.values()] or [0])
-                    self.settle_until = max(
-                        self.settle_until, time.time() + worst + 2)
+                    # Only extend the settle window when a test was
+                    # actually armed (active_key set). During the initial
+                    # post-connect settle the caller passes active_key =
+                    # None to keep every test disabled, and extending the
+                    # window then would just push settle out for a write
+                    # that armed nothing.
+                    if active_key is not None:
+                        worst = max(
+                            [e['cfg']['interval'] +
+                             e['cfg']['retry_count'] * e['cfg']['retry_interval']
+                             for e in desired.values()] or [0])
+                        self.settle_until = max(
+                            self.settle_until, time.time() + worst + 2)
         elif not desired:
             with self.lock:
                 self.armed_tests = {}
@@ -734,7 +891,8 @@ class Monitor(object):
         live = set(slots)
         with self.lock:
             for store in (self.signal_fail_counts, self.failback_ok_counts,
-                          self.http_results, self._http_next_run):
+                          self.http_results, self._http_next_run,
+                          self._switch_retry_after):
                 for key in [k for k in store if k not in live]:
                     del store[key]
 
@@ -752,9 +910,29 @@ class Monitor(object):
                 self._clear_failback_hold('the wait expired')
 
         if dsds.switch_in_progress(slots):
-            self.status_text = 'SIM switch in progress'
+            # The modem is mid-transition. If the app did not ask for it
+            # (self.switching is False) it is doing it on its own - most
+            # often unwinding a failed failback the app just abandoned,
+            # while the hold it armed is already in effect. Reporting
+            # "SIM switch in progress" next to an active hold reads as a
+            # contradiction, so while a hold is active, report the hold.
+            # Disarm every managed ping test while the modem transitions.
+            # The slot being left loses its route during the switch, so a
+            # test still enabled on it fails - and that stale failure is
+            # what flashes a red X the instant the slot reconnects, and
+            # what NCOS logs as "retry_fail -> failure_states". Nothing
+            # can be meaningfully verified mid-switch, so take them all
+            # down; _sync_ipverify re-arms the connected slot after it
+            # settles.
+            self._sync_ipverify(None)
+            held = self.failback_hold_slot
+            if not self.switching and held and self._failback_hold_remaining(held):
+                self.status_text = self._hold_status_text(active=None, held=held)
+            else:
+                self.status_text = 'SIM switch in progress'
             return
         if self.switching:
+            self._sync_ipverify(None)
             return
 
         active = dsds.active_slot(slots)
@@ -770,6 +948,9 @@ class Monitor(object):
             if self._no_active_since is None:
                 self._no_active_since = time.time()
             if time.time() - self._no_active_since < NO_ACTIVE_GRACE:
+                # No slot is carrying traffic, so no ping test can pass;
+                # keep them disarmed so none logs a failure in the gap.
+                self._sync_ipverify(None)
                 self.status_text = 'slot transition in progress'
                 return
             if not self._no_active_logged:
@@ -784,14 +965,60 @@ class Monitor(object):
                 # A slot change the app did not initiate (NCOS, a reboot,
                 # or a manual switch elsewhere) still needs a settle
                 # window, taken from the incoming slot's own config.
-                if self._last_active is not None:
-                    self.event('Active slot changed to %s'
-                               % dsds.slot_label(active))
+                left_key = self._last_active
+                if left_key is not None:
+                    # The modem's error text on the slot just left names
+                    # why NCOS moved off it (e.g. "CPPM failed: carrier
+                    # reject"), so include it instead of only saying the
+                    # slot changed.
+                    left_err = (slots.get(left_key) or {}).get('error_text')
+                    self.event('Active slot changed from %s to %s%s'
+                               % (self._label(left_key),
+                                  dsds.slot_label(active),
+                                  ': %s' % left_err if left_err else ''))
                     with self.lock:
                         self.settle_until = max(
                             self.settle_until,
                             time.time() + appconfig.slot_config(
                                 self.conf, active_key)['settle_seconds'])
+                    # NCOS moved traffic off left_key on its own. If that
+                    # is the slot the app would proactively fail back to
+                    # (the preferred one), arm the holdoff on it: the app
+                    # cannot see why NCOS left - a bad APN that suspends
+                    # the SIM reads as healthy signal from standby - so
+                    # without this the signal failback would pull traffic
+                    # straight back into the slot the network just
+                    # dropped and loop. _hold_failback() no-ops unless
+                    # left_key is the preferred slot and a holdoff is
+                    # configured. Not armed when the app itself drove the
+                    # switch: do_switch() handles that case with its own
+                    # cause, and _last_active was already updated there so
+                    # this branch does not see it as external.
+                    #
+                    # The one exception is a signal-driven departure. If
+                    # left_key is below its own signal threshold right now
+                    # - readable because a DSDS modem keeps reporting the
+                    # standby slot's diagnostics - then signal already
+                    # explains why NCOS left and, being a live measurement
+                    # from standby, already gates the return. A holdoff
+                    # would only delay a failback the threshold is fitted
+                    # to decide, so it is skipped. Any other departure
+                    # (signal fine, or no signal test on the slot) is one
+                    # signal cannot see, so the holdoff still applies.
+                    left_cfg = appconfig.slot_config(self.conf, left_key)
+                    left_slot = slots.get(left_key) or {}
+                    left_breaches, _ = self._signal_breaches(left_slot, left_cfg)
+                    if left_breaches:
+                        cp.log('Active slot changed off %s while it was below '
+                               'its signal threshold (%s); not arming the '
+                               'failback holdoff, because signal gates the '
+                               'return on its own'
+                               % (self._label(left_key), ', '.join(
+                                   '%s %g < %g' % (m, v, t)
+                                   for m, v, t in left_breaches)))
+                    else:
+                        self._hold_failback(left_key, cause='system',
+                                            detail=left_err)
                 # Something outside the app put traffic back on the held
                 # slot (NCOS, a reboot, an admin elsewhere). There is
                 # nothing left to fail back to, so the guard is spent.
@@ -808,7 +1035,30 @@ class Monitor(object):
                     self.http_results = {}
                     self._http_next_run = {}
 
-        self._sync_ipverify(active_key)
+        # Don't arm the connected slot's ping test the instant the slot
+        # reports 'connected'. A DSDS slot flips to 'connected' a beat
+        # before its route and source IP are usable, and IP Verify,
+        # enabled that instant, fires a probe that has nowhere to go and
+        # logs a failure the same second the slot comes up (observed:
+        # "retry_fail -> failure_states" at connect time).
+        #
+        # Wait a short, fixed readiness delay after the slot became
+        # active (PING_ARM_DELAY) - just long enough for the route to be
+        # up - NOT the full post-switch settle window, which is far
+        # longer and serves a different purpose (when the app trusts a
+        # slot's own results). Measured on an R2400: once armed on a
+        # routable slot the first verdict lands ~one ping interval later,
+        # and _sync_ipverify()'s own settle extension already covers that
+        # wait before the app trusts a result.
+        #
+        # arm_key=None leaves every managed test disabled; once the delay
+        # passes the real key arms it. active_since is 0 on a fresh start
+        # with a long-connected slot, so arming is immediate there.
+        connected = bool(active and active.get('connected'))
+        route_ready = connected and \
+            time.time() >= self.active_since + PING_ARM_DELAY
+        arm_key = active_key if route_ready else None
+        self._sync_ipverify(arm_key)
 
         for slot in slots.values():
             self._maybe_run_http(slot, appconfig.slot_config(self.conf, slot['key']))
@@ -907,13 +1157,15 @@ class Monitor(object):
     def _try_failover(self, active, slots, reason, conn_failed=False):
         target_key = active.get('sibling')
         target = slots.get(target_key) if target_key else None
-        if not target:
-            self.status_text = 'on %s - %s, but there is no sibling slot to ' \
-                               'move to' % (dsds.slot_label(active), reason)
-            return
-        if target.get('nosim'):
-            self.status_text = 'on %s - %s, but %s has no SIM' % (
-                dsds.slot_label(active), reason, dsds.slot_label(target))
+        # A suspended sibling (bad APN / registration backoff) cannot be
+        # switched to until its timer expires, and a slot with no SIM
+        # never can. Report it and wait rather than firing a switch that
+        # can only fail - the connected slot stays put, which beats
+        # dropping everything for a switch the modem will not complete.
+        blocked = dsds.switch_target_blocked(target)
+        if blocked:
+            self.status_text = 'on %s - %s, but cannot switch: %s' % (
+                dsds.slot_label(active), reason, blocked)
             return
 
         target_cfg = appconfig.slot_config(self.conf, target_key)
@@ -1018,6 +1270,37 @@ class Monitor(object):
         if not self._is_higher_priority(target_key, active['key']):
             return
 
+        # The holdoff is checked FIRST, before signal, suspended state, or
+        # anything else about the target. While it is running the decision
+        # is already made - the app is not failing back to this slot,
+        # full stop - so there is nothing to evaluate and nothing to say
+        # about the target's signal or whether it is suspended. Checking
+        # those first (as an earlier version did) made the dashboard cycle
+        # through "recovered but is suspended", "failing back in N
+        # readings", etc. while a 59-minute hold was plainly in effect,
+        # which read as though the app were still trying to switch. Just
+        # wait out the hold.
+        waiting = self._failback_hold_remaining(target_key)
+        if waiting:
+            self.failback_ok_counts.pop(target_key, None)
+            self.status_text = self._hold_status_text(active, target_key)
+            return
+
+        # A suspended higher-priority slot still reports healthy signal
+        # from standby, so without this guard the app would fire a
+        # failback the modem cannot complete (the switch never leaves the
+        # suspended slot) and repeat every cycle. Wait for it to return
+        # to standby. Streak reset so recovery is re-counted cleanly once
+        # it is switchable again.
+        if target.get('suspended'):
+            self.failback_ok_counts.pop(target_key, None)
+            self.status_text = \
+                'on %s - higher-priority %s recovered but is %s; waiting ' \
+                'for it to become switchable' % (
+                    dsds.slot_label(active), dsds.slot_label(target),
+                    target.get('summary') or 'suspended')
+            return
+
         cfg = appconfig.slot_config(self.conf, target_key)
         if not cfg.get('signal_failback_enabled'):
             return
@@ -1026,22 +1309,6 @@ class Monitor(object):
             # Signal is the only thing measurable on a standby slot, so
             # with no threshold set there is nothing to recover above and
             # failback stays manual.
-            return
-
-        # The app left this slot because its connectivity tests failed,
-        # and those tests cannot run while it is on standby. Its signal
-        # will keep saying "come back" regardless, so without this wait
-        # the app would return, fail connectivity, leave, and repeat
-        # every settle + ~30s. Not applied to a signal or disconnect
-        # failover, where the threshold below is live evidence.
-        waiting = self._failback_hold_remaining(target_key)
-        if waiting:
-            self.failback_ok_counts.pop(target_key, None)
-            self.status_text = \
-                'on %s - holding off failback to higher-priority %s for ' \
-                'another %dm %ds after its connectivity failure' % (
-                    dsds.slot_label(active), dsds.slot_label(target),
-                    waiting // 60, waiting % 60)
             return
 
         ok, failing = self._signal_allows_failback(target, cfg)
@@ -1128,9 +1395,11 @@ class Monitor(object):
                     'connection_state': slot.get('connection_state'),
                     'summary': slot.get('summary'),
                     'reason': slot.get('reason'),
+                    'error_text': slot.get('error_text'),
                     'connected': slot.get('connected'),
                     'active_sib': slot.get('active_sib'),
                     'switching': slot.get('switching'),
+                    'suspended': slot.get('suspended'),
                     'ip_address': slot.get('ip_address'),
                     'service_type': slot.get('service_type'),
                     'service_detail': slot.get('service_detail'),
