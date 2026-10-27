@@ -76,6 +76,14 @@ Ping and HTTP combine per slot — by default both must pass; you can set it to 
 retries on its own before a failure counts, so a reported failure is already confirmed and acted
 on right away.
 
+The ping test is bound to the connected slot's WAN IP (it sets the IP Verify test's `source_ip`),
+so the probe is forced out that SIM rather than following the router's default route. On a
+public-internet SIM both behave the same, but on a **private APN** (for example a private 5G core
+such as EP5G) the router has no default route to a public ping target out that slot, so an unbound
+probe never leaves the modem and the test fails even though the link is up. If ping still will not
+pass on a private APN, point it at a target reachable *inside* that network, or use the HTTP test,
+which is bound the same way.
+
 **Settle time** (default 20s) tells the app to ignore a slot's test results for a short while
 right after switching to it. A freshly connected slot legitimately fails tests for a few seconds
 while it registers on the carrier, so this is the main guard against the modem flapping back and

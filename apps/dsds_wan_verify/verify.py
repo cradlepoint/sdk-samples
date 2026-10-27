@@ -93,6 +93,24 @@ def _ping_test_payload(slot, target, cfg):
     UIDs survive a DSDS switch (verified), but they are still runtime
     values, so reconcile_ping_tests() rewrites this field whenever the
     resolved UID for a slot changes.
+
+    `source_ip` is bound to the slot's current WAN IP for the same reason
+    the HTTP test binds its socket source address: `wan_trigger_field`
+    alone only *selects* the device, it does not force the ICMP source
+    onto that interface. Without it the router sources the probe from its
+    own host stack and relies on a default route to the target existing -
+    which it does on a public-internet SIM but not on a private APN (e.g.
+    an EP5G core), where the router has no host route to a public target
+    out that slot. The probe is then generated but never leaves the slot
+    (confirmed on the router: an unbound test passes on a public SIM; the
+    same test with source_ip set to the slot's WAN IP also passes, and
+    set to any other address fails - so the router honours the bind).
+
+    The IP is a runtime value, so like the UID it is rewritten by
+    reconcile_ping_tests() when it changes. A slot with no current IP
+    (standby, or mid-connect) yields '' here, which is the field default
+    and allowed; the active slot, whose test is the only one enabled,
+    always has one.
     """
     return {
         'ping_target': target,
@@ -101,6 +119,10 @@ def _ping_test_payload(slot, target, cfg):
         # info/uid is the bare hex ('5a3e6e08'), not the 'mdm-' prefixed
         # device key used in status paths.
         'wan_trigger_value': (slot.get('uid') or '').replace('mdm-', ''),
+        # Force the probe out this slot's WAN interface, not the router's
+        # default route. The reason this test exists is to prove THIS
+        # slot can carry traffic.
+        'source_ip': slot.get('ip_address') or '',
         'pkt_per_try': int(cfg.get('pkt_per_try', 1)),
         'pkt_size': int(cfg.get('pkt_size', 36)),
         'pkt_timeout': int(cfg.get('pkt_timeout', 10)),

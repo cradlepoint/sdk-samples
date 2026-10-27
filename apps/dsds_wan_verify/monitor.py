@@ -639,9 +639,15 @@ class Monitor(object):
                 },
             }
 
+        # ip_address is part of the signature because the ping test now
+        # binds source_ip to the slot's WAN IP (so the probe is forced
+        # out that slot, like the HTTP test). A slot can reconnect with a
+        # new IP without a DSDS switch, and that has to rewrite the bound
+        # source_ip; the IP is otherwise stable while connected, so this
+        # adds no per-tick churn.
         signature = (active_key, tuple(sorted(
-            (key, entry['slot'].get('uid'), tuple(entry['targets']),
-             tuple(sorted(entry['cfg'].items())))
+            (key, entry['slot'].get('uid'), entry['slot'].get('ip_address'),
+             tuple(entry['targets']), tuple(sorted(entry['cfg'].items())))
             for key, entry in desired.items())))
 
         if signature != self._reconcile_signature:
