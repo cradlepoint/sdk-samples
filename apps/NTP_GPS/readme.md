@@ -5,26 +5,20 @@ NTP requests are answered on **UDP port 1123** (all interfaces) with reference I
 
 ## How it works
 
-**Primary source: the GNSS daemon socket** (`127.0.0.1:17488`). After the `ALL` command, gnssd streams,
-each GPS second:
+**Time source: `status/gps/nmea` polling** every 0.2 s. This is the one source used on all
+router models (R1900, R2400, ...). The per-model GNSS daemon socket is deliberately not used:
+its timing sentences differ by hardware (`$PCPTMDBG` on some, `$PCPTMINR` on others), so polling
+the status tree is the only consistent source.
 
-- the `RMC` sentence, giving the true UTC second and fix validity;
-- `$PCPTMDBG,UTC Time Tag <fix_uptime> system time <sys_uptime>`, the daemon's own uptime value
-  for that fix and its clock reading when it emitted the line.
+Each GPS second the app reads the NMEA array and takes the freshest UTC time from it — the date
+from `RMC` (or `ZDA`), the time of day from the newest of `RMC`/`ZDA`/fix-valid `GGA`/`GLL`, since
+`RMC`/`ZDA` in the status tree can lag `GGA` by one epoch. A change between two closely spaced
+polls marks a new GPS second and yields one offset sample against the monotonic clock.
 
-The daemon's uptime clock and the app's `time.monotonic()` are both `CLOCK_MONOTONIC` with a
-fixed offset, measured as `monotonic_at_arrival - sys_uptime` on each line. That converts
-`fix_uptime` to the app's clock and removes the socket transport delay exactly — no guessing.
-`fix_uptime` still trails the true GPS-second epoch by a fixed receiver+daemon fix latency
-(`ntp_gps_fix_latency_ms`, see below), which is subtracted.
-
-**Fallback: `status/gps/nmea` polling** every 0.2 s, if the socket is unavailable. NCOS
-publishes that array about 0.7 to 1.0 s after the GPS second, with a drifting delay, and its
-RMC/ZDA are one second older than GGA/GLL. The app retries the socket every 60 s.
-
-Each GPS second gives one offset sample against the monotonic clock. The socket samples cluster
-tightly, so the median of the last 30 is what NTP replies are built from. (The fallback uses the
-largest offset, the least-delayed poll.)
+NCOS publishes the array a few tenths of a second after the GPS second, so a fixed
+`STATUS_TREE_LATENCY` (0.8 s) is added to each sample. A polled sample can only ever arrive late,
+so the largest offset in the last 30 is the least-delayed one, and that is what NTP replies are
+built from.
 
 - **No GPS fix yet**: replies carry LI=3 (alarm) and stratum 16, so clients reject them.
 - **GPS lost after sync**: the server keeps answering from the monotonic clock for the holdover
@@ -37,25 +31,12 @@ The same state is published to `status/ntp_gps` (see Status below).
 
 ## Accuracy
 
-Measured on an R2400 (NCOS 7.26.100) from a LAN host synced to time.apple.com, the server read
-within **±3 ms of true time**, consistently (several rounds of −0.6 to −2.3 ms, run-to-run
-spread 2–4 ms), with reported dispersion around 10 ms. A PPS-disciplined server is still better;
-the limit here is the receiver+daemon fix latency and its stability, not GPS.
+Expect roughly a few hundred milliseconds. The limit is the `status/gps/nmea` publish delay and
+its drift, corrected by the fixed `STATUS_TREE_LATENCY` (0.8 s) constant and the least-delayed
+sample selection. This is coarser than a PPS-disciplined server, but it is the same on every
+model and needs no per-hardware calibration.
 
-On the status-tree fallback, expect a few hundred ms.
-
-Two caveats on the absolute figure:
-
-- The `±3 ms` is relative to a reference (time.apple.com via a Mac) that is itself only good to
-  about ±90 ms absolute. The *stability* is real; the absolute zero point is only as good as
-  that reference, because it is baked into `ntp_gps_fix_latency_ms`.
-- `ntp_gps_fix_latency_ms` (default 141) is the one calibrated constant, measured on one R2400
-  and firmware. A different model, firmware, or antenna may shift it. To recalibrate, query the
-  app from a LAN host with a well-synced clock (see Testing): if the app reads ahead of that
-  host, lower the value by that amount; if behind, raise it.
-
-The "system clock offset" in the log is the router's own SNTP error, measured about 0.8 s here;
-it is not the app's error.
+The "system clock offset" in the log is the router's own SNTP error; it is not the app's error.
 
 **Do not point the router's own NTP client at this app** (`127.0.0.1:1123`) while
 calibrating. The router clock then follows the app, and the offset line always reads near zero.
@@ -85,7 +66,8 @@ unsynced object rather than left stale.
 | Field | Description |
 |---|---|
 | `synced` | `true` when the server is currently serving GPS-derived time |
-| `source` | Active time source: `gnss-socket`, `status-tree`, or `none` |
+| `source` | Active time source path: `status/gps/nmea`, or `none` before the first sample |
+| `sentence` | Full NMEA id of the sentence the latest time came from, e.g. `GPGGA`, `GNRMC` (`null` before the first sample) |
 | `samples` | Offset samples in the current window (up to 30) |
 | `sample_age_s` | Seconds since the last GPS sample, or `null` |
 | `dispersion_ms` | Reported root dispersion, milliseconds |
@@ -104,13 +86,12 @@ All fields are optional. Defaults are applied in code.
 |---|---|---|---|
 | `ntp_gps_port` | No | `1123` | UDP port the NTP server listens on |
 | `ntp_gps_holdover` | No | `300` | Seconds to keep serving time after GPS samples stop |
-| `ntp_gps_fix_latency_ms` | No | `141` | Receiver+daemon fix latency: how far the GNSS daemon's fix timestamp trails the true GPS second. Subtracted from the served time. Calibrate per hardware (see Accuracy) |
 
 ## Security
 
 NTP is unauthenticated. Any host that can reach the port can query it. Replies are the same size
 as requests (48 bytes) and only client-mode packets are answered, so the server cannot be used
-for traffic amplification. The GNSS socket is local-only (`127.0.0.1`).
+for traffic amplification.
 
 ## Dependencies
 

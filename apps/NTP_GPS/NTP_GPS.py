@@ -1,15 +1,14 @@
 """NTP_GPS - NTP server whose time comes from GPS NMEA instead of the system clock.
 
-Time source (in order of preference):
-1. The GNSS daemon socket (127.0.0.1:17488, see the ibr1700_gnss app). After the NMEA command
-   it pushes every sentence as soon as gnssd has it, so the arrival of the first sentence of
-   each epoch marks the GPS second with only a few milliseconds of jitter.
-2. Fallback for models without the socket: poll status/gps/nmea and treat each change in the
-   array as a new second. NCOS publishes that array with a larger, drifting delay.
+Time source: poll status/gps/nmea and treat each change in the sentence array as a new GPS
+second. This is consistent across all router models (R1900, R2400, ...), unlike the GNSS daemon
+socket whose timing sentences differ by hardware. NCOS publishes the array with a modest,
+somewhat drifting delay (a few tenths of a second), which a fixed latency constant corrects for.
 
-Each epoch gives one sample: (GPS UTC time + latency) - monotonic clock at arrival. The largest
-offset in a short window is the least-delayed sample, and NTP replies on UDP port 1123
-(configurable) are built from it.
+Each epoch gives one sample: (GPS UTC time + latency) - monotonic clock at arrival. A polled
+sample can only ever arrive late, so the largest offset in a short window is the least-delayed
+one, closest to the true GPS second; NTP replies on UDP port 1123 (configurable) are built
+from it.
 
 If GPS is lost, the server keeps answering from the monotonic clock for a holdover period,
 then reports itself unsynchronized (LI=3, stratum 16) so clients stop trusting it.
@@ -32,23 +31,12 @@ STATUS_PATH = 'status/ntp_gps'  # app publishes its own sync state here (RAM onl
 
 DEFAULT_PORT = 1123
 DEFAULT_HOLDOVER = 300        # seconds to keep serving after the last GPS sample
-DEFAULT_FIX_LATENCY_MS = 141  # receiver+daemon fix latency: how far the daemon's fix_uptime
-                              # trails the true GPS-second epoch (R2400, NCOS 7.26.100, measured
-                              # against time.apple.com to +-1 ms run-to-run). Subtracted from the
-                              # GPS time. Fixed per hardware/firmware; tune via appdata.
-STATUS_TREE_LATENCY = 0.8     # GPS second -> status/gps/nmea publish delay (fallback source)
-
-GNSS_ADDR = ('127.0.0.1', 17488)
-GNSS_COMMAND = b'ALL\r\n'     # needed for $PCPTMGPSTIME / $PCPTMDBG timing sentences
-GNSS_IDLE_TIMEOUT = 5.0       # reconnect if the socket is silent this long
-MAX_LINE = 4096               # drop a partial line that grows past this (no newline seen)
-MIN_EPOCH_GAP = 0.5           # epochs arriving closer together are history backlog, not live
+STATUS_TREE_LATENCY = 0.8     # GPS second -> status/gps/nmea publish delay, added to each sample
 
 TIME_SENTENCES = ('RMC', 'ZDA', 'GGA', 'GLL')
 MAX_DATE_SKEW = 5.0           # seconds a time-of-day sentence may differ from the RMC/ZDA time
-POLL_INTERVAL = 0.2           # fallback: seconds between status/gps/nmea reads
-MAX_POLL_GAP = 0.5            # fallback: discard an edge if the polls around it were further apart
-FALLBACK_PERIOD = 60          # fallback: seconds to poll before retrying the socket
+POLL_INTERVAL = 0.2           # seconds between status/gps/nmea reads
+MAX_POLL_GAP = 0.5            # discard an edge if the polls around it were further apart
 
 SAMPLE_WINDOW = 30            # offset samples kept (about 30 s at 1 Hz)
 STEP_THRESHOLD = 1.0          # GPS time disagreeing with the estimate by more resets the window
@@ -73,19 +61,17 @@ class GpsClock:
         self.offsets = deque(maxlen=SAMPLE_WINDOW)  # gps_unix - monotonic
         self.last_sample_mono = None  # type: Optional[float]
         self.source = 'none'
+        self.sentence = None  # type: Optional[str]  NMEA sentence the latest time came from
 
     def _best_offset(self) -> Optional[float]:
         if not self.offsets:
             return None
-        if self.source == 'gnss-socket':
-            # Socket samples are already corrected to the true GPS second via the daemon's
-            # timestamps, so they scatter symmetrically. The median rejects jitter without bias.
-            return sorted(self.offsets)[len(self.offsets) // 2]
-        # Polling (fallback): a sample can only arrive late, shrinking its offset. The largest
-        # offset in the window is the least-delayed, hence closest to the true second.
+        # A polled sample can only arrive late, shrinking its offset. The largest offset in the
+        # window is the least-delayed, hence closest to the true GPS second.
         return max(self.offsets)
 
-    def add_sample(self, gps_unix: float, mono: float, source: str) -> None:
+    def add_sample(self, gps_unix: float, mono: float, source: str,
+                   sentence: Optional[str] = None) -> None:
         offset = gps_unix - mono
         with self.lock:
             best = self._best_offset()
@@ -99,6 +85,9 @@ class GpsClock:
                 self.offsets.clear()
             self.offsets.append(offset)
             self.last_sample_mono = mono
+            # The winning sentence can alternate epoch to epoch (GGA vs RMC); track it for
+            # display only, separately from `source`, so it never triggers a window reset.
+            self.sentence = sentence
 
     def now(self) -> Optional[float]:
         """Current GPS-derived Unix time, or None if unsynchronized."""
@@ -138,131 +127,7 @@ def get_appdata_number(name: str, default: float, cast=float):
 
 
 # ---------------------------------------------------------------------------------------------
-# Primary source: GNSS daemon socket
-# ---------------------------------------------------------------------------------------------
-
-class EpochTracker:
-    """Turns the GNSS daemon's timing sentences into exact (gps_unix, gps_second_mono) samples.
-
-    Each GPS second, within a burst that arrives in a few ms, gnssd emits (verified on an
-    R2400, NCOS 7.26.100):
-
-      $G?RMC ...,status,...,date,...
-          The true UTC second and whether the fix is valid.
-
-      $PCPTMDBG,UTC Time Tag <fix_uptime> system time <sys_uptime>
-          <fix_uptime>  - the daemon's uptime value for this GPS second, already corrected for
-                          receiver fix latency (fractional, e.g. ...495).
-          <sys_uptime>  - the daemon's uptime-clock reading when it emitted the line, tens of ms
-                          later. The app records time.monotonic() = `mono` at the same instant.
-
-    The daemon's uptime clock and the app's time.monotonic() are both CLOCK_MONOTONIC but have
-    DIFFERENT ORIGINS, so they differ by a constant C = mono - sys_uptime, measured from the same
-    line (re-measuring every second absorbs slow skew between the two clocks). That removes the
-    socket transport delay exactly:  gps_second_mono = fix_uptime + C.
-
-    fix_uptime itself still trails the true GPS-second epoch by the receiver+daemon fix latency
-    (~141 ms on an R2400, constant to +-1 ms), which is NOT exposed in any sentence, so it is
-    subtracted as a fixed, tunable offset (fix_latency). That is the one calibrated constant left.
-
-    (The $PCPTMGPSTIME third field is NOT hhmmss UTC - its seconds run past 60, so it is a GPS
-    time-of-week count. The UTC second is taken from RMC instead.)
-    """
-
-    def __init__(self, fix_latency: float):
-        self.fix_latency = fix_latency  # receiver+daemon lag of fix_uptime behind true GPS second
-        self.utc = None                 # type: Optional[float]   UTC unix sec from current RMC/ZDA
-        self.have_fix = False           # latest RMC reported status 'A'
-        self.prev_arrival = None        # type: Optional[float]
-
-    def feed(self, line: str, mono: float) -> Optional[Tuple[float, float]]:
-        talker = line[3:6]
-        if talker == 'RMC':
-            try:
-                msg = NMEAReader.parse(line)
-                self.have_fix = msg.status == 'A'
-                if self.have_fix and msg.date and msg.time:
-                    self.utc = datetime.combine(msg.date, msg.time, timezone.utc).timestamp()
-            except Exception:
-                pass
-            return None
-
-        if line.startswith('$PCPTMDBG,UTC Time Tag'):
-            return self._on_tag(line, mono)
-        return None
-
-    def _on_tag(self, line: str, mono: float) -> Optional[Tuple[float, float]]:
-        # "$PCPTMDBG,UTC Time Tag <fix_uptime> system time <sys_uptime>*cksum"
-        #   fix_uptime  - daemon uptime of THIS epoch's GPS second (fractional, already corrected
-        #                 for receiver fix latency)
-        #   sys_uptime  - daemon uptime clock reading when it emitted the line, a few tens of ms
-        #                 later. mono - sys_uptime is the app<->daemon monotonic clock offset.
-        # This line arrives right after the epoch's RMC, so self.utc is the matching UTC second.
-        try:
-            tail = line.split('UTC Time Tag', 1)[1]
-            fix_uptime = float(tail.split('system time', 1)[0].strip())
-            sys_uptime = float(tail.split('system time', 1)[1].split('*', 1)[0].strip())
-        except (IndexError, ValueError):
-            return None
-
-        # Skip the history burst: live epochs arrive ~1 s apart, backlog back-to-back.
-        live = self.prev_arrival is not None and (mono - self.prev_arrival) >= MIN_EPOCH_GAP
-        self.prev_arrival = mono
-        if not live or not self.have_fix or self.utc is None:
-            return None
-
-        # Convert the daemon's fix_uptime to the app's monotonic clock, then step back by the
-        # receiver+daemon fix latency so the sample marks the true GPS-second epoch.
-        clock_offset = mono - sys_uptime    # app monotonic - daemon uptime
-        gps_second_mono = fix_uptime + clock_offset - self.fix_latency
-        return self.utc, gps_second_mono
-
-
-def run_gnss_socket(clock: GpsClock, fix_latency: float) -> bool:
-    """Stream NMEA from the GNSS socket until it fails. Returns False if it never connected."""
-    try:
-        sock = socket.create_connection(GNSS_ADDR, timeout=5)
-    except Exception as e:
-        cp.log(f'GNSS socket {GNSS_ADDR[0]}:{GNSS_ADDR[1]} unavailable: {e}')
-        return False
-
-    cp.log(f'Connected to GNSS socket {GNSS_ADDR[0]}:{GNSS_ADDR[1]}')
-    tracker = EpochTracker(fix_latency)
-    buf = b''
-    try:
-        sock.settimeout(GNSS_IDLE_TIMEOUT)
-        sock.sendall(GNSS_COMMAND)
-        while running:
-            try:
-                data = sock.recv(4096)
-            except socket.timeout:
-                cp.log('GNSS socket idle, reconnecting')
-                break
-            mono = time.monotonic()
-            if not data:
-                cp.log('GNSS socket closed by daemon, reconnecting')
-                break
-            buf += data
-            while b'\n' in buf:
-                raw, buf = buf.split(b'\n', 1)
-                line = raw.strip().decode('ascii', errors='replace')
-                sample = tracker.feed(line, mono) if line.startswith('$') else None
-                if sample:
-                    clock.add_sample(sample[0], sample[1], 'gnss-socket')
-            if len(buf) > MAX_LINE:
-                buf = b''
-    except Exception as e:
-        cp.log(f'GNSS socket error: {e}')
-    finally:
-        try:
-            sock.close()
-        except Exception:
-            pass
-    return True
-
-
-# ---------------------------------------------------------------------------------------------
-# Fallback source: status/gps/nmea polling
+# Time source: status/gps/nmea polling
 # ---------------------------------------------------------------------------------------------
 
 def time_sentences(sentences) -> Tuple[str, ...]:
@@ -271,15 +136,18 @@ def time_sentences(sentences) -> Tuple[str, ...]:
                  if isinstance(s, str) and s[3:6] in TIME_SENTENCES)
 
 
-def nmea_to_unix(sentences: Tuple[str, ...]) -> Optional[float]:
-    """Freshest GPS UTC time in a status-tree snapshot as Unix time, or None without a fix.
+def nmea_to_unix(sentences: Tuple[str, ...]) -> Optional[Tuple[float, str]]:
+    """Freshest GPS UTC time in a status-tree snapshot, as (unix_time, sentence_id), or None
+    without a fix.
 
     The date comes from RMC (or ZDA). The time of day is the newest one among RMC, ZDA and
-    fix-valid GGA/GLL, because RMC/ZDA in the status tree can lag GGA by one epoch.
+    fix-valid GGA/GLL, because RMC/ZDA in the status tree can lag GGA by one epoch. The returned
+    sentence_id is the full NMEA id of the sentence that supplied the chosen time of day, e.g.
+    'GPGGA' or 'GNRMC'.
     """
     day = None          # type: Optional[date]
     day_time = None     # time of day of the sentence that supplied the date
-    times = []          # type: List
+    times = []          # type: List[Tuple[object, str]]  (time_of_day, sentence_id)
     has_fix = False
     for sentence in sentences:
         try:
@@ -309,14 +177,16 @@ def nmea_to_unix(sentences: Tuple[str, ...]) -> Optional[float]:
             if msg.status != 'A':
                 continue
             has_fix = True
-        times.append(msg_time)
+        # getattr(msg, 'identity', ...) is the full id incl. talker, e.g. 'GPGGA'.
+        times.append((msg_time, getattr(msg, 'identity', msg_id)))
 
     if not has_fix or day is None or day_time is None:
         return None
 
     anchor = datetime.combine(day, day_time)
-    best = None  # type: Optional[datetime]
-    for msg_time in times:
+    best = None     # type: Optional[datetime]
+    best_id = None  # type: Optional[str]
+    for msg_time, sentence_id in times:
         candidate = datetime.combine(day, msg_time)
         diff = (candidate - anchor).total_seconds()
         if diff < -43200:       # time of day wrapped past midnight after the dated sentence
@@ -326,18 +196,17 @@ def nmea_to_unix(sentences: Tuple[str, ...]) -> Optional[float]:
         if abs((candidate - anchor).total_seconds()) > MAX_DATE_SKEW:
             continue
         if best is None or candidate > best:
-            best = candidate
+            best, best_id = candidate, sentence_id
     if best is None:
         return None
-    return best.replace(tzinfo=timezone.utc).timestamp()
+    return best.replace(tzinfo=timezone.utc).timestamp(), best_id
 
 
-def run_status_tree(clock: GpsClock, duration: float) -> None:
-    """Poll status/gps/nmea for `duration` seconds, feeding one sample per publish."""
+def run_status_tree(clock: GpsClock) -> None:
+    """Poll status/gps/nmea until shutdown, feeding one sample per publish."""
     last_key = None             # type: Optional[Tuple[str, ...]]
     last_poll_mono = None       # type: Optional[float]
-    end = time.monotonic() + duration
-    while running and time.monotonic() < end:
+    while running:
         try:
             sentences = cp.get('status/gps/nmea')
             mono = time.monotonic()
@@ -347,9 +216,11 @@ def run_status_tree(clock: GpsClock, duration: float) -> None:
             if key and key != last_key:
                 if last_key is not None and last_poll_mono is not None \
                         and mono - last_poll_mono <= MAX_POLL_GAP:
-                    gps_unix = nmea_to_unix(key)
-                    if gps_unix is not None:
-                        clock.add_sample(gps_unix + STATUS_TREE_LATENCY, mono, 'status-tree')
+                    result = nmea_to_unix(key)
+                    if result is not None:
+                        gps_unix, sentence = result
+                        clock.add_sample(gps_unix + STATUS_TREE_LATENCY, mono,
+                                         'status/gps/nmea', sentence)
                 last_key = key
             last_poll_mono = mono
         except Exception as e:
@@ -467,6 +338,7 @@ def publish_status(clock: GpsClock, server: NtpServer, synced: bool,
     status = {
         'synced': synced,
         'source': clock.source,
+        'sentence': clock.sentence,
         'samples': count,
         'sample_age_s': round(age, 1) if age is not None else None,
         'dispersion_ms': round(dispersion * 1000, 1),
@@ -489,7 +361,8 @@ def log_status(clock: GpsClock, server: NtpServer) -> bool:
     _, dispersion, age, count = clock.snapshot()
     synced = gps_now is not None
     if synced:
-        cp.log(f'Synced to GPS via {clock.source}: {count} samples, last {age:.1f}s ago, '
+        cp.log(f'Synced to GPS via {clock.source} ({clock.sentence}): {count} samples, '
+               f'last {age:.1f}s ago, '
                f'dispersion {dispersion * 1000:.0f}ms, '
                f'system clock offset {time.time() - gps_now:+.3f}s, '
                f'{server.requests} NTP requests served')
@@ -529,8 +402,7 @@ def main():
 
     port = get_appdata_number('ntp_gps_port', DEFAULT_PORT, int)
     holdover = get_appdata_number('ntp_gps_holdover', DEFAULT_HOLDOVER, float)
-    fix_latency = get_appdata_number('ntp_gps_fix_latency_ms', DEFAULT_FIX_LATENCY_MS, float) / 1000
-    cp.log(f'Config: port={port}, holdover={holdover:.0f}s, fix_latency={fix_latency * 1000:.0f}ms')
+    cp.log(f'Config: port={port}, holdover={holdover:.0f}s')
 
     clock = GpsClock(holdover)
     server = None
@@ -546,12 +418,8 @@ def main():
     threading.Thread(target=server.serve, daemon=True).start()
     threading.Thread(target=status_loop, args=(clock, server), daemon=True).start()
 
-    while running:
-        if run_gnss_socket(clock, fix_latency):
-            time.sleep(1)  # brief pause before reconnecting
-        else:
-            cp.log(f'Falling back to status/gps/nmea polling for {FALLBACK_PERIOD}s')
-            run_status_tree(clock, FALLBACK_PERIOD)
+    run_status_tree(clock)
+
     # The status value outlives the app, so clear it to an unsynced object on the way out
     # rather than leaving a stale "synced" snapshot frozen in the tree.
     _, dispersion, age, count = clock.snapshot()
