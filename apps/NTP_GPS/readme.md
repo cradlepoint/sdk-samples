@@ -31,8 +31,9 @@ largest offset, the least-delayed poll.)
   period (default 300 s), with root dispersion growing over time, then reports unsynchronized.
 - Time is only taken from epochs whose RMC status is `A` (valid).
 
-Every 60 s the app logs the source in use, sample count, dispersion, the router system clock's
-offset from GPS time, and the number of requests served.
+Every 60 s (and whenever sync is gained or lost) the app logs the source in use, sample count,
+dispersion, the router system clock's offset from GPS time, and the number of requests served.
+The same state is published to `status/ntp_gps` (see Status below).
 
 ## Accuracy
 
@@ -73,6 +74,27 @@ supports a custom port (chrony: `server 192.168.0.1 port 1123 iburst`) at it, or
 ```bash
 python3 -c "import socket,struct,time;s=socket.socket(2,2);s.settimeout(2);s.sendto(b'\x23'+b'\0'*47,('192.168.0.1',1123));d=s.recv(48);print('stratum',d[1],'time',time.ctime(struct.unpack('!I',d[40:44])[0]-2208988800))"
 ```
+
+## Status
+
+The app publishes its sync state to `status/ntp_gps`, updated whenever sync is gained or lost and
+at least every 60 s. Read it with `GET /api/status/ntp_gps/` or `cp.get('status/ntp_gps')`. The
+value lives in RAM only (not persisted across reboot); on shutdown it is overwritten with an
+unsynced object rather than left stale.
+
+| Field | Description |
+|---|---|
+| `synced` | `true` when the server is currently serving GPS-derived time |
+| `source` | Active time source: `gnss-socket`, `status-tree`, or `none` |
+| `samples` | Offset samples in the current window (up to 30) |
+| `sample_age_s` | Seconds since the last GPS sample, or `null` |
+| `dispersion_ms` | Reported root dispersion, milliseconds |
+| `holdover_s` | Configured holdover window |
+| `ntp_requests` | NTP requests served since startup |
+| `ntp_port` | UDP port the server is listening on |
+| `gps_unix` | Current GPS-derived time as Unix epoch seconds, or `null` when unsynced |
+| `system_offset_s` | Router system clock minus GPS time, seconds (`null` when unsynced) |
+| `updated` | Unix epoch seconds when this object was published |
 
 ## SDK Appdata
 

@@ -28,6 +28,8 @@ from pynmeagps import NMEAReader
 
 APP_NAME = 'NTP_GPS'
 
+STATUS_PATH = 'status/ntp_gps'  # app publishes its own sync state here (RAM only, not persisted)
+
 DEFAULT_PORT = 1123
 DEFAULT_HOLDOVER = 300        # seconds to keep serving after the last GPS sample
 DEFAULT_FIX_LATENCY_MS = 141  # receiver+daemon fix latency: how far the daemon's fix_uptime
@@ -453,22 +455,51 @@ class NtpServer:
 # Status logging and main
 # ---------------------------------------------------------------------------------------------
 
+def publish_status(clock: GpsClock, server: NtpServer, synced: bool,
+                   gps_now: Optional[float], dispersion: float,
+                   age: Optional[float], count: int) -> None:
+    """Publish the complete sync-state object to STATUS_PATH.
+
+    A status-tree PUT REPLACES, so this must always be the whole object (see gotchas.md).
+    Times are epoch seconds / numeric offsets, never a %Z abbreviation. Values live in RAM
+    only and outlive the app, so shutdown overwrites this with an unsynced object.
+    """
+    status = {
+        'synced': synced,
+        'source': clock.source,
+        'samples': count,
+        'sample_age_s': round(age, 1) if age is not None else None,
+        'dispersion_ms': round(dispersion * 1000, 1),
+        'holdover_s': round(clock.holdover, 0),
+        'ntp_requests': server.requests,
+        'ntp_port': server.port,
+        'gps_unix': round(gps_now, 3) if gps_now is not None else None,
+        'system_offset_s': round(time.time() - gps_now, 3) if gps_now is not None else None,
+        'updated': round(time.time(), 3),
+    }
+    try:
+        cp.put(STATUS_PATH, status)
+    except Exception as e:
+        cp.log(f'Unable to publish {STATUS_PATH}: {e}')
+
+
 def log_status(clock: GpsClock, server: NtpServer) -> bool:
-    """Log sync state; returns whether currently synced."""
+    """Log sync state, publish it to STATUS_PATH; returns whether currently synced."""
     gps_now = clock.now()
     _, dispersion, age, count = clock.snapshot()
-    if gps_now is not None:
+    synced = gps_now is not None
+    if synced:
         cp.log(f'Synced to GPS via {clock.source}: {count} samples, last {age:.1f}s ago, '
                f'dispersion {dispersion * 1000:.0f}ms, '
                f'system clock offset {time.time() - gps_now:+.3f}s, '
                f'{server.requests} NTP requests served')
-        return True
-    if age is not None:
+    elif age is not None:
         cp.log(f'NOT synced: last GPS sample {age:.0f}s ago (holdover {clock.holdover:.0f}s), '
                f'{server.requests} NTP requests served')
     else:
         cp.log(f'NOT synced: waiting for valid GPS time, {server.requests} NTP requests served')
-    return False
+    publish_status(clock, server, synced, gps_now, dispersion, age, count)
+    return synced
 
 
 def status_loop(clock: GpsClock, server: NtpServer) -> None:
@@ -521,6 +552,10 @@ def main():
         else:
             cp.log(f'Falling back to status/gps/nmea polling for {FALLBACK_PERIOD}s')
             run_status_tree(clock, FALLBACK_PERIOD)
+    # The status value outlives the app, so clear it to an unsynced object on the way out
+    # rather than leaving a stale "synced" snapshot frozen in the tree.
+    _, dispersion, age, count = clock.snapshot()
+    publish_status(clock, server, False, None, dispersion, age, count)
     cp.log(f'{APP_NAME} stopped')
 
 
