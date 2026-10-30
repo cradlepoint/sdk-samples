@@ -1,5 +1,3 @@
-# Cell Survey
-
 <img width="1127" height="835" alt="image" src="https://github.com/user-attachments/assets/110d53e7-54c8-4ae0-9032-7ffd673c2c4c" />
 <img width="1127" height="734" alt="image" src="https://github.com/user-attachments/assets/3a012a10-a54f-4c58-a208-8d0f01923c1e" />
 <img width="1127" height="527" alt="image" src="https://github.com/user-attachments/assets/b956e369-101a-43d7-a4d9-8cc4342ffd74" />
