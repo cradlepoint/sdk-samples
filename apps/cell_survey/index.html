@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cell Survey</title>
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <script src="static/libs/jquery-3.5.1.min.js"></script>
+    <style>
+        .cs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        @media (max-width: 760px) { .cs-grid { grid-template-columns: repeat(2, 1fr); } }
+        .cs-stat { background: var(--light-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.9rem 1rem; }
+        .cs-stat .cs-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+        .cs-stat .cs-value { font-size: 1.35rem; font-weight: 600; margin-top: 0.25rem; word-break: break-word; }
+        .cs-stat .cs-sub { font-size: 0.78rem; opacity: 0.75; margin-top: 0.15rem; }
+        .cs-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+        .cs-select { padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--light-surface); color: var(--text-primary); min-width: 240px; font-size: 0.95rem; }
+        .cs-pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+        .cs-pill.ok { background: rgba(34,197,94,0.15); color: #16a34a; }
+        .cs-pill.bad { background: rgba(239,68,68,0.15); color: #dc2626; }
+        .cs-pill.warn { background: rgba(234,179,8,0.18); color: #b45309; }
+        .cs-signal-bar { height: 8px; border-radius: 999px; background: var(--border-color, #e2e8f0); overflow: hidden; margin-top: 0.5rem; }
+        .cs-signal-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+        .carrier-card { border: 1px solid var(--border-color, #e2e8f0); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+        .carrier-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.9rem 1.1rem; cursor: pointer; background: var(--light-bg); color: var(--text-primary); }
+        .carrier-head:hover { filter: brightness(0.98); }
+        .carrier-title { font-weight: 600; font-size: 1.05rem; display: flex; flex-direction: column; }
+        .carrier-title small { font-weight: 400; opacity: 0.7; font-size: 0.78rem; }
+        .carrier-meta { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+        .carrier-body { padding: 0 1.1rem 0.6rem; display: none; }
+        .carrier-card.open .carrier-body { display: block; }
+        .cs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .cs-table th, .cs-table td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border-color, #eef2f7); white-space: nowrap; }
+        .cs-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.65; }
+        .rat-tag { font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 6px; }
+        .rat-5g { background: rgba(99,102,241,0.15); color: #4f46e5; }
+        .rat-lte { background: rgba(14,165,233,0.15); color: #0284c7; }
+        .cs-muted { opacity: 0.65; }
+        .cs-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .cs-progress { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.75rem; }
+        .cs-spinner { width: 18px; height: 18px; border: 3px solid var(--border-color, #cbd5e1); border-top-color: var(--primary-color, #6366f1); border-radius: 50%; animation: cs-spin 0.8s linear infinite; }
+        @keyframes cs-spin { to { transform: rotate(360deg); } }
+        .locked-banner { display:none; align-items:center; gap:0.5rem; padding:0.6rem 0.9rem; border-radius:8px; background: rgba(234,179,8,0.18); color:#b45309; margin-bottom:1rem; font-size:0.9rem; }
+        .unsupported-banner { display:none; align-items:center; gap:0.5rem; padding:0.6rem 0.9rem; border-radius:8px; background: rgba(239,68,68,0.15); color:#b91c1c; margin-bottom:1rem; font-size:0.9rem; }
+        .btn-sm { padding: 0.35rem 0.7rem !important; font-size: 0.8rem !important; }
+        /* The template CSS has no disabled state for .btn, so a disabled
+           button looks identical to an enabled one. Make it visibly inert. */
+        .btn:disabled, .btn[disabled] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
+        /* No sidebar: let the content area use the full width and let the
+           page scroll at the body level instead of an inner scrollbar. The
+           template sized the main pane for a full-height sidebar, which left
+           the container ~25px taller than the viewport and forced a stray
+           scrollbar. Let the layout size to its content instead. */
+        html, body { min-height: 0 !important; }
+        .app-container { min-height: 100vh; }
+        /* Size the main pane to its content instead of stretching to fill the
+           viewport; the flex:1 stretch pushed the layout past 100vh and forced
+           a stray scrollbar. */
+        .app-main { overflow: visible; min-height: 0 !important; height: auto !important; flex: 0 1 auto !important; }
+        .content-area { width: 100%; max-width: 1100px; margin: 0 auto; overflow: visible; min-height: 0 !important; height: auto !important; }
+        .content-panel { height: auto !important; }
+        .carrier-chevron { transition: transform 0.2s ease; }
+        .carrier-card.open .carrier-chevron { transform: rotate(180deg); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title"><i class="fas fa-signal"></i> Cell Survey</h1>
+                    <span class="app-version" id="app-version"></span>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="header-icon-btn" id="help-btn" title="Help">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <button type="button" class="header-icon-btn" id="info-btn" title="Device Info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div class="content-area">
+                <div class="content-panel" id="content-panel">
+                    <section class="element-section active" id="homepage">
+                        <!-- Modem selection + status -->
+                        <div class="element-example">
+                            <div class="cs-row">
+                                <label for="modem-select"><strong>Modem</strong></label>
+                                <select id="modem-select" class="cs-select"></select>
+                                <button type="button" class="btn btn-secondary" id="refresh-modem-btn">
+                                    <i class="fas fa-rotate"></i> Refresh
+                                </button>
+                                <span id="modem-conn" class="cs-pill"></span>
+                                <button type="button" class="btn btn-primary" id="run-survey-btn" style="margin-left:auto;">
+                                    <i class="fas fa-satellite-dish"></i> Run Survey
+                                </button>
+                            </div>
+
+                            <div class="cs-progress" id="survey-progress" style="display:none;">
+                                <span class="cs-spinner"></span>
+                                <span id="survey-message"></span>
+                            </div>
+                            <div id="survey-status-text" class="cs-muted" style="margin-bottom:0.75rem;"></div>
+
+                            <div id="unsupported-banner" class="unsupported-banner">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span id="unsupported-text"></span>
+                            </div>
+
+                            <div id="locked-banner" class="locked-banner">
+                                <i class="fas fa-lock"></i>
+                                <span id="locked-text"></span>
+                                <button type="button" class="btn btn-secondary btn-sm" id="unlock-btn" style="margin-left:auto;">
+                                    <i class="fas fa-unlock"></i> Restore Automatic
+                                </button>
+                            </div>
+
+                            <div class="cs-grid" id="modem-stats"></div>
+                        </div>
+
+                        <!-- Results -->
+                        <div class="element-example" id="results-panel" style="display:none;">
+                            <div class="cs-row" style="margin-bottom:0.5rem;">
+                                <h3 style="margin:0;">Results by Carrier</h3>
+                                <span class="cs-muted" id="results-summary" style="margin-left:auto;"></span>
+                                <button type="button" class="btn btn-secondary btn-sm" id="export-csv-btn">
+                                    <i class="fas fa-download"></i> Export CSV
+                                </button>
+                            </div>
+                            <div id="carrier-list"></div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Lock confirmation modal -->
+    <div class="modal-overlay" id="lock-modal">
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-lock"></i> Lock to Carrier</h2>
+                <button type="button" class="modal-close" id="lock-modal-close" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p id="lock-modal-text"></p>
+                <p class="cs-muted">This forces the modem to use only this PLMN (manual network selection). The modem will re-register and the connection may drop briefly.</p>
+                <div class="cs-actions" style="justify-content:flex-end; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="lock-cancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="lock-confirm"><i class="fas fa-lock"></i> Lock Modem</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="help-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fas fa-question-circle"></i> Help</h2>
+                <button type="button" class="modal-close" id="help-modal-close" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="help-modal-body">
+                <div class="modal-loading"><div class="spinner-circle"></div><p>Loading help...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div class="modal-overlay" id="info-modal">
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> Device Info</h2>
+                <button type="button" class="modal-close" id="info-modal-close" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="info-modal-body">
+                <div class="modal-loading"><div class="spinner-circle"></div><p>Loading info...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="static/js/script.js"></script>
+    <script src="static/js/app.js"></script>
+</body>
+</html>
