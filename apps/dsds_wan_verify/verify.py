@@ -66,6 +66,32 @@ def _read_list(path):
     return val if isinstance(val, list) else []
 
 
+def ipverify_supported():
+    """Is the IP Verify feature present on this router at all?
+
+    Not every NCOS model carries IP Verify. On a router that does, the
+    subtree exists (an empty dict/list when nothing is configured); on
+    one that does not, ``config/ipverify`` reads back as ``null`` - the
+    same "feature-gated subtree is absent, not empty" rule that applies
+    to other optional config trees. Ping tests run entirely through this
+    subsystem, so when it is missing the app must not try to create
+    tests (the writes would silently apply nothing) and must not read
+    ping results. HTTP tests are performed by the app itself and keep
+    working regardless.
+
+    Returns True when supported, False when the path is null (feature
+    absent), and None when the read failed - callers must treat None as
+    "unknown", not as "unsupported", so a transient read error does not
+    tear down working ping tests.
+    """
+    try:
+        val = cp.get('config/ipverify')
+    except Exception as e:
+        cp.log('Error reading config/ipverify: %s' % e)
+        return None
+    return val is not None
+
+
 def read_ipverify_state():
     """Return (identities, ping_tests) as lists, or (None, None) on failure.
 

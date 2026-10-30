@@ -26,6 +26,31 @@
     grid-column: 1 / -1;
 }
 
+/* --- header: shorter, with the version inline after the app name ---
+   The template stacks the title and version in a column and gives the
+   header 1rem/2rem padding with a 1.875rem title. For this app the
+   header only carries a name and a few buttons, so it is tightened and
+   the version sits on the same baseline as the name to save a line. */
+.header-content {
+    padding: 0.5rem 1.5rem;
+}
+
+.logo-section {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+#app-title {
+    font-size: 1.35rem;
+}
+
+.app-version {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 /* --- header live badge --- */
 .dwv-live {
     display: inline-flex;
@@ -74,6 +99,26 @@
 .dwv-statusbar-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-light); }
 .dwv-statusbar-main strong { font-size: 1rem; line-height: 1.4; }
 
+/* Holdoff pill on the Monitor status line. A hold keeps traffic off the
+   preferred SIM while everything looks healthy, so it gets a distinct,
+   always-visible marker on the most-glanced line rather than only a
+   stat chip. */
+.dwv-monitor-hold {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.6rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    vertical-align: middle;
+    color: var(--warning-color);
+    border: 1px solid var(--warning-color);
+    background: color-mix(in srgb, var(--warning-color) 12%, transparent);
+    white-space: nowrap;
+}
+
 .dwv-statusbar-stats { display: flex; flex-wrap: wrap; gap: 1.25rem; }
 .dwv-stat { display: flex; flex-direction: column; gap: 0.1rem; }
 .dwv-stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-light); }
@@ -112,6 +157,9 @@
 
 .dwv-slot-title { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 0; }
 .dwv-slot-name { font-weight: 650; font-size: 1.02rem; }
+/* The port/sim identifier trailing the carrier in the slot name: lighter
+   and lower weight so the carrier reads as the primary label. */
+.dwv-slot-id { font-weight: 400; font-size: 0.85rem; color: var(--text-secondary); }
 .dwv-slot-sub { font-size: 0.78rem; color: var(--text-secondary); }
 
 .dwv-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: flex-end; }
@@ -130,6 +178,14 @@
     color: var(--text-secondary);
     background: var(--bg-primary);
     white-space: nowrap;
+}
+
+.dwv-slot-error {
+    color: var(--danger-color);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
 .dwv-badge.ok { color: var(--success-color); border-color: var(--success-color); }

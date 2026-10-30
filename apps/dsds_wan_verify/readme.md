@@ -84,6 +84,14 @@ probe never leaves the modem and the test fails even though the link is up. If p
 pass on a private APN, point it at a target reachable *inside* that network, or use the HTTP test,
 which is bound the same way.
 
+**IP Verify support.** Ping runs entirely through the router's IP Verify feature, which not every
+NCOS model has. At startup the app reads `config/ipverify`; when that comes back `null` the feature
+is absent, so the app skips ping tests altogether — it creates no IP Verify objects and reads no
+ping results — and logs that ping is disabled. The HTTP and signal tests are unaffected (the app
+performs HTTP itself), so a slot still fails over on a failing HTTP test or low signal. On the
+dashboard the ping rows read "not run (router does not support IP Verify)". Enable an HTTP test on
+each slot if you rely on connectivity failover on such a model.
+
 **Settle time** (default 20s) tells the app to ignore a slot's test results for a short while
 right after switching to it. A freshly connected slot legitimately fails tests for a few seconds
 while it registers on the carrier, so this is the main guard against the modem flapping back and
@@ -158,7 +166,7 @@ Firewall forward (see [LAN access](#lan-access)).
 | `ping_retry_interval` | `5` | Seconds between retries (5–30). |
 | `ping_pkt_per_try` | `1` | ICMP requests per attempt (1–255); the attempt passes if any is answered. |
 | `ping_pkt_size` | `36` | Payload bytes (minimum 36). |
-| `ping_pkt_timeout` | `10` | Per-packet timeout in tenths of a second (1–255). |
+| `ping_pkt_timeout` | `10` | Per-packet reply timeout, stored in tenths of a second (1–255); the router counts a reply that arrives after this as a lost packet. The web UI edits this field in milliseconds and converts (so stored `10` shows as `1000` ms). |
 | `signal_enabled` | `true` | Use a signal threshold on this slot. |
 | `signal_thresholds` | `{"RSRP": -100, "RSRP_5G": -120}` | Metric → minimum value. |
 | `signal_fail_threshold` | `3` | Consecutive low readings before acting (1–100). |

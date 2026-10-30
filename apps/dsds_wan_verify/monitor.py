@@ -153,6 +153,13 @@ class Monitor(object):
         # results are only ever read for what is actually armed.
         self.armed_tests = {}
         self.ping_results = {}
+        # Whether the router has the IP Verify feature at all. Ping tests
+        # run through IP Verify, so on a model without it they cannot run
+        # and must be skipped - HTTP tests, which the app performs
+        # itself, are unaffected. None until first checked; True/False
+        # after. config/ipverify reads back null on an unsupported model.
+        self.ipverify_supported = None
+        self._ipverify_unsupported_logged = False
         self.http_results = {}
         self._http_running = set()
         self._http_next_run = {}
@@ -299,6 +306,12 @@ class Monitor(object):
         verdict yet. Unknown is never counted as a failure.
         """
         if not cfg.get('ping_enabled') or not cfg.get('ping_targets'):
+            return None
+        # Ping runs through the router's IP Verify subsystem. On a model
+        # that lacks it there are no results and never will be, so the
+        # verdict is "unknown" (None) and ping simply does not contribute
+        # to the health decision - HTTP carries it instead.
+        if self.ipverify_supported is False:
             return None
         results = self.ping_results.get(key) or {}
         values = [results.get(t) for t in cfg['ping_targets']]
@@ -768,7 +781,32 @@ class Monitor(object):
         Every write restarts the router's IP Verify poller and blanks all
         results, so this is gated on a signature of the desired state to
         avoid rewriting identical config on every tick.
+
+        Does nothing on a router without the IP Verify feature. Ping
+        tests run entirely through IP Verify, so on such a model there is
+        nothing to reconcile and no results to read; HTTP tests, which
+        the app runs itself, are unaffected.
         """
+        # Resolve feature support once. None means the read failed, which
+        # is "unknown" and must not be mistaken for "unsupported" - a
+        # transient error should not tear down working ping tests, so
+        # leave the flag unset and retry on the next tick.
+        if self.ipverify_supported is None:
+            supported = verify.ipverify_supported()
+            if supported is not None:
+                self.ipverify_supported = supported
+
+        if self.ipverify_supported is False:
+            if not self._ipverify_unsupported_logged:
+                self._ipverify_unsupported_logged = True
+                self.event('This router does not support the IP Verify '
+                           'feature (config/ipverify is null); ping tests '
+                           'are disabled. HTTP tests are unaffected.', 'warn')
+            with self.lock:
+                self.armed_tests = {}
+                self.ping_results = {}
+            return
+
         desired = {}
         for key, slot in self.slots.items():
             cfg = appconfig.slot_config(self.conf, key)
@@ -1433,6 +1471,11 @@ class Monitor(object):
                 'slots': slots_out,
                 'status': self.status_text,
                 'switching': self.switching,
+                # None until first checked, then True/False. False means
+                # the router lacks IP Verify, so ping tests cannot run
+                # (HTTP tests still do). The UI uses this to show ping as
+                # unavailable rather than merely "off".
+                'ipverify_supported': self.ipverify_supported,
                 'poll_interval': POLL_INTERVAL,
                 'settle_remaining': max(0, int(self.settle_until - now)),
                 'last_switch_ago': int(now - self.last_switch_ts)

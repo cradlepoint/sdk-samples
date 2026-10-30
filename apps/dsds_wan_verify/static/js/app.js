@@ -22,7 +22,11 @@
         // everything the user had open. The two configuration pages share
         // one active tab so switching pages stays on the same slot.
         activeSlotTab: '',
-        openSections: {}
+        openSections: {},
+        // null until the first poll, then true/false. False means the
+        // router has no IP Verify feature, so ping tests cannot run and
+        // the UI shows them as unavailable rather than merely "off".
+        ipverifySupported: null
     };
 
     // ---------------------------------------------------------------
@@ -159,9 +163,10 @@
         // Counting down a wait the operator cannot otherwise see, since
         // the slot looks perfectly healthy on signal while it is held.
         if (slot.failback_hold) {
-            badges.push('<span class="dwv-badge warn" title="Left on a connectivity failure; ' +
-                'signal cannot tell whether that is fixed, so the app waits before returning">' +
-                '<i class="fas fa-hourglass-half"></i> Hold ' + fmtDuration(slot.failback_hold) +
+            badges.push('<span class="dwv-badge warn" title="Failback held: the app left this ' +
+                'slot (or a switch to it failed) for a reason its signal cannot show, so it waits ' +
+                'before returning">' +
+                '<i class="fas fa-hourglass-half"></i> Failback hold ' + fmtDuration(slot.failback_hold) +
                 '</span>');
         }
         return badges.join('');
@@ -201,15 +206,24 @@
         var cfg = slot.config;
 
         if (cfg.ping_enabled && cfg.ping_targets.length) {
+            // Ping runs through the router's IP Verify subsystem. On a
+            // model that lacks it (ipverify_supported === false) the test
+            // can never run, so say so plainly rather than leaving a grey
+            // "waiting" icon that never resolves.
+            var pingUnsupported = state.ipverifySupported === false;
             cfg.ping_targets.forEach(function (target) {
                 var verdict = slot.ping.hasOwnProperty(target) ? slot.ping[target] : null;
                 var note = '';
-                if (verdict === null) {
+                if (pingUnsupported) {
+                    note = '<span class="dwv-test-note">not run (router does not ' +
+                        'support IP Verify)</span>';
+                } else if (verdict === null) {
                     note = slot.connected
                         ? '<span class="dwv-test-note">waiting for a result</span>'
                         : '<span class="dwv-test-note">not run (slot is not connected)</span>';
                 }
-                rows.push('<div class="dwv-test">' + verdictIcon(verdict) +
+                rows.push('<div class="dwv-test">' +
+                    verdictIcon(pingUnsupported ? null : verdict) +
                     '<span class="dwv-test-target">ping ' + esc(target) + '</span>' + note + '</div>');
             });
         }
@@ -268,8 +282,7 @@
                 '<span class="dwv-test-target">failback on recovery</span>' +
                 '<span class="dwv-test-note">' + (
                     slot.failback_hold
-                        ? 'held for ' + fmtDuration(slot.failback_hold) +
-                          ' after its connectivity failure'
+                        ? 'failback held for ' + fmtDuration(slot.failback_hold)
                         : fb === null ? 'no thresholds set'
                         : noReading ? 'waiting for a reading to judge on'
                         : fb === false ? 'not above its threshold yet'
@@ -311,11 +324,14 @@
         '<div class="' + cls + '">' +
             '<div class="dwv-slot-head">' +
                 '<div class="dwv-slot-title">' +
-                    '<span class="dwv-slot-name">' + esc(slot.port) + ' / ' + esc(slot.sim) + '</span>' +
-                    '<span class="dwv-slot-sub">' +
+                    '<span class="dwv-slot-name">' +
                         esc(slot.carrier || 'unknown carrier') +
-                        (slot.service_detail ? ' · ' + esc(slot.service_detail) :
-                            (slot.service_type ? ' · ' + esc(slot.service_type) : '')) +
+                        ' <span class="dwv-slot-id">(' + esc(slot.port) + ' / ' +
+                        esc(slot.sim) + ')</span>' +
+                    '</span>' +
+                    '<span class="dwv-slot-sub">' +
+                        (slot.service_detail ? esc(slot.service_detail) :
+                            (slot.service_type ? esc(slot.service_type) : '')) +
                         (slot.rf_band ? ' · ' + esc(slot.rf_band) : '') +
                     '</span>' +
                 '</div>' +
@@ -325,6 +341,16 @@
                 '<dl class="dwv-kv">' +
                     '<dt>State</dt><dd>' + esc(slot.connection_state || '—') +
                         (slot.reason ? ' <span class="dwv-test-note">(' + esc(slot.reason) + ')</span>' : '') + '</dd>' +
+                    // Why the modem rejected or dropped this slot, straight
+                    // from NCOS - the one place to see a failure the app
+                    // did not cause (a bad APN, a carrier reject). Only
+                    // shown on a slot that is not connected, so a healthy
+                    // slot is not decorated with a stale error.
+                    (slot.error_text && !slot.connected
+                        ? '<dt>Error</dt><dd class="dwv-slot-error">' +
+                          '<i class="fas fa-triangle-exclamation"></i> ' +
+                          esc(slot.error_text) + '</dd>'
+                        : '') +
                     '<dt>WAN IP</dt><dd>' + esc(slot.ip_address || '—') + '</dd>' +
                     '<dt>Uptime</dt><dd>' + fmtUptime(slot.uptime) + '</dd>' +
                     '<dt>DSDS instance</dt><dd>' + esc(slot.dsds_instance !== null && slot.dsds_instance !== undefined ? slot.dsds_instance : '—') +
@@ -385,16 +411,10 @@
                 'so no slot can fail and nothing will switch automatically. Set up ping or HTTP ' +
                 'checks under <strong>Connectivity Tests</strong>, or a threshold under ' +
                 '<strong>Signal Thresholds</strong>.';
-        } else if (snap.failback_hold_slot) {
-            var held = snap.slots.filter(function (s) {
-                return s.key === snap.failback_hold_slot; })[0];
-            hint.innerHTML = '<i class="fas fa-hourglass-half"></i> The app left <strong>' +
-                esc(held ? held.sim : snap.failback_hold_slot) + '</strong> because its ' +
-                'connectivity tests failed. Those tests cannot run while it is on standby and its ' +
-                'signal looks fine either way, so failback to it is held for ' +
-                fmtDuration(snap.failback_hold_remaining) + ' to stop the modem flapping. ' +
-                '<strong>Switch SIM Now</strong> overrides it.';
         } else {
+            // The failback holdoff is shown by the "Failback hold" stat
+            // in the Monitor row and the badge on the held slot's card,
+            // so no banner is needed for it here.
             hint.innerHTML = '';
         }
 
@@ -411,8 +431,8 @@
             var active = snap.slots.filter(function (s) { return s.connected; })[0];
             if (active) {
                 badge.className += ' ok';
-                text.textContent = active.port + '/' + active.sim +
-                    (active.carrier ? ' · ' + active.carrier : '');
+                text.textContent = (active.carrier ? active.carrier + ' · ' : '') +
+                    active.port + '/' + active.sim;
             } else {
                 badge.className += ' bad';
                 text.textContent = 'no slot connected';
@@ -656,13 +676,17 @@
         var cfg = slot.config;
         return {
             id: function (f) { return 's-' + key.replace(/[^a-zA-Z0-9]/g, '_') + '-' + f; },
-            field: function (name, label, type, attrs) {
+            field: function (name, label, type, attrs, value) {
                 var id = this.id(name);
+                // `value` lets a caller show something other than the raw
+                // stored value (e.g. pkt_timeout stored in tenths of a
+                // second but edited in ms); it defaults to the stored one.
+                var shown = value === undefined ? cfg[name] : value;
                 return '<div class="form-field">' +
                     '<label for="' + id + '">' + label + '</label>' +
                     '<input type="' + type + '" class="form-input" id="' + id + '" ' +
                     'data-slot="' + esc(key) + '" data-key="' + esc(name) + '" ' +
-                    (attrs || '') + ' value="' + esc(cfg[name]) + '">' +
+                    (attrs || '') + ' value="' + esc(shown) + '">' +
                     '</div>';
             },
             toggle: function (name, label) {
@@ -712,8 +736,14 @@
                             'min="1" max="255"') +
                     b.field('ping_pkt_size', 'Packet size, bytes (&ge;36)', 'number',
                             'min="36" max="1500"') +
-                    b.field('ping_pkt_timeout', 'Per-packet timeout (tenths of a second)',
-                            'number', 'min="1" max="255"') +
+                    // Stored (and sent to the router) in tenths of a
+                    // second, but edited here in milliseconds. data-unit
+                    // tells collectSlots() to convert ms back to tenths;
+                    // step/min/max are the ms equivalents of the router's
+                    // 1-255 decisecond range.
+                    b.field('ping_pkt_timeout', 'Per-packet timeout (ms)', 'number',
+                            'min="100" max="25500" step="100" data-unit="ms-ds"',
+                            Math.round((Number(cfg.ping_pkt_timeout) || 10) * 100)) +
                 '</div>' +
                 '<p class="dwv-hint">' +
                     '<strong>Echo requests per attempt</strong> is IP Verify\'s own ' +
@@ -725,7 +755,10 @@
                     'routinely.' +
                 '</p>' +
                 '<p class="dwv-hint">' +
-                    'Per-packet timeout is in <em>tenths of a second</em>, so 10 means 1.0s. ' +
+                    '<strong>Per-packet timeout</strong> is how long the router waits for an ' +
+                    'echo reply before counting that packet as lost &mdash; a reply that ' +
+                    'arrives later is a failure, not a slow pass. The router stores it in ' +
+                    'tenths of a second, so values round to the nearest 100&nbsp;ms. ' +
                     'Packet size has a hard floor of 36 bytes on the router.' +
                 '</p>') +
             why('How the ping test is run', '' +
@@ -987,8 +1020,9 @@
             var on = s.key === state.activeSlotTab;
             return '<button type="button" class="tab-btn' + (on ? ' active' : '') + '" ' +
                 attr + '="' + esc(s.key) + '">' +
-                '<i class="fas fa-sim-card"></i> ' + esc(s.port) + ' / ' + esc(s.sim) +
-                (s.carrier ? ' <span class="dwv-tab-sub">' + esc(s.carrier) + '</span>' : '') +
+                '<i class="fas fa-sim-card"></i> ' +
+                (s.carrier ? esc(s.carrier) + ' ' : '') +
+                '<span class="dwv-tab-sub">(' + esc(s.port) + ' / ' + esc(s.sim) + ')</span>' +
                 (s.preferred ? ' <i class="fas fa-star dwv-tab-star" title="Preferred SIM"></i>' : '') +
                 (s.connected ? ' <i class="fas fa-circle dwv-tab-dot" title="Connected"></i>' : '') +
                 '</button>';
@@ -1175,7 +1209,16 @@
                     .filter(function (v) { return v !== null; });
             } else if (el.type === 'number') {
                 var parsed = num(el.value);
-                if (parsed !== null) { cfg[key] = parsed; }
+                if (parsed !== null) {
+                    // A field edited in ms but stored in tenths of a
+                    // second (pkt_timeout) is converted back on the way
+                    // out, and clamped to the router's 1-255 range so a
+                    // sub-100ms or huge entry still yields a valid value.
+                    if (el.getAttribute('data-unit') === 'ms-ds') {
+                        parsed = Math.max(1, Math.min(255, Math.round(parsed / 100)));
+                    }
+                    cfg[key] = parsed;
+                }
             } else {
                 cfg[key] = el.value;
             }
@@ -1315,6 +1358,7 @@
             // The snapshot carries the authoritative config, so the forms
             // and the dashboard never disagree.
             state.pollInterval = snap.poll_interval;
+            state.ipverifySupported = snap.ipverify_supported;
             snap.slots.forEach(function (s) { state.config.slots[s.key] = s.config; });
             renderDashboard(snap);
             buildSlotForms(snap);
