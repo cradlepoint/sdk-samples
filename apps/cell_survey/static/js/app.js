@@ -49,7 +49,8 @@
                 opt.textContent = m.model + ' (' + m.port + ')';
                 sel.appendChild(opt);
             });
-            // Default to int1 (backend sorts default first).
+            // Default to the first connected modem/SIM if available
+            // (backend chooses and sorts the default first).
             var def = data.default_port;
             var hasDef = state.modems.some(function (m) { return m.port === def; });
             state.selectedPort = hasDef ? def : state.modems[0].port;

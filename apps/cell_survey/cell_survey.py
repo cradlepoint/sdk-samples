@@ -147,8 +147,12 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
         elif path == '/api/info':
             self._send_json(_get_device_info())
         elif path == '/api/modems':
-            self._send_json({'modems': modems.list_modems(),
-                             'default_port': modems.DEFAULT_PORT})
+            modem_list = modems.list_modems()
+            default_port = next(
+                (m['port'] for m in modem_list if m.get('is_default')),
+                modems.DEFAULT_PORT)
+            self._send_json({'modems': modem_list,
+                             'default_port': default_port})
         elif path == '/api/modem':
             self._send_json(modems.modem_status(self._query('port')))
         elif path == '/api/survey/status':

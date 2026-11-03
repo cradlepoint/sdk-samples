@@ -232,6 +232,12 @@ def _signal_quality(rsrp):
 def list_modems():
     """Return one entry per physical modem port, default modem flagged.
 
+    The default is the first CONNECTED modem/SIM when any modem is connected,
+    so the UI opens on a usable link. Among connected modems the preferred
+    port (DEFAULT_PORT, int1) wins, otherwise the lowest-sorting connected
+    port. When nothing is connected, fall back to the preferred port if
+    present, else the lowest-sorting port.
+
     Returns:
         list: Each item is {port, uid, iface (SubIface), config_id, model,
             connected, sim_count, is_default}. Sorted with the default port
@@ -273,10 +279,34 @@ def list_modems():
                 })
 
     modems = list(by_port.values())
+    default_port = _choose_default_port(modems)
     for m in modems:
-        m['is_default'] = (m['port'] == DEFAULT_PORT)
+        m['is_default'] = (m['port'] == default_port)
     modems.sort(key=lambda m: (not m['is_default'], m['port']))
     return modems
+
+
+def _choose_default_port(modems):
+    """Pick the default port: first connected modem if any, else fallback.
+
+    Preference, in order:
+      1. The preferred port (DEFAULT_PORT) if it is connected.
+      2. The lowest-sorting connected port.
+      3. The preferred port if present (even if not connected).
+      4. The lowest-sorting port.
+      5. None (no modems).
+    """
+    if not modems:
+        return None
+    ports = sorted(m['port'] for m in modems)
+    connected = sorted(m['port'] for m in modems if m.get('connected'))
+    if connected:
+        if DEFAULT_PORT in connected:
+            return DEFAULT_PORT
+        return connected[0]
+    if DEFAULT_PORT in ports:
+        return DEFAULT_PORT
+    return ports[0]
 
 
 def _find_modem(port):
