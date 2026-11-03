@@ -27,6 +27,7 @@ except ImportError:
     import ConfigParser as configparser
 
 import cp
+import jobs
 import modems
 import survey
 
@@ -36,6 +37,9 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _STATIC_DIR = os.path.join(_SCRIPT_DIR, 'static')
 
 _runner = survey.SurveyRunner()
+# Auto-save every finished survey to history and run the optional carrier
+# action for startup/scheduled runs.
+_runner.on_complete = jobs.on_survey_complete
 
 _MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -157,6 +161,12 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(modems.modem_status(self._query('port')))
         elif path == '/api/survey/status':
             self._send_json(_runner.snapshot())
+        elif path == '/api/schedule':
+            self._send_json(jobs.get_schedule())
+        elif path == '/api/history':
+            self._send_json({'entries': jobs.list_history()})
+        elif path == '/api/history/download':
+            self._handle_history_download(self._query('file'))
         elif path.startswith('/static/'):
             self._handle_static(path)
         else:
@@ -180,6 +190,11 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
             self._handle_unlock(body)
         elif path == '/api/esim/activate':
             self._handle_esim_activate(body)
+        elif path == '/api/schedule':
+            self._send_json({'ok': True, 'schedule': jobs.set_schedule(body)})
+        elif path == '/api/history/clear':
+            jobs.clear_history()
+            self._send_json({'ok': True})
         else:
             self.send_error(404)
 
@@ -214,7 +229,8 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
                              'message': 'A survey is already running.'})
             return
         started = _runner.start(modem['iface'], modem.get('uid'),
-                                modem.get('mfg_model', ''))
+                                modem.get('mfg_model', ''),
+                                port=modem.get('port'), trigger='manual')
         self._send_json({'ok': started,
                          'message': 'Survey started' if started
                                     else 'Could not start survey.'})
@@ -233,6 +249,26 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
         eid = body.get('eid')
         iccid = body.get('iccid')
         self._send_json(modems.activate_esim_profile(uid, eid, iccid))
+
+    def _handle_history_download(self, filename):
+        """Stream a stored history CSV as a file download."""
+        result = jobs.read_history_csv(filename)
+        if not result:
+            self.send_error(404)
+            return
+        csv_text, name = result
+        body = csv_text.encode('utf-8')
+        try:
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/csv; charset=utf-8')
+            self.send_header('Content-Disposition',
+                             'attachment; filename="{}"'.format(name))
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     # --- helpers ----------------------------------------------------------
 
@@ -336,6 +372,15 @@ def main():
     cp.log('Starting {} v{}...'.format(app_name, version))
     # Warm the PLMN table so the first survey response is fast.
     survey.load_plmn_table()
+
+    # Load the saved schedule, then start the scheduler loop and (if enabled)
+    # the one-shot startup survey. Both are daemon threads so they don't block
+    # the web server and die with the process.
+    jobs.load_schedule()
+    threading.Thread(target=jobs.scheduler_loop, args=(_runner,),
+                     daemon=True).start()
+    threading.Thread(target=jobs.run_startup_survey, args=(_runner,),
+                     daemon=True).start()
 
     def _shutdown(signum, frame):
         cp.log('cell_survey stopping (signal {}).'.format(signum))

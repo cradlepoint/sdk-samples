@@ -277,6 +277,41 @@ def parse_survey(raw):
     return [c for c in cells if c['plmn']]
 
 
+def _csv_cell(value):
+    """Quote a CSV field per RFC 4180 when it contains a comma/quote/newline."""
+    s = '' if value is None else str(value)
+    if any(ch in s for ch in (',', '"', '\r', '\n')):
+        s = '"' + s.replace('"', '""') + '"'
+    return s
+
+
+def groups_to_csv(groups):
+    """Render grouped survey results as CSV text (one row per cell).
+
+    Mirrors the browser's Export CSV so a scheduled/startup survey (which has
+    no browser) saves the exact same layout. Returns a CSV string with a header
+    row and CRLF line endings.
+
+    Args:
+        groups: output of group_by_carrier().
+
+    Returns:
+        str: CSV text, header-only when there are no cells.
+    """
+    headers = ['carrier', 'country', 'plmn', 'mcc', 'mnc', 'rat', 'band',
+               'bandwidth_mhz', 'channel', 'rsrp_dbm', 'rsrq_db', 'pci',
+               'cell_id', 'tac']
+    rows = [','.join(headers)]
+    for g in groups or []:
+        for c in g.get('cells', []):
+            row = [g.get('network'), g.get('country'), g.get('plmn'),
+                   g.get('mcc'), g.get('mnc'), c.get('rat'), c.get('band'),
+                   c.get('bandwidth'), c.get('channel'), c.get('rsrp'),
+                   c.get('rsrq'), c.get('pci'), c.get('cell_id'), c.get('tac')]
+            rows.append(','.join(_csv_cell(v) for v in row))
+    return '\r\n'.join(rows) + '\r\n'
+
+
 def group_by_carrier(cells):
     """Group parsed cells by PLMN/carrier, sorted by best signal.
 
@@ -327,11 +362,17 @@ class SurveyRunner:
         self.subiface = None
         self.uid = None
         self.mfg_model = ''
+        self.port = None
+        self.trigger = 'manual'      # manual | startup | schedule
         self.started_at = None
         self.finished_at = None
         self.raw = ''
         self.groups = []
         self.cell_count = 0
+        # Optional callback(runner) invoked once a survey finishes with results
+        # (used to auto-save a CSV to history and run a carrier action). Set by
+        # the app; called outside the lock from the worker thread.
+        self.on_complete = None
 
     def is_running(self):
         with self._lock:
@@ -343,13 +384,16 @@ class SurveyRunner:
                 'state': self.state,
                 'message': self.message,
                 'subiface': self.subiface,
+                'port': self.port,
+                'trigger': self.trigger,
                 'started_at': self.started_at,
                 'finished_at': self.finished_at,
                 'cell_count': self.cell_count,
                 'groups': self.groups,
             }
 
-    def start(self, subiface, uid=None, mfg_model=''):
+    def start(self, subiface, uid=None, mfg_model='', port=None,
+              trigger='manual'):
         """Begin a survey on the given modem SubIface (e.g. 'rmnet501').
 
         Args:
@@ -357,6 +401,9 @@ class SurveyRunner:
             uid: Modem WAN device uid (e.g. 'mdm-5a3e6e08').
             mfg_model: Modem manufacturer model (e.g. 'FE990B40-NAD'), recorded
                 for diagnostics.
+            port: Physical modem port (e.g. 'int1'), recorded for CSV naming.
+            trigger: What started the survey - 'manual', 'startup', or
+                'schedule' - so the completion handler knows the context.
         """
         with self._lock:
             if self.state == 'running':
@@ -366,6 +413,8 @@ class SurveyRunner:
             self.subiface = subiface
             self.uid = uid
             self.mfg_model = mfg_model or ''
+            self.port = port
+            self.trigger = trigger or 'manual'
             self.started_at = time.time()
             self.finished_at = None
             self.raw = ''
@@ -492,6 +541,16 @@ class SurveyRunner:
                 snippet = survey.strip().replace('\r', '')[-300:]
                 cp.log('cell_survey: no cells parsed in {:.0f}s. Tail: {}'
                        .format(elapsed, snippet))
+
+            # Fire the completion hook (auto-save CSV to history, optional
+            # carrier action). Done outside the lock and guarded so a handler
+            # error can't crash the worker thread or corrupt runner state.
+            cb = self.on_complete
+            if cb:
+                try:
+                    cb(self)
+                except Exception as e:
+                    cp.log('cell_survey: completion handler error: {}'.format(e))
         except Exception as e:
             cp.log('cell_survey: survey error: {}'.format(e))
             self._fail('Survey error: {}'.format(e))

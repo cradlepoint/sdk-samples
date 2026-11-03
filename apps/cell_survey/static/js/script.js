@@ -1578,6 +1578,12 @@ class WebAppTemplate {
         fetch('api/help')
             .then(function(r) { return r.text(); })
             .then(function(md) {
+                // The repo readme starts with GitHub-hosted screenshot images
+                // that don't load in the app's help panel. Strip images
+                // (HTML <img> tags and markdown ![alt](url)) before rendering
+                // so the help text reads cleanly; the readme itself is unchanged.
+                md = md.replace(/<img\b[^>]*>/gi, '')
+                       .replace(/!\[[^\]]*\]\([^)]*\)/g, '');
                 body.innerHTML = self.renderMarkdown(md);
                 self._helpLoaded = true;
             })

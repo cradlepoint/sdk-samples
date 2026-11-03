@@ -12,7 +12,8 @@
         pollTimer: null,
         pendingLock: null,    // {plmn, network}
         pendingEsim: null,    // {iccid, profile_name, network}
-        lastGroups: []        // last survey results, for CSV export
+        lastGroups: [],       // last survey results, for CSV export
+        scheduleCfg: null     // last-loaded schedule config (for re-applying)
     };
 
     function $(id) { return document.getElementById(id); }
@@ -55,7 +56,12 @@
             var hasDef = state.modems.some(function (m) { return m.port === def; });
             state.selectedPort = hasDef ? def : state.modems[0].port;
             sel.value = state.selectedPort;
-            loadModemStatus();
+            // Return the status promise so callers chaining off loadModems()
+            // (e.g. loadModems().then(restoreSurveyState)) wait for the modem
+            // status — including state.currentModem.esim — to load before they
+            // run. Without this, restoreSurveyState() renders survey results
+            // before .esim exists, so the eSIM buttons never appear on refresh.
+            return loadModemStatus();
         }).catch(function () {
             toast('Could not load modems', 'error');
         });
@@ -177,6 +183,9 @@
             } else {
                 banner.style.display = 'none';
             }
+
+            // Keep the Schedule tab's eSIM option in sync with this modem.
+            updateEsimOptionAvailability();
         }).catch(function () {
             $('modem-stats').innerHTML = '<p class="cs-muted">Failed to read modem status.</p>';
         });
@@ -191,7 +200,7 @@
         return api('/api/survey/status').then(function (s) {
             if (s.state === 'running') {
                 $('run-survey-btn').disabled = true;
-                $('results-panel').style.display = 'none';
+                $('results-panel').classList.add('cs-hidden');
                 $('survey-progress').style.display = 'flex';
                 $('survey-message').textContent = s.message || 'Survey in progress...';
                 pollSurvey();
@@ -210,7 +219,7 @@
         var btn = $('run-survey-btn');
         btn.disabled = true;
         $('survey-status-text').textContent = '';
-        $('results-panel').style.display = 'none';
+        $('results-panel').classList.add('cs-hidden');
         // Show the live connection again while the new survey runs.
         expandConnSection();
         api('/api/survey/start', {
@@ -270,11 +279,13 @@
         var panel = $('results-panel');
         var list = $('carrier-list');
         if (!groups.length) {
+            // Only show the "Results by Carrier" section when there are
+            // results to show. An empty survey leaves the panel hidden.
             state.lastGroups = [];
-            panel.style.display = 'block';
+            panel.classList.add('cs-hidden');
             $('results-summary').textContent = '';
             $('export-csv-btn').style.display = 'none';
-            list.innerHTML = '<p class="cs-muted">No cells were detected in this survey.</p>';
+            list.innerHTML = '';
             return;
         }
         $('export-csv-btn').style.display = '';
@@ -345,7 +356,7 @@
             html += '</tbody></table></div></div>';
         });
         list.innerHTML = html;
-        panel.style.display = 'block';
+        panel.classList.remove('cs-hidden');
 
         // Wire up collapse toggles and action buttons (delegation-free, scoped).
         list.querySelectorAll('.carrier-head').forEach(function (head) {
@@ -513,6 +524,332 @@
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
 
+    // ---- Schedule --------------------------------------------------------
+
+    // Hide the "Activate best carrier eSIM" option unless the selected modem
+    // has an operational eSIM profile. Preserves the current selection when
+    // possible; falls back to 'none' if eSIM was selected but is unavailable.
+    function updateEsimOptionAvailability() {
+        var m = state.currentModem || {};
+        var esim = m.esim || {};
+        var hasOperational = !!(esim.supported &&
+            (esim.profiles || []).some(function (p) { return p.operational; }));
+        ['startup-action', 'schedule-action'].forEach(function (id) {
+            var sel = $(id);
+            if (!sel) return;
+            var opt = sel.querySelector('option[data-esim="1"]');
+            if (!opt) return;
+            opt.hidden = !hasOperational;
+            opt.disabled = !hasOperational;
+            if (!hasOperational && sel.value === 'esim') sel.value = 'none';
+        });
+        var avail = $('esim-availability-note');
+        var unavail = $('esim-unavailable-note');
+        if (avail && unavail) {
+            avail.style.display = hasOperational ? 'block' : 'none';
+            unavail.style.display = hasOperational ? 'none' : 'block';
+        }
+    }
+
+    // Fill the per-trigger modem dropdowns from the detected modems. The
+    // "Default (auto-select)" option maps to an empty port, which the backend
+    // resolves to the default modem at run time. The modem field only shows
+    // when the router has more than one modem - a single-modem router has no
+    // choice to make. Preserves each select's current value across refills.
+    function populateScheduleModems() {
+        var modemList = state.modems || [];
+        var multi = modemList.length > 1;
+        document.querySelectorAll('.cs-modem-field').forEach(function (f) {
+            f.style.display = multi ? '' : 'none';
+        });
+        document.querySelectorAll('.sched-modem-select').forEach(function (sel) {
+            var prev = sel.value;
+            sel.innerHTML = '';
+            var def = document.createElement('option');
+            def.value = '';
+            def.textContent = 'Default (auto-select)';
+            sel.appendChild(def);
+            modemList.forEach(function (m) {
+                var o = document.createElement('option');
+                o.value = m.port;
+                o.textContent = m.model + ' (' + m.port + ')';
+                sel.appendChild(o);
+            });
+            // Restore prior selection if it still exists, else default ('').
+            var hasPrev = Array.prototype.some.call(sel.options, function (o) {
+                return o.value === prev;
+            });
+            sel.value = hasPrev ? prev : '';
+        });
+    }
+
+    // Cron builder: mirror speedtest_web's helper so the generated expression
+    // matches what the backend's cron_matches() understands.
+    function cronEls() {
+        return {
+            preset: $('sched-preset'),
+            custom: $('sched-cron-custom'),
+            customRow: $('sched-custom-row'),
+            builderWrap: $('sched-builder-wrap'),
+            repeat: $('cron-repeat'),
+            interval: $('cron-interval'),
+            hour: $('cron-hour'),
+            minute: $('cron-minute'),
+            dow: $('cron-dow'),
+            preview: $('cron-preview')
+        };
+    }
+
+    function populateHourOptions() {
+        var sel = $('cron-hour');
+        if (!sel || sel.options.length) return;
+        for (var h = 0; h < 24; h++) {
+            var ampm = h < 12 ? 'AM' : 'PM';
+            var disp = (h % 12 === 0 ? 12 : h % 12) + ':00 ' + ampm;
+            var o = document.createElement('option');
+            o.value = String(h);
+            o.textContent = disp;
+            sel.appendChild(o);
+        }
+    }
+
+    function updateBuilderVisibility() {
+        var e = cronEls();
+        var mode = e.repeat.value;
+        $('cron-interval-wrap').style.display = (mode === 'minutes' || mode === 'hours') ? '' : 'none';
+        $('cron-hour-wrap').style.display = (mode === 'daily' || mode === 'weekly' || mode === 'weekdays') ? '' : 'none';
+        $('cron-minute-wrap').style.display = (mode === 'daily' || mode === 'weekly' || mode === 'weekdays') ? '' : 'none';
+        $('cron-dow-wrap').style.display = (mode === 'weekly') ? '' : 'none';
+        if (mode === 'minutes') {
+            e.interval.innerHTML = '<option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="30">30</option>';
+        } else if (mode === 'hours') {
+            e.interval.innerHTML = '<option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="12">12</option>';
+        }
+        updateCronPreview();
+    }
+
+    function buildCronFromBuilder() {
+        var e = cronEls();
+        var mode = e.repeat.value;
+        var interval = e.interval.value;
+        var hour = e.hour.value;
+        var minute = e.minute.value;
+        var dow = e.dow.value;
+        if (mode === 'minutes') return '*/' + interval + ' * * * *';
+        if (mode === 'hours') return '0 */' + interval + ' * * *';
+        if (mode === 'daily') return minute + ' ' + hour + ' * * *';
+        if (mode === 'weekdays') return minute + ' ' + hour + ' * * 1-5';
+        if (mode === 'weekly') return minute + ' ' + hour + ' * * ' + dow;
+        return '0 * * * *';
+    }
+
+    function updateCronPreview() {
+        $('cron-preview').textContent = getCronValue();
+    }
+
+    function getCronValue() {
+        var e = cronEls();
+        if (e.preset.value === 'custom') return e.custom.value.trim();
+        if (e.preset.value) return e.preset.value;
+        return buildCronFromBuilder();
+    }
+
+    function parseCronToBuilder(cron) {
+        var e = cronEls();
+        var parts = (cron || '').split(/\s+/);
+        if (parts.length !== 5) return false;
+        var min = parts[0], hr = parts[1], dom = parts[2], mon = parts[3], dow = parts[4];
+        if (min.indexOf('/') > -1 && hr === '*') {
+            e.repeat.value = 'minutes';
+            updateBuilderVisibility();
+            e.interval.value = min.split('/')[1];
+        } else if (min === '0' && hr.indexOf('/') > -1) {
+            e.repeat.value = 'hours';
+            updateBuilderVisibility();
+            e.interval.value = hr.split('/')[1];
+        } else if (dom === '*' && mon === '*' && dow === '1-5') {
+            e.repeat.value = 'weekdays';
+            updateBuilderVisibility();
+            e.hour.value = hr; e.minute.value = min;
+        } else if (dom === '*' && mon === '*' && dow !== '*') {
+            e.repeat.value = 'weekly';
+            updateBuilderVisibility();
+            e.hour.value = hr; e.minute.value = min; e.dow.value = dow;
+        } else if (dom === '*' && mon === '*' && dow === '*') {
+            e.repeat.value = 'daily';
+            updateBuilderVisibility();
+            e.hour.value = hr; e.minute.value = min;
+        } else {
+            return false;
+        }
+        return buildCronFromBuilder() === cron;
+    }
+
+    function syncSubOptionState() {
+        $('startup-options').classList.toggle('cs-disabled', !$('sched-startup-enabled').checked);
+        $('schedule-options').classList.toggle('cs-disabled', !$('sched-schedule-enabled').checked);
+    }
+
+    function applyPresetVisibility() {
+        var e = cronEls();
+        if (e.preset.value === 'custom') {
+            e.customRow.style.display = '';
+            e.builderWrap.style.display = 'none';
+        } else if (e.preset.value === '') {
+            e.customRow.style.display = 'none';
+            e.builderWrap.style.display = '';
+        } else {
+            e.customRow.style.display = 'none';
+            e.builderWrap.style.display = 'none';
+        }
+        updateCronPreview();
+    }
+
+    // Apply the saved modem ports to the dropdowns. Called after both the
+    // schedule config and the modem list are available (either order), so the
+    // option for a saved port exists before we select it.
+    function applyScheduleModemPorts() {
+        var s = state.scheduleCfg;
+        if (!s) return;
+        var sp = $('startup-port');
+        var cp2 = $('schedule-port');
+        if (sp) sp.value = Array.prototype.some.call(sp.options, function (o) {
+            return o.value === (s.startup_port || '');
+        }) ? (s.startup_port || '') : '';
+        if (cp2) cp2.value = Array.prototype.some.call(cp2.options, function (o) {
+            return o.value === (s.schedule_port || '');
+        }) ? (s.schedule_port || '') : '';
+    }
+
+    function loadSchedule() {
+        return api('/api/schedule').then(function (s) {
+            state.scheduleCfg = s;
+            $('sched-startup-enabled').checked = !!s.startup_enabled;
+            $('sched-schedule-enabled').checked = !!s.schedule_enabled;
+            $('startup-action').value = s.startup_action || 'none';
+            $('schedule-action').value = s.schedule_action || 'none';
+            applyScheduleModemPorts();
+            // Restore the cron into preset/builder/custom.
+            var e = cronEls();
+            var cron = s.schedule_cron || '';
+            if (cron) {
+                var matchedPreset = false;
+                for (var i = 0; i < e.preset.options.length; i++) {
+                    if (e.preset.options[i].value === cron) {
+                        e.preset.value = cron;
+                        matchedPreset = true;
+                        break;
+                    }
+                }
+                if (!matchedPreset) {
+                    if (parseCronToBuilder(cron)) {
+                        e.preset.value = '';
+                    } else {
+                        e.preset.value = 'custom';
+                        e.custom.value = cron;
+                    }
+                }
+            }
+            applyPresetVisibility();
+            if (cron) e.preview.textContent = cron;
+            syncSubOptionState();
+            updateEsimOptionAvailability();
+        }).catch(function () { /* leave defaults */ });
+    }
+
+    function saveSchedule() {
+        var btn = $('save-schedule-btn');
+        btn.disabled = true;
+        $('schedule-save-status').textContent = '';
+        var payload = {
+            startup_enabled: $('sched-startup-enabled').checked,
+            startup_action: $('startup-action').value,
+            startup_port: $('startup-port').value,
+            schedule_enabled: $('sched-schedule-enabled').checked,
+            schedule_cron: getCronValue(),
+            schedule_action: $('schedule-action').value,
+            schedule_port: $('schedule-port').value
+        };
+        api('/api/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(function (r) {
+            btn.disabled = false;
+            if (r.ok) {
+                toast('Schedule saved', 'success');
+                $('schedule-save-status').textContent = 'Saved.';
+            } else {
+                toast('Could not save schedule', 'error');
+            }
+        }).catch(function () {
+            btn.disabled = false;
+            toast('Could not save schedule', 'error');
+        });
+    }
+
+    // ---- History ---------------------------------------------------------
+
+    function triggerTag(trigger) {
+        var cls = 'cs-trigger-manual', label = 'Manual';
+        if (trigger === 'startup') { cls = 'cs-trigger-startup'; label = 'Startup'; }
+        else if (trigger === 'schedule') { cls = 'cs-trigger-schedule'; label = 'Schedule'; }
+        return '<span class="cs-trigger-tag ' + cls + '">' + label + '</span>';
+    }
+
+    function loadHistory() {
+        var content = $('history-content');
+        content.innerHTML = '<p class="cs-muted">Loading history...</p>';
+        return api('/api/history').then(function (data) {
+            var entries = data.entries || [];
+            if (!entries.length) {
+                $('history-summary').textContent = '';
+                content.innerHTML = '<div class="cs-empty"><i class="fas fa-folder-open"></i>' +
+                    'No saved surveys yet. Run a survey, or enable a schedule, and ' +
+                    'completed surveys will be saved here as downloadable CSVs.</div>';
+                return;
+            }
+            $('history-summary').textContent = entries.length + ' saved survey' + (entries.length === 1 ? '' : 's');
+            var html = '<table class="cs-history-table"><thead><tr>' +
+                '<th>When</th><th>Trigger</th><th>Carriers</th><th>Cells</th><th>File</th><th></th>' +
+                '</tr></thead><tbody>';
+            entries.forEach(function (e) {
+                var dl = '/api/history/download?file=' + encodeURIComponent(e.filename);
+                html += '<tr>' +
+                    '<td>' + escapeHtml(e.timestamp || '') + '</td>' +
+                    '<td>' + triggerTag(e.trigger) + '</td>' +
+                    '<td>' + escapeHtml(String(e.carrier_count != null ? e.carrier_count : '')) + '</td>' +
+                    '<td>' + escapeHtml(String(e.cell_count != null ? e.cell_count : '')) + '</td>' +
+                    '<td class="cs-muted">' + escapeHtml(e.display_name || e.filename) + '</td>' +
+                    '<td><a class="btn btn-secondary btn-sm" href="' + dl + '" download>' +
+                    '<i class="fas fa-download"></i> Download</a></td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }).catch(function () {
+            content.innerHTML = '<p class="cs-muted">Could not load history.</p>';
+        });
+    }
+
+    function openClearModal() { $('clear-modal').classList.add('show'); }
+    function closeClearModal() { $('clear-modal').classList.remove('show'); }
+
+    function confirmClearHistory() {
+        var btn = $('clear-confirm');
+        btn.disabled = true;
+        api('/api/history/clear', { method: 'POST' }).then(function (r) {
+            btn.disabled = false;
+            closeClearModal();
+            if (r.ok) { toast('History cleared', 'success'); loadHistory(); }
+            else toast('Could not clear history', 'error');
+        }).catch(function () {
+            btn.disabled = false;
+            closeClearModal();
+            toast('Could not clear history', 'error');
+        });
+    }
+
     // ---- utils -----------------------------------------------------------
 
     function escapeHtml(s) {
@@ -557,12 +894,17 @@
         $('modem-select').addEventListener('change', function () {
             state.selectedPort = this.value;
             expandConnSection();
-            loadModemStatus();
+            loadModemStatus().then(updateEsimOptionAvailability);
         });
         $('conn-collapse-head').addEventListener('click', function () {
             $('conn-section').classList.toggle('open');
         });
-        $('refresh-modem-btn').addEventListener('click', loadModems);
+        $('refresh-modem-btn').addEventListener('click', function () {
+            loadModems().then(function () {
+                populateScheduleModems();
+                applyScheduleModemPorts();
+            });
+        });
         $('run-survey-btn').addEventListener('click', runSurvey);
         $('export-csv-btn').addEventListener('click', exportCsv);
         $('unlock-btn').addEventListener('click', unlockModem);
@@ -578,10 +920,50 @@
         $('esim-modal').addEventListener('click', function (e) {
             if (e.target === this) closeEsimModal();
         });
+
+        // Schedule controls.
+        populateHourOptions();
+        $('sched-startup-enabled').addEventListener('change', syncSubOptionState);
+        $('sched-schedule-enabled').addEventListener('change', syncSubOptionState);
+        $('sched-preset').addEventListener('change', applyPresetVisibility);
+        $('sched-cron-custom').addEventListener('input', updateCronPreview);
+        $('cron-repeat').addEventListener('change', updateBuilderVisibility);
+        $('cron-interval').addEventListener('change', updateCronPreview);
+        $('cron-hour').addEventListener('change', updateCronPreview);
+        $('cron-minute').addEventListener('change', updateCronPreview);
+        $('cron-dow').addEventListener('change', updateCronPreview);
+        $('save-schedule-btn').addEventListener('click', saveSchedule);
+        updateBuilderVisibility();
+
+        // History controls.
+        $('history-refresh-btn').addEventListener('click', loadHistory);
+        $('history-clear-btn').addEventListener('click', openClearModal);
+        $('clear-cancel').addEventListener('click', closeClearModal);
+        $('clear-modal-close').addEventListener('click', closeClearModal);
+        $('clear-confirm').addEventListener('click', confirmClearHistory);
+        $('clear-modal').addEventListener('click', function (e) {
+            if (e.target === this) closeClearModal();
+        });
+
+        // Reload history whenever the History nav item is clicked so a survey
+        // that finished in the background shows up without a full refresh.
+        var historyNav = document.querySelector('.nav-item[data-element="history"]');
+        if (historyNav) historyNav.addEventListener('click', function () {
+            setTimeout(loadHistory, 0);
+        });
+
         // Load modems first (sets selectedPort and modem status), then
         // restore any survey the server is already running or has finished so
-        // a browser refresh doesn't lose the session.
-        loadModems().then(restoreSurveyState);
+        // a browser refresh doesn't lose the session. Load the saved schedule
+        // and history in parallel.
+        loadModems().then(function () {
+            restoreSurveyState();
+            updateEsimOptionAvailability();
+            populateScheduleModems();
+            applyScheduleModemPorts();
+        });
+        loadSchedule();
+        loadHistory();
     }
 
     if (document.readyState === 'loading') {

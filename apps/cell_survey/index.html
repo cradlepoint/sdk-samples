@@ -48,19 +48,35 @@
         /* The template CSS has no disabled state for .btn, so a disabled
            button looks identical to an enabled one. Make it visibly inert. */
         .btn:disabled, .btn[disabled] { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.4); }
-        /* No sidebar: let the content area use the full width and let the
-           page scroll at the body level instead of an inner scrollbar. The
-           template sized the main pane for a full-height sidebar, which left
-           the container ~25px taller than the viewport and forced a stray
-           scrollbar. Let the layout size to its content instead. */
-        html, body { min-height: 0 !important; }
-        .app-container { min-height: 100vh; }
-        /* Size the main pane to its content instead of stretching to fill the
-           viewport; the flex:1 stretch pushed the layout past 100vh and forced
-           a stray scrollbar. */
-        .app-main { overflow: visible; min-height: 0 !important; height: auto !important; flex: 0 1 auto !important; }
-        .content-area { width: 100%; max-width: 1100px; margin: 0 auto; overflow: visible; min-height: 0 !important; height: auto !important; }
-        .content-panel { height: auto !important; }
+        /* Keep a comfortable max width for the survey content. The template's
+           .content-area owns scrolling (overflow-y: auto); don't override its
+           overflow or the results below the fold become unreachable. */
+        .content-panel { max-width: 1100px; }
+        .cs-section-title { font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+
+        /* Schedule + History shared form bits */
+        .cs-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1.25rem; background: var(--light-surface); }
+        .cs-card h4 { margin: 0 0 0.25rem; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .cs-card .cs-hint { font-size: 0.82rem; opacity: 0.7; margin: 0 0 0.9rem; }
+        .cs-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; cursor: pointer; margin-bottom: 0.6rem; }
+        .cs-check input { width: 16px; height: 16px; }
+        .cs-field { margin-bottom: 0.8rem; }
+        .cs-field > label { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.7; margin-bottom: 0.3rem; }
+        .cs-sub-options { margin: 0.2rem 0 0.9rem 1.6rem; padding-left: 0.9rem; border-left: 2px solid var(--border-color); }
+        .cs-sub-options.cs-disabled { opacity: 0.45; pointer-events: none; }
+        .cron-builder { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.4rem; }
+        .cron-builder .cs-field { margin-bottom: 0; }
+        .cron-preview { margin-top: 0.6rem; font-size: 0.8rem; opacity: 0.8; }
+        .cron-preview code { background: var(--border-color); padding: 0.15rem 0.45rem; border-radius: 4px; }
+        .cs-history-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        .cs-history-table th, .cs-history-table td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        .cs-history-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.65; }
+        .cs-trigger-tag { font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 6px; text-transform: uppercase; }
+        .cs-trigger-manual { background: rgba(99,102,241,0.15); color: #4f46e5; }
+        .cs-trigger-startup { background: rgba(234,179,8,0.18); color: #b45309; }
+        .cs-trigger-schedule { background: rgba(14,165,233,0.15); color: #0284c7; }
+        .cs-empty { text-align: center; padding: 2.5rem 1rem; opacity: 0.6; }
+        .cs-empty i { font-size: 2rem; display: block; margin-bottom: 0.6rem; opacity: 0.5; }
         .carrier-chevron { transition: transform 0.2s ease; }
         .carrier-card.open .carrier-chevron { transform: rotate(180deg); }
         /* Collapsible current-connection section. When collapsed, the tile
@@ -73,6 +89,17 @@
         .cs-collapse .cs-collapse-body { display: none; }
         .cs-collapse.open .cs-collapse-body { display: block; }
         #conn-collapsed-summary { margin-left: auto; }
+
+        /* This app has no .sidebar-header, so the nav would otherwise sit
+           flush against the header. Add breathing room above the first
+           nav item ("Run Survey"). */
+        .sidebar-nav { padding-top: 1.75rem; }
+
+        /* The template's tab switcher resets inline `display` on every
+           `.element-example` when you navigate back to a section, which would
+           re-reveal an empty results panel. Gate it with a class the
+           framework never touches instead of inline display. */
+        .cs-hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -98,6 +125,28 @@
         </header>
 
         <main class="app-main">
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <ul class="nav-list" id="nav-list">
+                        <li>
+                            <a href="#" class="nav-item active" data-element="homepage">
+                                <i class="fas fa-satellite-dish"></i> Run Survey
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="schedule">
+                                <i class="fas fa-clock"></i> Schedule
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="nav-item" data-element="history">
+                                <i class="fas fa-clock-rotate-left"></i> History
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
             <div class="content-area">
                 <div class="content-panel" id="content-panel">
                     <section class="element-section active" id="homepage">
@@ -150,7 +199,7 @@
                         </div>
 
                         <!-- Results -->
-                        <div class="element-example" id="results-panel" style="display:none;">
+                        <div class="element-example cs-hidden" id="results-panel">
                             <div class="cs-row" style="margin-bottom:0.5rem;">
                                 <h3 style="margin:0;">Results by Carrier</h3>
                                 <span class="cs-muted" id="results-summary" style="margin-left:auto;"></span>
@@ -160,6 +209,162 @@
                             </div>
                             <div id="carrier-list"></div>
                         </div>
+                    </section>
+
+                    <!-- ============ SCHEDULE ============ -->
+                    <section class="element-section" id="schedule">
+                        <h3 class="cs-section-title"><i class="fas fa-clock"></i> Schedule</h3>
+                        <p class="cs-muted" style="margin-top:-0.5rem; margin-bottom:1.25rem;">
+                            Run a survey automatically on router startup and/or on a repeating
+                            schedule. Each automatic survey is saved to <strong>History</strong>.
+                            You can also pick what to do with the strongest carrier after the scan.
+                        </p>
+
+                        <!-- Run on Startup -->
+                        <div class="cs-card">
+                            <label class="cs-check">
+                                <input type="checkbox" id="sched-startup-enabled">
+                                <strong>Run Survey on Startup</strong>
+                            </label>
+                            <p class="cs-hint">Runs one survey a short time after the router boots and the modem connects.</p>
+                            <div class="cs-sub-options" id="startup-options">
+                                <div class="cs-field cs-modem-field" style="display:none;">
+                                    <label for="startup-port">Modem</label>
+                                    <select id="startup-port" class="cs-select sched-modem-select"></select>
+                                </div>
+                                <div class="cs-field">
+                                    <label for="startup-action">After the survey</label>
+                                    <select id="startup-action" class="cs-select">
+                                        <option value="none">Do not select carrier</option>
+                                        <option value="lock">Lock best carrier PLMN</option>
+                                        <option value="esim" data-esim="1">Activate best carrier eSIM</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Run on Schedule -->
+                        <div class="cs-card">
+                            <label class="cs-check">
+                                <input type="checkbox" id="sched-schedule-enabled">
+                                <strong>Run Survey on Schedule</strong>
+                            </label>
+                            <p class="cs-hint">Repeats on a schedule you define below (router time, UTC).</p>
+                            <div class="cs-sub-options" id="schedule-options">
+                                <div class="cs-field cs-modem-field" style="display:none;">
+                                    <label for="schedule-port">Modem</label>
+                                    <select id="schedule-port" class="cs-select sched-modem-select"></select>
+                                </div>
+                                <div class="cs-field">
+                                    <label for="sched-preset">Quick preset</label>
+                                    <select id="sched-preset" class="cs-select">
+                                        <option value="">Use builder below</option>
+                                        <option value="custom">Custom cron expression...</option>
+                                        <option value="*/15 * * * *">Every 15 minutes</option>
+                                        <option value="*/30 * * * *">Every 30 minutes</option>
+                                        <option value="0 * * * *">Every hour</option>
+                                        <option value="0 */2 * * *">Every 2 hours</option>
+                                        <option value="0 */6 * * *">Every 6 hours</option>
+                                        <option value="0 */12 * * *">Every 12 hours</option>
+                                        <option value="0 0 * * *">Daily at midnight</option>
+                                        <option value="0 6 * * *">Daily at 6am</option>
+                                        <option value="0 12 * * *">Daily at noon</option>
+                                        <option value="0 2 * * 1">Weekly (Mon 2am)</option>
+                                    </select>
+                                </div>
+
+                                <div class="cs-field" id="sched-custom-row" style="display:none;">
+                                    <label for="sched-cron-custom">Custom cron (min hour dom month dow)</label>
+                                    <input type="text" id="sched-cron-custom" class="cs-select" style="min-width:0; width:100%;" placeholder="0 */4 * * 1-5">
+                                </div>
+
+                                <div id="sched-builder-wrap">
+                                    <div class="cron-builder">
+                                        <div class="cs-field">
+                                            <label for="cron-repeat">Run every</label>
+                                            <select id="cron-repeat" class="cs-select" style="min-width:0; width:100%;">
+                                                <option value="minutes">X minutes</option>
+                                                <option value="hours">X hours</option>
+                                                <option value="daily">day</option>
+                                                <option value="weekdays">weekday (M-F)</option>
+                                                <option value="weekly">week</option>
+                                            </select>
+                                        </div>
+                                        <div class="cs-field" id="cron-interval-wrap">
+                                            <label for="cron-interval">Interval</label>
+                                            <select id="cron-interval" class="cs-select" style="min-width:0; width:100%;"></select>
+                                        </div>
+                                        <div class="cs-field" id="cron-hour-wrap" style="display:none;">
+                                            <label for="cron-hour">At hour (UTC)</label>
+                                            <select id="cron-hour" class="cs-select" style="min-width:0; width:100%;"></select>
+                                        </div>
+                                        <div class="cs-field" id="cron-minute-wrap" style="display:none;">
+                                            <label for="cron-minute">At minute</label>
+                                            <select id="cron-minute" class="cs-select" style="min-width:0; width:100%;">
+                                                <option value="0">:00</option>
+                                                <option value="15">:15</option>
+                                                <option value="30">:30</option>
+                                                <option value="45">:45</option>
+                                            </select>
+                                        </div>
+                                        <div class="cs-field" id="cron-dow-wrap" style="display:none;">
+                                            <label for="cron-dow">Day of week</label>
+                                            <select id="cron-dow" class="cs-select" style="min-width:0; width:100%;">
+                                                <option value="0">Sunday</option>
+                                                <option value="1">Monday</option>
+                                                <option value="2">Tuesday</option>
+                                                <option value="3">Wednesday</option>
+                                                <option value="4">Thursday</option>
+                                                <option value="5">Friday</option>
+                                                <option value="6">Saturday</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="cron-preview">Cron: <code id="cron-preview">* * * * *</code></div>
+                                </div>
+
+                                <div class="cs-field" style="margin-top:0.9rem;">
+                                    <label for="schedule-action">After the survey</label>
+                                    <select id="schedule-action" class="cs-select">
+                                        <option value="none">Do not select carrier</option>
+                                        <option value="lock">Lock best carrier PLMN</option>
+                                        <option value="esim" data-esim="1">Activate best carrier eSIM</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="cs-row">
+                            <button type="button" class="btn btn-primary" id="save-schedule-btn">
+                                <i class="fas fa-save"></i> Save Schedule
+                            </button>
+                            <span class="cs-muted" id="schedule-save-status"></span>
+                        </div>
+                        <p class="cs-muted" id="esim-availability-note" style="display:none; margin-top:0.75rem;">
+                            <i class="fas fa-info-circle"></i>
+                            "Activate best carrier eSIM" is available because this modem has an
+                            operational eSIM profile.
+                        </p>
+                        <p class="cs-muted" id="esim-unavailable-note" style="display:none; margin-top:0.75rem;">
+                            <i class="fas fa-info-circle"></i>
+                            "Activate best carrier eSIM" is hidden because this modem has no
+                            operational eSIM profile.
+                        </p>
+                    </section>
+
+                    <!-- ============ HISTORY ============ -->
+                    <section class="element-section" id="history">
+                        <h3 class="cs-section-title"><i class="fas fa-clock-rotate-left"></i> History</h3>
+                        <div class="cs-row" style="margin-bottom:0.75rem;">
+                            <span class="cs-muted" id="history-summary"></span>
+                            <button type="button" class="btn btn-secondary btn-sm" id="history-refresh-btn" style="margin-left:auto;">
+                                <i class="fas fa-rotate"></i> Refresh
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="history-clear-btn">
+                                <i class="fas fa-trash"></i> Clear All
+                            </button>
+                        </div>
+                        <div id="history-content"></div>
                     </section>
                 </div>
             </div>
@@ -197,6 +402,23 @@
                 <div class="cs-actions" style="justify-content:flex-end; margin-top:1rem;">
                     <button type="button" class="btn btn-secondary" id="esim-cancel">Cancel</button>
                     <button type="button" class="btn btn-primary" id="esim-confirm"><i class="fas fa-sim-card"></i> Activate Profile</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear history confirmation modal -->
+    <div class="modal-overlay" id="clear-modal">
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-trash"></i> Clear History</h2>
+                <button type="button" class="modal-close" id="clear-modal-close" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>Delete all saved survey CSVs? This cannot be undone.</p>
+                <div class="cs-actions" style="justify-content:flex-end; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="clear-cancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="clear-confirm"><i class="fas fa-trash"></i> Clear All</button>
                 </div>
             </div>
         </div>
