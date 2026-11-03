@@ -72,7 +72,6 @@ The Web App Template Style Guide provides a complete design system with:
 4. **Assets** – Ensure your app references:
    - `static/css/style.css` – Main stylesheet
    - `static/libs/font-awesome.min.css` – Icons
-   - `static/libs/jquery-3.5.1.min.js` – jQuery (if your scripts depend on it)
 
 ### Project Structure
 
@@ -86,7 +85,7 @@ web_app_template/
 ├── static/
 │   ├── css/style.css       # Design system styles
 │   ├── js/script.js        # Application logic
-│   └── libs/               # Font Awesome, jQuery
+│   └── libs/               # Font Awesome (CSS + webfonts)
 └── readme.md
 ```
 
