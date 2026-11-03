@@ -30,7 +30,7 @@ import cp
 import modems
 import survey
 
-PORT = 8000
+DEFAULT_PORT = 8000
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _STATIC_DIR = os.path.join(_SCRIPT_DIR, 'static')
@@ -51,6 +51,29 @@ _MIME_TYPES = {
     '.ttf': 'font/ttf',
     '.json': 'application/json',
 }
+
+
+def _get_port():
+    """Return the web server port.
+
+    Reads the optional 'cell_survey_port' appdata field. Falls back to
+    DEFAULT_PORT when the field is missing or not a valid port number.
+    The default is never written to appdata (that would override NCM config).
+    """
+    try:
+        value = cp.get_appdata('cell_survey_port')
+        if value is not None:
+            port = int(str(value).strip())
+            if 1 <= port <= 65535:
+                return port
+            cp.log('cell_survey_port {} out of range; using {}'.format(
+                port, DEFAULT_PORT))
+    except (ValueError, TypeError):
+        cp.log('cell_survey_port is not a valid integer; using {}'.format(
+            DEFAULT_PORT))
+    except Exception as e:
+        cp.log('Error reading cell_survey_port appdata: {}'.format(e))
+    return DEFAULT_PORT
 
 
 def _read_package_ini():
@@ -151,6 +174,8 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
             self._handle_lock(body)
         elif path == '/api/unlock':
             self._handle_unlock(body)
+        elif path == '/api/esim/activate':
+            self._handle_esim_activate(body)
         else:
             self.send_error(404)
 
@@ -198,6 +223,12 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
     def _handle_unlock(self, body):
         config_id = body.get('config_id')
         self._send_json(modems.unlock(config_id))
+
+    def _handle_esim_activate(self, body):
+        uid = body.get('uid')
+        eid = body.get('eid')
+        iccid = body.get('iccid')
+        self._send_json(modems.activate_esim_profile(uid, eid, iccid))
 
     # --- helpers ----------------------------------------------------------
 
@@ -281,6 +312,20 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn,
     daemon_threads = True
     allow_reuse_address = True
 
+    def server_bind(self):
+        """Bind without resolving the host FQDN.
+
+        http.server.HTTPServer.server_bind() calls socket.getfqdn(), which on
+        the router runs the hostname through the 'idna' codec and raises
+        UnicodeError ('label too long') for non-conforming hostnames. We don't
+        need the FQDN for anything (clients connect by IP), so skip it and set
+        server_name/server_port directly from the bound socket.
+        """
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.socket.getsockname()[:2]
+        self.server_name = host
+        self.server_port = port
+
 
 def main():
     app_name, version = _read_package_ini()
@@ -295,13 +340,14 @@ def main():
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
+    port = _get_port()
     try:
-        httpd = ThreadingHTTPServer(('', PORT), AppRequestHandler)
+        httpd = ThreadingHTTPServer(('', port), AppRequestHandler)
         httpd.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cp.log('cell_survey web server started on port {}'.format(PORT))
+        cp.log('cell_survey web server started on port {}'.format(port))
         httpd.serve_forever()
     except OSError as e:
-        cp.log('ERROR starting server on port {}: {}'.format(PORT, e))
+        cp.log('ERROR starting server on port {}: {}'.format(port, e))
         # Park so a one-shot failure idles instead of hot-restart looping.
         while True:
             import time

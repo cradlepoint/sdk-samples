@@ -63,6 +63,16 @@
         .content-panel { height: auto !important; }
         .carrier-chevron { transition: transform 0.2s ease; }
         .carrier-card.open .carrier-chevron { transform: rotate(180deg); }
+        /* Collapsible current-connection section. When collapsed, the tile
+           grid hides and a compact header summary shows the carrier/signal so
+           the survey results become the prominent content on the page. */
+        .cs-collapse-head { display: flex; align-items: center; gap: 0.6rem; cursor: pointer; padding: 0.6rem 0.2rem; user-select: none; }
+        .cs-collapse-head:hover { opacity: 0.85; }
+        .cs-collapse-head .cs-conn-chevron { transition: transform 0.2s ease; transform: rotate(-90deg); }
+        .cs-collapse.open .cs-conn-chevron { transform: rotate(0deg); }
+        .cs-collapse .cs-collapse-body { display: none; }
+        .cs-collapse.open .cs-collapse-body { display: block; }
+        #conn-collapsed-summary { margin-left: auto; }
     </style>
 </head>
 <body>
@@ -124,7 +134,19 @@
                                 </button>
                             </div>
 
-                            <div class="cs-grid" id="modem-stats"></div>
+                            <!-- Current-connection tiles. Collapsed after a
+                                 survey finishes so the results take center
+                                 stage; click the header to expand again. -->
+                            <div id="conn-section" class="cs-collapse open">
+                                <div class="cs-collapse-head" id="conn-collapse-head" style="display:none;">
+                                    <i class="fas fa-chevron-down carrier-chevron cs-conn-chevron"></i>
+                                    <strong>Current connection</strong>
+                                    <span class="cs-muted" id="conn-collapsed-summary"></span>
+                                </div>
+                                <div class="cs-collapse-body">
+                                    <div class="cs-grid" id="modem-stats"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Results -->
@@ -148,7 +170,7 @@
     <div class="modal-overlay" id="lock-modal">
         <div class="modal-container modal-sm">
             <div class="modal-header">
-                <h2><i class="fas fa-lock"></i> Lock to Carrier</h2>
+                <h2><i class="fas fa-lock"></i> Lock Carrier PLMN</h2>
                 <button type="button" class="modal-close" id="lock-modal-close" title="Close"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
@@ -156,7 +178,25 @@
                 <p class="cs-muted">This forces the modem to use only this PLMN (manual network selection). The modem will re-register and the connection may drop briefly.</p>
                 <div class="cs-actions" style="justify-content:flex-end; margin-top:1rem;">
                     <button type="button" class="btn btn-secondary" id="lock-cancel">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="lock-confirm"><i class="fas fa-lock"></i> Lock Modem</button>
+                    <button type="button" class="btn btn-primary" id="lock-confirm"><i class="fas fa-lock"></i> Lock Carrier PLMN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- eSIM activation confirmation modal -->
+    <div class="modal-overlay" id="esim-modal">
+        <div class="modal-container modal-sm">
+            <div class="modal-header">
+                <h2><i class="fas fa-sim-card"></i> Activate eSIM Profile</h2>
+                <button type="button" class="modal-close" id="esim-modal-close" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p id="esim-modal-text"></p>
+                <p class="cs-muted">This enables the selected eSIM profile on the modem. The modem will re-register on this carrier, so the connection may drop briefly and the modem may reset if it needs different firmware.</p>
+                <div class="cs-actions" style="justify-content:flex-end; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" id="esim-cancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="esim-confirm"><i class="fas fa-sim-card"></i> Activate Profile</button>
                 </div>
             </div>
         </div>

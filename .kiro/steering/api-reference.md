@@ -79,6 +79,7 @@ entry there before acting on anything in this list.
 - `config/wan/rules2/priority` is LOWER = more preferred
 - DSDS: each SIM slot is a separate `mdm-*` device; `info/port` and `info/config_id` are identical on both
 - Which modem signal metrics exist depends on the live radio technology, not the modem
+- eSIM: `diagnostics` `EUICC_PROF<n>` = `iccid,name,active,nickname,provider,class,…` (class 2=operational); activate via PUT `control/wan/devices/<uid>/euicc` — see `control/wan.md`
 
 **IP Verify**
 - A test bound to a disconnected WAN reports `pass: false`, not "no result"

@@ -36,6 +36,184 @@ def is_supported(mfg_model):
     return any(m in model for m in _SUPPORTED_MODELS)
 
 
+# eUICC profile "Class" codes from the EUICC_PROF<n> diagnostics string. These
+# match the eSIM Manager UI's Class column: 0 is a test profile, 2 is a
+# provisioned operational profile. Only operational profiles are worth
+# activating from this app, so the UI offers an "Activate eSIM Profile" button
+# only for class == '2'.
+_EUICC_CLASS_LABELS = {
+    '0': 'test',
+    '1': 'provisioning',
+    '2': 'operational',
+}
+
+
+def parse_euicc_profiles(diag):
+    """Parse the EUICC_PROF<n> diagnostics fields into profile dicts.
+
+    An eSIM-capable modem (ESIM_TYPE set, EUICC_SGP22 == 'TRUE') publishes one
+    EUICC_PROF<n> field per installed profile, each a comma-separated string.
+    The field order matches the columns in the router's eSIM Manager UI:
+
+        0: iccid            (e.g. '8901882014725970045F')
+        1: profile_name     (e.g. 'T-Mobile')            -- "Profile Name"
+        2: active           ('1' = active, '0' = not)    -- "Active"
+        3: nickname         (e.g. 'W2255-SIM1-TMO')      -- "Nickname"
+        4: service_provider (e.g. 'T-Mobile')            -- "Service Provider"
+        5: class            ('0' test, '2' operational)  -- "Class"
+        6: reserved         (trailing padding, ignored)
+
+    Only operational profiles (class '2') can be meaningfully activated from
+    this app; a test profile is flagged so the UI can hide its button.
+
+    Args:
+        diag: The modem's status/wan/devices/<uid>/diagnostics dict.
+
+    Returns:
+        list: profile dicts {iccid, profile_name, nickname, service_provider,
+            active (bool), profile_class, class_label, operational (bool)},
+            in profile-slot order. Empty if the modem has no eUICC profiles.
+    """
+    if not isinstance(diag, dict):
+        return []
+    profiles = []
+    i = 1
+    while True:
+        raw = diag.get('EUICC_PROF{}'.format(i))
+        if raw is None:
+            break
+        i += 1
+        parts = [p.strip() for p in str(raw).split(',')]
+        if len(parts) < 6 or not parts[0]:
+            continue
+        iccid = parts[0]
+        profile_name = parts[1]
+        active = parts[2] == '1'
+        nickname = parts[3]
+        service_provider = parts[4]
+        profile_class = parts[5]
+        profiles.append({
+            'iccid': iccid,
+            'profile_name': profile_name,
+            'nickname': nickname,
+            'service_provider': service_provider,
+            'active': active,
+            'profile_class': profile_class,
+            'class_label': _EUICC_CLASS_LABELS.get(profile_class, profile_class),
+            'operational': profile_class == '2',
+        })
+    return profiles
+
+
+def _norm_carrier(name):
+    """Normalize a carrier/profile name for loose matching.
+
+    Lowercases and strips non-alphanumerics so 'AT&T' matches 'at&t' / 'att'
+    and 'T-Mobile' matches 'tmobile'. Used to line a survey carrier up with an
+    installed eUICC profile by name.
+    """
+    return ''.join(ch for ch in str(name or '').lower() if ch.isalnum())
+
+
+def euicc_info(diag):
+    """Summarize a modem's eUICC (eSIM) state for the UI.
+
+    Args:
+        diag: The modem's diagnostics dict.
+
+    Returns:
+        dict: {supported (bool), eid, profiles (list)}. supported is True when
+            the modem exposes SGP.22 eUICC support; profiles is from
+            parse_euicc_profiles().
+    """
+    if not isinstance(diag, dict):
+        return {'supported': False, 'eid': None, 'profiles': []}
+    profiles = parse_euicc_profiles(diag)
+    supported = (str(diag.get('EUICC_SGP22', '')).upper() == 'TRUE'
+                 or bool(diag.get('EID'))
+                 or bool(profiles))
+    return {
+        'supported': supported,
+        'eid': diag.get('EID'),
+        'profiles': profiles,
+    }
+
+
+def find_profile_for_carrier(profiles, network=None, plmn_mcc=None,
+                             plmn_mnc=None):
+    """Find an operational eUICC profile matching a survey carrier by name.
+
+    Matching is by profile/service-provider name against the survey carrier's
+    network name (normalized), since the EUICC_PROF string carries no PLMN.
+    Only operational (class '2') profiles are considered.
+
+    Args:
+        profiles: list from parse_euicc_profiles().
+        network: Survey carrier network name (e.g. 'T-Mobile').
+
+    Returns:
+        dict: The matching profile, or None.
+    """
+    target = _norm_carrier(network)
+    if not target:
+        return None
+    for p in profiles:
+        if not p.get('operational'):
+            continue
+        names = {_norm_carrier(p.get('profile_name')),
+                 _norm_carrier(p.get('service_provider'))}
+        if target in names:
+            return p
+        # Allow a loose contains match (e.g. 'tmobile' in 'tmobileus').
+        for n in names:
+            if n and (n in target or target in n):
+                return p
+    return None
+
+
+def activate_esim_profile(uid, eid, iccid):
+    """Activate (enable) an eUICC profile by ICCID on a modem.
+
+    Sends the SGP.22 set_state/enable action to the modem's eUICC control
+    endpoint. Enabling a profile makes the modem re-register on that carrier,
+    which may briefly drop the connection (and can reset the modem if it needs
+    different firmware).
+
+    Args:
+        uid: Modem WAN device uid (e.g. 'mdm-84e7b418').
+        eid: The eUICC EID (from diagnostics 'EID').
+        iccid: The target profile's ICCID.
+
+    Returns:
+        dict: {ok: bool, message: str}.
+    """
+    if not uid:
+        return {'ok': False, 'message': 'Missing modem id.'}
+    if not eid:
+        return {'ok': False, 'message': 'Missing eUICC EID for this modem.'}
+    if not iccid:
+        return {'ok': False, 'message': 'Missing profile ICCID.'}
+    path = 'control/wan/devices/{}/euicc'.format(uid)
+    value = {
+        'eid': eid,
+        'op_id': 0,
+        'action': 'set_state',
+        'payload': {'iccid': iccid, 'state': 'enable'},
+    }
+    resp = cp.put(path, value)
+    if _put_ok(resp):
+        cp.log('cell_survey: activating eUICC profile {} on {}'.format(
+            iccid, uid))
+        return {'ok': True,
+                'message': 'Activating eSIM profile. The modem will '
+                           're-register on this carrier; the connection may '
+                           'drop briefly and the modem may reset.'}
+    cp.log('cell_survey: failed to activate eUICC profile {} on {}: {}'.format(
+        iccid, uid, resp))
+    return {'ok': False,
+            'message': 'Could not start eSIM profile activation.'}
+
+
 def _signal_quality(rsrp):
     """Rough human label for an RSRP value (dBm)."""
     try:
@@ -126,12 +304,14 @@ def modem_status(port):
 
     mfg_model = diag.get('MFG_MDL') or modem.get('mfg_model') or ''
     signal = _signal_metrics(diag)
+    esim = euicc_info(diag)
     result = {
         'port': port,
         'uid': uid,
         'iface': modem['iface'],
         'config_id': modem['config_id'],
         'mfg_model': mfg_model,
+        'esim': esim,
         'supported': is_supported(mfg_model),
         'model': diag.get('MDL') or modem['model'],
         'sim_count': modem['sim_count'],

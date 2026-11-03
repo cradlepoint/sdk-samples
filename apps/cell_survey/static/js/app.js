@@ -11,6 +11,7 @@
         currentModem: null,   // last /api/modem result
         pollTimer: null,
         pendingLock: null,    // {plmn, network}
+        pendingEsim: null,    // {iccid, profile_name, network}
         lastGroups: []        // last survey results, for CSV export
     };
 
@@ -59,6 +60,32 @@
         });
     }
 
+    // Collapse the current-connection tiles so survey results take center
+    // stage. Shows a compact header (carrier + signal) that re-expands on
+    // click. Called when a survey finishes with results.
+    function collapseConnSection() {
+        var section = $('conn-section');
+        var head = $('conn-collapse-head');
+        head.style.display = 'flex';
+        section.classList.remove('open');
+        var m = state.currentModem || {};
+        var bits = [];
+        if (m.carrier) bits.push(escapeHtml(m.carrier));
+        if (m.service_type_display || m.service_type) {
+            bits.push(escapeHtml(m.service_type_display || m.service_type));
+        }
+        if (m.rsrp != null && m.rsrp !== '') bits.push(escapeHtml(m.rsrp) + ' dBm');
+        $('conn-collapsed-summary').innerHTML = bits.join(' &middot; ');
+    }
+
+    // Expand the current-connection tiles and hide the collapse header. Called
+    // when a new survey starts or the selected modem changes, so the live
+    // connection is visible again.
+    function expandConnSection() {
+        $('conn-section').classList.add('open');
+        $('conn-collapse-head').style.display = 'none';
+    }
+
     function connPill(cstate) {
         var pill = $('modem-conn');
         pill.className = 'cs-pill';
@@ -90,9 +117,9 @@
     }
 
     function loadModemStatus() {
-        if (!state.selectedPort) return;
+        if (!state.selectedPort) return Promise.resolve();
         $('modem-stats').innerHTML = '<p class="cs-muted">Loading modem status...</p>';
-        api('/api/modem?port=' + encodeURIComponent(state.selectedPort)).then(function (m) {
+        return api('/api/modem?port=' + encodeURIComponent(state.selectedPort)).then(function (m) {
             if (m.error) {
                 $('modem-stats').innerHTML = '<p class="cs-muted">' + m.error + '</p>';
                 return;
@@ -169,7 +196,9 @@
                 pollSurvey();
             } else if (s.state === 'done') {
                 $('survey-status-text').textContent = s.message || '';
-                renderResults(s.groups || []);
+                var groups = s.groups || [];
+                renderResults(groups);
+                if (groups.length) collapseConnSection();
             } else if (s.state === 'error') {
                 $('survey-status-text').textContent = s.message || '';
             }
@@ -181,6 +210,8 @@
         btn.disabled = true;
         $('survey-status-text').textContent = '';
         $('results-panel').style.display = 'none';
+        // Show the live connection again while the new survey runs.
+        expandConnSection();
         api('/api/survey/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -220,9 +251,15 @@
                 return;
             }
             $('survey-status-text').textContent = s.message || '';
-            renderResults(s.groups || []);
-            // Refresh modem status in case the survey affected the connection.
-            loadModemStatus();
+            var groups = s.groups || [];
+            // Refresh modem status (survey may have touched the connection),
+            // then render results and collapse the connection tiles so the
+            // results are prominent. Rendering after the status refresh means
+            // the eSIM profile matching uses the latest modem data.
+            loadModemStatus().then(function () {
+                renderResults(groups);
+                if (groups.length) collapseConnSection();
+            });
         }).catch(function () {
             state.pollTimer = setTimeout(pollSurvey, 1500);
         });
@@ -253,7 +290,23 @@
             var best = g.best_signal != null ? g.best_signal + ' dBm' : '&mdash;';
             var lockBtn = isUnknown ? '' :
                 '<button type="button" class="btn btn-primary btn-sm cs-lock-btn" data-plmn="' + g.plmn +
-                '" data-network="' + escapeAttr(g.network) + '"><i class="fas fa-lock"></i> Use this carrier</button>';
+                '" data-network="' + escapeAttr(g.network) + '"><i class="fas fa-lock"></i> Lock Carrier PLMN</button>';
+
+            // If the modem has an operational eSIM profile for this carrier,
+            // offer a button to activate (enable) it next to the PLMN lock.
+            var esimBtn = '';
+            var profile = isUnknown ? null : esimProfileForCarrier(g.network);
+            if (profile && !profile.active) {
+                esimBtn = '<button type="button" class="btn btn-secondary btn-sm cs-esim-btn" ' +
+                    'data-iccid="' + escapeAttr(profile.iccid) + '" ' +
+                    'data-profile="' + escapeAttr(profile.profile_name) + '" ' +
+                    'data-network="' + escapeAttr(g.network) + '">' +
+                    '<i class="fas fa-sim-card"></i> Activate eSIM Profile</button>';
+            } else if (profile && profile.active) {
+                esimBtn = '<span class="cs-pill ok" title="eSIM profile ' +
+                    escapeAttr(profile.profile_name) + ' is active">' +
+                    '<i class="fas fa-sim-card"></i> eSIM active</span>';
+            }
 
             html += '<div class="carrier-card open">';
             html += '  <div class="carrier-head">';
@@ -261,6 +314,7 @@
             html += '    <div class="carrier-meta">';
             html += '      <span class="cs-muted">' + g.cell_count + ' cells</span>';
             html += '      <span class="cs-pill" style="background:rgba(99,102,241,0.12);color:' + signalColor(g.best_signal) + '"><i class="fas fa-signal"></i> ' + best + '</span>';
+            html += '      ' + esimBtn;
             html += '      ' + lockBtn;
             html += '      <i class="fas fa-chevron-down carrier-chevron"></i>';
             html += '    </div>';
@@ -292,10 +346,11 @@
         list.innerHTML = html;
         panel.style.display = 'block';
 
-        // Wire up collapse toggles and lock buttons (delegation-free, scoped).
+        // Wire up collapse toggles and action buttons (delegation-free, scoped).
         list.querySelectorAll('.carrier-head').forEach(function (head) {
             head.addEventListener('click', function (e) {
-                if (e.target.closest('.cs-lock-btn')) return;
+                if (e.target.closest('.cs-lock-btn') ||
+                    e.target.closest('.cs-esim-btn')) return;
                 head.parentElement.classList.toggle('open');
             });
         });
@@ -303,6 +358,14 @@
             btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 openLockModal(btn.getAttribute('data-plmn'), btn.getAttribute('data-network'));
+            });
+        });
+        list.querySelectorAll('.cs-esim-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                openEsimModal(btn.getAttribute('data-iccid'),
+                    btn.getAttribute('data-profile'),
+                    btn.getAttribute('data-network'));
             });
         });
     }
@@ -363,6 +426,45 @@
         });
     }
 
+    // ---- eSIM profile activation -----------------------------------------
+
+    function openEsimModal(iccid, profileName, network) {
+        state.pendingEsim = { iccid: iccid, profile_name: profileName, network: network };
+        $('esim-modal-text').innerHTML = 'Activate the <strong>' +
+            escapeHtml(profileName) + '</strong> eSIM profile (ICCID ' +
+            escapeHtml(iccid) + ') on modem ' + escapeHtml(state.selectedPort) + '?';
+        $('esim-modal').classList.add('show');
+    }
+
+    function closeEsimModal() {
+        $('esim-modal').classList.remove('show');
+        state.pendingEsim = null;
+    }
+
+    function confirmEsim() {
+        if (!state.pendingEsim || !state.currentModem) { closeEsimModal(); return; }
+        var m = state.currentModem;
+        var eid = m.esim ? m.esim.eid : null;
+        var btn = $('esim-confirm');
+        btn.disabled = true;
+        api('/api/esim/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uid: m.uid, eid: eid, iccid: state.pendingEsim.iccid })
+        }).then(function (r) {
+            btn.disabled = false;
+            closeEsimModal();
+            toast(r.message, r.ok ? 'success' : 'error');
+            // The modem re-registers; refresh status after a moment so the
+            // Active flag and connection tiles catch up.
+            if (r.ok) setTimeout(loadModemStatus, 3000);
+        }).catch(function () {
+            btn.disabled = false;
+            closeEsimModal();
+            toast('eSIM activation request failed', 'error');
+        });
+    }
+
     // ---- CSV export ------------------------------------------------------
 
     function csvCell(v) {
@@ -420,12 +522,44 @@
     }
     function escapeAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
 
+    // Normalize a carrier/profile name for loose matching: lowercase, drop
+    // non-alphanumerics. Mirrors _norm_carrier() on the backend so 'AT&T'
+    // matches 'att' and 'T-Mobile' matches 'tmobile'.
+    function normCarrier(s) {
+        return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    // Find an operational eUICC profile on the current modem matching a survey
+    // carrier by name. Returns the profile dict or null.
+    function esimProfileForCarrier(network) {
+        var m = state.currentModem;
+        if (!m || !m.esim || !m.esim.supported) return null;
+        var profiles = m.esim.profiles || [];
+        var target = normCarrier(network);
+        if (!target) return null;
+        for (var i = 0; i < profiles.length; i++) {
+            var p = profiles[i];
+            if (!p.operational) continue;
+            var names = [normCarrier(p.profile_name), normCarrier(p.service_provider)];
+            if (names.indexOf(target) >= 0) return p;
+            for (var j = 0; j < names.length; j++) {
+                var n = names[j];
+                if (n && (n.indexOf(target) >= 0 || target.indexOf(n) >= 0)) return p;
+            }
+        }
+        return null;
+    }
+
     // ---- wire up ---------------------------------------------------------
 
     function init() {
         $('modem-select').addEventListener('change', function () {
             state.selectedPort = this.value;
+            expandConnSection();
             loadModemStatus();
+        });
+        $('conn-collapse-head').addEventListener('click', function () {
+            $('conn-section').classList.toggle('open');
         });
         $('refresh-modem-btn').addEventListener('click', loadModems);
         $('run-survey-btn').addEventListener('click', runSurvey);
@@ -436,6 +570,12 @@
         $('lock-confirm').addEventListener('click', confirmLock);
         $('lock-modal').addEventListener('click', function (e) {
             if (e.target === this) closeLockModal();
+        });
+        $('esim-cancel').addEventListener('click', closeEsimModal);
+        $('esim-modal-close').addEventListener('click', closeEsimModal);
+        $('esim-confirm').addEventListener('click', confirmEsim);
+        $('esim-modal').addEventListener('click', function (e) {
+            if (e.target === this) closeEsimModal();
         });
         // Load modems first (sets selectedPort and modem status), then
         // restore any survey the server is already running or has finished so

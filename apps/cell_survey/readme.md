@@ -14,10 +14,12 @@ want. Everything happens in a simple web page served by the router.
 - **Export the results** to a spreadsheet-friendly CSV file.
 - **Lock onto a carrier** so the modem uses only that network, and switch back
   to automatic selection whenever you want.
+- **Activate an eSIM profile** for a carrier, if your modem is eSIM-capable and
+  already has an operational profile installed for that network.
 
 ## Opening the app
 
-The app runs on the router and serves its web page on **port 8000**.
+The app runs on the router and serves its web page on **port 8000** by default.
 
 From a device connected to the router, open a browser to:
 
@@ -28,9 +30,23 @@ http://<router-LAN-IP>:8000
 For example `http://192.168.0.1:8000`.
 
 If the page won't load, the router's firewall may be blocking the port. Make
-sure traffic from the LAN is allowed to reach the router on port 8000 (in the
-router UI under **Security > Zone Firewall**, forward the Primary LAN Zone to
-the Router Zone for that port).
+sure traffic from the LAN is allowed to reach the router on the port the app is
+using (in the router UI under **Security > Zone Firewall**, forward the Primary
+LAN Zone to the Router Zone for that port).
+
+## Configuration (optional SDK appdata)
+
+These fields are optional. Set them in the router config under
+**System > SDK Data** (`config/system/sdk/appdata`). When unset, the app uses
+its built-in default.
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `cell_survey_port` | No | `8000` | TCP port the web server listens on. Use this to avoid a conflict with another app already using port 8000 (e.g. `8001`). Must be 1–65535. |
+
+After changing `cell_survey_port`, open the app on the new port
+(`http://<router-LAN-IP>:<port>`) and make sure the firewall forwards the LAN
+Zone to the Router Zone for that port.
 
 ## Using it
 
@@ -42,21 +58,38 @@ the Router Zone for that port).
 3. **Click Run Survey.** A "Scanning..." message with a timer appears while the
    scan runs. Most modems finish in under a minute; a 5G Standalone connection
    can take a couple of minutes.
-4. **Review the results.** Carriers are listed strongest first and expanded by
-   default. Each carrier lists its individual cells with band, channel, and
-   signal details. Click a carrier's header to collapse it.
+4. **Review the results.** When the survey finishes, the current-connection
+   tiles collapse to a one-line summary so the results stand out; click
+   **Current connection** to expand them again. Carriers are listed strongest
+   first and expanded by default. Each carrier lists its individual cells with
+   band, channel, and signal details. Click a carrier's header to collapse it.
 5. **Export CSV** (top of the results) downloads every detected cell as a
    timestamped file you can open in Excel or Google Sheets.
 
 ## Locking onto a carrier
 
-To force the modem to use a specific carrier, click **Use this carrier** on that
-carrier, then confirm with **Lock Modem**. The modem re-registers on that
-network, so the data connection may drop for a few seconds.
+To force the modem to use a specific carrier, click **Lock Carrier PLMN** on
+that carrier, then confirm. The modem re-registers on that network, so the data
+connection may drop for a few seconds.
 
 A yellow banner shows which carrier is locked. To go back to normal, click
 **Restore Automatic** in that banner and the modem returns to picking a network
 on its own.
+
+## Activating an eSIM profile
+
+If your modem is eSIM-capable (an eUICC module such as the Internal 5GF-NA
+eSIM), the app reads the profiles already installed on it. When a surveyed
+carrier matches one of your **operational** eSIM profiles, an **Activate eSIM
+Profile** button appears next to **Lock Carrier PLMN** for that carrier.
+
+- Click **Activate eSIM Profile** and confirm to enable that profile. The modem
+  switches to it, re-registers on the carrier, and may briefly drop the
+  connection (and can reset if the profile needs different modem firmware).
+- A carrier whose profile is already the active one shows an **eSIM active**
+  badge instead of a button.
+- Only operational profiles are offered; test/provisioning profiles are not.
+- Modems without eSIM support simply don't show any eSIM controls.
 
 ## Tips
 

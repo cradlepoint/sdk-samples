@@ -1,6 +1,18 @@
 # Web Development Standards
 
 - **ALWAYS use Python's built-in `http.server` module** - never use third-party web frameworks (Flask, Bottle, CherryPy, etc.). The native `http.server.HTTPServer` is available on cppython and has zero dependencies
+- **ALWAYS override `server_bind` to skip the FQDN lookup** - `http.server.HTTPServer.server_bind()` calls `socket.getfqdn()`, which runs the router's hostname through the `idna` codec. On routers whose hostname does not conform to IDNA (common), this raises `UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)` and the server never starts. No SDK web app needs the FQDN (clients connect by IP), so bypass it. Subclass the server and override `server_bind` to call `socketserver.TCPServer.server_bind(self)` then set `server_name`/`server_port` from the bound socket:
+  ```python
+  class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+      daemon_threads = True
+      allow_reuse_address = True
+
+      def server_bind(self):
+          socketserver.TCPServer.server_bind(self)  # skips socket.getfqdn()
+          host, port = self.socket.getsockname()[:2]
+          self.server_name = host
+          self.server_port = port
+  ```
 - **LAN client access to router ports requires firewall zone forwarding** - For a client device on the LAN to reach a port on the router (SDK app web UI, SNMP agent, container-published port, etc.), the firewall must have a forwarding rule from the Primary LAN Zone to the Router Zone. If an app is running but LAN clients get connection timeouts, the zone forwarding is the first thing to check. This is configured at `config/firewall/zone_fwd` or via the NCOS UI under Security > Zone Firewall.
 - **NCM API does NOT support CORS** - the NetCloud Manager API at `us0.cradlepointecm.com` blocks cross-origin browser requests (no `Access-Control-Allow-Origin` header). Browser JS from third-party origins (e.g., GitHub Pages) cannot call NCM APIs directly. Use server-side calls (curl, Python requests) or the NCM web UI for uploads
 - **Default port: 8000** - use port 8000 for web applications unless there's a conflict
