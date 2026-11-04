@@ -78,7 +78,23 @@ cp.post('config/ipverify/ping', {
 - **A test bound to a DISCONNECTED device reports `pass: false`, not "no result".** WAN
   binding does *not* gate on connection state, so a standby device is indistinguishable
   from a real outage. To make a test genuinely stop running, set its identity's
-  `enabled` to `false`, which removes its key from `status/ipverify` entirely.
+  `enabled` to `false`.
+- **Disabling an identity does NOT remove its entry from `status/ipverify`, and does not
+  clear the result.** The entry stays with the `pass` value from when the test last ran,
+  frozen indefinitely. The only visible difference is that a disabled entry loses its
+  `name` field:
+  ```json
+  {
+    "00000001-91a5-3a5b-ac9b-5ae6367d2d59": {"pass": true},
+    "00010001-91a5-3a5b-ac9b-5ae6367d2d59": {"name": "DSDSWV-int1_sim1-8_8_8_8",
+                                             "pass": true}
+  }
+  ```
+  The first is disabled and has not run for an hour; the second is live. Verified on an
+  R2400 running 7.25.101. So **the presence of a key proves nothing about whether the test
+  is running**, and `name` is far too incidental a signal to key behavior off. Track which
+  identities you enabled — reading `enabled` back after the write, since a config PUT can
+  report success and apply nothing — and read results only for those.
 - **`pass` has three states: `True`, `False`, and `''`.** The empty string means no verdict
   yet (just created, or the poller restarted). Treating `''` as a failure is the classic
   trap.
@@ -94,6 +110,18 @@ cp.post('config/ipverify/ping', {
   ```
 - **`name` only allows `[a-zA-Z0-9_-]`** — no dots, no pipes. Translate them:
   `'8.8.8.8'` → `'8_8_8_8'`. 30 character limit.
+- **`wan_trigger_*` selects the device but does NOT force the probe's source onto that
+  interface — set `source_ip` for that.** With `source_ip` empty, the ICMP probe is sourced
+  from the router's host stack and relies on a default route to the target. On a
+  public-internet SIM that route exists, so the test passes; on a private APN (e.g. an EP5G
+  private 5G core) the router has no host route to a public target out that slot, so the probe
+  is generated but never leaves the modem — it does not appear in a packet capture, and the
+  test reports `pass: false`. Setting `source_ip` to the device's own WAN IP
+  (`status/wan/devices/{uid}/status/ipinfo/ip_address`) binds the probe to that interface, the
+  same way an HTTP check binds its socket source. Verified on an R2400 DSDS modem (NCOS
+  7.26.81): with `source_ip` set to the connected slot's WAN IP the test passes, set to any
+  other address it reports `pass: false`, so the router honours the bind. The WAN IP is a
+  runtime value — rewrite it when the slot reconnects with a new address.
 - **Deleting shifts array indexes.** Collect indexes, delete highest first, and delete
   identities before the tests they point at.
 - **There is no HTTP test type.** For an HTTP connectivity check, perform it in the app and

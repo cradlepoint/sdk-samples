@@ -164,6 +164,11 @@
                                 </button>
                             </div>
 
+                            <!-- One status pill per SIM slot on the selected
+                                 modem: "NO SIM" for an empty slot, otherwise
+                                 the slot's connection state. -->
+                            <div class="cs-row" id="sim-pills" style="display:none; margin-top:-0.5rem;"></div>
+
                             <div class="cs-progress" id="survey-progress" style="display:none;">
                                 <span class="cs-spinner"></span>
                                 <span id="survey-message"></span>

@@ -2,175 +2,142 @@
 <img width="1127" height="734" alt="image" src="https://github.com/user-attachments/assets/3a012a10-a54f-4c58-a208-8d0f01923c1e" />
 <img width="1127" height="527" alt="image" src="https://github.com/user-attachments/assets/b956e369-101a-43d7-a4d9-8cc4342ffd74" />
 
+# Cell Survey
 
-Scan the cellular networks around your router, see which carriers are in range
-and how strong each one is, and optionally lock your modem to the carrier you
-want. Everything happens in a simple web page served by the router.
+See which cellular carriers are around your router and how strong each one is,
+then optionally lock your modem to the carrier you want. Everything happens in
+a simple web page served by the router — no apps to install on your computer.
 
-## What you can do with it
+## What you can do
 
-- **See your modem's status at a glance** — carrier, network type (5G or LTE),
-  band, APN, SIM (ICCID), and signal strength, with an easy-to-read quality
-  label on the main signal reading.
-- **Run a survey** to discover every nearby cell tower, grouped by carrier and
-  country and sorted strongest signal first.
-- **Export the results** to a spreadsheet-friendly CSV file.
+- **See your modem at a glance** — carrier, network type (5G or LTE), band,
+  APN, SIM, and signal strength, with an easy-to-read quality label.
+- **Run a survey** to find every nearby cell tower, grouped by carrier and
+  sorted strongest first.
+- **Export the results** to a spreadsheet (CSV).
 - **Lock onto a carrier** so the modem uses only that network, and switch back
-  to automatic selection whenever you want.
+  to automatic whenever you want.
 - **Activate an eSIM profile** for a carrier, if your modem is eSIM-capable and
-  already has an operational profile installed for that network.
-- **Schedule surveys** to run automatically on router startup and/or on a
-  repeating schedule, and optionally act on the strongest carrier afterwards.
-- **Keep a history** of every completed survey as a downloadable, timestamped
-  CSV.
-
-## Pages
-
-A sidebar on the left switches between three pages:
-
-- **Run Survey** (default) — the live modem status and the manual survey
-  described below.
-- **Schedule** — set up automatic surveys on startup and/or on a schedule.
-- **History** — browse and download the CSVs saved from completed surveys.
+  already has a profile installed for it.
+- **Schedule surveys** to run on their own and, if you like, automatically move
+  the modem to the best carrier afterward.
+- **Keep a history** of past surveys you can download anytime.
 
 ## Opening the app
 
-The app runs on the router and serves its web page on **port 8000** by default.
-
-From a device connected to the router, open a browser to:
+From a phone or computer connected to the router, open a web browser to:
 
 ```
-http://<router-LAN-IP>:8000
+http://<your-router-IP>:8000
 ```
 
-For example `http://192.168.0.1:8000`.
+For example `http://192.168.0.1:8000`. (Your router's IP is the same address
+you use to reach its admin page.)
 
-If the page won't load, the router's firewall may be blocking the port. Make
-sure traffic from the LAN is allowed to reach the router on the port the app is
-using (in the router UI under **Security > Zone Firewall**, forward the Primary
-LAN Zone to the Router Zone for that port).
+If the page doesn't load, see **Troubleshooting** at the bottom.
 
-## Configuration (optional SDK appdata)
+## The three pages
 
-These fields are optional. Set them in the router config under
-**System > SDK Data** (`config/system/sdk/appdata`). When unset, the app uses
-its built-in default.
+A menu on the left switches between:
 
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `cell_survey_port` | No | `8000` | TCP port the web server listens on. Use this to avoid a conflict with another app already using port 8000 (e.g. `8001`). Must be 1–65535. |
-| `cell_survey_schedule` | No | _(unset)_ | JSON holding the startup/schedule settings. This is written by the **Schedule** page in the app — you normally don't edit it by hand, but it can be pushed from an NCM group config to apply the same schedule to a fleet. Shape: `{"startup_enabled":bool,"startup_action":"none\|lock\|esim","schedule_enabled":bool,"schedule_cron":"*/30 * * * *","schedule_action":"none\|lock\|esim"}`. |
+- **Run Survey** — your modem's live status and the manual survey.
+- **Schedule** — set up surveys that run automatically.
+- **History** — browse and download past survey results.
 
-After changing `cell_survey_port`, open the app on the new port
-(`http://<router-LAN-IP>:<port>`) and make sure the firewall forwards the LAN
-Zone to the Router Zone for that port.
-
-## Using it
+## Running a survey
 
 1. **Pick a modem.** If your router has more than one modem, choose it from the
-   **Modem** dropdown. The built-in modem is selected for you by default. Use
-   **Refresh** if you just inserted a SIM or the list looks out of date.
-2. **Check the status tiles** to confirm the modem is **Connected** and see its
-   current carrier and signal.
-3. **Click Run Survey.** A "Scanning..." message with a timer appears while the
-   scan runs. Most modems finish in under a minute; a 5G Standalone connection
-   can take a couple of minutes.
-4. **Review the results.** When the survey finishes, the current-connection
-   tiles collapse to a one-line summary so the results stand out; click
-   **Current connection** to expand them again. Carriers are listed strongest
-   first and expanded by default. Each carrier lists its individual cells with
-   band, channel, and signal details. Click a carrier's header to collapse it.
-5. **Export CSV** (top of the results) downloads every detected cell as a
-   timestamped file you can open in Excel or Google Sheets.
+   **Modem** menu; otherwise the built-in modem is already selected. You pick
+   the modem, not a SIM slot.
+2. **Check the SIM slots.** Below the menu, a small tag shows each SIM slot's
+   status — **NO SIM** if the slot is empty, otherwise whether it's connected.
+3. **Review the status tiles** for the current carrier and signal. You don't
+   need an active connection to run a survey — it scans the airwaves directly
+   and works even with no SIM installed.
+4. **Click Run Survey.** A "Scanning..." timer appears. Most scans finish in
+   under a minute; 5G can take a couple of minutes.
+5. **Read the results.** Carriers are listed strongest first. Click a carrier
+   to expand its individual towers with band, channel, and signal details. The
+   live status tiles collapse to a one-line summary so the results stand out —
+   click **Current connection** to open them again.
+6. **Export CSV** (above the results) saves everything to a file you can open
+   in Excel or Google Sheets.
 
 ## Locking onto a carrier
 
-To force the modem to use a specific carrier, click **Lock Carrier PLMN** on
-that carrier, then confirm. The modem re-registers on that network, so the data
-connection may drop for a few seconds.
+To make the modem use one specific carrier, click **Lock Carrier PLMN** on that
+carrier and confirm. The modem re-registers on that network, so your connection
+may drop for a few seconds.
 
-A yellow banner shows which carrier is locked. To go back to normal, click
-**Restore Automatic** in that banner and the modem returns to picking a network
-on its own.
+A banner then shows which carrier is locked. To go back to normal, click
+**Restore Automatic** in that banner.
 
 ## Activating an eSIM profile
 
-If your modem is eSIM-capable (an eUICC module such as the Internal 5GF-NA
-eSIM), the app reads the profiles already installed on it. When a surveyed
-carrier matches one of your **operational** eSIM profiles, an **Activate eSIM
-Profile** button appears next to **Lock Carrier PLMN** for that carrier.
+If your modem has a built-in eSIM, the app reads the profiles already loaded on
+it. When a surveyed carrier matches one of your usable profiles, an **Activate
+eSIM Profile** button appears next to **Lock Carrier PLMN** for that carrier.
 
-- Click **Activate eSIM Profile** and confirm to enable that profile. The modem
-  switches to it, re-registers on the carrier, and may briefly drop the
-  connection (and can reset if the profile needs different modem firmware).
-- A carrier whose profile is already the active one shows an **eSIM active**
-  badge instead of a button.
-- Only operational profiles are offered; test/provisioning profiles are not.
-- Modems without eSIM support simply don't show any eSIM controls.
+- Click it and confirm to switch to that profile. The modem re-registers and
+  may briefly drop the connection.
+- A carrier that's already active shows an **eSIM active** badge instead.
+- If your modem has no eSIM, you simply won't see any eSIM buttons.
 
 ## Scheduling surveys
 
-Open the **Schedule** page in the sidebar to have the app run surveys on its
-own. There are two independent triggers, and you can enable either or both:
+On the **Schedule** page you can have the app survey on its own. Turn on either
+or both:
 
-- **Run Survey on Startup** — runs one survey a short time after the router
-  boots and the modem connects.
-- **Run Survey on Schedule** — repeats on a schedule you choose. Pick a quick
-  preset (every 15 minutes, hourly, daily at 6am, and so on), use the builder
-  to assemble a simple recurrence, or enter a custom cron expression. Schedule
-  times are in the router's time (UTC). The current cron expression is shown
-  under the builder.
+- **Run Survey on Startup** — runs once shortly after the router powers on.
+- **Run Survey on Schedule** — repeats on a timing you choose. Pick a ready-made
+  option (every 15 minutes, hourly, daily at 6am, and so on) or build your own.
 
-For each trigger you choose what the app does with the surveyed carriers
-**after** the scan — the **After the survey** dropdown:
+For each one, the **After the survey** menu decides what happens next:
 
-- **Do not select carrier** — just save the results to History and change
-  nothing (default).
-- **Lock best carrier PLMN** — lock the modem to the strongest surveyed
-  carrier (same as clicking Lock Carrier PLMN by hand).
-- **Activate best carrier eSIM** — activate the eSIM profile of the
-  highest-ranking carrier that has an operational profile installed on the
-  modem. The app walks carriers strongest-first, so if the strongest carrier
-  has no matching profile it moves on to the next strongest that does. This
-  option only appears when the selected modem has an operational eSIM profile.
+- **Do not select carrier** — just save the results (default).
+- **Lock best carrier PLMN** — lock the modem to the strongest carrier found.
+- **Activate best carrier eSIM** — switch to the eSIM profile of the best
+  carrier that has one installed. (Only shown when your modem has a usable eSIM
+  profile.)
 
-Click **Save Schedule** to store the settings. They persist across reboots and
-can be pushed to a fleet via NCM (see the `cell_survey_schedule` appdata field
-above).
-
-Automatic surveys only run when a supported, connected modem is available; if
-one is not ready, the app logs why and skips that run. A manual survey never
-triggers a carrier action — you stay in control of lock/eSIM from the results
-page.
+Click **Save Schedule** to keep your settings; they survive a reboot.
 
 ## History
 
-Every completed survey that found cells is saved automatically as a CSV on the
-**History** page, whether you ran it by hand or it ran on a schedule. Each file
-is named with the date/time and the router's name, for example
-`20260312_084500 - Store-142.csv`.
+Every survey that finds towers is saved automatically on the **History** page,
+whether you ran it yourself or it ran on a schedule.
 
-- Click **Download** next to any entry to save that CSV to your computer.
-- The list shows when each survey ran, whether it was manual, startup, or
-  scheduled, and how many carriers and cells it found.
-- **Clear All** removes every saved CSV. The app keeps the 100 most recent
-  surveys and prunes older ones automatically.
+- **Download** saves that survey's CSV to your device.
+- The list shows when each ran, how it was triggered, and how many carriers and
+  towers it found.
+- **Clear All** removes saved surveys. The app keeps the 100 most recent and
+  drops older ones on its own.
 
 ## Tips
 
-- **Run the survey when the modem shows Connected.** Running it right after a
-  lock or restore, while the modem is still re-registering, can return fewer
-  cells or none. Wait for **Connected**, then scan again for a full result.
 - A survey briefly uses the radio, so it may cause a short hiccup on an active
   connection.
-- Carrier and country names come from a built-in lookup table, so they work
-  without internet access. A cell the app can't match to a known carrier is
-  shown as "Unknown."
-- The header has a **Help** button and a **Device Info** button, plus a
-  light/dark mode toggle.
+- Right after a lock or eSIM switch the modem is still settling, so a scan can
+  show fewer towers. Wait a few seconds and scan again for a full picture.
+- A tower the app can't match to a known carrier shows as "Unknown."
+- The header has **Help** and **Device Info** buttons and a light/dark toggle.
+
+## Troubleshooting
+
+- **The page won't open.** Double-check the router's IP and that you used port
+  `8000` (`http://<your-router-IP>:8000`). Make sure your device is connected
+  to the router. If it still won't load, the router's firewall may be blocking
+  the port — ask whoever manages the router to allow LAN devices to reach it on
+  that port.
+- **"Run Survey" is greyed out.** The survey needs one of the supported modems
+  (Cradlepoint's Telit 5G modules). Other modems can't run it, and the app will
+  say so.
+- **No modems listed.** Use the **Refresh** button, especially right after
+  inserting a SIM or powering the modem up.
 
 ## Good to know
 
-This app only changes your network settings when *you* lock or restore a
-carrier. It doesn't alter any other router configuration, and it doesn't send
-your data anywhere — the survey and carrier lookup run entirely on the router.
+The app only changes your network settings when *you* lock or restore a carrier
+(or when a schedule you set up does). It doesn't touch anything else on the
+router, and it doesn't send your data anywhere — everything runs on the router
+itself.

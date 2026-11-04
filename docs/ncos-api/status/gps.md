@@ -57,8 +57,13 @@ GET /api/status/gps
 Use the `pynmeagps` library for parsing NMEA sentences. Install to your app folder:
 
 ```bash
-.venv/bin/pip install -t path/to/app_folder pynmeagps
+.venv/bin/pip3 install -t path/to/app_folder --python-version 3.8 --only-binary=:all: \
+    --no-deps "pynmeagps==1.0.42"
+rm -rf path/to/app_folder/pynmeagps/__pycache__ path/to/app_folder/pynmeagps-*.dist-info
 ```
+
+Pin 1.0.42: later releases need Python 3.9+/3.10+, and every 3.8-compatible release is yanked
+on PyPI, so an unpinned install fails on cppython.
 
 Cradlepoint routers may emit `GPRMC` (GPS-only) or `GNRMC` (multi-constellation) depending on modem config. pynmeagps handles both — `msg.msgID` returns `RMC` regardless of talker prefix.
 
@@ -141,6 +146,40 @@ status/rtk/gnss/fix_sentence        -> $GNGGA with quality 2 / 4 / 5 (RTK)
 Both update at 1 Hz. Discover `{mdm_uid}` at runtime: several entries can exist
 under `status/gps/devices` and the non-GNSS ones are `{}`. See
 `apps/rtk_compare/` for a working comparison app.
+
+### NMEA timing: status tree vs GNSS socket
+
+Verified on R2400, NCOS 7.26.100, against a LAN host synced to time.apple.com.
+
+**`status/gps/nmea`** is replaced once per second as a whole array:
+- Published **0.7–1.0 s after** the GPS second of its GGA, and the delay drifts between runs.
+- **RMC and ZDA are one epoch older than GGA/GLL** in the same snapshot
+  (e.g. `$GNRMC,140910.000,...` alongside `$GNGGA,140911.000,...`). Take the date from RMC and
+  the freshest time of day from GGA, handling midnight rollover.
+- `status/gps/fix/time` lags even further (~1.2 s).
+
+**GNSS daemon socket, `127.0.0.1:17488`** (TCP, local only). Exists on R2400 as well as IBR1700:
+- `NMEA\r\n` sends the position history as one burst, then live sentences each second.
+- `ALL\r\n` sends everything, including 10 Hz `$PCPTMIMU` and `$PCPTMINR` (~140 lines/s).
+- Each epoch arrives in the order GGA, GLL, GSA..., RMC, VTG, ZDA, then `$PCPTMDBG` and
+  `$PCPTMGPSTIME`, within a few ms. The whole burst lands ~0.95 s into the following second.
+
+**Recovering the exact GPS-second instant (for NTP / precise timestamping):**
+
+- `$PCPTMDBG,UTC Time Tag <fix_uptime> system time <sys_uptime>` — `fix_uptime` is the daemon's
+  uptime value for this epoch's fix (already corrected for receiver latency); `sys_uptime` is the
+  daemon's uptime-clock reading when it emitted the line. Record `time.monotonic()` on arrival.
+- The daemon uptime clock and the app's `time.monotonic()` are both `CLOCK_MONOTONIC` but with
+  **different origins**, so `C = monotonic_at_arrival - sys_uptime` is a constant (~95 ms on an
+  R2400, the socket+scheduler transport delay) — NOT zero. `fix_uptime + C` places the fix on the
+  app clock with the transport delay removed. Re-measure `C` every line to absorb slow skew.
+- `fix_uptime` still trails the true GPS-second epoch by a fixed receiver+daemon fix latency,
+  ~141 ms on an R2400 (measured against time.apple.com, stable to ±1 ms). Subtract it as a
+  tunable constant; it is not exposed in any sentence.
+- `$PCPTMGPSTIME,<fix_uptime>,<field3>,<gps_week>` — field 3 is **NOT hhmmss UTC**; its seconds
+  run past 60 (a GPS time-of-week count). Take the UTC second from RMC, not from this line.
+- Net result: ±3 ms vs true UTC. Skip the history burst by only accepting epochs ~1 s apart.
+  `apps/NTP_GPS/` is a working example.
 
 ### Proprietary NMEA Sentences
 

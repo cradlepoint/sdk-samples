@@ -26,6 +26,29 @@ DEFAULT_PORT = 'int1'
 _SUPPORTED_MODELS = ('FE990', 'FN990')
 
 
+import re
+
+# Trailing " (SIM1)" / " (SIM 2)" etc. that NCOS appends to a per-slot mdm
+# device's model string. Stripped for display since the UI shows one modem per
+# port, and used to label the per-slot SIM status pills.
+_SIM_SUFFIX_RE = re.compile(r'\s*\(\s*SIM\s*(\d+)\s*\)\s*$', re.IGNORECASE)
+
+
+def _clean_model(model):
+    """Model string without the per-slot ' (SIMn)' suffix."""
+    if not model:
+        return model
+    return _SIM_SUFFIX_RE.sub('', str(model)).strip()
+
+
+def _sim_label(model, fallback_index):
+    """SIM slot label from a model's ' (SIMn)' suffix, else 'SIM<index>'."""
+    m = _SIM_SUFFIX_RE.search(str(model or ''))
+    if m:
+        return 'SIM{}'.format(m.group(1))
+    return 'SIM{}'.format(fallback_index)
+
+
 def is_supported(mfg_model):
     """True if the modem's manufacturer model supports the AT survey.
 
@@ -232,16 +255,28 @@ def _signal_quality(rsrp):
 def list_modems():
     """Return one entry per physical modem port, default modem flagged.
 
-    The default is the first CONNECTED modem/SIM when any modem is connected,
-    so the UI opens on a usable link. Among connected modems the preferred
-    port (DEFAULT_PORT, int1) wins, otherwise the lowest-sorting connected
-    port. When nothing is connected, fall back to the preferred port if
-    present, else the lowest-sorting port.
+    One entry per PHYSICAL modem port, not per SIM slot. A multi-SIM / DSDS
+    modem exposes a device per SIM slot (e.g. SIM1 and SIM2 both on int1);
+    they are collapsed into a single port entry here because the user picks
+    the modem, not a slot.
+
+    Connection state does NOT affect selection. The AT network survey
+    (AT#CSURVC) scans the radio environment directly and returns results even
+    when the modem is disconnected, in standby, or has no SIM at all. So every
+    detected modem port is selectable and surveyable; the 'connected' flag is
+    kept only so the UI can show an informational status pill.
+
+    Default port preference: the preferred port (DEFAULT_PORT, int1) if
+    present, otherwise the lowest-sorting port. A connected slot is chosen as
+    the representative device for its port when one exists, so the status
+    tiles show live carrier/signal when a SIM is attached.
 
     Returns:
         list: Each item is {port, uid, iface (SubIface), config_id, model,
-            connected, sim_count, is_default}. Sorted with the default port
-            first.
+            connected, sim_count, sims, is_default}. 'model' has the per-slot
+            ' (SIMn)' suffix removed. 'sims' is one entry per SIM slot on the
+            port: {label, uid, connection_state, no_sim}. Sorted with the
+            default port first.
     """
     devices = cp.get('status/wan/devices') or {}
     by_port = {}
@@ -250,24 +285,42 @@ def list_modems():
         if info.get('type') != 'mdm':
             continue
         status = (dev or {}).get('status') or {}
+        diag = (dev or {}).get('diagnostics') or {}
         port = info.get('port') or key
         connected = status.get('connection_state') == 'connected'
+        raw_model = info.get('model') or 'Modem'
         entry = by_port.get(port)
+        # Per-slot status pill data. NOSIM is a diagnostics string 'TRUE' /
+        # 'FALSE'; when TRUE the slot is empty, otherwise show its link state.
+        sim = {
+            'label': _sim_label(raw_model, 1),
+            'uid': key,
+            'connection_state': status.get('connection_state', 'unknown'),
+            'no_sim': str(diag.get('NOSIM', '')).upper() == 'TRUE',
+        }
         candidate = {
             'port': port,
             'uid': key,
             'iface': info.get('iface'),
             'config_id': info.get('config_id'),
-            'model': info.get('model') or 'Modem',
+            'model': _clean_model(raw_model),
             'mfg_model': info.get('mfg_model') or '',
             'connected': connected,
             'sim_count': 1,
+            'sims': [sim],
         }
         if entry is None:
             by_port[port] = candidate
         else:
             entry['sim_count'] += 1
-            # Prefer a connected SIM instance for the representative device.
+            # Label a later slot by order if its model had no (SIMn) suffix.
+            if not _SIM_SUFFIX_RE.search(str(raw_model)):
+                sim['label'] = 'SIM{}'.format(len(entry['sims']) + 1)
+            entry['sims'].append(sim)
+            # Surface a connected slot as the representative device for the
+            # port when one exists, so the status tiles show live
+            # carrier/signal. This does not affect whether the port is
+            # selectable or surveyable - every port is.
             if connected and not entry['connected']:
                 entry.update({
                     'uid': candidate['uid'],
@@ -279,6 +332,9 @@ def list_modems():
                 })
 
     modems = list(by_port.values())
+    for m in modems:
+        # Stable slot order (SIM1, SIM2, ...) regardless of device iteration.
+        m['sims'].sort(key=lambda s: s['label'])
     default_port = _choose_default_port(modems)
     for m in modems:
         m['is_default'] = (m['port'] == default_port)
@@ -287,23 +343,17 @@ def list_modems():
 
 
 def _choose_default_port(modems):
-    """Pick the default port: first connected modem if any, else fallback.
+    """Pick the default port the UI opens on.
 
-    Preference, in order:
-      1. The preferred port (DEFAULT_PORT) if it is connected.
-      2. The lowest-sorting connected port.
-      3. The preferred port if present (even if not connected).
-      4. The lowest-sorting port.
-      5. None (no modems).
+    Connection state is irrelevant (every modem is surveyable), so this is a
+    simple positional preference:
+      1. The preferred port (DEFAULT_PORT, int1) if present.
+      2. The lowest-sorting port.
+      3. None (no modems).
     """
     if not modems:
         return None
     ports = sorted(m['port'] for m in modems)
-    connected = sorted(m['port'] for m in modems if m.get('connected'))
-    if connected:
-        if DEFAULT_PORT in connected:
-            return DEFAULT_PORT
-        return connected[0]
     if DEFAULT_PORT in ports:
         return DEFAULT_PORT
     return ports[0]
@@ -343,8 +393,9 @@ def modem_status(port):
         'mfg_model': mfg_model,
         'esim': esim,
         'supported': is_supported(mfg_model),
-        'model': diag.get('MDL') or modem['model'],
+        'model': _clean_model(diag.get('MDL')) or modem['model'],
         'sim_count': modem['sim_count'],
+        'sims': modem.get('sims', []),
         'connection_state': status.get('connection_state', 'unknown'),
         'summary': status.get('summary', ''),
         'error_text': status.get('error_text'),

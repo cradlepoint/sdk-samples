@@ -448,8 +448,10 @@ def cron_matches(cron_expr, dt):
 def _start_survey(runner, trigger, port=''):
     """Start a survey via the shared SurveyRunner for a non-manual trigger.
 
-    Selects the modem to scan on, validates it supports the AT survey and is
-    connected, and starts the runner. Returns True when a survey was started.
+    Selects the modem to scan on, validates it supports the AT survey, and
+    starts the runner. Connection state is not checked - the AT survey scans
+    the radio regardless of link state or SIM presence. Returns True when a
+    survey was started.
 
     Args:
         runner: the shared SurveyRunner.
@@ -490,10 +492,6 @@ def _start_survey(runner, trigger, port=''):
         cp.log('cell_survey: {} survey skipped - modem {} does not support the '
                'AT survey'.format(trigger, modem.get('mfg_model') or 'unknown'))
         return False
-    if not modem.get('connected'):
-        cp.log('cell_survey: {} survey skipped - modem {} is not connected'
-               .format(trigger, modem.get('port')))
-        return False
     started = runner.start(modem['iface'], modem.get('uid'),
                            modem.get('mfg_model', ''), port=modem.get('port'),
                            trigger=trigger)
@@ -504,23 +502,30 @@ def _start_survey(runner, trigger, port=''):
 
 
 def run_startup_survey(runner):
-    """Run the on-startup survey if enabled, after waiting for a WAN link.
+    """Run the on-startup survey if enabled.
 
-    Called once from a daemon thread at boot. The AT survey needs a connected
-    modem, so this waits for WAN connectivity first (bounded), then starts the
-    survey with trigger 'startup'.
+    Called once from a daemon thread at boot. The AT survey scans the radio
+    regardless of connection state, so a WAN link is not required. We still
+    give the modem a short grace period at boot to finish enumerating and
+    populating diagnostics (and a connection, if one is coming, improves the
+    status tiles), but we do not block on WAN - a SIM-less or disconnected
+    modem can still be surveyed. Then starts the survey with trigger
+    'startup'.
     """
     with _schedule_lock:
         enabled = _schedule.get('startup_enabled', False)
         port = _schedule.get('startup_port', '')
     if not enabled:
         return
-    cp.log('cell_survey: startup survey enabled - waiting for WAN connection')
+    cp.log('cell_survey: startup survey enabled - waiting briefly for the '
+           'modem to come up')
+    # Best-effort, bounded wait so a modem that IS going to connect has a
+    # chance to before we scan. Does not block the survey if it never does.
     try:
-        cp.wait_for_wan_connection(timeout=180)
+        cp.wait_for_wan_connection(timeout=30)
     except Exception:
         pass
-    # Give the modem a moment to populate diagnostics after connecting.
+    # Give the modem a moment to finish enumerating / populating diagnostics.
     time.sleep(5)
     _start_survey(runner, 'startup', port=port)
 
