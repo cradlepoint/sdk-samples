@@ -94,18 +94,50 @@
     }
 
     function connPill(cstate) {
+        // Legacy single pill is superseded by the per-SIM-slot pills; keep
+        // the element clear so nothing stale lingers in the modem row.
         var pill = $('modem-conn');
-        pill.className = 'cs-pill';
-        if (cstate === 'connected') {
-            pill.classList.add('ok');
-            pill.innerHTML = '<i class="fas fa-circle-check"></i> Connected';
-        } else if (cstate === 'connecting' || cstate === 'establishing') {
-            pill.classList.add('warn');
-            pill.innerHTML = '<i class="fas fa-circle-notch"></i> ' + cstate;
-        } else {
-            pill.classList.add('bad');
-            pill.innerHTML = '<i class="fas fa-circle-xmark"></i> ' + (cstate || 'disconnected');
+        if (pill) { pill.className = 'cs-pill'; pill.innerHTML = ''; }
+    }
+
+    // Visual treatment for one SIM slot's status. "NO SIM" is neutral (not an
+    // error — a scan still works); connected is green; standby/transitional is
+    // amber; anything else (disconnected, unknown) is red.
+    function simPillStyle(sim) {
+        if (sim.no_sim) {
+            return { cls: 'warn', icon: 'fa-sim-card', text: 'NO SIM' };
         }
+        var cstate = sim.connection_state || 'unknown';
+        if (cstate === 'connected') {
+            return { cls: 'ok', icon: 'fa-circle-check', text: 'Connected' };
+        }
+        if (cstate === 'standby') {
+            return { cls: 'warn', icon: 'fa-circle-pause', text: 'Standby' };
+        }
+        if (cstate === 'connecting' || cstate === 'establishing') {
+            return { cls: 'warn', icon: 'fa-circle-notch', text: cstate };
+        }
+        return { cls: 'bad', icon: 'fa-circle-xmark', text: cstate };
+    }
+
+    // Render one status pill per SIM slot on the selected modem.
+    function renderSimPills(sims) {
+        var row = $('sim-pills');
+        if (!row) return;
+        if (!sims || !sims.length) {
+            row.innerHTML = '';
+            row.style.display = 'none';
+            return;
+        }
+        var html = sims.map(function (sim) {
+            var s = simPillStyle(sim);
+            return '<span class="cs-pill ' + s.cls + '">'
+                + '<i class="fas ' + s.icon + '"></i> '
+                + escapeHtml(sim.label || 'SIM') + ': ' + escapeHtml(s.text)
+                + '</span>';
+        }).join('');
+        row.innerHTML = html;
+        row.style.display = 'flex';
     }
 
     function signalColor(rsrp) {
@@ -129,10 +161,12 @@
         return api('/api/modem?port=' + encodeURIComponent(state.selectedPort)).then(function (m) {
             if (m.error) {
                 $('modem-stats').innerHTML = '<p class="cs-muted">' + m.error + '</p>';
+                renderSimPills(null);
                 return;
             }
             state.currentModem = m;
             connPill(m.connection_state);
+            renderSimPills(m.sims);
 
             var html = '';
             // Top row: identity/connection tiles.
@@ -147,16 +181,14 @@
             html += statCard('RSSI', m.rssi != null ? m.rssi + ' dBm' : '');
             $('modem-stats').innerHTML = html;
 
-            // Survey-button gating. A survey can only run when:
-            //   1. the module is a supported Telit FE990/FN990, and
-            //   2. the modem is actually connected (the AT channel is only
-            //      usable on a connected modem; a disconnected modem can't
-            //      scan).
-            // Don't clobber the disabled state while a survey is in flight.
+            // Survey-button gating. The only requirement is a supported Telit
+            // FE990/FN990 module. The AT survey (AT#CSURVC) scans the radio
+            // environment directly, so it works regardless of connection
+            // state - disconnected, standby, or no SIM at all. Don't clobber
+            // the disabled state while a survey is in flight.
             var unsupported = $('unsupported-banner');
             var surveyBtn = $('run-survey-btn');
             var surveyRunning = state.pollTimer !== null;
-            var connected = m.connection_state === 'connected';
             if (m.supported === false) {
                 unsupported.style.display = 'flex';
                 $('unsupported-text').textContent =
@@ -165,10 +197,6 @@
                     + ') is not supported.';
                 if (!surveyRunning) surveyBtn.disabled = true;
                 surveyBtn.title = 'Unsupported modem';
-            } else if (!connected) {
-                unsupported.style.display = 'none';
-                if (!surveyRunning) surveyBtn.disabled = true;
-                surveyBtn.title = 'Modem must be connected to run a survey';
             } else {
                 unsupported.style.display = 'none';
                 if (!surveyRunning) surveyBtn.disabled = false;
