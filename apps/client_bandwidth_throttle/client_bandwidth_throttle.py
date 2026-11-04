@@ -7,13 +7,45 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
-DEFAULT_LIMIT_MBPS = 10
+DEFAULT_LIMIT_MBPS = 10  # Fallback default when no appdata value is set
+APPDATA_DEFAULT_LIMIT = 'default_limit_mbps'
 PORT = 8000
 LIMITS_FILE = 'tmp/client_limits.json'
 
 # Store previous usage data for rate calculation
 previous_usage = {}
 rate_history = {}  # Store last 3 rate samples per client
+
+
+def get_default_limit():
+    """Return the configured default limit (Mbps) for new clients.
+
+    Reads from appdata if set, otherwise falls back to DEFAULT_LIMIT_MBPS.
+    Never writes a default to appdata (that would override NCM group config).
+    """
+    try:
+        value = cp.get_appdata(APPDATA_DEFAULT_LIMIT)
+        if value is not None and str(value).strip() != '':
+            limit = int(value)
+            if limit > 0:
+                return limit
+    except Exception as e:
+        cp.log(f'Error reading default limit: {e}')
+    return DEFAULT_LIMIT_MBPS
+
+
+def set_default_limit(limit_mbps):
+    """Persist the default limit (Mbps) for new clients to SDK appdata."""
+    try:
+        limit = int(limit_mbps)
+        if limit < 1 or limit > 1000:
+            return False
+        cp.put_appdata(APPDATA_DEFAULT_LIMIT, str(limit))
+        cp.log(f'Default limit set to {limit} Mbps')
+        return True
+    except Exception as e:
+        cp.log(f'Error saving default limit: {e}')
+        return False
 
 def load_saved_limits():
     try:
@@ -28,7 +60,7 @@ def save_limit(mac, limit_mbps):
     try:
         os.makedirs('tmp', exist_ok=True)
         limits = load_saved_limits()
-        if limit_mbps == DEFAULT_LIMIT_MBPS:
+        if limit_mbps == get_default_limit():
             limits.pop(mac, None)  # Remove default limits
         else:
             limits[mac] = limit_mbps
@@ -53,6 +85,12 @@ class BandwidthHandler(BaseHTTPRequestHandler):
             self.end_headers()
             data = get_clients_with_limits()
             self.wfile.write(json.dumps(data).encode())
+        elif self.path == '/api/settings':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            data = {'default_limit_mbps': get_default_limit()}
+            self.wfile.write(json.dumps(data).encode())
         else:
             self.send_error(404)
 
@@ -69,6 +107,18 @@ class BandwidthHandler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({'success': success}).encode())
+        elif self.path == '/api/set_default':
+            length = int(self.headers['Content-Length'])
+            body = self.rfile.read(length).decode()
+            params = parse_qs(body)
+            limit = params.get('limit', [''])[0]
+
+            success = set_default_limit(limit)
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(
+                {'success': success, 'default_limit_mbps': get_default_limit()}).encode())
         else:
             self.send_error(404)
 
@@ -76,6 +126,7 @@ def get_clients_with_limits():
     global previous_usage, rate_history
     clients = []
     current_time = time.time()
+    default_limit = get_default_limit()
     
     try:
         # Get IPv4 clients from status/lan/clients
@@ -95,12 +146,12 @@ def get_clients_with_limits():
             queue_name = f'CBT-{mac}'
             queue = queues.get(queue_name, {})
             
-            # Check saved limits first, then queue config
+            # Check saved limits first, then queue config, then default
             saved_limits = load_saved_limits()
             if mac in saved_limits:
                 limit = saved_limits[mac]
             else:
-                limit = queue.get('download_bw', DEFAULT_LIMIT_MBPS * 1000) // 1000
+                limit = queue.get('download_bw', default_limit * 1000) // 1000
             
             # Get usage stats for this client
             usage = usage_stats.get(mac, {})
@@ -261,12 +312,27 @@ button:hover{background:#0056b3}
 .status{padding:10px;margin-bottom:20px;border-radius:4px;background:#d4edda;color:#155724}
 .usage{font-size:0.9em;color:#666}
 .current-limit{font-weight:bold;color:#000}
+.settings{background:#f8f9fa;border:1px solid #e3e6ea;border-radius:6px;padding:16px 20px;margin-bottom:20px}
+.settings h2{font-size:1.1em;color:#333;margin-bottom:10px}
+.settings .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.settings label{color:#555}
+.settings .hint{color:#888;font-size:0.85em;margin-top:8px}
+.settings button{margin-left:0}
 </style>
 </head>
 <body>
 <div class="container">
 <h1>Client Bandwidth Throttle</h1>
 <div id="status" class="status" style="display:none"></div>
+<div class="settings">
+<h2>Settings</h2>
+<div class="row">
+<label for="default-limit">Default rate limit for new clients (Mbps):</label>
+<input type="number" id="default-limit" min="1" max="1000">
+<button id="save-default">Save Default</button>
+</div>
+<div class="hint">New clients without a specific limit use this value. Saved to SDK appdata, so it persists across reboots and redeploys.</div>
+</div>
 <table id="clients">
 <thead><tr><th>Hostname</th><th>IP</th><th>MAC</th><th>Usage</th><th>Rate</th><th>Current Limit</th><th>New Limit</th></tr></thead>
 <tbody></tbody>
@@ -274,6 +340,45 @@ button:hover{background:#0056b3}
 </div>
 <script>
 var data = [];
+
+function showStatus(message, ok) {
+    var status = document.getElementById('status');
+    status.textContent = message;
+    status.style.background = ok ? '#d4edda' : '#f8d7da';
+    status.style.color = ok ? '#155724' : '#721c24';
+    status.style.display = 'block';
+    setTimeout(function() { status.style.display = 'none'; }, 3000);
+}
+
+function loadSettings() {
+    fetch('/api/settings')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var input = document.getElementById('default-limit');
+            if (document.activeElement !== input) {
+                input.value = d.default_limit_mbps;
+            }
+        });
+}
+
+function saveDefault() {
+    var limit = document.getElementById('default-limit').value;
+    fetch('/api/set_default', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'limit=' + encodeURIComponent(limit)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            document.getElementById('default-limit').value = d.default_limit_mbps;
+            showStatus('Default limit saved (' + d.default_limit_mbps + ' Mbps)', true);
+        } else {
+            showStatus('Failed to save default limit (must be 1-1000)', false);
+        }
+        load();
+    });
+}
 
 function formatBytes(b) {
     if (b === 0) return '0 B';
@@ -343,10 +448,7 @@ function handleSetLimit(event) {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-        var status = document.getElementById('status');
-        status.textContent = d.success ? 'Limit updated successfully' : 'Failed to update limit';
-        status.style.display = 'block';
-        setTimeout(function() { status.style.display = 'none'; }, 3000);
+        showStatus(d.success ? 'Limit updated successfully' : 'Failed to update limit', d.success);
         load();
     });
 }
@@ -360,6 +462,9 @@ function load() {
         });
 }
 
+document.getElementById('save-default').addEventListener('click', saveDefault);
+
+loadSettings();
 load();
 setInterval(load, 5000);
 </script>
@@ -398,11 +503,12 @@ if __name__ == '__main__':
     # Set default limits for all clients on startup
     try:
         saved_limits = load_saved_limits()
+        default_limit = get_default_limit()
         clients_data = get_clients_with_limits()
         for client in clients_data:
             mac = client['mac']
-            # Use saved limit if exists, otherwise default
-            limit = saved_limits.get(mac, DEFAULT_LIMIT_MBPS)
+            # Use saved limit if exists, otherwise configured default
+            limit = saved_limits.get(mac, default_limit)
             set_client_limit(mac, limit)
         cp.log('Applied saved/default limits to all clients')
     except Exception as e:
