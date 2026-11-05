@@ -46,6 +46,29 @@ After creation, modify only `{app_name}.py` and `readme.md`. The rest is generat
 Before writing any app code: run the API Verification Workflow (`api-reference.md`), and
 **ask the user about unknowns** rather than assuming requirements, data formats, or behavior.
 
+## Write the readme for the user, not the developer
+
+`readme.md` is for someone who just wants to **use** the app, not read its source. Write it so a
+person who found the app in NCM can install it, configure it, and know what it does — without
+opening the code. Do not document the implementation (internal functions, code structure, how the
+polling loop works); only what a user needs to operate it.
+
+Follow the house style of the existing app readmes (`5GSpeed`, `client_bandwidth_throttle`):
+
+1. **Title + one-line description** — what the app does, in plain language.
+2. **Features** — a short bullet list of what the user gets. Include the web UI URL
+   (`http://router_ip:8000`) if the app has one.
+3. **Usage / Steps to Use** — numbered steps from deploy to result, in the order the user does
+   them. Include a screenshot for web apps if one exists.
+4. **Settings** — how to configure it (web Settings panel, NCM SDK Data field, etc.) in user terms.
+5. **Appdata Fields** — a table with columns `Field | Required | Description` (add `Values` when
+   helpful). **Document every appdata field and mark which are required** — this is mandatory per
+   `api-reference.md`. Note the in-code default for optional fields.
+6. **Sample output / results** — show what the user will see, when the app produces output.
+
+Keep it concise and task-oriented. A short "Technical Details" footnote (which APIs it reads,
+where state is stored) is fine at the end, but it is the last thing, not the readme's focus.
+
 ## Deploy
 
 **Always deploy after creating or modifying an app. Do not ask — just run it.**
@@ -111,7 +134,7 @@ apps/{app_name}/
 ├── cp.py                # CP module copy
 ├── {app_name}.py        # Main logic
 ├── start.sh             # Uses cppython
-├── readme.md            # Usage and appdata fields
+├── readme.md            # User-facing: usage, settings, appdata fields (see readme section above)
 ├── static/              # Web assets (if applicable)
 └── mylib/               # Subdirectories with Python modules work fine
 ```

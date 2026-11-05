@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NTP Server</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%E2%8F%B0</text></svg>">
+    <link rel="stylesheet" type="text/css" href="static/css/style.css" />
+    <link href="static/libs/font-awesome.min.css" rel="stylesheet">
+    <style>
+        .ntp-wrap { max-width: 1040px; margin: 0 auto; padding: 1.5rem; }
+        .ntp-hero {
+            background: var(--panel-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-md);
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .ntp-hero-top {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 1rem;
+        }
+        .ntp-state-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.4rem 0.9rem; border-radius: 999px;
+            font-weight: 600; font-size: 0.85rem; letter-spacing: 0.02em;
+            border: 1px solid transparent;
+        }
+        .state-synced   { background: rgba(5,150,105,0.14);  color: var(--success-color); border-color: rgba(5,150,105,0.3); }
+        .state-waiting  { background: rgba(217,119,6,0.14);  color: var(--warning-color); border-color: rgba(217,119,6,0.3); }
+        .state-holdover { background: rgba(2,132,199,0.14);  color: var(--info-color);    border-color: rgba(2,132,199,0.3); }
+        .state-unsynced,
+        .state-stopped  { background: rgba(220,38,38,0.14);  color: var(--danger-color);  border-color: rgba(220,38,38,0.3); }
+        .ntp-main {
+            display: flex; gap: 1.25rem; margin-top: 1.5rem; align-items: stretch;
+            flex-wrap: wrap;
+        }
+        .clock-tile {
+            flex: 0 0 280px; max-width: 280px;
+            display: flex; flex-direction: column;
+            background: var(--card-surface); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); padding: 1.25rem; min-height: 200px;
+        }
+        .set-panel {
+            flex: 1 1 320px; min-width: 300px;
+            background: var(--card-surface); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); padding: 1.25rem;
+        }
+        @media (max-width: 640px) {
+            .clock-tile { flex-basis: 100%; max-width: none; }
+        }
+        .clock-label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .clock-time  { font-size: 1.9rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 0.35rem 0 0.1rem; color: var(--text-primary); line-height: 1.15; }
+        .clock-date  { font-size: 1.05rem; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+        .clock-sub   { font-size: 0.85rem; color: var(--text-light); margin-top: 0.4rem; }
+        .ntp-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.9rem;
+        }
+        .ntp-card {
+            background: var(--card-surface); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); padding: 1rem 1.15rem;
+        }
+        .ntp-card .k { font-size: 0.78rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+        .ntp-card .v { font-size: 1.25rem; font-weight: 600; margin-top: 0.25rem; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+        .ntp-section-title { font-size: 1.05rem; font-weight: 700; margin: 1.75rem 0 0.9rem; color: var(--text-primary); display:flex; align-items:center; gap:0.5rem; }
+        .set-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+        .set-row input#manual-time {
+            padding: 0.6rem 0.8rem; border-radius: var(--radius-md);
+            border: 1px solid var(--border-color); background: var(--light-surface);
+            color: var(--text-primary); font-size: 0.9rem;
+            font-variant-numeric: tabular-nums; min-width: 190px;
+        }
+        [data-theme="dark"] .set-row input#manual-time { background: var(--dark-surface); }
+        .set-row input#manual-time:invalid { border-color: var(--danger-color); }
+        .toast-feedback { margin-top: 0.9rem; font-size: 0.9rem; min-height: 1.2rem; }
+        .ok  { color: var(--success-color); }
+        .err { color: var(--danger-color); }
+        .muted { color: var(--text-light); }
+        .hint { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
+        .set-row .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .zone-switch {
+            display: inline-flex; border: 1px solid var(--border-color);
+            border-radius: 999px; overflow: hidden; background: var(--card-surface);
+        }
+        .zone-btn {
+            border: 0; background: transparent; cursor: pointer;
+            padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 600;
+            color: var(--text-secondary); letter-spacing: 0.02em;
+        }
+        .zone-btn.active { background: var(--primary-color); color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1 id="app-title"><i class="fas fa-clock"></i> NTP Server</h1>
+                    <span class="app-version" id="app-version"></span>
+                </div>
+                <div class="header-actions">
+                    <button type="button" class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="ntp-wrap">
+            <!-- Clock + set-clock, combined -->
+            <div class="ntp-hero">
+                <div class="ntp-hero-top">
+                    <div>
+                        <div class="clock-label">GPS Sync Status</div>
+                        <span id="state-badge" class="ntp-state-badge state-waiting">
+                            <i class="fas fa-circle-notch fa-spin"></i> <span id="state-text">Loading...</span>
+                        </span>
+                    </div>
+                    <div class="zone-switch" role="group" aria-label="Time zone">
+                        <button type="button" class="zone-btn" id="zone-local" data-zone="local">Local</button>
+                        <button type="button" class="zone-btn" id="zone-utc" data-zone="utc">UTC</button>
+                    </div>
+                </div>
+
+                <!-- Clock tile (left) + set-clock controls (right) -->
+                <div class="ntp-main">
+                    <!-- Current router time, in the selected zone -->
+                    <div class="clock-tile">
+                        <div class="clock-label"><i class="fas fa-network-wired"></i> Router Clock <span id="clock-zone-label"></span></div>
+                        <div class="clock-time" id="router-time">--:--:--</div>
+                        <div class="clock-date" id="router-date">----------</div>
+                        <div class="clock-sub" id="router-offset"></div>
+                        <div class="clock-sub" id="ntp-sync" style="margin-top:0.6rem;"></div>
+                        <div class="clock-sub" id="ntp-server" style="word-break:break-all;"></div>
+                        <div class="clock-sub" id="source-line" style="margin-top:auto;"></div>
+                    </div>
+
+                    <!-- Set the router clock, from GPS / browser / manual -->
+                    <div class="set-panel">
+                        <div class="ntp-section-title" style="margin-top:0;">
+                            <i class="fas fa-sliders-h"></i> Set Router Clock
+                        </div>
+                        <div class="set-row">
+                            <button type="button" class="btn btn-primary" id="btn-gps-time">
+                                <i class="fas fa-satellite-dish"></i> Set from GPS
+                            </button>
+                            <span class="muted" id="gps-now">GPS time unavailable</span>
+                        </div>
+                        <div class="set-row" style="margin-top: 1rem;">
+                            <button type="button" class="btn btn-secondary" id="btn-browser-time">
+                                <i class="fas fa-laptop"></i> Set from browser time
+                            </button>
+                            <span class="muted" id="browser-now"></span>
+                        </div>
+                        <div class="set-row" style="margin-top: 1rem;">
+                            <input type="text" id="manual-time" inputmode="numeric"
+                                   placeholder="YYYY-MM-DD HH:MM:SS"
+                                   pattern="\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
+                                   title="Format: YYYY-MM-DD HH:MM:SS">
+                            <button type="button" class="btn btn-secondary" id="btn-manual-time">
+                                <i class="fas fa-calendar-check"></i> Set manually
+                            </button>
+                        </div>
+                        <div class="toast-feedback" id="set-feedback"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed status -->
+            <div class="ntp-section-title"><i class="fas fa-list-ul"></i> Details</div>
+            <div class="ntp-grid" id="detail-grid"></div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        // ---- dark mode (data-theme + localStorage) ----
+        const root = document.documentElement;
+        const saved = localStorage.getItem('theme');
+        if (saved) root.setAttribute('data-theme', saved);
+        const toggle = document.getElementById('dark-mode-toggle');
+        function syncIcon() {
+            const dark = root.getAttribute('data-theme') === 'dark';
+            toggle.querySelector('i').className = dark ? 'fas fa-sun' : 'fas fa-moon';
+        }
+        syncIcon();
+        toggle.addEventListener('click', function () {
+            const dark = root.getAttribute('data-theme') === 'dark';
+            const next = dark ? 'light' : 'dark';
+            root.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            syncIcon();
+        });
+
+        // ---- helpers ----
+        const $ = (id) => document.getElementById(id);
+
+        // One zone for the whole page, chosen by the Local/UTC switch (default Local, saved in
+        // localStorage). Every timestamp is formatted at that zone's fixed offset, so nothing
+        // is ambiguous and nothing mixes zones. "Local" is the ROUTER's timezone (from the
+        // tz_offset status field), not the browser's.
+        let activeZone = localStorage.getItem('ntp_zone') === 'utc' ? 'utc' : 'local';
+        let routerOffsetMin = null;  // router UTC offset in minutes, from tz_offset (e.g. -0700)
+        let lastStatus = null;       // last /api/status payload, so a zone switch re-renders it
+        let manualDirty = false;     // true once the user edits the manual picker
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function parseOffsetMin(tz) {
+            // "-0700" -> -420 ; "+0530" -> 330 ; null/"" -> null
+            if (!tz) return null;
+            const m = tz.match(/^([+-])(\d{2})(\d{2})$/);
+            if (!m) return null;
+            const sign = m[1] === '-' ? -1 : 1;
+            return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+        }
+        function offsetSuffix() {
+            // Zone label/suffix for the active zone.
+            if (activeZone === 'utc') return 'UTC';
+            if (routerOffsetMin == null) return 'local';
+            const o = routerOffsetMin;
+            return (o < 0 ? '-' : '+') + pad(Math.floor(Math.abs(o) / 60)) + pad(Math.abs(o) % 60);
+        }
+        function parts(epoch) {
+            // {date, time, suffix} for an epoch, in the active zone.
+            const off = activeZone === 'utc' ? 0 : (routerOffsetMin || 0);
+            const d = new Date((epoch + off * 60) * 1000);
+            return {
+                date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`,
+                time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`,
+                suffix: offsetSuffix()
+            };
+        }
+        function fmt(epoch) {
+            // Full "YYYY-MM-DD HH:MM:SS <suffix>" timestamp in the active zone.
+            if (epoch == null) return '--';
+            const p = parts(epoch);
+            return `${p.date} ${p.time} ${p.suffix}`;
+        }
+        function fmtAge(sec) {
+            // Human-readable duration, e.g. "3s", "4m 1s", "1h 22m", "2d 3h".
+            if (sec == null) return '--';
+            sec = Math.max(0, Math.round(sec));
+            const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600);
+            const m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            if (d) return `${d}d ${h}h`;
+            if (h) return `${h}h ${m}m`;
+            if (m) return `${m}m ${s}s`;
+            return `${s}s`;
+        }
+
+        const STATE_CLASS = {
+            synced: 'state-synced', waiting: 'state-waiting', holdover: 'state-holdover',
+            unsynced: 'state-unsynced', stopped: 'state-stopped'
+        };
+        const STATE_ICON = {
+            synced: 'fas fa-check-circle', waiting: 'fas fa-circle-notch fa-spin',
+            holdover: 'fas fa-hourglass-half', unsynced: 'fas fa-exclamation-triangle',
+            stopped: 'fas fa-stop-circle'
+        };
+
+        function renderDetails(s) {
+            const rows = [
+                ['State', s.state],
+                ['Serving NTP', s.serving ? 'yes' : 'no'],
+                ['NTP port', s.ntp_port != null ? s.ntp_port : '—'],
+                ['NTP requests', s.ntp_requests],
+                ['Samples', s.samples],
+                ['Sample age', s.sample_age_s != null ? s.sample_age_s + ' s' : '—'],
+                ['Dispersion', s.dispersion_ms != null ? s.dispersion_ms + ' ms' : '—'],
+                ['Holdover', s.holdover_s != null ? s.holdover_s + ' s' : '—'],
+                ['Source', s.source || '—'],
+                ['Sentence', s.sentence || '—'],
+                ['Timezone (UTC offset)', s.tz_offset || '—'],
+                ['Router offset', s.system_offset_s != null ? s.system_offset_s + ' s' : '—'],
+            ];
+            $('detail-grid').innerHTML = rows.map(([k, v]) =>
+                `<div class="ntp-card"><div class="k">${k}</div><div class="v">${v}</div></div>`
+            ).join('');
+        }
+
+        async function refresh() {
+            try {
+                const r = await fetch('api/status', { cache: 'no-store' });
+                const s = await r.json();
+
+                lastStatus = s;
+                const hadOffset = routerOffsetMin != null;
+                routerOffsetMin = parseOffsetMin(s.tz_offset);
+                // The very first status is what tells us the router's offset. The picker was
+                // seeded at init before we knew it (so Local looked like UTC); re-seed now that
+                // the offset is known. Only do it once, so it never overwrites user input.
+                if (!hadOffset && routerOffsetMin != null && !manualDirty) {
+                    seedManual();
+                }
+                render(s);
+            } catch (e) {
+                $('state-text').textContent = 'UNREACHABLE';
+            }
+        }
+
+        // Render everything from a status payload in the currently active zone. Called on each
+        // refresh and whenever the Local/UTC switch changes (re-rendering the last payload).
+        function render(s) {
+            if (!s) return;
+            const cls = STATE_CLASS[s.state] || 'state-waiting';
+            const icon = STATE_ICON[s.state] || 'fas fa-question-circle';
+            const badge = $('state-badge');
+            badge.className = 'ntp-state-badge ' + cls;
+            badge.querySelector('i').className = icon;
+            $('state-text').textContent = (s.state || 'unknown').toUpperCase();
+
+            // Single router clock in the active zone: big time, full date, zone + GPS offset.
+            $('clock-zone-label').textContent =
+                '(' + (activeZone === 'utc' ? 'UTC' : 'Local') + ')';
+            if (s.router_unix != null) {
+                const p = parts(s.router_unix);
+                $('router-time').textContent = p.time;
+                $('router-date').textContent = p.date;
+            } else {
+                $('router-time').textContent = '--:--:--';
+                $('router-date').textContent = '----------';
+            }
+
+            const zoneTxt = offsetSuffix() === 'UTC' ? 'UTC' : ('UTC' + offsetSuffix());
+            if (s.system_offset_s != null) {
+                const off = s.system_offset_s;
+                const big = Math.abs(off) > 2;
+                const offTxt = big
+                    ? `<span class="err">off by ${off} s vs GPS — needs setting</span>`
+                    : `<span class="ok">within ${off} s of GPS</span>`;
+                $('router-offset').innerHTML = zoneTxt + ' · ' + offTxt;
+            } else {
+                $('router-offset').textContent = zoneTxt;
+            }
+
+            // Where the router last synced its own clock, and how long ago (status/system/ntp).
+            $('ntp-sync').textContent = s.ntp_sync_age_s != null
+                ? ('last sync: ' + fmtAge(s.ntp_sync_age_s) + ' ago')
+                : 'last sync: never';
+            $('ntp-server').textContent = s.ntp_last_server
+                ? ('server: ' + s.ntp_last_server.split('=>')[0].trim())
+                : '';
+
+            // GPS-set button: enabled only when GPS time is available; label shows that time.
+            const gpsBtn = $('btn-gps-time');
+            if (s.gps_unix != null) {
+                gpsBtn.disabled = false;
+                gpsBtn.dataset.epoch = String(Math.round(s.gps_unix));
+                $('gps-now').textContent = 'GPS: ' + fmt(s.gps_unix);
+            } else {
+                gpsBtn.disabled = true;
+                delete gpsBtn.dataset.epoch;
+                $('gps-now').textContent = 'GPS time unavailable';
+            }
+
+            $('source-line').textContent = s.updated ? ('updated ' + fmt(s.updated)) : '';
+
+            renderDetails(s);
+        }
+
+        async function setTime(epoch) {
+            const fb = $('set-feedback');
+            fb.textContent = 'Setting...';
+            fb.className = 'toast-feedback muted';
+            try {
+                const r = await fetch('api/set_time', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ epoch: epoch })
+                });
+                const j = await r.json();
+                if (j.ok) {
+                    fb.textContent = 'Router clock set to ' + fmt(epoch);
+                    fb.className = 'toast-feedback ok';
+                } else {
+                    fb.textContent = 'Failed: ' + (j.message || 'unknown error');
+                    fb.className = 'toast-feedback err';
+                }
+            } catch (e) {
+                fb.textContent = 'Request failed: ' + e;
+                fb.className = 'toast-feedback err';
+            }
+            refresh();
+        }
+
+        // ---- set from GPS time (the app's GPS-derived UTC epoch) ----
+        $('btn-gps-time').addEventListener('click', function () {
+            const epoch = this.dataset.epoch ? parseInt(this.dataset.epoch, 10) : null;
+            if (epoch == null) {
+                $('set-feedback').textContent = 'No GPS time available yet.';
+                $('set-feedback').className = 'toast-feedback err';
+                return;
+            }
+            setTime(epoch);
+        });
+
+        // ---- set from browser time ----
+        $('btn-browser-time').addEventListener('click', function () {
+            // Date.now() is UTC epoch ms regardless of the browser's timezone, so the router
+            // gets correct UTC and applies its own configured timezone for local display.
+            setTime(Math.floor(Date.now() / 1000));
+        });
+
+        // ---- manual picker ----
+        // The manual field is a plain "YYYY-MM-DD HH:MM:SS" text input (same format shown
+        // everywhere else). Its wall-clock value is interpreted in the ACTIVE zone, not the
+        // browser's, by converting via the active zone's offset — keeping the page consistent.
+        function manualToEpoch(val) {
+            // Accept the standard "YYYY-MM-DD HH:MM:SS" (seconds optional).
+            const m = (val || '').trim().match(
+                /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+            if (!m) return null;
+            const off = activeZone === 'utc' ? 0 : (routerOffsetMin || 0);
+            const utcMs = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+            return Math.floor(utcMs / 1000) - off * 60;
+        }
+        function seedManual() {
+            // Seed the picker with "now" in the active zone, standard "YYYY-MM-DD HH:MM:SS".
+            const p = parts(Date.now() / 1000);
+            $('manual-time').value = `${p.date} ${p.time}`;
+        }
+        $('manual-time').addEventListener('input', function () { manualDirty = true; });
+        $('btn-manual-time').addEventListener('click', function () {
+            const val = $('manual-time').value;
+            if (!val) { $('set-feedback').textContent = 'Pick a date and time first.'; return; }
+            const epoch = manualToEpoch(val);
+            if (epoch == null) { $('set-feedback').textContent = 'Could not read that time.'; return; }
+            setTime(epoch);
+        });
+
+        // show the current wall-clock time next to the browser button, ticking, in active zone
+        setInterval(function () {
+            $('browser-now').textContent = 'now: ' + fmt(Date.now() / 1000);
+        }, 1000);
+
+        // ---- Local / UTC zone switch ----
+        function applyZone() {
+            $('zone-local').classList.toggle('active', activeZone === 'local');
+            $('zone-utc').classList.toggle('active', activeZone === 'utc');
+            render(lastStatus);  // re-render last payload in the new zone immediately
+            seedManual();        // re-seed the picker so its wall-clock matches the new zone
+        }
+        [$('zone-local'), $('zone-utc')].forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                activeZone = this.dataset.zone;
+                localStorage.setItem('ntp_zone', activeZone);
+                applyZone();
+            });
+        });
+
+        applyZone();
+        seedManual();
+        refresh();
+        setInterval(refresh, 1000);
+    })();
+    </script>
+</body>
+</html>
