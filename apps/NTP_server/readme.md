@@ -1,4 +1,4 @@
-# NTP_server
+<img width="1454" height="845" alt="image" src="https://github.com/user-attachments/assets/dfe1c7e2-3b3b-476d-9b3d-58b8cb5b73d1" />
 
 Gives your router accurate time from GPS, even with no internet. The app runs a stratum-1 NTP
 server sourced from the router's GPS fix, so the router (and any LAN client) can keep its clock
@@ -29,8 +29,6 @@ NTP to learn the real time. This app is that time source when the only thing ava
    (Administration > System > Time, or `config/system/ntp`). The router's clock is then
    disciplined to GPS.
 4. Open **http://router_ip:8000** to watch status and, if needed, set the clock manually.
-
-![NTP Server dashboard](screenshot.png)
 
 ### Setting the clock from the web UI
 
