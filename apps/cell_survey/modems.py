@@ -237,6 +237,25 @@ def activate_esim_profile(uid, eid, iccid):
             'message': 'Could not start eSIM profile activation.'}
 
 
+def _at_channel_rank(summary, connected):
+    """Rank a SIM slot by how usable its AT channel is (higher is better).
+
+    The AT survey opens the slot's SubIface (e.g. rmnet501). A disabled slot
+    has no open AT channel, so its iface must never be chosen even when it is
+    the only slot iterated first. A connected slot is best; any other
+    non-disabled state (standby, connecting, Dual SIM switch) keeps a working
+    channel and is preferred over a disabled slot.
+
+    Returns:
+        int: 2 = connected, 1 = usable (non-disabled), 0 = disabled/unusable.
+    """
+    if str(summary or '').strip().lower() == 'disabled':
+        return 0
+    if connected:
+        return 2
+    return 1
+
+
 def _signal_quality(rsrp):
     """Rough human label for an RSRP value (dBm)."""
     try:
@@ -288,6 +307,12 @@ def list_modems():
         diag = (dev or {}).get('diagnostics') or {}
         port = info.get('port') or key
         connected = status.get('connection_state') == 'connected'
+        summary = status.get('summary', '')
+        # How usable this slot's AT channel is. A disabled slot's SubIface
+        # has no open AT channel, so it must never be picked as the port's
+        # representative iface (the survey would fail with "Could not open AT
+        # channel"). Higher rank wins.
+        at_rank = _at_channel_rank(summary, connected)
         raw_model = info.get('model') or 'Modem'
         entry = by_port.get(port)
         # Per-slot status pill data. NOSIM is a diagnostics string 'TRUE' /
@@ -306,6 +331,7 @@ def list_modems():
             'model': _clean_model(raw_model),
             'mfg_model': info.get('mfg_model') or '',
             'connected': connected,
+            'at_rank': at_rank,
             'sim_count': 1,
             'sims': [sim],
         }
@@ -317,24 +343,29 @@ def list_modems():
             if not _SIM_SUFFIX_RE.search(str(raw_model)):
                 sim['label'] = 'SIM{}'.format(len(entry['sims']) + 1)
             entry['sims'].append(sim)
-            # Surface a connected slot as the representative device for the
-            # port when one exists, so the status tiles show live
-            # carrier/signal. This does not affect whether the port is
-            # selectable or surveyable - every port is.
-            if connected and not entry['connected']:
+            # Pick the representative device for the port by AT-channel
+            # usability: a connected slot beats a standby one, and any
+            # non-disabled slot beats a disabled one. This both surfaces live
+            # carrier/signal in the status tiles and keeps the survey off a
+            # disabled slot's dead AT channel. This does not affect whether
+            # the port is selectable - every port is.
+            if candidate['at_rank'] > entry['at_rank']:
                 entry.update({
                     'uid': candidate['uid'],
                     'iface': candidate['iface'],
                     'config_id': candidate['config_id'],
                     'model': candidate['model'],
                     'mfg_model': candidate['mfg_model'],
-                    'connected': True,
+                    'connected': candidate['connected'],
+                    'at_rank': candidate['at_rank'],
                 })
 
     modems = list(by_port.values())
     for m in modems:
         # Stable slot order (SIM1, SIM2, ...) regardless of device iteration.
         m['sims'].sort(key=lambda s: s['label'])
+        # at_rank is internal selection state, not part of the API contract.
+        m.pop('at_rank', None)
     default_port = _choose_default_port(modems)
     for m in modems:
         m['is_default'] = (m['port'] == default_port)
