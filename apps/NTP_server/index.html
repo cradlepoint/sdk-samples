@@ -8,6 +8,11 @@
     <link rel="stylesheet" type="text/css" href="static/css/style.css" />
     <link href="static/libs/font-awesome.min.css" rel="stylesheet">
     <style>
+        /* Template hardcodes a light body gradient that ignores data-theme;
+           override so the page background follows dark mode like the cards do. */
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
         .ntp-wrap { max-width: 1040px; margin: 0 auto; padding: 1.5rem; }
         .ntp-hero {
             background: var(--panel-surface);
