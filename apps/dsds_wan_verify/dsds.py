@@ -45,19 +45,38 @@ METRIC_UNITS = {key: unit for key, _, unit in SIGNAL_METRICS}
 # the dsds_switch PUT. While either appears, no test result is meaningful.
 SWITCHING_SUMMARIES = ('dual sim switch', 'sibling transitioning')
 
+# connection_state values that mean a slot is no longer sitting connected
+# and is in the middle of coming up or going down. A DSDS switch tears the
+# outgoing slot down (2.6s -> 'disconnecting', 6s -> 'disconnected') a
+# handful of seconds BEFORE either slot reports a SWITCHING_SUMMARIES
+# summary (~7s). On a modem where that summary is late or brief, keying the
+# "did it start?" check on the summary alone can miss the whole switch and
+# declare 'did not start' while the modem is plainly mid-transition - which
+# then makes the app abandon a switch that completes moments later and
+# misread the completion as an external slot change. So the transition is
+# also recognized by the outgoing slot leaving 'connected'.
+TRANSITIONING_STATES = ('disconnecting', 'disconnected', 'connecting')
+
 # A switch took 31s end to end on the test unit. Allow generous headroom
 # before calling it stuck, since a cold registration on a new carrier can
 # take considerably longer than a warm one.
 SWITCH_TIMEOUT = 150
 
-# After the dsds_switch PUT, one of the slots enters a switching summary
-# (SWITCHING_SUMMARIES) within ~1-2s on the test unit. If nothing is
-# switching by this deadline, the request did not take - most often
-# because the target slot was suspended on a backoff timer and could not
-# be brought up - so the switch is declared failed here rather than after
-# the full SWITCH_TIMEOUT. Measured onset was under 2s; the headroom
-# covers a busier modem.
-SWITCH_START_TIMEOUT = 12
+# After the dsds_switch PUT, the switch becomes observable - the outgoing
+# slot starts tearing down (~2.6s) and a switching summary follows (~7s).
+# If nothing is moving by this deadline, the request did not take - most
+# often because the target slot was suspended on a backoff timer and could
+# not be brought up - so the switch is declared failed here rather than
+# after the full SWITCH_TIMEOUT.
+#
+# switch_in_progress(slots, from_key) now also detects the earlier
+# teardown phase, not just the switching summary, so onset is seen within
+# a few seconds. The timeout is nonetheless generous (30s) because a busy
+# modem was observed not surfacing the summary for well over 12s, and a
+# premature 'did not start' is costly: the app abandons a switch that
+# then completes on its own and misreads the completion as an external
+# slot change, arming a bogus failback holdoff.
+SWITCH_START_TIMEOUT = 30
 
 
 def slot_key(port, sim):
@@ -238,9 +257,33 @@ def active_slot(slots):
     return None
 
 
-def switch_in_progress(slots):
-    """True if any slot reports a DSDS switch in flight."""
-    return any(slot.get('switching') for slot in slots.values())
+def switch_in_progress(slots, from_key=None):
+    """True if a DSDS switch is in flight.
+
+    A switch is "in flight" when any slot reports a SWITCHING_SUMMARIES
+    summary. When `from_key` is given (the slot the switch was requested
+    on), the transition is also recognized earlier: the outgoing slot
+    leaving 'connected' for a transitional state, or no slot being
+    connected at all. Those precede the switching summary by several
+    seconds, so including them stops a slow or brief summary from reading
+    as "the switch never started".
+
+    Without `from_key`, only the summary is used, because off a specific
+    switch a slot in a transitional state could be ordinary churn rather
+    than a swap in progress.
+    """
+    if any(slot.get('switching') for slot in slots.values()):
+        return True
+    if from_key is not None:
+        outgoing = slots.get(from_key) or {}
+        if outgoing.get('connection_state') in TRANSITIONING_STATES:
+            return True
+        # The outgoing slot was connected when the switch was requested;
+        # once nothing is connected, the teardown has begun even if no
+        # slot has reached a switching summary yet.
+        if not any(slot.get('connected') for slot in slots.values()):
+            return True
+    return False
 
 
 def switch_target_blocked(target):
@@ -248,10 +291,12 @@ def switch_target_blocked(target):
 
     A dsds_switch is accepted by the modem even when the destination
     cannot come up, and then simply never completes - which is what made
-    the app sit through the full SWITCH_TIMEOUT. The two cases worth
-    catching before asking are a missing SIM and a slot suspended on a
-    registration backoff (bad APN, no service). A suspended slot returns
-    to 'standby' when its timer expires, so this is transient, not fatal.
+    the app sit through the full SWITCH_TIMEOUT. The cases worth catching
+    before asking are a missing SIM, a slot suspended on a registration
+    backoff (bad APN, no service), and a slot that has no service at all
+    (e.g. a SIM disabled at the network). A suspended slot returns to
+    'standby' when its timer expires, so this is transient, not fatal;
+    a no-service slot clears the moment it registers again.
 
     Returns a short human-readable reason string, or None when the target
     looks ready to switch to.
@@ -263,6 +308,21 @@ def switch_target_blocked(target):
     if target.get('suspended'):
         summary = target.get('summary') or 'suspended'
         return '%s is %s' % (slot_label(target), summary)
+    # A SIM disabled at the network (or otherwise out of service) sits in
+    # 'standby' - so it is neither nosim nor suspended - but reports no
+    # service type and no signal metrics at all. Switching to it is
+    # accepted and never completes, which is exactly the wasted ~30s
+    # attempt this screen exists to prevent. The connected slot is never
+    # screened here (it reports no service type while connected on some
+    # radios, and it is not a switch *target* anyway), and a merely weak
+    # slot still reporting a service type and signal is left switchable -
+    # the signal threshold, not this gate, decides whether weak is too
+    # weak.
+    if not target.get('connected') \
+            and not target.get('service_type') \
+            and not (target.get('signal') or {}):
+        return '%s has no service (out of service or disabled at the ' \
+               'network)' % slot_label(target)
     return None
 
 
@@ -343,7 +403,7 @@ def wait_for_switch(from_key, to_key=None, timeout=SWITCH_TIMEOUT, poll=2.0,
         current = active_slot(slots)
         if current and current['key'] != from_key:
             return True, time.time() - start, slots, None
-        if switch_in_progress(slots):
+        if switch_in_progress(slots, from_key=from_key):
             switch_seen = True
         elif not switch_seen and time.time() - start >= start_timeout:
             # Nothing ever entered a switching state, so the request did

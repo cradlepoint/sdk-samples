@@ -6,7 +6,12 @@
 (function () {
     'use strict';
 
-    var STATUS_POLL_MS = 3000;
+    // The UI refreshes in lockstep with the backend monitor loop
+    // (snap.poll_interval, 2s), since in-memory state cannot change any
+    // faster than that - polling quicker would only burn CPU re-fetching
+    // identical data. A floor keeps a bad/zero value from busy-looping.
+    var MIN_STATUS_POLL_MS = 1000;
+    var FALLBACK_STATUS_POLL_MS = 2000;
     var state = {
         metrics: [],
         pollInterval: 2,
@@ -204,6 +209,12 @@
     function renderTests(slot) {
         var rows = [];
         var cfg = slot.config;
+        // Set on a slot the app just left because its connectivity test
+        // failed. The failing ping/HTTP verdict is kept visible (red) on
+        // the now-standby slot so the dashboard still shows why it moved,
+        // with the failback-holdoff countdown when one is active. Used by
+        // both the ping and HTTP rows below.
+        var fo = slot.ping_failover;
 
         if (cfg.ping_enabled && cfg.ping_targets.length) {
             // Ping runs through the router's IP Verify subsystem. On a
@@ -217,6 +228,15 @@
                 if (pingUnsupported) {
                     note = '<span class="dwv-test-note">not run (router does not ' +
                         'support IP Verify)</span>';
+                } else if (verdict === false && fo) {
+                    // Failed its own test and that is why the app moved
+                    // off this slot. Name the reason and, when a failback
+                    // holdoff is counting down, how long it is held.
+                    note = fo.hold_remaining
+                        ? '<span class="dwv-test-note bad">failed &mdash; holding off ' +
+                          'failback for ' + esc(fmtDuration(fo.hold_remaining)) + '</span>'
+                        : '<span class="dwv-test-note bad">failed its connectivity ' +
+                          'test, so the app switched off this slot</span>';
                 } else if (verdict === null) {
                     note = slot.connected
                         ? '<span class="dwv-test-note">waiting for a result</span>'
@@ -231,7 +251,17 @@
         if (cfg.http_enabled && cfg.http_url) {
             var verdict = slot.http_verdict;
             var note;
-            if (!slot.connected) {
+            // Same as ping: if HTTP is what failed and drove the switch,
+            // keep a red "failed" on the now-standby slot instead of the
+            // grey "not run" so the dashboard still says why it moved.
+            if (!slot.connected && fo && fo.http === false) {
+                verdict = false;
+                note = fo.hold_remaining
+                    ? '<span class="dwv-test-note bad">failed &mdash; holding off ' +
+                      'failback for ' + esc(fmtDuration(fo.hold_remaining)) + '</span>'
+                    : '<span class="dwv-test-note bad">failed its connectivity ' +
+                      'test, so the app switched off this slot</span>';
+            } else if (!slot.connected) {
                 note = '<span class="dwv-test-note">not run (slot is not connected)</span>';
             } else if (slot.http.error) {
                 note = '<span class="dwv-test-note">' + esc(slot.http.error) +
@@ -1426,19 +1456,35 @@
             forms.addEventListener('change', updateSummaries);
         });
 
-        setInterval(function () {
-            // Pause polling while a field is focused so a refresh cannot
-            // overwrite what the user is typing.
+        // Self-scheduling loop rather than a fixed setInterval: each tick
+        // waits for its own fetch to finish before arming the next, so a
+        // slow or stalled request can never stack overlapping polls, and
+        // the period tracks the backend cadence (state.pollInterval) once
+        // the first snapshot lands.
+        function tick() {
+            // Pause full refreshes while a field is focused so a refresh
+            // cannot overwrite what the user is typing; still keep the
+            // dashboard live with a lightweight status-only update.
             var active = document.activeElement;
+            var work;
             if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) {
-                getJSON('api/status').then(function (snap) {
+                work = getJSON('api/status').then(function (snap) {
                     state.slots = snap.slots;
                     renderDashboard(snap);
                 }).catch(function () {});
-                return;
+            } else {
+                work = poll();
             }
-            poll();
-        }, STATUS_POLL_MS);
+            work.then(schedule, schedule);
+        }
+
+        function schedule() {
+            var ms = (state.pollInterval || 0) * 1000 || FALLBACK_STATUS_POLL_MS;
+            if (ms < MIN_STATUS_POLL_MS) { ms = MIN_STATUS_POLL_MS; }
+            setTimeout(tick, ms);
+        }
+
+        schedule();
     }
 
     if (document.readyState === 'loading') {

@@ -271,6 +271,7 @@
 .dwv-test-icon.unknown { color: var(--text-light); }
 .dwv-test-target { font-family: var(--font-mono, monospace); word-break: break-all; }
 .dwv-test-note { color: var(--text-secondary); font-size: 0.78rem; }
+.dwv-test-note.bad { color: var(--danger-color); font-weight: 600; }
 
 /* --- the two configuration pages ---
    These carry far more controls than the dashboard, and the design

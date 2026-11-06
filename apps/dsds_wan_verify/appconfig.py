@@ -71,7 +71,7 @@ SLOT_DEFAULTS = {
     # active slot, so it has time to finish registering and get a stable
     # route. A DSDS switch itself takes ~30s; this is the quiet period
     # *after* that.
-    'settle_seconds': 20,
+    'settle_seconds': 10,
 
     # How the ping verdict and the HTTP verdict combine.
     #   'all' - every enabled test type must pass (default). An HTTP test
@@ -147,8 +147,8 @@ SLOT_DEFAULTS = {
     # radio technology uses, and a metric that is not reported is ignored
     # for job 1 rather than failed.
     'signal_enabled': True,
-    'signal_thresholds': {'RSRP': -100.0, 'RSRP_5G': -120.0},
-    'signal_fail_threshold': 3,
+    'signal_thresholds': {'RSRP': -110.0, 'RSRP_5G': -120.0},
+    'signal_fail_threshold': 5,
 
     # Proactively return to this slot once its signal comes back above
     # its own threshold, even though the slot carrying traffic is passing
