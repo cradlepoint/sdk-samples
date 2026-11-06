@@ -71,7 +71,7 @@ SLOT_DEFAULTS = {
     # active slot, so it has time to finish registering and get a stable
     # route. A DSDS switch itself takes ~30s; this is the quiet period
     # *after* that.
-    'settle_seconds': 10,
+    'settle_seconds': 20,
 
     # How the ping verdict and the HTTP verdict combine.
     #   'all' - every enabled test type must pass (default). An HTTP test
