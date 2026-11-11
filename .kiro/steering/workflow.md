@@ -69,6 +69,31 @@ Follow the house style of the existing app readmes (`5GSpeed`, `client_bandwidth
 Keep it concise and task-oriented. A short "Technical Details" footnote (which APIs it reads,
 where state is stored) is fine at the end, but it is the last thing, not the readme's focus.
 
+## Test locally before deploying (fast iteration)
+
+An app can run **on your computer** against the dev router in `sdk_settings.ini` — `cp.py`
+detects it is off-router and uses HTTP REST. This is the fastest way to shake out API reads,
+data processing, and business logic without a build/install cycle, and it does **not** require
+Developer Mode (REST works regardless; some users develop this way exclusively).
+
+```bash
+.venv/bin/python3 my_app/my_app.py      # run from apps/, NOT from inside the app folder
+```
+
+- **Run from `apps/`** so `cp.py` can find `sdk_settings.ini` (it only looks in the cwd and its
+  parent). Interrupt with Ctrl-C when done.
+- **Works locally**: `cp.get/put/post/delete` (real reads and writes hit the router) and
+  `cp.log()` (prints to stdout). A local run really does publish to `status/...` and change
+  config on the dev router — the effects are live.
+- **Does NOT work locally**: `cp.alert()` (never reaches NCM), `cp.register()`/`cp.unregister()`
+  (needs the router's internal socket), `cp.decrypt()`, serial, and GPIO. A web UI binds to your
+  machine, so LAN clients behind the router can't reach it.
+- **Then deploy** to test the pieces that only work on-router (alerts, events, register, web UI
+  for LAN clients, serial, GPIO) and to confirm it runs under cppython.
+
+Full mechanics, caveats, and the `cp.put()` envelope difference are in `coding-standards.md`
+(*Local Development*).
+
 ## Deploy
 
 **Always deploy after creating or modifying an app. Do not ask — just run it.**

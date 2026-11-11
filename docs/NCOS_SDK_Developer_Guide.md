@@ -81,17 +81,24 @@ git clone https://github.com/cradlepoint/sdk-samples.git
 cd sdk-samples
 ```
 
-**Windows:**
-```cmd
-python make.py setup
-```
+Then run the setup script. It creates a `.venv` virtual environment, installs all dependencies from `requirements.txt` (pyserial, requests, cryptography, paramiko), and — when run interactively — helps you fill in the router connection details in `sdk_settings.ini`.
 
 **macOS / Linux:**
 ```bash
-python3 make.py setup
+python3 setup_env.py
 ```
 
-This creates a `.venv` virtual environment and installs all dependencies from `requirements.txt` (requests, cryptography, paramiko, pyserial).
+**Windows:**
+```cmd
+python setup_env.py
+```
+
+`setup_env.py` is the recommended way to set up and repair the environment. `make.py setup` is a thin wrapper that calls the same script, so either works:
+
+```bash
+.venv/bin/python make.py setup      # macOS / Linux
+.venv\Scripts\python make.py setup  # Windows
+```
 
 ### Configure Router Connection
 
@@ -129,19 +136,21 @@ Developer Mode must be enabled in **NetCloud Manager** (not the router's local U
 ```
 sdk-samples/
 ├── apps/                       # All sample applications
-│   ├── hello_world/            # Minimal example
-│   ├── mqtt_app/               # MQTT integration
-│   ├── speedtest_web/          # Web-based speed test
-│   ├── ...                     # 75+ apps
-│   ├── templates/              # Scaffolding templates
-│   │   ├── app_template/       # Basic app template
-│   │   └── web_app_template/   # Web app with UI
-│   └── archive/                # Retired apps
-├── docs/                       # Documentation
+│   ├── 5GSpeed/                # Speed test with Ookla/iPerf3
+│   ├── Mobile_Site_Survey/     # Automated drive-test survey
+│   ├── ...                     # 80+ apps
+│   └── templates/              # Scaffolding templates
+│       ├── app_template/       # Basic app template
+│       └── web_app_template/   # Web app with UI
+├── docs/                       # Documentation (this guide + ncos-api/ reference)
 ├── make.py                     # Build/deploy tool
-├── sdk_settings.ini            # Router connection settings
+├── setup_env.py                # Environment setup / repair
+├── sdk_settings.ini            # Router connection settings (git-ignored)
+├── sdk_settings.ini.example    # Template for sdk_settings.ini
 └── requirements.txt            # Python dependencies
 ```
+
+New apps are scaffolded directly into `apps/` by `make.py create` — that is where the repo keeps its apps and where CI looks, so there is no separate step to move them. Older apps may still live at the repo root; `make.py` finds apps by name in the repo root first, then under `apps/`.
 
 ### Application Layout
 
@@ -716,9 +725,12 @@ All commands use the virtual environment Python:
 | `purge` | Remove ALL apps from router |
 | `clean <name>` | Remove local build artifacts |
 | `clean all` | Clean all apps |
-| `setup` | Create .venv and install dependencies |
+| `setup` | Create .venv and install dependencies (wraps `setup_env.py`) |
+| `contribute <name>` | Submit one app to cradlepoint/sdk-samples as a pull request (interactive) |
 | `uuid` | Generate UUID for app |
 | `update` | Update make.py and app_template/cp.py from GitHub |
+
+App names passed to `install`, `deploy`, `build`, `clean`, `start`, `stop`, `uninstall`, and `status` are **case-insensitive**, and the repo root is searched before `apps/`. `install` and `deploy` also accept a `.tar.gz` file name directly (e.g. `make.py install "My_App v1.0.0.tar.gz"`) to install that exact package with no rebuild.
 
 ### Creating a New App
 
@@ -726,11 +738,7 @@ All commands use the virtual environment Python:
 .venv/bin/python make.py create my_new_app
 ```
 
-This copies `apps/templates/app_template/` to `./my_new_app/` at the repo root, renames the main file, and updates all internal references. Edit `my_new_app.py` and `readme.md`. When ready, move to apps:
-
-```bash
-mv my_new_app apps/
-```
+This copies `apps/templates/app_template/` to `apps/my_new_app/`, renames the main file to `my_new_app.py`, and updates all internal references (`package.ini`, `readme.md`, `start.sh`). The app is created **directly in `apps/`** — the same place the repo keeps its apps and where CI looks — so do not move it afterward. Edit `my_new_app.py` and `readme.md`; leave the generated `package.ini`, `start.sh`, and `cp.py` as-is.
 
 ### Deploying
 
@@ -759,6 +767,16 @@ docs/
 ```
 
 Always excluded automatically: `__pycache__/`, `buildignore`, `.DS_Store`.
+
+### Contributing an App Upstream
+
+To submit one of your apps to `cradlepoint/sdk-samples` as a pull request:
+
+```bash
+.venv/bin/python make.py contribute my_app
+```
+
+This is **interactive** — it runs a CI preflight, branches off upstream, stages only the app folder, prompts for a commit message and PR text, forks the repo on demand, pushes to your fork, and opens the pull request. It uses the GitHub CLI and offers to download it into `.gh/` (git-ignored) on first run. Your `origin` remote stays pointed at the upstream repo, so `git pull` keeps working; the fork is added as a second remote named `fork`. Do not run it unattended.
 
 ---
 
@@ -846,11 +864,26 @@ ARM64 (aarch64) with musl libc. When downloading binaries, always use `aarch64`/
 import cp
 import json
 import socket
+import socketserver
 import time
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import http.server
+from http.server import SimpleHTTPRequestHandler
 from threading import Thread
 
 PORT = 8000
+
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def server_bind(self):
+        # Skip socket.getfqdn() — on routers whose hostname is not IDNA-safe
+        # the default server_bind() raises UnicodeError and the server never
+        # starts. No SDK web app needs the FQDN; clients connect by IP.
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.socket.getsockname()[:2]
+        self.server_name = host
+        self.server_port = port
 
 class MyHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -864,7 +897,7 @@ class MyHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
 cp.log('Starting web server...')
-server = HTTPServer(('', PORT), MyHandler)
+server = ThreadingHTTPServer(('', PORT), MyHandler)
 server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 Thread(target=server.serve_forever, daemon=True).start()
 cp.log(f'Web server started on port {PORT}')
@@ -876,6 +909,7 @@ while True:
 ### Web Development Rules
 
 - **Port 8000** is the default
+- **Always override `server_bind`** to skip `socket.getfqdn()` — the default `HTTPServer.server_bind()` crashes with `UnicodeError: ... 'idna' codec failed` on routers whose hostname is not IDNA-conformant, and the server never starts
 - **Always set SO_REUSEADDR** before binding
 - **Run in a daemon thread** so the main thread handles app logic
 - **Serve all assets locally** — no external CDNs
@@ -892,8 +926,11 @@ web_app_template/
 ├── package.ini
 ├── start.sh
 ├── cp.py
+├── ncm.py                   # NCM REST helper (optional, available to web apps)
 ├── web_app_template.py      # HTTP server
 ├── your_web_app.html        # Starting HTML (copy as index.html)
+├── index.html
+├── readme.md
 └── static/
     ├── css/style.css        # Complete design system
     ├── js/script.js         # Navigation, dark mode, search
@@ -1432,9 +1469,12 @@ cp.post('config/container/projects', json.dumps(project))
 Applications can run on your development machine. The `cp.py` module auto-detects the environment:
 
 ```bash
-# Run locally — talks to router over REST
-.venv/bin/python apps/my_app/my_app.py
+# Run locally — talks to router over REST. Run from apps/, NOT from inside the app folder.
+cd apps
+../.venv/bin/python my_app/my_app.py
 ```
+
+**Run from `apps/`.** `cp.py` only looks for `sdk_settings.ini` in the current directory and its parent. Running from inside the app folder (`apps/my_app/`) finds nothing, and every call fails with `Invalid URL 'https:///api/...': No host supplied` while `wait_for_wan_connection()` spins until it times out.
 
 ### What Works Locally
 
@@ -1454,6 +1494,8 @@ Applications can run on your development machine. The `cp.py` module auto-detect
 | `cp.decrypt()` | Returns None |
 | Web servers (`http.server`) | Binds to YOUR machine, not router |
 | Serial/GPIO | Accesses your computer, not router |
+
+> **`cp.put()` returns a different envelope locally than on-router.** On-router it returns `{'status': 'ok'|'error'|'timeout', ...}`; local REST returns `{'success': True|False, ...}`. Code that only checks `success` will silently treat every on-router failure as a success. Check both keys.
 
 ### Development Workflow
 
@@ -1621,11 +1663,23 @@ publish_loop(client)
 import cp
 import json
 import socket
+import socketserver
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import http.server
+from http.server import BaseHTTPRequestHandler
 from threading import Thread
 
 PORT = 8000
+
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)  # skips socket.getfqdn()
+        host, port = self.socket.getsockname()[:2]
+        self.server_name = host
+        self.server_port = port
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -1653,7 +1707,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         pass  # Suppress request logging
 
 cp.log('Starting dashboard...')
-server = HTTPServer(('', PORT), DashboardHandler)
+server = ThreadingHTTPServer(('', PORT), DashboardHandler)
 server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 Thread(target=server.serve_forever, daemon=True).start()
 cp.log(f'Dashboard running on port {PORT}')
