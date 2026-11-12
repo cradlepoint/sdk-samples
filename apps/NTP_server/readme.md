@@ -11,7 +11,7 @@ NTP to learn the real time. This app is that time source when the only thing ava
 ## Features
 
 - Stratum-1 NTP server sourced from GPS, answering on **UDP port 1123**.
-- Web dashboard at **http://router_ip:8000** showing full sync status and the router's current
+- Web dashboard at **http://router_ip:8123** showing full sync status and the router's current
   clock. A **Local / UTC switch** at the top (defaults to Local) sets the timezone for every
   timestamp on the page, so you never have to reconcile mixed zones. "Local" is the router's own
   configured timezone.
@@ -28,7 +28,7 @@ NTP to learn the real time. This app is that time source when the only thing ava
 3. Point the router's NTP client at the app: NTP server `127.0.0.1`, port `1123`
    (Administration > System > Time, or `config/system/ntp`). The router's clock is then
    disciplined to GPS.
-4. Open **http://router_ip:8000** to watch status and, if needed, set the clock manually.
+4. Open **http://router_ip:8123** to watch status and, if needed, set the clock manually.
 
 ### Setting the clock from the web UI
 
@@ -87,7 +87,7 @@ All fields are optional. Defaults are applied in code.
 | `ntp_gps_port` | No | `1123` | UDP port the NTP server listens on |
 | `ntp_gps_holdover` | No | `300` | Seconds to keep serving time after GPS samples stop |
 
-The web UI picks port `8000`; if that is in use it tries `8010`, `8020`, ... up to `8100`. The
+The web UI picks port `8123`; if that is in use it tries `8133`, `8143`, ... up to `8223`. The
 chosen port is logged at startup.
 
 ## How it works

@@ -35,7 +35,7 @@ status/ntp_gps is published from the very first second, including while still wa
 
 Web UI
 ------
-A small web dashboard (default port 8000) shows all of the status, and lets a user set the
+A small web dashboard (port 8123, fixed) shows all of the status, and lets a user set the
 router's clock either from their browser's current time or from a manually picked date/time,
 using control/system/clock/set_time. Handy for a router that has no time source at all yet.
 """
@@ -64,9 +64,7 @@ DEFAULT_PORT = 1123
 DEFAULT_HOLDOVER = 300        # seconds to keep serving after the last GPS sample
 STATUS_TREE_LATENCY = 0.8     # GPS second -> status/gps/nmea publish delay, added to each sample
 
-WEB_PORT_BASE = 8000          # web UI port; if busy, step by WEB_PORT_STEP up to WEB_PORT_MAX
-WEB_PORT_STEP = 10
-WEB_PORT_MAX = 8100
+WEB_PORT = 8123               # web UI port; fixed, never steps to another port if busy
 
 TIME_SENTENCES = ('RMC', 'ZDA', 'GGA', 'GLL')
 MAX_DATE_SKEW = 5.0           # seconds a time-of-day sentence may differ from the RMC/ZDA time
@@ -622,21 +620,15 @@ def make_web_handler(state: AppState):
 
 
 def start_web_server(state: AppState) -> None:
-    """Bind the web UI, stepping the port if the preferred one is in use."""
+    """Bind the web UI on the fixed port; do not fall back to another port if it is in use."""
     handler = make_web_handler(state)
-    port = WEB_PORT_BASE
-    httpd = None
-    while running and httpd is None and port <= WEB_PORT_MAX:
-        try:
-            httpd = ThreadingHTTPServer(('0.0.0.0', port), handler)
-        except OSError as e:
-            cp.log(f'Web port {port} unavailable ({e}), trying {port + WEB_PORT_STEP}')
-            port += WEB_PORT_STEP
-    if httpd is None:
-        cp.log(f'Could not bind a web port in {WEB_PORT_BASE}-{WEB_PORT_MAX}, web UI disabled')
+    try:
+        httpd = ThreadingHTTPServer(('0.0.0.0', WEB_PORT), handler)
+    except OSError as e:
+        cp.log(f'Web port {WEB_PORT} unavailable ({e}), web UI disabled')
         return
-    state.web_port = port
-    cp.log(f'Web UI started on http://<router_ip>:{port}')
+    state.web_port = WEB_PORT
+    cp.log(f'Web UI started on http://<router_ip>:{WEB_PORT}')
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 
