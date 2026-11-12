@@ -1620,6 +1620,9 @@ class WebAppTemplate {
 
     renderMarkdown(md) {
         if (!md) return '';
+        // Drop raw <img> tags (readme screenshots point at GitHub asset URLs that
+        // don't resolve from the router UI). They stay in the readme file itself.
+        md = md.replace(/<img\b[^>]*>/gi, '');
         // Escape HTML entities first
         var html = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
