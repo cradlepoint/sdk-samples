@@ -16,6 +16,444 @@ These are compiled from the sample apps in this repository and can be installed 
 
 ---
 
+## Development Environment Setup
+
+### Quick setup
+
+```bash
+git clone https://github.com/cradlepoint/sdk-samples.git
+cd sdk-samples
+```
+
+**Windows:**
+
+```cmd
+python setup_env.py
+```
+
+**macOS / Linux:**
+
+```bash
+python3 setup_env.py
+```
+
+---
+
+### Detailed Setup Instructions
+
+There are three ways to set it up. Use the flowchart to find the one that fits, then open the
+matching section below for step-by-step instructions. **Every option gets you to the same
+place:** Kiro (or other IDE) open on this repo, a working `.venv`, and your dev router configured.
+
+> New to all this? **Option B is recommended.** It is barely more work than a plain download
+> and it lets you pull updates later with one click.
+
+### Which option is right for me?
+
+```mermaid
+flowchart TD
+    Start([I want to build router apps with Kiro or other IDE]) --> Q1{Do I want to get
+    repo updates later?}
+
+    Q1 -->|"No, just try it out"| A[["📦 Option A — Download ZIP
+    Simplest. No Git, no account.
+    Updating means re-downloading."]]
+
+    Q1 -->|"Yes, pull updates easily"| Q2{Do I have — or want —
+    a GitHub account?}
+
+    Q2 -->|"No account needed"| B[["⬇️ Option B — Install Git and clone
+    ⭐ RECOMMENDED
+    Pull updates with one click. No account required."]]
+
+    Q2 -->|"Yes, I want to contribute apps back"| C[["🍴 Option C — Fork and clone your fork
+    Standard contributor workflow.
+    Submit your apps as pull requests."]]
+
+    style A fill:#fff3cd,stroke:#d39e00,color:#000
+    style B fill:#d4edda,stroke:#155724,color:#000
+    style C fill:#d1ecf1,stroke:#0c5460,color:#000
+```
+
+**At a glance:**
+
+| | Option A — ZIP | Option B — Clone ⭐ | Option C — Fork + clone |
+|---|---|---|---|
+| Need Git installed | No | Yes | Yes |
+| Need a GitHub account | No | No (needed only to contribute) | Yes |
+| Pull updates later | Re-download | One click in Kiro | One click in Kiro |
+| Contribute apps back | No | Yes — needs a GitHub account (`make.py contribute` makes a fork for you) | Yes |
+| Best for | A quick look | **Most users** | Regular contributors |
+
+Pick an option below and follow its steps.
+
+---
+
+### Option A — Download the ZIP
+
+<details>
+<summary><b>📦 Simplest. No Git and no GitHub account. Click to expand.</b></summary>
+
+Best if you just want to try the apps and don't mind manual updates.
+
+#### 1. Install Python
+
+**Windows:** Download Python 3 from [python.org/downloads](https://www.python.org/downloads/).
+Run the installer and **check "Add python.exe to PATH"** on the first screen, then click
+**Install Now**. Open a **new** terminal and verify with `python --version`.
+
+<details>
+<summary>🪟 Windows: detailed Python setup &amp; PATH troubleshooting (click if <code>python</code> isn't found)</summary>
+
+> **Why can I double-click .py files but `python` doesn't work in the terminal?**
+> This usually means Python was installed from the Microsoft Store, which registers file
+> associations but doesn't always add Python to your system PATH. Follow the steps below to fix it.
+
+1. **Uninstall existing Python (recommended).** Open **Settings → Apps → Installed apps**, search
+   for **Python**, and uninstall any entries (including any **Python Launcher**).
+2. **Download.** Go to [python.org/downloads](https://www.python.org/downloads/) and click the
+   large **Download Python 3.x.x** button.
+3. **Install.** Right-click the installer and **Run as administrator**. On the very first screen
+   check **both** boxes: **"Use admin privileges when installing py.exe"** and
+   **"Add python.exe to PATH"** (this is the critical step). Click **Install Now**, and if you see
+   a **Disable path length limit** option at the end, click it.
+4. **Verify.** Close and reopen your terminal (PATH changes don't apply to open windows), then run
+   `python --version` and `pip --version`.
+5. **If `python` still isn't found:** open **Settings → Environment Variables → Edit the system
+   environment variables → Environment Variables**, select **Path** under **System variables**,
+   and confirm these two entries exist (version may differ):
+   - `C:\Users\<YourUsername>\AppData\Local\Programs\Python\Python3xx\`
+   - `C:\Users\<YourUsername>\AppData\Local\Programs\Python\Python3xx\Scripts\`
+6. **If `python` opens the Microsoft Store:** open **Settings → Apps → Advanced app settings →
+   App execution aliases** and turn **OFF** both **App Installer - python.exe** and
+   **App Installer - python3.exe**.
+7. **If `pip` is not recognized:** run `python -m ensurepip --upgrade`.
+
+</details>
+
+**macOS:** Install with [Homebrew](https://brew.sh/) (`brew install python3`) or download from
+[python.org/downloads](https://www.python.org/downloads/). Verify with `python3 --version`.
+
+#### 2. Download and unzip the repo
+
+- Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples).
+- Click **Code ▸ Download ZIP**.
+- Unzip it somewhere easy to find, e.g. `C:\sdk-samples` or `~/sdk-samples`.
+
+#### 3. Run setup from the terminal
+
+Open a terminal in the unzipped folder and run:
+
+**Windows**
+
+```powershell
+python setup_env.py
+```
+
+**macOS / Linux**
+
+```bash
+python3 setup_env.py
+```
+
+This creates the `.venv` virtual environment, installs the Python dependencies, points the
+editor's interpreter at `.venv`, and then asks for your dev router's **IP, username, and
+password** (reply `skip` to do that later). It finishes by checking the router connection and
+Developer Mode. Re-run anytime with `python setup_env.py --configure` to change router settings.
+
+#### 4. Install Kiro (or other IDE) and sign in
+
+1. Download Kiro from [kiro.dev](https://kiro.dev/) and run the installer.
+2. When Kiro asks you to sign in, choose one of:
+   - **Ericsson employees — organization identity.** Click **"Sign in with your organization
+     identity"**. On the next page, **do not enter your email address** — click the link below
+     that reads **"Sign in via IAM Identity Center instead"**, then enter the **Start URL** and
+     **Region** your IT department gave you.
+   - **Everyone else — social login.** Sign in with a Google account to try Kiro for free
+     (50 credits over 30 days).
+3. To switch accounts later, click the account icon at the bottom of the left sidebar, sign out,
+   and sign back in.
+
+Then, in Kiro (or other IDE), choose **Open a Project** (or **File ▸ Open Folder**), select the
+unzipped folder, and click **"Yes, I trust the authors"** when prompted.
+
+#### Getting updates later
+
+There is no one-click update on a ZIP download. To update:
+
+1. Move your own app folders (under `apps/`) somewhere safe.
+2. Download and unzip the latest ZIP.
+3. Copy your app folders back in.
+
+If you would rather update with one click, use **Option B** instead.
+
+</details>
+
+---
+
+### Option B — Install Git and clone ⭐ Recommended
+
+<details>
+<summary><b>⬇️ Pull updates with one click. No GitHub account needed. Click to expand.</b></summary>
+
+Best for most users. One extra tool (Git) gives you painless updates, and you can still
+contribute apps back later without setting up a fork by hand.
+
+#### 1. Install Python
+
+**Windows:** Download Python 3 from [python.org/downloads](https://www.python.org/downloads/).
+Run the installer and **check "Add python.exe to PATH"** on the first screen, then click
+**Install Now**. Open a **new** terminal and verify with `python --version`.
+
+<details>
+<summary>🪟 Windows: detailed Python setup &amp; PATH troubleshooting (click if <code>python</code> isn't found)</summary>
+
+> **Why can I double-click .py files but `python` doesn't work in the terminal?**
+> This usually means Python was installed from the Microsoft Store, which registers file
+> associations but doesn't always add Python to your system PATH. Follow the steps below to fix it.
+
+1. **Uninstall existing Python (recommended).** Open **Settings → Apps → Installed apps**, search
+   for **Python**, and uninstall any entries (including any **Python Launcher**).
+2. **Download.** Go to [python.org/downloads](https://www.python.org/downloads/) and click the
+   large **Download Python 3.x.x** button.
+3. **Install.** Right-click the installer and **Run as administrator**. On the very first screen
+   check **both** boxes: **"Use admin privileges when installing py.exe"** and
+   **"Add python.exe to PATH"** (this is the critical step). Click **Install Now**, and if you see
+   a **Disable path length limit** option at the end, click it.
+4. **Verify.** Close and reopen your terminal (PATH changes don't apply to open windows), then run
+   `python --version` and `pip --version`.
+5. **If `python` still isn't found:** open **Settings → Environment Variables → Edit the system
+   environment variables → Environment Variables**, select **Path** under **System variables**,
+   and confirm these two entries exist (version may differ):
+   - `C:\Users\<YourUsername>\AppData\Local\Programs\Python\Python3xx\`
+   - `C:\Users\<YourUsername>\AppData\Local\Programs\Python\Python3xx\Scripts\`
+6. **If `python` opens the Microsoft Store:** open **Settings → Apps → Advanced app settings →
+   App execution aliases** and turn **OFF** both **App Installer - python.exe** and
+   **App Installer - python3.exe**.
+7. **If `pip` is not recognized:** run `python -m ensurepip --upgrade`.
+
+</details>
+
+**macOS:** Install with [Homebrew](https://brew.sh/) (`brew install python3`) or download from
+[python.org/downloads](https://www.python.org/downloads/). Verify with `python3 --version`.
+
+#### 2. Install Git
+
+- **Windows:** Download **Git for Windows** from
+  [git-scm.com/download/win](https://git-scm.com/download/win) and install it (the default
+  options are fine).
+- **macOS:** install with Homebrew, or run `git --version` once and accept the prompt to install
+  Apple's command line tools:
+
+  ```bash
+  brew install git
+  ```
+
+#### 3. Clone the repo and run setup
+
+Open a terminal and run these in order. The clone needs no GitHub sign-in — this repo is public.
+
+**Windows**
+
+```powershell
+git clone https://github.com/cradlepoint/sdk-samples.git
+cd sdk-samples
+python setup_env.py
+```
+
+**macOS / Linux**
+
+```bash
+git clone https://github.com/cradlepoint/sdk-samples.git
+cd sdk-samples
+python3 setup_env.py
+```
+
+`setup_env.py` creates `.venv`, installs dependencies, points the editor's interpreter at
+`.venv`, then asks for your dev router's **IP, username, and password** (reply `skip` to do it
+later) and checks the connection and Developer Mode.
+
+#### 4. Install Kiro (or other IDE) and sign in
+
+1. Download Kiro from [kiro.dev](https://kiro.dev/) and run the installer.
+2. When Kiro asks you to sign in, choose one of:
+   - **Ericsson employees — organization identity.** Click **"Sign in with your organization
+     identity"**. On the next page, **do not enter your email address** — click the link below
+     that reads **"Sign in via IAM Identity Center instead"**, then enter the **Start URL** and
+     **Region** your IT department gave you.
+   - **Everyone else — social login.** Sign in with a Google account to try Kiro for free
+     (50 credits over 30 days).
+3. To switch accounts later, click the account icon at the bottom of the left sidebar, sign out,
+   and sign back in.
+
+Then, in Kiro (or other IDE), choose **Open a Project** (or **File ▸ Open Folder**), select the
+`sdk-samples` folder you just cloned, and click **"Yes, I trust the authors"** when prompted.
+
+#### Getting updates later
+
+In Kiro, click the **Synchronize Changes** button (the circular-arrows icon) in the bottom-left
+status bar. That pulls the latest changes into your clone. (From a terminal, the equivalent is
+`git pull`.)
+
+#### Contributing apps back (optional)
+
+**You will need a GitHub account to contribute** — the free one from
+[github.com/signup](https://github.com/signup) is fine. You do **not** need to fork first.
+Once you have an app you want to share, run:
+
+**Windows**
+
+```powershell
+.venv\Scripts\python make.py contribute my_app
+```
+
+**macOS / Linux**
+
+```bash
+.venv/bin/python3 make.py contribute my_app
+```
+
+`make.py contribute` creates your fork automatically, pushes your app, and opens a pull request.
+It installs the GitHub CLI for you on first run and signs you in with `gh auth login`.
+
+</details>
+
+---
+
+### Option C — Fork and clone your fork
+
+<details>
+<summary><b>🍴 The standard contributor workflow. Needs a GitHub account. Click to expand.</b></summary>
+
+Best if you plan to contribute apps regularly and want your own copy of the repo on GitHub.
+
+#### 1. Create a GitHub account
+
+If you don't already have one, sign up free at
+[github.com/signup](https://github.com/signup).
+
+#### 2. Install Python and Git
+
+**Python — Windows:** Download Python 3 from
+[python.org/downloads](https://www.python.org/downloads/). Run the installer and
+**check "Add python.exe to PATH"** on the first screen, then click **Install Now**. Open a
+**new** terminal and verify with `python --version`.
+
+<details>
+<summary>🪟 Windows: detailed Python setup &amp; PATH troubleshooting (click if <code>python</code> isn't found)</summary>
+
+> **Why can I double-click .py files but `python` doesn't work in the terminal?**
+> This usually means Python was installed from the Microsoft Store, which registers file
+> associations but doesn't always add Python to your system PATH. Follow the steps below to fix it.
+
+1. **Uninstall existing Python (recommended).** Open **Settings → Apps → Installed apps**, search
+   for **Python**, and uninstall any entries (including any **Python Launcher**).
+2. **Download.** Go to [python.org/downloads](https://www.python.org/downloads/) and click the
+   large **Download Python 3.x.x** button.
+3. **Install.** Right-click the installer and **Run as administrator**. On the very first screen
+   check **both** boxes: **"Use admin privileges when installing py.exe"** and
+   **"Add python.exe to PATH"** (this is the critical step). Click **Install Now**, and if you see
+   a **Disable path length limit** option at the end, click it.
+4. **Verify.** Close and reopen your terminal (PATH changes don't apply to open windows), then run
+   `python --version` and `pip --version`.
+5. **If `python` still isn't found:** open **Settings → Environment Variables → Edit the system
+   environment variables → Environment Variables**, select **Path** under **System variables**,
+   and confirm these two entries exist (version may differ):
+   - `C:\Users\<YourUsername>\AppData\Local\Programs\Python\Python3xx\`
+   - `C:\Users\<YourUsername>\AppData\Local\Programs\Python\Python3xx\Scripts\`
+6. **If `python` opens the Microsoft Store:** open **Settings → Apps → Advanced app settings →
+   App execution aliases** and turn **OFF** both **App Installer - python.exe** and
+   **App Installer - python3.exe**.
+7. **If `pip` is not recognized:** run `python -m ensurepip --upgrade`.
+
+</details>
+
+**Python — macOS:** Install with [Homebrew](https://brew.sh/) (`brew install python3`) or download
+from [python.org/downloads](https://www.python.org/downloads/). Verify with `python3 --version`.
+
+**Git:** [git-scm.com/download/win](https://git-scm.com/download/win) on Windows (default options
+are fine), or `brew install git` on macOS.
+
+#### 3. Fork the repo
+
+- Go to [github.com/cradlepoint/sdk-samples](https://github.com/cradlepoint/sdk-samples).
+- Click **Fork** (top right) and create the fork under your account.
+
+#### 4. Clone your fork and run setup
+
+Replace `YOUR-USERNAME` with your GitHub username.
+
+**Windows**
+
+```powershell
+git clone https://github.com/YOUR-USERNAME/sdk-samples.git
+cd sdk-samples
+python setup_env.py
+```
+
+**macOS / Linux**
+
+```bash
+git clone https://github.com/YOUR-USERNAME/sdk-samples.git
+cd sdk-samples
+python3 setup_env.py
+```
+
+`setup_env.py` creates `.venv`, installs dependencies, points the editor's interpreter at
+`.venv`, then asks for your dev router details and checks the connection and Developer Mode.
+
+#### 5. Install Kiro (or other IDE) and sign in
+
+1. Download Kiro from [kiro.dev](https://kiro.dev/) and run the installer.
+2. When Kiro asks you to sign in, choose one of:
+   - **Ericsson employees — organization identity.** Click **"Sign in with your organization
+     identity"**. On the next page, **do not enter your email address** — click the link below
+     that reads **"Sign in via IAM Identity Center instead"**, then enter the **Start URL** and
+     **Region** your IT department gave you.
+   - **Everyone else — social login.** Sign in with a Google account to try Kiro for free
+     (50 credits over 30 days).
+3. To switch accounts later, click the account icon at the bottom of the left sidebar, sign out,
+   and sign back in.
+
+Then, in Kiro (or other IDE), choose **Open a Project** (or **File ▸ Open Folder**), select the
+cloned folder, and click **"Yes, I trust the authors"** when prompted.
+
+#### Getting updates later
+
+In Kiro, click the **Synchronize Changes** button (the circular-arrows icon) in the bottom-left
+status bar to pull from your fork. To also pull the latest changes from the original repo, add it
+as a remote once in a terminal:
+
+```bash
+git remote add upstream https://github.com/cradlepoint/sdk-samples.git
+git pull upstream master
+```
+
+#### Contributing apps back
+
+With a fork and a GitHub account you can submit pull requests the standard way, or let
+`make.py contribute my_app` handle the branch, push, and PR for you.
+
+</details>
+
+---
+
+### After setup — a quick check
+
+Whichever option you chose, you are ready when:
+
+- `setup_env.py` finished without errors and created `.venv`.
+- Kiro (or other IDE) is open on the `sdk-samples` folder and you have signed in.
+- Your dev router is configured in `sdk_settings.ini` (or you chose to `skip` for now).
+- **Developer Mode is enabled** for your router in NetCloud Manager under
+  **Tools ▸ Developer Mode Devices**. This cannot be enabled from the router's own UI, and
+  deploys are rejected without it.
+
+Then open the Kiro (or other IDE) chat panel and describe what you want to build — for example,
+*"Build a web app that shows WAN status and signal strength for all modems."*
+
+---
+
 ## Resources
 
 | Resource | Link |
@@ -46,108 +484,7 @@ Apps are categorized using the `tags` field in their `package.ini` (e.g., `tags 
 
 ---
 
-## Development Environment Setup
-
-**Prerequisites**
-
-- Python 3.9 or higher — Windows users, see the [Windows Python Setup Guide](docs/WINDOWS_PYTHON_SETUP.md)
-- Git (optional, for cloning the repository)
-- A router with **Developer Mode** enabled in NetCloud Manager (Tools > Developer Mode Devices)
-
-### 1. Clone the repo
-
-Clone this repo directly — no fork needed. `git pull` then always brings you the latest
-samples, with no fork to keep in sync first. If you later decide to contribute an app back,
-you create the fork at that point: see
-[Contributing back upstream](#contributing-back-upstream-optional).
-
-1. **Have Git installed?** In Kiro, open the Command Palette and select **Git: Clone**, then
-   paste this repo's URL:
-
-   ```
-   https://github.com/cradlepoint/sdk-samples.git
-   ```
-
-   Kiro clones the repo and opens it for you.
-
-   **No Git?** Download a ZIP instead:
-
-   1. On this repo's GitHub page, click the green **Code** button, then **Download ZIP**
-   2. Extract the ZIP to a folder on your computer
-   3. In Kiro, use **File > Open Folder** (or the Command Palette's **File: Open Folder**) and
-      select the extracted `sdk-samples` folder
-
-Once the repo is open in Kiro, open the chat panel — that's it. Kiro builds the `.venv`
-environment and installs dependencies automatically the first time a session starts, then
-asks in chat for your router details. Nothing to click. Then just describe the app you want —
-see [docs/SETUP.md](docs/SETUP.md).
-
-#### Manual setup (terminal)
-
-If you'd rather set things up from a terminal instead of letting Kiro do it:
-
-```bash
-git clone https://github.com/cradlepoint/sdk-samples.git
-cd sdk-samples
-```
-
-**macOS / Linux:**
-
-```bash
-python3 setup_env.py
-```
-
-**Windows:**
-
-```cmd
-python setup_env.py
-```
-
-`setup_env.py` does the whole setup:
-
-- creates the `.venv` virtual environment
-- installs everything in `requirements.txt`
-- prompts for your dev-mode router IP, username, and password and writes them to
-  `sdk_settings.ini` (press Enter or type `skip` to leave it for later)
-- confirms the router is reachable and Developer Mode is on
-- points the IDE's Python interpreter at `.venv`
-
-Useful flags:
-
-| Flag | Effect |
-|------|--------|
-| `--configure` | Only update the router settings |
-| `--skip-router` | Only build the venv and install dependencies |
-| `-y` | Never prompt (CI, hooks) |
-| `--quiet` | Print only problems and changes |
-| `--hook` | Session-start mode used by Kiro: fixes the environment, prints one status line, always exits 0 |
-| `--router-ip / --router-username / --router-password` | Set settings without prompting |
-
-### 2. Router connection settings
-
-`setup_env.py` writes these for you. To edit them by hand, open `sdk_settings.ini`:
-
-```ini
-[sdk]
-app_name=hello_world
-dev_client_ip=192.168.0.1
-dev_client_username=admin
-dev_client_password=your_password
-```
-
-`sdk_settings.ini` holds credentials, so it is **git-ignored and never committed**.
-You do not need to create it: `setup_env.py` and `make.py` both generate it from
-[sdk_settings.ini.example](sdk_settings.ini.example) the first time they run.
-
-If you cloned this repo before the file was git-ignored, untrack your local copy once:
-
-```bash
-git rm --cached sdk_settings.ini
-```
-
----
-
-## Quick Start — make.py
+## Usage — make.py
 
 ```bash
 # Create a new app (created in apps/, path printed when done)
@@ -179,73 +516,6 @@ python3 make.py status my_app
 
 ---
 
-## Contributing back upstream (optional)
+## Usage Agreement
 
-Built something worth sharing? You fork only when you reach this point, and you add the fork
-as a *second* remote so `origin` keeps pointing at this repo. That way `git pull` still works
-exactly as before.
-
-One command does all of it:
-
-```bash
-# macOS / Linux
-.venv/bin/python3 make.py contribute my_app
-
-# Windows
-.venv\Scripts\python make.py contribute my_app
-```
-
-It walks through the whole flow and stops for confirmation before anything is committed:
-
-1. Checks your app the way CI does — it needs a `readme.md`, and its `package.ini` needs a
-   `[section]` header matching the folder name.
-2. Creates a branch from the current upstream `master`.
-3. Shows exactly which files it is about to commit and asks you to confirm. Only your app's
-   folder is staged. Build artifacts, `METADATA/`, and `sdk_settings.ini` are git-ignored and
-   never included.
-4. Asks for a commit message, then commits.
-5. Creates your fork if you don't have one, adds it as a remote named `fork`, and pushes the
-   branch there. `origin` is left pointing at this repo, so `git pull` keeps working.
-6. Asks for a pull request title and description, then opens the PR.
-
-Nothing touches your GitHub account until after you've approved the commit. If you stop
-partway, your work is committed on the branch and the command tells you how to finish by hand.
-
-**First run only:** contributing needs the [GitHub CLI](https://cli.github.com) to create the
-fork, authenticate the push, and open the PR. If you don't have it, `contribute` offers to
-download it into `.gh/` — about 10 MB, no admin rights needed, and it stays inside the repo
-folder. You then sign in to GitHub once with a one-time code in your browser. Later runs skip
-both steps. Decline the download and `contribute` falls back to doing the fork and PR through
-your browser instead.
-
-### Doing it by hand
-
-If you'd rather run the git commands yourself:
-
-```bash
-# 1. Fork on github.com, then add it as a second remote
-git remote add fork https://github.com/YOUR-USERNAME/sdk-samples.git
-
-# 2. Branch, commit just your app, and push to your fork
-git fetch origin
-git checkout -b add-your_app origin/master
-git add apps/your_app
-git commit -m "Add your_app"
-git push -u fork add-your_app
-```
-
-Then open the pull request from the link in the `git push` output. Check the two CI
-requirements above before you submit.
-
-This whole section is optional — your clone works completely on its own for building and
-deploying apps to your router.
-
----
-
-## License Agreement
-
-This Software Development Kit License Agreement (this "**Agreement**") is entered into by and between Ericsson Enterprise Wireless Solutions, Inc. ("**Company**"), and the individual or entity that downloads, installs, or uses the SDK ("**You**" or "**Licensee**"). By downloading, installing, accessing, or using the SDK, You agree to be bound by this Agreement. If You are accepting on behalf of an entity, You represent that You have authority to bind that entity.
-
-**License**. Company grants You a limited, non-exclusive, non-transferable, non-sublicensable, revocable license during the term to: (a) install and use the SDK internally to develop, test, and support applications that interoperate with the Service ("Applications"); and (b) distribute the SDK's redistributable runtime components, if any and only as expressly designated as redistributable in the documentation, solely as incorporated into and as necessary to run Your Applications. You will not, and will not permit any third party to: (a) reverse engineer, decompile, or disassemble the SDK, except to the extent this restriction is prohibited by applicable law; (b) modify, translate, or create derivative works of the SDK, except as expressly permitted for redistributable components; (c) rent, lease, sell, sublicense, or distribute the SDK except as expressly permitted; (d) use the SDK to build a product or service that competes with the Service or the SDK; (e) remove or alter any proprietary notices; or (f) use the SDK other than to develop and support Applications that interoperate with the Company’s services.  
-
-**Limitations**. Company has no obligation under this Agreement to provide support, maintenance, updates, or upgrades for the SDK. Company may modify, deprecate, or discontinue the SDK or any feature at any time. THE SDK IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, COMPANY DISCLAIMS ALL WARRANTIES, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT, AND ANY WARRANTY ARISING FROM COURSE OF DEALING OR USAGE OF TRADE. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, COMPANY WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, OR FOR LOST PROFITS, REVENUE, DATA, OR GOODWILL, ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE SDK, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. COMPANY'S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT WILL NOT EXCEED USD $100. This Agreement is effective until terminated. Company may terminate this Agreement immediately if You breach it. You may terminate at any time by ceasing all use of the SDK and destroying all copies. Upon termination, the licenses herein end and You will cease using and destroy all copies of the SDK.
+Ericsson Enterprise Wireless Solutions, Inc. has no obligation under this Agreement to provide support, maintenance, updates, or upgrades for the SDK. Company may modify, deprecate, or discontinue the SDK or any feature at any time. THE SDK IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY KIND. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, COMPANY DISCLAIMS ALL WARRANTIES, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT, AND ANY WARRANTY ARISING FROM COURSE OF DEALING OR USAGE OF TRADE. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, COMPANY WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, OR FOR LOST PROFITS, REVENUE, DATA, OR GOODWILL, ARISING OUT OF OR RELATED TO THIS AGREEMENT OR THE SDK, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. COMPANY'S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT WILL NOT EXCEED USD $100. 
