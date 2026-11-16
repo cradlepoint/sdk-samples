@@ -118,6 +118,118 @@
         return Math.max(2, Math.min(100, pct));
     }
 
+    // Signal-quality bands per metric family, from the carrier signal
+    // quality reference (dBm/dB, higher is better). Each band is the
+    // UPPER bound of a poor→excellent run; the span is sized to
+    // METRIC_RANGE so the colored segments fill the whole meter. 5G
+    // variants share their LTE counterpart's bands. These are only for
+    // the visual meter - pass/fail always uses the configured threshold.
+    var METRIC_BANDS = {
+        DBM:     [{ to: -85, cls: 'poor' }, { to: -75, cls: 'fair' }, { to: -65, cls: 'good' }, { to: Infinity, cls: 'excellent' }],
+        RSRP:    [{ to: -111, cls: 'poor' }, { to: -103, cls: 'fair' }, { to: -85, cls: 'good' }, { to: Infinity, cls: 'excellent' }],
+        RSRQ:    [{ to: -12, cls: 'poor' }, { to: -9, cls: 'fair' }, { to: -5, cls: 'good' }, { to: Infinity, cls: 'excellent' }],
+        SINR:    [{ to: 7, cls: 'poor' }, { to: 10, cls: 'fair' }, { to: 12.5, cls: 'good' }, { to: Infinity, cls: 'excellent' }]
+    };
+    METRIC_BANDS.RSRP_5G = METRIC_BANDS.RSRP;
+    METRIC_BANDS.RSRQ_5G = METRIC_BANDS.RSRQ;
+    METRIC_BANDS.SINR_5G = METRIC_BANDS.SINR;
+
+    function metricBandClass(key, value) {
+        var bands = METRIC_BANDS[key];
+        if (!bands) { return ''; }
+        for (var i = 0; i < bands.length; i++) {
+            if (value <= bands[i].to) { return bands[i].cls; }
+        }
+        return 'excellent';
+    }
+
+    // Build the colored band segments once per metric (they don't change
+    // with the live value), sized by where each band's upper bound falls
+    // on the meter's METRIC_RANGE span.
+    var BAND_LABEL = { poor: 'Poor', fair: 'Fair', good: 'Good', excellent: 'Excellent' };
+
+    function metricBoundPct(key, bound) {
+        var range = METRIC_RANGE[key] || [-120, 0];
+        var lo = range[0], hi = range[1];
+        return Math.max(0, Math.min(100, ((bound - lo) / (hi - lo)) * 100));
+    }
+
+    // Colored band segments plus a quality label (Poor/Fair/Good/
+    // Excellent) centered on each one, so the meaning of each color is
+    // readable straight off the meter.
+    function metricBandSegments(key) {
+        var bands = METRIC_BANDS[key];
+        var range = METRIC_RANGE[key] || [-120, 0];
+        if (!bands) { return ''; }
+        var hi = range[1];
+        var prev = 0;
+        // Approximate % of the (min 14rem) meter body one character of
+        // the band label needs at its font size. Used to decide whether a
+        // band is wide enough for its whole word; a half-clipped word
+        // reads worse than none, and the boundary numbers below still
+        // convey the range either way.
+        var pctPerChar = 100 * (0.42 / 14);  // ~0.42rem per char / 14rem body
+        return bands.map(function (b) {
+            var bound = b.to === Infinity ? hi : b.to;
+            var pct = metricBoundPct(key, bound);
+            var width = Math.max(0, pct - prev);
+            prev = pct;
+            var label = BAND_LABEL[b.cls] || b.cls;
+            var fits = width >= label.length * pctPerChar;
+            var labelHtml = fits
+                ? '<span class="dwv-meter-band-label">' + esc(label) + '</span>'
+                : '';
+            return '<span class="dwv-meter-band ' + b.cls + '" style="width:' + width.toFixed(1) + '%">' +
+                labelHtml +
+            '</span>';
+        }).join('');
+    }
+
+    // Boundary numbers (the value where one band becomes the next) placed
+    // right under each color transition, so the ranges are legible
+    // without hovering. The outer edges (±Infinity) have no number.
+    function metricBoundTicks(key) {
+        var bands = METRIC_BANDS[key];
+        if (!bands) { return ''; }
+        var ticks = [];
+        for (var i = 0; i < bands.length - 1; i++) {
+            var bound = bands[i].to;
+            var pct = metricBoundPct(key, bound);
+            ticks.push('<span class="dwv-meter-tick" style="left:' + pct.toFixed(1) + '%">' +
+                esc(bound) + '</span>');
+        }
+        return ticks.join('');
+    }
+
+    // Inline color-coded signal meter with the quality bands and their
+    // boundary numbers labeled directly on it, a marker at the current
+    // value, and the number beside it. Used in the Signal Thresholds
+    // "Now" column. Falls back to the bare number for metrics with no
+    // bands.
+    function metricMeterHtml(key, value, unit) {
+        if (value === null || value === undefined || value === '') {
+            return '<span class="dwv-test-note">not reported</span>';
+        }
+        var num = Number(value);
+        if (!METRIC_BANDS[key] || isNaN(num)) {
+            return '<span class="dwv-meter-num">' + esc(value) +
+                (unit ? ' ' + esc(unit) : '') + '</span>';
+        }
+        var pct = metricPercent(key, num);
+        var cls = metricBandClass(key, num);
+        return '<span class="dwv-meter">' +
+            '<span class="dwv-meter-body">' +
+                '<span class="dwv-meter-track">' +
+                    metricBandSegments(key) +
+                    '<span class="dwv-meter-marker" style="left:' + pct.toFixed(1) + '%"></span>' +
+                '</span>' +
+                '<span class="dwv-meter-ticks">' + metricBoundTicks(key) + '</span>' +
+            '</span>' +
+            '<span class="dwv-meter-num ' + cls + '">' + esc(value) +
+                (unit ? ' ' + esc(unit) : '') + '</span>' +
+        '</span>';
+    }
+
     // ---------------------------------------------------------------
     // dashboard rendering
     // ---------------------------------------------------------------
@@ -582,28 +694,52 @@
     // config. That also means a threshold input left off-screen still
     // carries its stored value, instead of being blanked by a save.
 
+    function is5gMetric(m) { return /_5G$/.test(m.key); }
+
+    function thresholdMetricRow(slot, field, cfg, live, m) {
+        var present = live.hasOwnProperty(m.key);
+        var value = cfg.hasOwnProperty(m.key) ? cfg[m.key] : '';
+        return '<tr class="' + (present ? 'is-present' : '') + '">' +
+            '<td>' + esc(m.label) + ' <span class="dwv-test-note">' + esc(m.unit) + '</span></td>' +
+            '<td class="dwv-live-val" data-metric-cell="' + esc(m.key) + '">' +
+                (present ? metricMeterHtml(m.key, live[m.key].value, m.unit)
+                    : '<span class="dwv-test-note">not reported</span>') + '</td>' +
+            '<td><input type="number" step="any" class="form-input" ' +
+                'data-slot="' + esc(slot.key) + '" data-field="' + esc(field) + '" ' +
+                'data-metric="' + esc(m.key) + '" value="' + esc(value) + '" ' +
+                'placeholder="off"></td>' +
+            '</tr>';
+    }
+
+    function thresholdGroupHeader(title) {
+        return '<tr class="dwv-metric-group"><td colspan="3">' + esc(title) + '</td></tr>';
+    }
+
     function thresholdTable(slot, field, valueHeader) {
         var cfg = slot.config[field] || {};
         var live = {};
         slot.metrics.forEach(function (m) { live[m.key] = m; });
 
-        var rows = state.metrics.map(function (m) {
-            var present = live.hasOwnProperty(m.key);
-            var value = cfg.hasOwnProperty(m.key) ? cfg[m.key] : '';
-            return '<tr class="' + (present ? 'is-present' : '') + '">' +
-                '<td>' + esc(m.label) + ' <span class="dwv-test-note">' + esc(m.unit) + '</span></td>' +
-                '<td class="dwv-live-val">' + (present ? esc(live[m.key].value)
-                    : '<span class="dwv-test-note">not reported</span>') + '</td>' +
-                '<td><input type="number" step="any" class="form-input" ' +
-                    'data-slot="' + esc(slot.key) + '" data-field="' + esc(field) + '" ' +
-                    'data-metric="' + esc(m.key) + '" value="' + esc(value) + '" ' +
-                    'placeholder="off"></td>' +
-                '</tr>';
-        }).join('');
+        // Split into the LTE/3G family and the 5G family so the two are
+        // easy to tell apart. Each family gets its own labeled group; a
+        // family header is only drawn when that family has any metrics.
+        var lte = [], nr = [];
+        state.metrics.forEach(function (m) {
+            (is5gMetric(m) ? nr : lte).push(m);
+        });
+
+        var rowsFor = function (m) { return thresholdMetricRow(slot, field, cfg, live, m); };
+        var body = '';
+        if (lte.length) {
+            body += thresholdGroupHeader('LTE / 3G') + lte.map(rowsFor).join('');
+        }
+        if (nr.length) {
+            body += thresholdGroupHeader('5G') + nr.map(rowsFor).join('');
+        }
 
         return '<table class="dwv-threshold-table">' +
             '<thead><tr><th>Metric</th><th>Now</th><th>' + valueHeader + '</th></tr></thead>' +
-            '<tbody>' + rows + '</tbody>' +
+            '<tbody>' + body + '</tbody>' +
         '</table>';
     }
 
@@ -1158,6 +1294,10 @@
     }
 
     function refreshLiveThresholdValues(snap) {
+        // Unit per metric key, so the live meter can label its number the
+        // same way the initial render did.
+        var units = {};
+        state.metrics.forEach(function (m) { units[m.key] = m.unit; });
         // Update only the read-only "Now" column; never touch inputs.
         snap.slots.forEach(function (slot) {
             var live = {};
@@ -1174,7 +1314,7 @@
                 if (!liveCell) { return; }
                 var key = input.getAttribute('data-metric');
                 if (live.hasOwnProperty(key)) {
-                    liveCell.textContent = live[key];
+                    liveCell.innerHTML = metricMeterHtml(key, live[key], units[key]);
                     cell.classList.add('is-present');
                 } else {
                     liveCell.innerHTML = '<span class="dwv-test-note">not reported</span>';

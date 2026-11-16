@@ -594,8 +594,101 @@
    metric rows ~50px tall, which is 350px of table before anything else
    on the page. Tighter padding here only, inside the table. */
 .dwv-threshold-table input { width: 6.5rem; padding: 0.35rem 0.6rem; }
-.dwv-threshold-table .dwv-live-val { color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dwv-threshold-table .dwv-live-val { color: var(--text-secondary); font-variant-numeric: tabular-nums; width: 22rem; }
 .dwv-threshold-table tr.is-present td:first-child { font-weight: 650; }
+
+/* Family divider rows (LTE / 3G, 5G) so the two metric groups are easy
+   to tell apart. A tinted, uppercase band spanning the whole table. */
+.dwv-threshold-table tr.dwv-metric-group td {
+    padding: 0.4rem 0.5rem 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+    border-bottom: 1px solid var(--border-color);
+}
+/* No gap above the very first group header. */
+.dwv-threshold-table tbody tr.dwv-metric-group:first-child td { padding-top: 0.2rem; }
+
+/* Signal-quality meter in the "Now" column: a color-banded track
+   (poor→excellent, from the carrier signal reference) with the quality
+   label on each band, the boundary numbers under each color transition,
+   a marker at the live value, and the live number to the right. The
+   labels/ticks make the ranges readable without a tooltip. */
+.dwv-meter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.15rem 0;
+}
+/* Left column: the track and the boundary-number row stacked, so the
+   ticks line up under the color transitions above them. Fixed width
+   (not flex-grow) so the meter stays the same size on every row and the
+   bar does not resize when the live number's width changes each poll. */
+.dwv-meter-body { flex: 0 0 14rem; width: 14rem; display: flex; flex-direction: column; gap: 2px; }
+.dwv-meter-track {
+    position: relative;
+    height: 15px;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    border: 1px solid var(--border-color);
+}
+.dwv-meter-band {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.dwv-meter-band.poor { background: var(--danger-color); }
+.dwv-meter-band.fair { background: #f1c40f; }
+.dwv-meter-band.good { background: #7cb342; }
+.dwv-meter-band.excellent { background: var(--success-color); }
+/* The quality word printed inside its band. Dark text with a light halo
+   reads on every band color in both themes. Clipped by the band's
+   overflow when a band is too narrow for the word. */
+.dwv-meter-band-label {
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    white-space: nowrap;
+    color: rgba(0, 0, 0, 0.82);
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
+    padding: 0 1px;
+}
+.dwv-meter-marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 3px;
+    margin-left: -1.5px;
+    background: var(--text-primary, #1a1a1a);
+    border-radius: 1px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+/* Boundary numbers, centered on each color transition. */
+.dwv-meter-ticks { position: relative; height: 0.85rem; }
+.dwv-meter-tick {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 0.62rem;
+    line-height: 1;
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+/* Fixed width so a shorter reading (e.g. "8 dB" vs "-54 dBm") does not
+   let the meter body reclaim the space and resize the bar each poll. */
+.dwv-meter-num { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; flex: 0 0 5rem; width: 5rem; text-align: left; }
+.dwv-meter-num.poor { color: var(--danger-color); }
+.dwv-meter-num.fair { color: #c79b00; }
+.dwv-meter-num.good,
+.dwv-meter-num.excellent { color: var(--success-color); }
 
 .dwv-actions-bar {
     display: flex;
