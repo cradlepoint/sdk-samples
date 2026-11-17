@@ -3,28 +3,26 @@
 Web App Template Server
 Serves the web app template using Python's built-in HTTP server
 with API endpoints for help content and device info.
+
+The port is chosen by cp.start_web_server(): the appdata field
+"<app_name>_web_port" is used when set (NCM group/device SDK Data);
+otherwise the first free port from 8000 is used and saved there.
 """
 
 import http.server
-import socketserver
 import os
 import sys
 import json
+import time
+import configparser
 
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+import cp
 
-try:
-    import cp
-    # Check if we're truly on a router by looking for the NCOS socket
-    ON_ROUTER = os.path.exists('/var/tmp/cs.sock')
-except ImportError:
-    ON_ROUTER = False
+# Check if we're truly on a router by looking for the NCOS socket
+ON_ROUTER = os.path.exists('/var/tmp/cs.sock')
 
-# Default port
-PORT = 8000
+# Effective web port, set in main() and shown in /api/info
+WEB_PORT = None
 
 # Resolve paths relative to this script
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -111,6 +109,7 @@ def _get_device_info():
         'mac_address': 'N/A',
         'firmware_version': 'N/A',
         'app_version': app_version,
+        'web_port': WEB_PORT,
     }
 
     if ON_ROUTER:
@@ -315,45 +314,29 @@ class AppRequestHandler(http.server.BaseHTTPRequestHandler):
 
 
 def main():
-    """Start the HTTP server."""
+    """Start the web server and keep the main thread alive."""
+    global WEB_PORT
     app_name, version = _read_package_ini()
+    cp.log('Starting {} v{}...'.format(app_name, version))
 
-    if ON_ROUTER:
-        cp.log('Starting {} v{}...'.format(app_name, version))
+    # Picks the port from appdata "<app_name>_web_port", or the first free
+    # port from 8000. On the router a failure stops the app, never exits.
+    httpd = cp.start_web_server(AppRequestHandler)
+    if httpd is None:
+        sys.exit(1)  # local run only; the reason is already printed
+    WEB_PORT = httpd.server_port
+
+    if not ON_ROUTER:
+        print("Server running at: http://localhost:{}  (Ctrl+C to stop)"
+              .format(WEB_PORT))
 
     try:
-        with socketserver.TCPServer(("", PORT), AppRequestHandler) as httpd:
-            if ON_ROUTER:
-                cp.log('Web server started on port {}'.format(PORT))
-            else:
-                print("=" * 60)
-                print("{} v{}".format(app_name, version))
-                print("=" * 60)
-                print("Server running at: http://0.0.0.0:{}".format(PORT))
-                print("Serving directory: {}".format(_SCRIPT_DIR))
-                print("\nPress Ctrl+C to stop the server")
-                print("=" * 60)
-
-            httpd.serve_forever()
-
+        # The app's main work goes here; the web server runs in its thread.
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
-        if not ON_ROUTER:
-            print("\n\nServer stopped by user.")
-        sys.exit(0)
-    except OSError as e:
-        if e.errno == 48 or e.errno == 98:  # Address already in use
-            msg = "Port {} is already in use.".format(PORT)
-            if ON_ROUTER:
-                cp.log('ERROR: {}'.format(msg))
-            else:
-                print("\nError: {}".format(msg))
-        else:
-            msg = "Failed to start server: {}".format(e)
-            if ON_ROUTER:
-                cp.log('ERROR: {}'.format(msg))
-            else:
-                print("\nError: {}".format(msg))
-        sys.exit(1)
+        httpd.shutdown()
+        httpd.server_close()
 
 
 if __name__ == "__main__":

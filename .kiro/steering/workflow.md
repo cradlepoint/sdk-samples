@@ -57,7 +57,8 @@ Follow the house style of the existing app readmes (`5GSpeed`, `client_bandwidth
 
 1. **Title + one-line description** — what the app does, in plain language.
 2. **Features** — a short bullet list of what the user gets. Include the web UI URL
-   (`http://router_ip:8000`) if the app has one.
+   (`http://router_ip:<port>`, where the port is in the app log or `<app_name>_web_port`) if
+   the app has one.
 3. **Usage / Steps to Use** — numbered steps from deploy to result, in the order the user does
    them. Include a screenshot for web apps if one exists.
 4. **Settings** — how to configure it (web Settings panel, NCM SDK Data field, etc.) in user terms.

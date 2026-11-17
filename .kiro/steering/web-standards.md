@@ -1,7 +1,13 @@
 # Web Development Standards
 
 - **ALWAYS use Python's built-in `http.server` module** - never use third-party web frameworks (Flask, Bottle, CherryPy, etc.). The native `http.server.HTTPServer` is available on cppython and has zero dependencies
-- **ALWAYS override `server_bind` to skip the FQDN lookup** - `http.server.HTTPServer.server_bind()` calls `socket.getfqdn()`, which runs the router's hostname through the `idna` codec. On routers whose hostname does not conform to IDNA (common), this raises `UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)` and the server never starts. No SDK web app needs the FQDN (clients connect by IP), so bypass it. Subclass the server and override `server_bind` to call `socketserver.TCPServer.server_bind(self)` then set `server_name`/`server_port` from the bound socket:
+- **ALWAYS start the web server with `cp.start_web_server(Handler)` - NEVER hardcode a port** - it picks the port, serves in a daemon thread, and returns the server (`server.server_port` is the port). See `main()` in `apps/templates/web_app_template/web_app_template.py`. How the port is chosen:
+  - Appdata `<app_name>_web_port` set (NCM group/device SDK Data): that exact port, retried ~10 s if busy. It never moves to another port, so pinned LAN Manager connections and firewall rules stay valid
+  - Not set: first free port from 8000, saved to `<app_name>_web_port` so it stays the same across reboots. This records a real assignment; it is not writing a default to appdata
+  - On failure (invalid value, port busy) on the router it stops the app via the SDK and never returns - do not `sys.exit()` around it, that causes a `restart = true` loop. Off-router it returns `None`
+  - Apps with their own server class: `sock = cp.bind_web_port()` returns the bound socket (same rules, returns `None` on failure). Build the server with `bind_and_activate=False`, close its placeholder `server.socket`, then assign `server.socket = sock`. A second listener in one app uses `cp.bind_web_port(name='api')` → `<app_name>_api_port`
+  - Document `<app_name>_web_port` in the readme's Appdata Fields table (optional; set it to pin the port, delete it to rediscover). Readme URLs say `http://router_ip:<port>`, not `:8000`
+- **Custom server classes must skip the FQDN lookup** (not needed with `cp.start_web_server`, which never binds through `server_bind`) - `http.server.HTTPServer.server_bind()` calls `socket.getfqdn()`, which runs the router's hostname through the `idna` codec. On routers whose hostname does not conform to IDNA (common), this raises `UnicodeError: encoding with 'idna' codec failed (UnicodeError: label too long)` and the server never starts. No SDK web app needs the FQDN (clients connect by IP), so bypass it. Subclass the server and override `server_bind` to call `socketserver.TCPServer.server_bind(self)` then set `server_name`/`server_port` from the bound socket:
   ```python
   class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
       daemon_threads = True
@@ -15,10 +21,7 @@
   ```
 - **LAN client access to router ports requires firewall zone forwarding** - For a client device on the LAN to reach a port on the router (SDK app web UI, SNMP agent, container-published port, etc.), the firewall must have a forwarding rule from the Primary LAN Zone to the Router Zone. If an app is running but LAN clients get connection timeouts, the zone forwarding is the first thing to check. This is configured at `config/firewall/zone_fwd` or via the NCOS UI under Security > Zone Firewall.
 - **NCM API does NOT support CORS** - the NetCloud Manager API at `us0.cradlepointecm.com` blocks cross-origin browser requests (no `Access-Control-Allow-Origin` header). Browser JS from third-party origins (e.g., GitHub Pages) cannot call NCM APIs directly. Use server-side calls (curl, Python requests) or the NCM web UI for uploads
-- **Default port: 8000** - use port 8000 for web applications unless there's a conflict
-- **ALWAYS set SO_REUSEADDR** before binding: `server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)`
-- **Port conflicts on redeployment** - SO_REUSEADDR doesn't prevent "Address in use" errors when redeploying without router reboot. If port 8000 is in use, either reboot router or use a different port (8001, 8002, etc.)
-- **Background web server pattern** - run `http.server.HTTPServer` in a daemon thread: `Thread(target=server.serve_forever, daemon=True).start()`. Main thread runs the app's primary loop
+- **Background web server pattern** - the server runs in a daemon thread (`cp.start_web_server` does this); the main thread runs the app's primary loop and must not fall off the end of `main()`
 - **Dashboard auto-refresh with server-side timestamps** - compute `_ago` values (seconds since event) on the server, not the client. Client clocks may differ from router. Return `connected_ago`, `last_rx_ago` etc. as integers
 - **Dynamic download filenames** - use router hostname and timestamp: `cp.get('config/system/system_id')` + `datetime.now().strftime('%Y%m%d_%H%M%S')`
 - **Light/dark mode** - use `data-theme` attribute on `<html>` element, persist with `localStorage.setItem('theme', 'light'|'dark')`, load on page init
@@ -38,4 +41,3 @@
 - Proper error handling with try/catch
 - Serve assets locally (no external dependencies)
 - Implement signal handlers for graceful shutdown
-- Log which port server started on

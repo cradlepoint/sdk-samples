@@ -524,13 +524,18 @@ cp.stop_packet_capture() -> Dict
 cp.download_packet_capture(filename, local_path=None, capture_params=None) -> Optional[Dict]
 ```
 
-### 4.22 File Server
+### 4.22 Web Server and File Server
 
 ```python
-cp.start_file_server(folder_path="files", port=8000, host="0.0.0.0",
+cp.start_web_server(handler_class, start_port=8000, host="0.0.0.0") -> HTTPServer
+cp.bind_web_port(start_port=8000, host="0.0.0.0", name="web") -> Optional[socket]
+cp.start_file_server(folder_path="files", port=None, host="0.0.0.0",
                      title="File Download") -> Optional[Dict]
 ```
-Starts a web file server with a responsive UI for downloading files.
+`start_web_server` serves a handler on the app's dynamic port (appdata `<app_name>_web_port`,
+else first free from 8000, saved back). `bind_web_port` returns just the bound socket for apps
+with their own server class. `start_file_server` serves a download UI; with `port=None` it uses
+a dynamic port from `<app_name>_file_port`.
 
 ### 4.23 Event Registration
 
@@ -863,27 +868,8 @@ ARM64 (aarch64) with musl libc. When downloading binaries, always use `aarch64`/
 ```python
 import cp
 import json
-import socket
-import socketserver
 import time
-import http.server
 from http.server import SimpleHTTPRequestHandler
-from threading import Thread
-
-PORT = 8000
-
-class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    daemon_threads = True
-    allow_reuse_address = True
-
-    def server_bind(self):
-        # Skip socket.getfqdn() — on routers whose hostname is not IDNA-safe
-        # the default server_bind() raises UnicodeError and the server never
-        # starts. No SDK web app needs the FQDN; clients connect by IP.
-        socketserver.TCPServer.server_bind(self)
-        host, port = self.socket.getsockname()[:2]
-        self.server_name = host
-        self.server_port = port
 
 class MyHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -897,10 +883,7 @@ class MyHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
 cp.log('Starting web server...')
-server = ThreadingHTTPServer(('', PORT), MyHandler)
-server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-Thread(target=server.serve_forever, daemon=True).start()
-cp.log(f'Web server started on port {PORT}')
+server = cp.start_web_server(MyHandler)  # logs the port it bound
 
 while True:
     time.sleep(60)
@@ -908,10 +891,9 @@ while True:
 
 ### Web Development Rules
 
-- **Port 8000** is the default
-- **Always override `server_bind`** to skip `socket.getfqdn()` — the default `HTTPServer.server_bind()` crashes with `UnicodeError: ... 'idna' codec failed` on routers whose hostname is not IDNA-conformant, and the server never starts
-- **Always set SO_REUSEADDR** before binding
-- **Run in a daemon thread** so the main thread handles app logic
+- **Never hardcode a port** — `cp.start_web_server()` uses appdata `<app_name>_web_port` when it is set (NCM group/device SDK Data), otherwise the first free port from 8000, which it saves to that field so the port survives reboots. A configured port is never moved; if it is invalid or stays busy, the app stops itself instead of restart-looping. Apps with their own server class use `cp.bind_web_port()` (see `cp_methods_reference.md`)
+- **Skip `socket.getfqdn()` in custom server classes** — the default `HTTPServer.server_bind()` crashes with `UnicodeError: ... 'idna' codec failed` on routers whose hostname is not IDNA-conformant. `cp.start_web_server()` already avoids it
+- **Run in a daemon thread** so the main thread handles app logic (`cp.start_web_server()` does this)
 - **Serve all assets locally** — no external CDNs
 - **Use Python's built-in `http.server`** — never use Flask, Bottle, etc.
 - **Vanilla JavaScript** — ES6+ is fine (arrow functions, async/await, template literals)
@@ -927,7 +909,7 @@ web_app_template/
 ├── start.sh
 ├── cp.py
 ├── ncm.py                   # NCM REST helper (optional, available to web apps)
-├── web_app_template.py      # HTTP server
+├── web_app_template.py      # HTTP server (cp.start_web_server)
 ├── your_web_app.html        # Starting HTML (copy as index.html)
 ├── index.html
 ├── readme.md
@@ -1662,24 +1644,8 @@ publish_loop(client)
 ```python
 import cp
 import json
-import socket
-import socketserver
 import time
-import http.server
 from http.server import BaseHTTPRequestHandler
-from threading import Thread
-
-PORT = 8000
-
-class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    daemon_threads = True
-    allow_reuse_address = True
-
-    def server_bind(self):
-        socketserver.TCPServer.server_bind(self)  # skips socket.getfqdn()
-        host, port = self.socket.getsockname()[:2]
-        self.server_name = host
-        self.server_port = port
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -1707,10 +1673,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         pass  # Suppress request logging
 
 cp.log('Starting dashboard...')
-server = ThreadingHTTPServer(('', PORT), DashboardHandler)
-server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-Thread(target=server.serve_forever, daemon=True).start()
-cp.log(f'Dashboard running on port {PORT}')
+server = cp.start_web_server(DashboardHandler)
+cp.log(f'Dashboard running on port {server.server_port}')
 
 while True:
     time.sleep(60)

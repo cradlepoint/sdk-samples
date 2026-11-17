@@ -1599,7 +1599,8 @@ class WebAppTemplate {
                     { icon: 'fas fa-barcode', label: 'Serial Number', value: data.serial_number || 'N/A' },
                     { icon: 'fas fa-network-wired', label: 'MAC Address', value: data.mac_address || 'N/A' },
                     { icon: 'fas fa-microchip', label: 'Firmware Version', value: data.firmware_version || 'N/A' },
-                    { icon: 'fas fa-cube', label: 'SDK App Version', value: data.app_version || 'N/A' }
+                    { icon: 'fas fa-cube', label: 'SDK App Version', value: data.app_version || 'N/A' },
+                    { icon: 'fas fa-plug', label: 'Web Port', value: data.web_port || 'N/A' }
                 ];
                 var html = '<div class="info-grid">';
                 items.forEach(function(item) {

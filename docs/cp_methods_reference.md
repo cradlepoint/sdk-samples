@@ -1695,16 +1695,56 @@ Download a captured pcap file.
 
 ---
 
+## Web Server (dynamic port)
+
+### `cp.start_web_server(handler_class, start_port=8000, host='0.0.0.0')`
+
+Start a threaded `http.server` on the app's dynamic web port, serving in a daemon thread. Never
+calls `socket.getfqdn()` (which crashes on non-IDNA router hostnames).
+
+Port selection (shared with `bind_web_port`):
+- Appdata `<app_name>_web_port` set: bind exactly that port, retried for ~10 s if busy. Never
+  moves to another port. An invalid value (not 1–65535) is an error.
+- Not set: first free port from `start_port` (up to 64 tried), saved to `<app_name>_web_port`.
+- Off-router: a free local port is used; appdata is not read or written.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `handler_class` | `type` | — | `BaseHTTPRequestHandler` subclass |
+| `start_port` | `int` | `8000` | First port tried when the field is not set |
+| `host` | `str` | `'0.0.0.0'` | Bind address |
+
+**Returns:** the running `HTTPServer` (`server.server_port` is the port). On the router a failure
+does **not** return: it stops the app via `control/system/sdk/action` (avoiding a `restart = true`
+loop) and idles if the stop is ignored. Off-router a failure returns `None`.
+
+```python
+server = cp.start_web_server(MyHandler)
+cp.log(f'UI at http://router_ip:{server.server_port}')
+```
+
+### `cp.bind_web_port(start_port=8000, host='0.0.0.0', name='web')`
+
+Same port selection, but returns only the bound, listening socket, for apps with their own
+server class. Build the server with `bind_and_activate=False`, close its placeholder
+`server.socket`, then assign `server.socket = sock`. `name` selects the appdata field
+`<app_name>_<name>_port` for a second listener.
+
+**Returns:** `Optional[socket.socket]` — `None` on failure (reason logged). Port is
+`sock.getsockname()[1]`.
+
+---
+
 ## File Server
 
-### `cp.start_file_server(folder_path='files', port=8000, host='0.0.0.0', title='File Download')`
+### `cp.start_file_server(folder_path='files', port=None, host='0.0.0.0', title='File Download')`
 
 Start a web file server with a responsive UI for downloading files. Runs in a background thread.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `folder_path` | `str` | `'files'` | Relative path to serve files from |
-| `port` | `int` | `8000` | Port number |
+| `port` | `Optional[int]` | `None` | Port number. `None` uses `bind_web_port(name='file')` (appdata `<app_name>_file_port`) |
 | `host` | `str` | `'0.0.0.0'` | Bind address |
 | `title` | `str` | `'File Download'` | Page title shown in the UI |
 
@@ -1713,6 +1753,8 @@ Start a web file server with a responsive UI for downloading files. Runs in a ba
 - `url` (str): e.g. `'http://0.0.0.0:8000'`
 - `folder_path` (str): Absolute path being served
 - `port` (int)
+
+Returns `None` if `port=None` and no port could be bound.
 
 ```python
 server = cp.start_file_server(folder_path='logs', port=9000, title='Log Files')

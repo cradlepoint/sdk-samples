@@ -21,6 +21,8 @@ lives in the topic files listed at the bottom.
 - **Never invent a `cp` function name** — read `cp.py`.
 - **Never use random or placeholder data** — real data from router APIs, or `None`.
 - **Never write defaults to appdata** — that overrides NCM group config. Default in code instead.
+  (`cp.start_web_server` saving the port it actually bound is a recorded assignment, not a default.)
+- **Web apps never hardcode a port** — use `cp.start_web_server()` (see `web-standards.md`).
 - **Never commit `sdk_settings.ini`**, and never print the router password.
 
 ## Always deploy after changing an app

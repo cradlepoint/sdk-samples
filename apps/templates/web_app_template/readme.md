@@ -33,6 +33,7 @@ The Web App Template Style Guide provides a complete design system with:
 - **Help button** – Opens a modal displaying the app's readme.md content, rendered as formatted HTML
 - **Device info button** – Opens a modal showing router model, serial number, MAC address, firmware version, and SDK app version
 - **App version display** – Version number from package.ini shown below the app title
+- **Dynamic web port** – Finds a free port from 8000 on first run and remembers it, or uses the port you set in NCM SDK Data (see *Web Port* below)
 - **Copyable markup** – Structured HTML ready for rapid prototyping
 - **Consistent design language** – Shared typography, color tokens, and spacing across all components
 - **Production-ready patterns** – Snapshot of UI patterns suitable for internal portals, admin consoles, and monitoring dashboards
@@ -49,7 +50,7 @@ The Web App Template Style Guide provides a complete design system with:
    python3 web_app_template.py
    ```
 
-2. Open a browser and go to: **http://localhost:8000**
+2. Open the URL printed at startup (usually **http://localhost:8000**; the next free port if 8000 is taken). On a router, browse to `http://router_ip:<port>`, where the port is shown in the app log and the Device Info modal.
 
 3. The style guide (`index.html`) loads by default, with a sidebar for browsing components and a search bar for filtering elements.
 
@@ -96,7 +97,26 @@ web_app_template/
 | `GET /` | Serves `index.html` (style guide) |
 | `GET /your_web_app.html` | Serves the starter template |
 | `GET /api/help` | Returns readme.md content as plain text |
-| `GET /api/info` | Returns JSON with router model, serial number, MAC address, firmware version, and app version |
+| `GET /api/info` | Returns JSON with router model, serial number, MAC address, firmware version, app version, and the web port |
+
+---
+
+## Web Port
+
+The app does not hardcode its port. At startup it reads the SDK Data field `web_app_template_web_port`:
+
+- **Set** – the app binds exactly that port. If the port is busy it retries for about 10 seconds, then stops itself. It never moves to a different port, so NCM LAN Manager connections and firewall rules pinned to that port stay valid. An invalid value (not a number from 1 to 65535) stops the app straight away.
+- **Not set** – on first run the app takes the first free port from 8000 to 8063 and saves it to `web_app_template_web_port`, so it keeps the same port after reboots.
+
+To change the port for one router or a whole group, set the field in NCM SDK Data (Device or Group) and restart the app. To go back to automatic selection, delete the field and restart the app. After fixing a bad value, start the app again (it also retries on the next reboot).
+
+LAN clients need a firewall forwarding rule from the Primary LAN Zone to the Router Zone to reach the port. A connection timeout while the log says the server started usually means that rule is missing.
+
+## Appdata Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `web_app_template_web_port` | No | Web UI port (1–65535). Authoritative when set. When not set, the app discovers a free port from 8000 and saves it here. Apps built from this template use `<app_name>_web_port`. |
 
 ---
 
@@ -110,5 +130,5 @@ web_app_template/
 
 ## Version
 
-- **Version:** 1.1.0  
+- **Version:** 1.2.0  
 - **Status:** BETA
