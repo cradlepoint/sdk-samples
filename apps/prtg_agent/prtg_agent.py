@@ -7,14 +7,11 @@ import cp
 import json
 import os
 import re
-import socket
-import threading
 import time
 import http.server
 
 # --- Constants ---
 APP_NAME = 'prtg_agent'
-WEB_PORT = 8000
 DEFAULT_INTERVAL = 60
 DEFAULT_PRTG_PORT_HTTP = 5050
 DEFAULT_PRTG_PORT_HTTPS = 5051
@@ -721,38 +718,16 @@ def data_collection_loop():
     cp.log('Data collection loop stopped')
 
 
-class NoFQDNHTTPServer(http.server.HTTPServer):
-    """HTTPServer that skips FQDN lookup to avoid IDNA encoding errors with long hostnames."""
-
-    def server_bind(self):
-        """Override to bind without calling getfqdn()."""
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind(self.server_address)
-        host, port = self.socket.getsockname()[:2]
-        self.server_name = '0.0.0.0'
-        self.server_port = port
-
-
-def start_web_server():
-    """Start the web server in a daemon thread."""
-    app_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(app_dir)
-
-    server = http.server.HTTPServer(('0.0.0.0', WEB_PORT), PRTGAgentHandler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    cp.log('Web server started on port {}'.format(WEB_PORT))
-    server.serve_forever()
-
-
 def main():
     """Main entry point."""
     global agent_running
 
     cp.log('Starting PRTG Agent')
 
-    # Start web server in daemon thread
-    web_thread = threading.Thread(target=start_web_server, daemon=True)
-    web_thread.start()
+    # Static files are served relative to the app folder.
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    # Port: appdata prtg_agent_web_port, else first free from 8000 (saved).
+    cp.start_web_server(PRTGAgentHandler)
 
     # Run data collection in the main thread
     try:

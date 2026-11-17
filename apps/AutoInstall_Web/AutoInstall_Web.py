@@ -11,6 +11,7 @@ Speedtest engines (in priority order):
 """
 
 import cp
+import tornado.httpserver
 import tornado.web
 import json
 import time
@@ -441,19 +442,6 @@ def use_group_mode():
 def use_carrier_matching():
     """True if matching by carrier. False if group_by_sim appdata exists (match by SIM slot)."""
     return not has_appdata('group_by_sim')
-
-def get_web_port():
-    """Get web server port from appdata 'AutoInstall_Web_port' (case insensitive). Default 8000."""
-    try:
-        val = get_config('AutoInstall_Web_port')
-        if val is not None and str(val).strip():
-            port = int(str(val).strip())
-            if 1 <= port <= 65535:
-                return port
-        return 8000
-    except (ValueError, TypeError) as e:
-        cp.log(f'Invalid AutoInstall_Web_port appdata, using 8000: {e}')
-        return 8000
 
 def get_password():
     """Get password from SDK data 'installer_password' or use serial number as fallback."""
@@ -2632,8 +2620,6 @@ def run_auto_install():
 
 if __name__ == '__main__':
     cp.log('Starting...')
-    web_port = get_web_port()
-    cp.log('Access the web interface at http://<router-ip>:%d/' % web_port)
     get_password()
     application = tornado.web.Application(
         [
@@ -2651,7 +2637,21 @@ if __name__ == '__main__':
         ],
         default_handler_class=DefaultHandler,
     )
-    application.listen(web_port)
+    # Port: appdata AutoInstall_Web_web_port (or the older
+    # AutoInstall_Web_port), else the first free port from 8000, saved to
+    # AutoInstall_Web_web_port. Tornado takes the pre-bound socket directly.
+    sock = cp.bind_web_port(legacy_field='AutoInstall_Web_port')
+    if sock is None:
+        # Never exit: restart = true would relaunch the app in a loop.
+        if cp.stop_app():
+            time.sleep(30)
+        while True:
+            time.sleep(3600)
+    sock.setblocking(False)
+    web_server = tornado.httpserver.HTTPServer(application)
+    web_server.add_sockets([sock])
+    cp.log('Access the web interface at http://<router-ip>:%d/'
+           % sock.getsockname()[1])
     if has_appdata('autostart'):
         if has_appdata('results'):
             cp.log('Autostart enabled but results already exist - skipping. Delete "results" appdata to re-run.')

@@ -1,15 +1,12 @@
 import cp
 import json
-import socket
-import threading
 import time
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 DEFAULT_LIMIT_MBPS = 10  # Fallback default when no appdata value is set
 APPDATA_DEFAULT_LIMIT = 'default_limit_mbps'
-PORT = 8000
 LIMITS_FILE = 'tmp/client_limits.json'
 
 # Store previous usage data for rate calculation
@@ -471,20 +468,6 @@ setInterval(load, 5000);
 </body>
 </html>"""
 
-def run_server():
-    try:
-        server = HTTPServer(('', PORT), BandwidthHandler)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cp.log(f'Server started on port {PORT}')
-        server.serve_forever()
-    except OSError as e:
-        if e.errno == 98:  # Address already in use
-            cp.log(f'ERROR: Port {PORT} is busy - {e}')
-        else:
-            cp.log(f'ERROR: Failed to start server on port {PORT} - {e}')
-    except Exception as e:
-        cp.log(f'ERROR: Server error - {e}')
-
 if __name__ == '__main__':
     cp.log('Starting Client Bandwidth Throttle')
     
@@ -514,6 +497,7 @@ if __name__ == '__main__':
     except Exception as e:
         cp.log(f'Error setting limits: {e}')
     
-    threading.Thread(target=run_server, daemon=True).start()
+    # Port: appdata client_bandwidth_throttle_web_port, else first free from 8000.
+    cp.start_web_server(BandwidthHandler)
     while True:
         time.sleep(60)

@@ -3,7 +3,7 @@ import socket
 import time
 import json
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
 
 cp.log('Starting Client Session Monitor...')
 
@@ -471,13 +471,6 @@ else{d.history.forEach(function(s){var r=h.insertRow();r.innerHTML='<td>'+s.ip+'
 update();setInterval(update,3000);
 </script></body></html>'''
 
-def start_web_server():
-    port = 8000
-    server = HTTPServer(('', port), DashboardHandler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    cp.log(f'Dashboard running on port {port}')
-    server.serve_forever()
-
 if __name__ == '__main__':
     import os
     os.makedirs('tmp', exist_ok=True)
@@ -494,7 +487,10 @@ if __name__ == '__main__':
     monitor_thread = threading.Thread(target=monitor_connections, daemon=True)
     monitor_thread.start()
     
+    # Port: appdata client_session_monitor_web_port, else first free from 8000.
+    cp.start_web_server(DashboardHandler)
     try:
-        start_web_server()
+        while True:
+            time.sleep(60)
     except KeyboardInterrupt:
         cp.log('Shutting down...')

@@ -43,8 +43,16 @@
 
 Once installed and running, access CS Explorer via:
 ```
-http://YOUR_ROUTER_IP:9002
+http://<router_ip>:<port>
 ```
+
+The port is shown in the app log at startup (for example `Web server started on port 9002`) and saved in the appdata field `cs_explorer_web_port`. It is usually 9002, or the next free port if 9002 is taken, and it stays the same after reboots. To change it, set `cs_explorer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
+
+## Appdata Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `cs_explorer_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 9002 and saves it here. Delete it to pick a port automatically again. |
 
 ## 🎯 Usage
 
@@ -120,9 +128,13 @@ cs_explorer/
 - Check that the router meets minimum firmware requirements (7.25+)
 - Check system logs for startup errors
 
+**Application stops with a port error:**
+- `cs_explorer_web_port` is not a number from 1 to 65535, or that port stayed busy
+- Fix or delete the field, then start the app
+
 **Cannot access web interface:**
-- Ensure you're accessing `http://ROUTER_IP:9002`
-- Check that port 9002 is not blocked by firewall
+- Ensure you're accessing `http://<router_ip>:<port>` with the port shown in the app log (also saved in `cs_explorer_web_port`)
+- Check that the app's web port is not blocked by firewall (LAN clients need a Zone Firewall forward from the Primary LAN Zone to the Router Zone)
 - Verify the application is running via NCOS application status
 
 ## 🤝 Contributing

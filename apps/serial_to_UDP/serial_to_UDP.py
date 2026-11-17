@@ -10,7 +10,7 @@ import time
 import json
 import os
 import http.server
-from threading import Thread, Lock
+from threading import Lock
 
 cp.log('Starting serial_to_UDP...')
 
@@ -21,7 +21,6 @@ cp.log('Starting serial_to_UDP...')
 # config/lan/0/ip_address on DEFAULT_SRC_PORT. Defaults are never written to
 # appdata so NCM group configs are not overridden.
 APP_DATA_KEY = 'serial_to_UDP'
-WEB_PORT = 8000
 
 # Source defaults
 DEFAULT_SRC_PORT = 5000
@@ -540,30 +539,18 @@ class SettingsHandler(http.server.SimpleHTTPRequestHandler):
         cp.log(format % args)
 
 
-class SettingsServer(http.server.HTTPServer):
-    """HTTPServer that survives a router hostname the idna codec rejects
-    (e.g. one with spaces). Falls back to the plain bind host if so.
+def start_web_ui():
+    """Start the settings web UI. Returns the port, or None if it failed.
+
+    Port: appdata serial_to_UDP_web_port, else the first free port from
+    8000 (saved there). Forwarding does not need the UI, so a failure
+    leaves the app running (required=False).
     """
-
-    allow_reuse_address = True
-
-    def server_bind(self):
-        try:
-            super().server_bind()
-        except UnicodeError:
-            host, port = self.server_address[:2]
-            self.server_name = host
-            self.server_port = port
-
-
-def start_web_server():
-    """Start the settings web UI. Runs forever; call in a daemon thread."""
-    try:
-        server = SettingsServer(('0.0.0.0', WEB_PORT), SettingsHandler)
-        cp.log('Web UI started on port %d' % WEB_PORT)
-        server.serve_forever()
-    except Exception as e:
-        cp.log('ERROR: Web server failed to start: %s' % e)
+    server = cp.start_web_server(SettingsHandler, required=False)
+    if server is None:
+        cp.log('ERROR: Web UI not started; forwarding continues')
+        return None
+    return server.server_port
 
 
 # ---------------------------------------------------------------------------
@@ -634,13 +621,13 @@ def close_quietly(resource):
 
 def main():
     """Main loop: read serial data and forward to all UDP destinations."""
-    Thread(target=start_web_server, daemon=True).start()
+    web_port = start_web_ui()
 
     settings = load_udp_settings()
     settings_error = validate_udp_settings(settings)
     if settings_error:
         cp.log('UDP settings incomplete (%s). Configure destinations in the '
-               'web UI on port %d.' % (settings_error, WEB_PORT))
+               'web UI on port %s.' % (settings_error, web_port))
     else:
         cp.log('Forwarding serial data from %s:%s to %s' % (
             settings['udp_src_ip'], settings['udp_src_port'],

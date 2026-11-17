@@ -22,6 +22,7 @@
   - [Sustain Options](#sustain-options)
 - [Web Dashboard](#web-dashboard)
 - [Data Storage](#data-storage)
+- [Appdata Fields](#appdata-fields)
 - [API Reference](#api-reference)
 - [File Reference](#file-reference)
 - [Operators](#operators)
@@ -32,7 +33,7 @@
 
 The IFTTT Rule Engine is an NCOS SDK application that provides a drag-and-drop web dashboard for creating automated "if this then that" rules on Ericsson/Cradlepoint routers. Rules interact with the router's config and status tree via `cp.py` to monitor conditions and execute actions automatically.
 
-The application runs a web server on port 8000 and supports five condition types (IF, WHILE path, WHILE time, WHEN, WHERE), three action types (Set Config, Send Alert, Log Message), per-rule polling intervals or callback triggers, and sustained condition tracking with duration and interval modes.
+The application runs a web server on a port shown in the app log and saved in the `ifttt_web_port` appdata field (usually 8000, or the next free port if 8000 is taken). It supports five condition types (IF, WHILE path, WHILE time, WHEN, WHERE), three action types (Set Config, Send Alert, Log Message), per-rule polling intervals or callback triggers, and sustained condition tracking with duration and interval modes.
 
 ## Features
 
@@ -78,7 +79,7 @@ The application runs a web server on port 8000 and supports five condition types
 ┌─────────────────────────────────────────────────────────────┐
 │                    IFTTT Rule Engine                         │
 ├─────────────────────────────────────────────────────────────┤
-│  Web Dashboard (port 8000)                                  │
+│  Web Dashboard (web port)                                   │
 │  ├── Homepage (feature overview)                            │
 │  ├── Rules Page (drag-and-drop builder)                     │
 │  └── Browse Config Store (modal path browser)               │
@@ -157,15 +158,15 @@ python make.py build ifttt
 
 2. Upload to NCM or directly to the router via the SDK Apps interface
 
-3. The app waits for system uptime (120s), then auto-starts and serves the web dashboard on port 8000
+3. The app waits for system uptime (120s), then auto-starts and serves the web dashboard on its web port. The port is shown in the app log and saved in the `ifttt_web_port` appdata field (usually 8000, or the next free port if 8000 is taken). See [Appdata Fields](#appdata-fields).
 
 ### Accessing the Web Interface
 
 **From the router LAN:**
-Add a Zone Firewall Forwarding Policy for Primary LAN Zone → Router Zone, set to Allow. Then browse to `http://<router-ip>:8000`.
+Add a Zone Firewall Forwarding Policy for Primary LAN Zone → Router Zone, set to Allow. Then browse to `http://<router_ip>:<port>`.
 
 **Via Remote Connect (NCM):**
-Use LAN Manager with HTTP to `127.0.0.1` port `8000`.
+Use LAN Manager with HTTP to `127.0.0.1` and the app's web port.
 
 ### Development Mode (Workstation)
 
@@ -176,11 +177,11 @@ Use LAN Manager with HTTP to `127.0.0.1` port `8000`.
 python3 ifttt.py
 ```
 
-3. Open your browser to `http://localhost:8000`
+3. Open your browser to `http://localhost:<port>`, using the port shown in the console output
 
 ## Getting Started
 
-1. Open the web dashboard at `http://<router-ip>:8000`
+1. Open the web dashboard at `http://<router_ip>:<port>`
 2. Click **Get Started** on the homepage or navigate to **Rules** in the sidebar
 3. Click **+ New Rule** to create a rule
 4. Drag conditions from the **Conditions** palette into the conditions drop zone
@@ -332,7 +333,7 @@ WHILE (path) conditions default to **Duration** sustain. WHERE conditions defaul
 
 ## Web Dashboard
 
-The web dashboard runs on port 8000 and provides two main views:
+The web dashboard runs on the app's web port (see [Appdata Fields](#appdata-fields)) and provides two main views:
 
 **Homepage** — Feature overview with color-coded condition type badges (IF, WHILE, WHEN, WHERE, THEN) and highlight cards. Click **Get Started** to navigate to the rules page.
 
@@ -434,9 +435,20 @@ Each rule is stored as an individual appdata entry with the key prefix `ifttt_ru
   "radius_unit": "km", "operator": "within", "sustain": "none" }
 ```
 
+## Appdata Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `ifttt_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `ifttt_rule_<id>` | No | One entry per saved rule, written by the web dashboard. See [Data Storage](#data-storage). |
+
+The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to ifttt_web_port)` followed by `Web server started on port 8001`. If `ifttt_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+
+To change the port for one router or a group, set `ifttt_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
+
 ## API Reference
 
-The application exposes a REST API on port 8000:
+The application exposes a REST API on the app's web port:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -489,7 +501,8 @@ The application exposes a REST API on port 8000:
 
 | Issue | Solution |
 |-------|----------|
-| Dashboard not loading | Verify the app is running: check router logs for "Web dashboard running on port 8000". Ensure the uptime wait (120s) has completed. |
+| Dashboard not loading | Verify the app is running: check router logs for "Web server started on port N" and browse to that port. Ensure the uptime wait (120s) has completed. |
+| App stops at startup | The `ifttt_web_port` value is not a number from 1 to 65535, or that port stayed busy. The log says why. Fix or delete the field in NCM SDK Data, then start the app. |
 | Can't access from LAN | Add a Zone Firewall Forwarding Policy: Primary LAN Zone → Router Zone, Allow. |
 | Rules not evaluating | Ensure rules are enabled (ON) and saved. Check router logs for evaluation messages. |
 | Callback mode not firing | Not all paths support callbacks. Switch to Polling Interval mode and test the path. |

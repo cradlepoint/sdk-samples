@@ -44,7 +44,6 @@ import json
 import os
 import signal
 import socket
-import socketserver
 import struct
 import threading
 import time
@@ -64,7 +63,7 @@ DEFAULT_PORT = 1123
 DEFAULT_HOLDOVER = 300        # seconds to keep serving after the last GPS sample
 STATUS_TREE_LATENCY = 0.8     # GPS second -> status/gps/nmea publish delay, added to each sample
 
-WEB_PORT = 8123               # web UI port; fixed, never steps to another port if busy
+WEB_PORT = 8123               # first web UI port tried when NTP_server_web_port is unset
 
 TIME_SENTENCES = ('RMC', 'ZDA', 'GGA', 'GLL')
 MAX_DATE_SKEW = 5.0           # seconds a time-of-day sentence may differ from the RMC/ZDA time
@@ -521,23 +520,6 @@ class AppState:
 # Web server
 # ---------------------------------------------------------------------------------------------
 
-class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    """Threaded HTTP server that skips the FQDN lookup in server_bind.
-
-    http.server.HTTPServer.server_bind() calls socket.getfqdn(), which runs the router hostname
-    through the IDNA codec and raises UnicodeError on non-conforming hostnames (see
-    web-standards.md). No web client needs the FQDN, so bypass it.
-    """
-    daemon_threads = True
-    allow_reuse_address = True
-
-    def server_bind(self):
-        socketserver.TCPServer.server_bind(self)  # skips socket.getfqdn()
-        host, port = self.socket.getsockname()[:2]
-        self.server_name = host
-        self.server_port = port
-
-
 def make_web_handler(state: AppState):
     class WebHandler(http.server.BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.1'
@@ -619,17 +601,19 @@ def make_web_handler(state: AppState):
     return WebHandler
 
 
-def start_web_server(state: AppState) -> None:
-    """Bind the web UI on the fixed port; do not fall back to another port if it is in use."""
-    handler = make_web_handler(state)
-    try:
-        httpd = ThreadingHTTPServer(('0.0.0.0', WEB_PORT), handler)
-    except OSError as e:
-        cp.log(f'Web port {WEB_PORT} unavailable ({e}), web UI disabled')
+def start_web_ui(state: AppState) -> None:
+    """Start the web UI on the app's dynamic port.
+
+    Port: appdata NTP_server_web_port, else the first free port from 8123
+    (saved there). The UI is optional here: if it cannot start, NTP keeps
+    running (required=False) instead of the whole app stopping.
+    """
+    httpd = cp.start_web_server(make_web_handler(state), start_port=WEB_PORT,
+                                required=False)
+    if httpd is None:
+        cp.log('Web UI disabled; NTP service continues')
         return
-    state.web_port = WEB_PORT
-    cp.log(f'Web UI started on http://<router_ip>:{WEB_PORT}')
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    state.web_port = httpd.server_port
 
 
 # ---------------------------------------------------------------------------------------------
@@ -678,7 +662,7 @@ def main():
     # visible and a user can set the clock manually even before GPS lock.
     threading.Thread(target=run_status_tree, args=(clock,), daemon=True).start()
     threading.Thread(target=status_loop, args=(state,), daemon=True).start()
-    start_web_server(state)
+    start_web_ui(state)
 
     # Do NOT bind the NTP port until GPS is locked (see module docstring): a pre-fix reply is
     # stratum 16, gets discarded, and the router may not poll again for up to 24h.

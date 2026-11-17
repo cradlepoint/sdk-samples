@@ -3,9 +3,8 @@ import time
 import re
 import json
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
 import threading
-import socket
 
 # Global state
 tracked_macs = {}  # {network: {mac: {'ip': str, 'blocked': bool, 'known': bool, 'missing_count': int}}}
@@ -13,8 +12,7 @@ manual_blocks = {}  # {network: {mac: True}} - Manually blocked MACs that persis
 sticky_macs = {}  # {network: {mac: True}} - Learned/allowed unknown MACs that occupy a slot permanently
 network_config = {}  # {network: {'max_unknown': int, 'allowed_prefixes': [str]}}
 network_policy_status = {}  # {network: bool} - True if policy exists
-web_port = 8000
-web_server = None  # HTTPServer instance (or None if UI disabled)
+web_server = None  # running server from cp.start_web_server (None if UI off)
 web_thread = None  # Web server thread
 ui_disabled = False  # True when disable_ui appdata is set
 GRACE_PERIOD_CYCLES = 3  # Remove MAC after missing for this many cycles
@@ -714,11 +712,11 @@ def monitor_macs():
                 if disable_ui and not ui_disabled:
                     cp.log("disable_ui appdata set, stopping web UI")
                     ui_disabled = True
-                    stop_web_server()
+                    stop_web_ui()
                 elif not disable_ui and ui_disabled:
                     cp.log("disable_ui appdata cleared, starting web UI")
                     ui_disabled = False
-                    web_thread = threading.Thread(target=start_web_server, daemon=True)
+                    web_thread = threading.Thread(target=start_web_ui, daemon=True)
                     web_thread.start()
             except Exception as e:
                 cp.log(f"Error checking disable_ui: {e}")
@@ -1159,28 +1157,32 @@ setInterval(loadData, 2000);
 </html>'''
 
 
-def start_web_server():
-    """Start web server in background thread."""
-    global web_port, web_server
-    
+def start_web_ui():
+    """Start the web UI (run in a thread: a busy port retries for ~10s).
+
+    Port: appdata network_mac_filter_web_port (or the older
+    custom_mac_filter_port), else the first free port from 8000, saved to
+    network_mac_filter_web_port. MAC filtering does not need the UI, so a
+    failure leaves the app running (required=False).
+    """
+    global web_server
     try:
         os.makedirs('tmp', exist_ok=True)
-        web_server = HTTPServer(('', web_port), WebHandler)
-        web_server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cp.log(f"Web server started on port {web_port}")
-        web_server.serve_forever()
+        web_server = cp.start_web_server(
+            WebHandler, legacy_field='custom_mac_filter_port', required=False)
+        if web_server is None:
+            cp.log("Web UI not started; MAC filtering continues")
     except Exception as e:
         cp.log(f"Error starting web server: {e}")
-    finally:
-        web_server = None
 
 
-def stop_web_server():
-    """Stop the web server if running."""
+def stop_web_ui():
+    """Stop the web UI and release its port so it can be started again."""
     global web_server
     if web_server:
         try:
             web_server.shutdown()
+            web_server.server_close()
             cp.log("Web server stopped")
         except Exception as e:
             cp.log(f"Error stopping web server: {e}")
@@ -1188,7 +1190,7 @@ def stop_web_server():
 
 
 def main():
-    global network_config, web_port, web_thread, ui_disabled
+    global network_config, web_thread, ui_disabled
     
     cp.log("Starting network_mac_filter")
     
@@ -1211,20 +1213,13 @@ def main():
     # Check filter policies on startup
     check_filter_policies()
     
-    try:
-        port_str = cp.get_appdata('custom_mac_filter_port')
-        if port_str:
-            web_port = int(port_str)
-    except Exception as e:
-        cp.log(f"Error loading custom_mac_filter_port: {e}")
-    
     # Start web server in background (unless disabled via appdata)
     disable_ui = cp.get_appdata('disable_ui')
     if disable_ui:
         cp.log("Web UI disabled via appdata")
         ui_disabled = True
     else:
-        web_thread = threading.Thread(target=start_web_server, daemon=True)
+        web_thread = threading.Thread(target=start_web_ui, daemon=True)
         web_thread.start()
     
     # Register control callbacks for CLI block/unblock

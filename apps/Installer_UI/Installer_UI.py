@@ -3,9 +3,9 @@
 import cp
 import json
 import os
-import socket
 import threading
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import time
+from http.server import SimpleHTTPRequestHandler
 from urllib.parse import parse_qs
 
 
@@ -293,9 +293,7 @@ if __name__ == '__main__':
     cp.log('Speedtest engine: ' + engine)
     get_config('installer_password')
     open_firewall()
-    server = HTTPServer(('', 8000), AppHandler)
-    server.socket.setsockopt(
-        socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
-    )
-    cp.log('Web server started on port 8000')
-    server.serve_forever()
+    # Port: appdata Installer_UI_web_port, else first free from 8000 (saved).
+    cp.start_web_server(AppHandler)
+    while True:
+        time.sleep(60)

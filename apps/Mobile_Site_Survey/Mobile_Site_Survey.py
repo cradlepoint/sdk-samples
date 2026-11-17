@@ -6,6 +6,7 @@ from speedtest import Speedtest
 from geopy import distance
 from settings import settings
 import requests
+import tornado.httpserver
 import tornado.web
 import json
 import os
@@ -1423,22 +1424,18 @@ if __name__ == "__main__":
         (r"/(.*)", tornado.web.StaticFileHandler,
          {"path": os.path.dirname(__file__), "default_filename": "index.html"})
     ])
-    
-    # Try ports from 8000-8100 until we find an open one
-    import socket
-    found_port = None
-    for port in range(8000, 8101):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                sock.bind(('0.0.0.0', port))
-                found_port = port
-                break
-            except OSError:
-                continue
-    if found_port is None:
-        cp.log('ERROR: No available ports found between 8000-8100!')
-        exit(1)
-    cp.log(f'Web interface available on port {found_port}')
-    application.listen(found_port)
+
+    # Port: appdata Mobile_Site_Survey_web_port, else the first free port
+    # from 8000 (saved there). Tornado takes the pre-bound socket directly.
+    sock = cp.bind_web_port()
+    if sock is None:
+        # Never exit: restart = true would relaunch the app in a loop.
+        if cp.stop_app():
+            time.sleep(30)
+        while True:
+            time.sleep(3600)
+    sock.setblocking(False)
+    web_server = tornado.httpserver.HTTPServer(application)
+    web_server.add_sockets([sock])
+    cp.log(f'Web interface available on port {sock.getsockname()[1]}')
     tornado.ioloop.IOLoop.instance().start()

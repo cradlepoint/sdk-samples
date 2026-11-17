@@ -8,7 +8,7 @@ import json
 import os
 import threading
 from datetime import datetime, timedelta
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 class WANDashboard:
@@ -29,19 +29,8 @@ class WANDashboard:
             self.router_name = "Router"
             self.router_name_safe = "Router"
         
-        # Get port from appdata with default of 8000
-        port = cp.get_appdata('wan_dashboard_port') or '8000'
-        try:
-            self.base_port = int(port)
-            if self.base_port < 1 or self.base_port > 65535:
-                cp.log(f"Invalid port value '{port}' (must be 1-65535), using default 8000")
-                self.base_port = 8000
-        except (ValueError, TypeError):
-            cp.log(f"Invalid port value '{port}', using default 8000")
-            self.base_port = 8000
-        
-        # Actual port will be set during server startup (may differ if port is in use)
-        self.port = self.base_port
+        # Web port is chosen in start_server() by cp.start_web_server().
+        self.port = None
         
         # Get WAN Rate appdata configuration (for asset_id updates)
         # Check if asset_id updates are disabled (default: enabled)
@@ -76,9 +65,9 @@ class WANDashboard:
         self.wan_rate_output_path = cp.get_appdata('wan_rate_output_path') or '/config/system/asset_id'
         
         if self.asset_id_updates_enabled:
-            cp.log(f"WAN Rate asset_id updates ENABLED.  Webserver started on port {self.port}.  Report interval: {self.wan_rate_report_interval}s.  Buffer size: {self.wan_rate_buffer_size}s.  Output path: {self.wan_rate_output_path}")
+            cp.log(f"WAN Rate asset_id updates ENABLED.  Report interval: {self.wan_rate_report_interval}s.  Buffer size: {self.wan_rate_buffer_size}s.  Output path: {self.wan_rate_output_path}")
         else:
-            cp.log(f"WAN Rate asset_id updates DISABLED (wan_rate_disable appdata field exists).  Webserver started on port {self.port}")
+            cp.log("WAN Rate asset_id updates DISABLED (wan_rate_disable appdata field exists).")
         
         # Per-device data storage
         # devices_data[device_id]['timeframes'][tf] = { 'in':[], 'out':[], 'timestamps':[], 'conn':[] (live only) }
@@ -1329,74 +1318,16 @@ class WANDashboard:
                     self.send_response(404)
                     self.end_headers()
         
-        try:
-            # Create custom HTTP server that bypasses IDNA encoding issues
-            class CustomHTTPServer(HTTPServer):
-                def server_bind(self):
-                    # Override server_bind to avoid hostname resolution issues
-                    import socket
-                    self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    self.socket.bind(self.server_address)
-                    self.server_address = self.socket.getsockname()
-            
-            # Try to bind to the configured port, fallback to next 100 ports if in use
-            import socket
-            server = None
-            actual_port = None
-            max_attempts = 100
-            
-            for attempt in range(max_attempts):
-                try_port = dashboard.base_port + attempt
-                if try_port > 65535:
-                    cp.log(f"Error: Port {try_port} exceeds maximum port number (65535)")
-                    break
-                
-                try:
-                    # Test if port is available by trying to bind
-                    test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    test_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    test_socket.bind(('0.0.0.0', try_port))
-                    test_socket.close()
-                    
-                    # Port is available, create and start the server
-                    server = CustomHTTPServer(('0.0.0.0', try_port), DashboardHandler)
-                    actual_port = try_port
-                    dashboard.port = actual_port
-                    cp.log(f"WAN Dashboard server started on port {actual_port}")
-                    server.serve_forever()
-                    break
-                    
-                except OSError as e:
-                    if "Address already in use" in str(e) or "already in use" in str(e).lower():
-                        if attempt < max_attempts - 1:
-                            # Try next port
-                            cp.log(f"Port {try_port} is in use, trying next port...")
-                            continue
-                        else:
-                            cp.log(f"Error: Could not find an available port after {max_attempts} attempts")
-                            return
-                    else:
-                        # Different OSError, log and try next port
-                        if attempt < max_attempts - 1:
-                            cp.log(f"Error testing port {try_port}: {e}, trying next port...")
-                            continue
-                        else:
-                            cp.log(f"Error: Could not find an available port after {max_attempts} attempts: {e}")
-                            return
-                except Exception as e:
-                    # Other exceptions, log and try next port
-                    if attempt < max_attempts - 1:
-                        cp.log(f"Error with port {try_port}: {e}, trying next port...")
-                        continue
-                    else:
-                        cp.log(f"Error: Could not start server after {max_attempts} attempts: {e}")
-                        return
-                
-        except UnicodeError as e:
-            cp.log(f'IDNA encoding error - hostname contains invalid characters: {e}')
-            cp.log('Server failed to start due to hostname encoding issues')
-        except Exception as e:
-            cp.log(f'Error starting server: {e}')
+        # Port: appdata wan_dashboard_web_port (or the older
+        # wan_dashboard_port), else the first free port from 8000, saved to
+        # wan_dashboard_web_port.
+        server = cp.start_web_server(DashboardHandler,
+                                     legacy_field='wan_dashboard_port')
+        if server:
+            dashboard.port = server.server_port
+        # Keep the main thread alive; the server runs in its own thread.
+        while True:
+            time.sleep(60)
 
 
 # Apps will never be imported, therefore do not need if __name__ == "__main__":

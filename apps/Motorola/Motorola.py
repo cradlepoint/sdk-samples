@@ -12,7 +12,7 @@ Default Configuration:
 
 import cp
 from threading import Thread
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import json
 import os
@@ -397,8 +397,8 @@ if __name__ == "__main__":
     broadcaster = Broadcaster()
     Thread(target=broadcaster.loop, daemon=True).start()
 
-    web_port = int(cp.get_appdata('Motorola_port') or 8000)
-    cp.log('Web UI on port %s' % web_port)
-    server = HTTPServer(('0.0.0.0', web_port), AppHandler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.serve_forever()
+    # Port: appdata Motorola_web_port (or the older Motorola_port), else the
+    # first free port from 8000, saved to Motorola_web_port.
+    cp.start_web_server(AppHandler, legacy_field='Motorola_port')
+    while True:
+        time.sleep(60)

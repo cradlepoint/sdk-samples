@@ -52,14 +52,14 @@ Push settings to a fleet via NCM group appdata to enable automated capture acros
 
 ### Manual Capture
 
-1. Access `http://<router-ip>:8000`
+1. Access `http://<router-ip>:<port>` (see [Web Port](#web-port))
 2. Select mode, interface, and filter
 3. Click **Start** → **Stop** when done
 4. Download from **Saved Files**
 
 ### Automated Capture (recommended)
 
-1. Access `http://<router-ip>:8000`
+1. Access `http://<router-ip>:<port>`
 2. Select **Stream** mode, choose interface
 3. Set disk threshold (e.g. 80%) and check **Send Alert**
 4. Click **Save Defaults** then **Auto Start** (turns green)
@@ -94,13 +94,23 @@ Push the `pcap_defaults` appdata field via NCM group config to enable automated 
 | Field | Description |
 |-------|-------------|
 | `pcap_defaults` | JSON string with capture settings, auto_start flag, and interface config |
+| `Packet_Capture_Web_web_port` | Optional. Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
 
 ## Web Port
 
-Default port: **8000**
+The web UI port is shown in the app log and saved in `Packet_Capture_Web_web_port` (usually
+8000, or the next free port if 8000 is taken). The startup log shows it, for example
+`Bound port 8001 (discovered, saved to Packet_Capture_Web_web_port)` then
+`Web server started on port 8001`.
+
+To change the port for one router or a group, set `Packet_Capture_Web_web_port` in NCM SDK Data
+(device or group) and restart the app. Delete the field and restart to go back to automatic
+selection. A configured port that is busy is retried for about 10 seconds. If the port is not a
+number from 1 to 65535, or stays busy, the app stops itself and logs why. Fix or delete the
+field, then start the app.
 
 ## Requirements
 
 - Firmware 7.24+
-- Zone forwarding from Primary LAN Zone to Router Zone for LAN client access
+- Zone forwarding from Primary LAN Zone to Router Zone so LAN clients can reach the app's web port
 - `requests` library (pre-installed on cppython)

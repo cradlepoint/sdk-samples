@@ -99,29 +99,38 @@ which is exactly the case the fall-through handles.
 
 ## Quick Start
 
-1. **Access Web Interface** - Navigate to the router's IP on the port the app logged (8000 by default)
+1. **Access Web Interface** - Navigate to `http://<router_ip>:<port>`, using the port shown in the app log and saved in `Mobile_Site_Survey_web_port` (usually 8000, or the next free port if that is taken)
 2. **Configure Settings** - Set distance/time intervals and testing options
 3. **Run Survey** - Click "Run Survey Now" for manual testing or enable automatic testing
 4. **View Results** - Real-time results display with professional formatting
 
 ### Web Interface Port
 
-The web interface starts on **port 8000**. If 8000 is already in use, the app
-walks up through **8001-8100** and binds the first free port. If every port in
-that range is taken, the app logs an error and exits.
+The web port is kept in the appdata field `Mobile_Site_Survey_web_port`. If the
+field is set, the app uses exactly that port. If it is not set, the app takes the
+first free port from **8000** on first start and saves it there, so the port
+stays the same after reboots.
 
 The chosen port is always written to the router log at startup:
 
 ```text
+Bound port 8000 (discovered, saved to Mobile_Site_Survey_web_port)
 Web interface available on port 8000
 ```
 
 Check the log (or `make.py deploy` output) to see which port was used before
 browsing to the router. LAN clients also need a firewall zone forward from the
-Primary LAN Zone to the Router Zone to reach the app's port.
+Primary LAN Zone to the Router Zone to reach the app's web port.
 
-Note: surveyor coordination (`enable_surveyors`) contacts peer routers on port
-**8000** only, so peers that fell back to another port will not be triggered.
+To change the port for one router or a group, set `Mobile_Site_Survey_web_port`
+in NCM SDK Data (device or group) and restart the app. Delete the field and
+restart to go back to automatic selection. If the configured port is not a
+number from 1 to 65535, or stays busy for about 10 seconds, the app stops and
+logs why. Fix or delete the field, then start the app.
+
+**Survey targets need port 8000.** A surveyor router (`enable_surveyors`) starts
+tests on other routers by calling them on port **8000**. On routers used as
+survey targets, set `Mobile_Site_Survey_web_port` to `8000`.
 
 ## Requirements
 
@@ -139,7 +148,7 @@ Note: surveyor coordination (`enable_surveyors`) contacts peer routers on port
 
 ## Configuration (appdata `Mobile_Site_Survey`)
 
-All settings live in a single JSON value under `config/system/sdk/appdata` with
+All survey settings live in a single JSON value under `config/system/sdk/appdata` with
 the name `Mobile_Site_Survey`, and every one of them is editable from the web UI.
 None are required — anything missing falls back to the code default.
 
@@ -180,6 +189,14 @@ Every `iperf3_*` field is ignored unless `speedtest_engine` is `iperf3`.
 
 The older combined `speedtest_url` field (`host:start-end`) is migrated
 automatically into `iperf3_server` and `iperf3_ports` on first run and removed.
+
+## Appdata Fields
+
+These are separate appdata fields, not part of the `Mobile_Site_Survey` JSON value.
+
+| Field | Required | Description |
+|---|---|---|
+| `Mobile_Site_Survey_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. Set it to `8000` on routers used as survey targets |
 
 ## Results
 

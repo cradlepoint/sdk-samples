@@ -1697,7 +1697,7 @@ Download a captured pcap file.
 
 ## Web Server (dynamic port)
 
-### `cp.start_web_server(handler_class, start_port=8000, host='0.0.0.0')`
+### `cp.start_web_server(handler_class, start_port=8000, host='0.0.0.0', legacy_field=None, required=True)`
 
 Start a threaded `http.server` on the app's dynamic web port, serving in a daemon thread. Never
 calls `socket.getfqdn()` (which crashes on non-IDNA router hostnames).
@@ -1713,25 +1713,37 @@ Port selection (shared with `bind_web_port`):
 | `handler_class` | `type` | — | `BaseHTTPRequestHandler` subclass |
 | `start_port` | `int` | `8000` | First port tried when the field is not set |
 | `host` | `str` | `'0.0.0.0'` | Bind address |
+| `legacy_field` | `Optional[str]` | `None` | Older appdata port field, honoured when `<app_name>_web_port` is unset |
+| `required` | `bool` | `True` | `False` returns `None` on failure instead of stopping the app |
 
 **Returns:** the running `HTTPServer` (`server.server_port` is the port). On the router a failure
-does **not** return: it stops the app via `control/system/sdk/action` (avoiding a `restart = true`
-loop) and idles if the stop is ignored. Off-router a failure returns `None`.
+does **not** return (unless `required=False`): it stops the app via `cp.stop_app()` (avoiding a
+`restart = true` loop) and idles if the stop is ignored. Off-router a failure returns `None`. The
+caller must keep the main thread alive afterwards.
 
 ```python
 server = cp.start_web_server(MyHandler)
 cp.log(f'UI at http://router_ip:{server.server_port}')
 ```
 
-### `cp.bind_web_port(start_port=8000, host='0.0.0.0', name='web')`
+### `cp.bind_web_port(start_port=8000, host='0.0.0.0', name='web', legacy_field=None)`
 
 Same port selection, but returns only the bound, listening socket, for apps with their own
-server class. Build the server with `bind_and_activate=False`, close its placeholder
-`server.socket`, then assign `server.socket = sock`. `name` selects the appdata field
-`<app_name>_<name>_port` for a second listener.
+server class or tornado. For `http.server`: build with `bind_and_activate=False`, close its
+placeholder `server.socket`, then assign `server.socket = sock`. For tornado:
+`sock.setblocking(False)` then `tornado.httpserver.HTTPServer(app).add_sockets([sock])`. `name`
+selects the appdata field `<app_name>_<name>_port` for a second listener; `legacy_field` as above.
 
 **Returns:** `Optional[socket.socket]` — `None` on failure (reason logged). Port is
-`sock.getsockname()[1]`.
+`sock.getsockname()[1]`. On `None`, call `cp.stop_app()` and idle; never `sys.exit()`.
+
+### `cp.stop_app()`
+
+Ask the SDK to stop this app (`control/system/sdk/action` = `stop <uuid>`, uuid from
+`package.ini`). A stopped app is not relaunched by `restart = true`, unlike one that exits.
+Off-router it does nothing (it would stop the router's copy).
+
+**Returns:** `bool` — `True` if the stop request was sent.
 
 ---
 

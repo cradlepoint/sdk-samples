@@ -13,7 +13,6 @@ import signal
 import sys
 from datetime import datetime
 import http.server
-import socketserver
 
 # Global variables for data storage
 power_data = []
@@ -93,23 +92,6 @@ def is_signal_enabled():
     except Exception as e:
         cp.log(f"Error checking power_dashboard_signal: {e}")
         return False
-
-def get_web_server_port():
-    """Get web server port from appdata with default"""
-    try:
-        # Default port 8000
-        default_port = 8000
-        
-        try:
-            port_appdata = cp.get_appdata('power_dashboard_port')
-            if port_appdata:
-                return int(port_appdata)
-        except Exception as e:
-            cp.log(f"Error getting power dashboard port from appdata: {e}")
-        return default_port  # Return default on error
-    except Exception as e:
-        cp.log(f"Error getting web server port: {e}")
-        return default_port  # Return default on error
 
 def get_voltage_thresholds():
     """Get voltage thresholds from appdata with defaults"""
@@ -1767,12 +1749,9 @@ def create_html_page():
 
 
 def start_web_server():
-    """Start a simple HTTP server on configured port (default 8000)"""
+    """Start the dashboard web server and keep the main thread alive."""
     global web_server, shutdown_requested
-    
-    # Get port from appdata, default to 8000
-    preferred_port = get_web_server_port()
-    
+
     class PowerTrackerHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
             if self.path == '/':
@@ -1843,36 +1822,15 @@ def start_web_server():
     
     
 
-    # Try to bind to preferred port first, then try next ports if needed
-    max_port = preferred_port + 100
-    ports_to_try = [preferred_port] + list(range(preferred_port + 1, max_port + 1))
-    
-    for port in ports_to_try:
-        try:
-            cp.log(f"Starting web server on port {port}")
-            web_server = socketserver.TCPServer(("", port), PowerTrackerHandler)
-            cp.log(f"Web server started on port {port}")
-            break
-        except OSError as e:
-            if "Address already in use" in str(e) or "Address in use" in str(e):
-                cp.log(f"Port {port} is in use, trying next port...")
-                continue
-            else:
-                cp.log(f"Error binding to port {port}: {e}")
-                continue
-    else:
-        cp.log("Error: Could not find an available port")
-        return
-    
-    try:
-        while not shutdown_requested:
-            web_server.handle_request()
-    except Exception as e:
-        cp.log(f"Error in web server: {e}")
-    finally:
-        if web_server:
-            cp.log("Closing web server...")
-            web_server.server_close()
+    # Port: appdata power_dashboard_web_port (or the older
+    # power_dashboard_port), else the first free port from 8000, saved to
+    # power_dashboard_web_port.
+    web_server = cp.start_web_server(PowerTrackerHandler,
+                                     legacy_field='power_dashboard_port')
+
+    # Keep the main thread alive; signal_handler shuts the server down.
+    while not shutdown_requested:
+        time.sleep(1)
 
 
 """Main application entry point"""

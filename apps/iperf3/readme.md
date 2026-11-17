@@ -9,8 +9,8 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 
 ## How It Works
 
-1. On startup, the app launches a web server on port 8000
-2. Browse to `http://<router_ip>:8000` to access the UI
+1. On startup, the app launches a web server. The port is shown in the app log and saved in the `iperf3_web_port` appdata field (usually 8000, or the next free port if 8000 is taken)
+2. Browse to `http://<router_ip>:<port>` to access the UI
 3. Select Client or Server mode and configure options
 4. Click "Run Test" (client) or "Start Server" (server) to begin
 5. Results display in real-time with summary cards (client mode)
@@ -64,14 +64,24 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 - Router firmware 7.26 or later
 - An iPerf3 server reachable from the router (for client mode)
 - Network connectivity on port 5201 (default) to the iPerf3 server
-- LAN zone forwarding to Router zone for port 8000 (for LAN client access to the web UI)
+- LAN zone forwarding to Router zone for the app's web port (for LAN client access to the web UI)
+
+## Appdata Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `iperf3_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+
+The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to iperf3_web_port)` followed by `Web server started on port 8001`. If `iperf3_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+
+To change the port for one router or a group, set `iperf3_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 
 ## Notes
 
 - The bundled binary (`iperf3-arm64v8`) is for ARM64 routers — compatible with all current Cradlepoint models
 - History is stored in `tmp/iperf3_history.json` (up to 500 entries)
 - Only one test/server instance can run at a time
-- Web server binds to all interfaces on port 8000
+- Web server binds to all interfaces on the app's web port (see Appdata Fields)
 - Client tests use JSON output mode (`-J`) internally for result parsing
 - Server mode streams raw text output (no JSON) for readability
 - Server output buffer is capped at 50KB to prevent memory issues on long-running servers

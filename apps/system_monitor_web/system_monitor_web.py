@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 System Monitor for Cradlepoint Router
-Comprehensive memory and CPU usage tracking with web interface on port 8000
+Comprehensive memory and CPU usage tracking with a web interface
 """
 
 import cp
@@ -11,7 +11,6 @@ import threading
 import os
 from datetime import datetime
 import http.server
-import socketserver
 
 # Global variables for data storage
 memory_data = []
@@ -1008,7 +1007,7 @@ def create_html_page():
     return html
 
 def start_web_server():
-    """Start a simple HTTP server on port 8000"""
+    """Start the dashboard web server and keep the main thread alive."""
     class MemoryTrackerHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
             if self.path == '/':
@@ -1073,12 +1072,11 @@ def start_web_server():
                 self.send_response(404)
                 self.end_headers()
     
-    try:
-        with socketserver.TCPServer(("", 8000), MemoryTrackerHandler) as httpd:
-            cp.log("Web server started on port 8000")
-            httpd.serve_forever()
-    except Exception as e:
-        cp.log(f"Error starting web server: {e}")
+    # Port: appdata system_monitor_web_web_port, else the first free port
+    # from 8000 (saved there).
+    cp.start_web_server(MemoryTrackerHandler)
+    while True:
+        time.sleep(60)
 
 def main():
     """Main application entry point"""

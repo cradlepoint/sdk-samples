@@ -72,11 +72,12 @@ because an RR test measures transactions rather than bytes.
 
 ## Web Interface
 
-Access at `http://<router_ip>:8000` from a device on the LAN (default port 8000,
-configurable via the `speedtest_web_port` appdata field).
+Access at `http://<router_ip>:<port>` from a device on the LAN. The port is shown in
+the app log and saved in the `speedtest_web_web_port` appdata field (usually 8000, or
+the next free port if 8000 is taken). See [Appdata Fields](#appdata-fields).
 
-**Note**: LAN access requires a firewall zone forwarding rule from the Primary LAN Zone
-to the Router Zone.
+**Note**: LAN access to the app's web port requires a firewall zone forwarding rule from
+the Primary LAN Zone to the Router Zone.
 
 ## Tabs
 
@@ -111,11 +112,16 @@ All optional. Configuration is done through the web interface.
 
 | Field | Description |
 |-------|-------------|
-| `speedtest_web_port` | Web server port (default: 8000 if unset/invalid) |
+| `speedtest_web_web_port` | Optional. Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `speedtest_web_port` | Optional. Deprecated. Older name for the web port, used only when `speedtest_web_web_port` is not set. |
 | `speedtest_schedule` | JSON: `{enabled, autostart, cron, engine, params}` |
 | `speedtest_outputs` | JSON array of output paths |
 | `netperf_servers` | JSON array of `{server, label}` objects |
 | `iperf3_servers` | JSON array of `{server, port, city, country}` objects |
+
+The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to speedtest_web_web_port)` followed by `Web server started on port 8001`. If `speedtest_web_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+
+To change the port for one router or a group, set `speedtest_web_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 
 ## Output Format
 

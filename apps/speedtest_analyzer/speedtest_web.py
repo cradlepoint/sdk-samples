@@ -4,15 +4,13 @@
 import cp
 import os
 import re
-import sys
 import json
 import time
 import random
 import socket
-import socketserver
 import subprocess
 import threading
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler
 from datetime import datetime
 from threading import Thread
 from urllib.parse import parse_qs, urlparse
@@ -39,7 +37,6 @@ import geo_cache
 import geo_contributions
 
 # Constants
-PORT = 8000
 # GeoView has no user-facing provider selector: the cellular serving-location
 # service is fixed to OpenCellID. Enrichment reads, the resolve job, status,
 # and cache invalidation all key on this provider. The browser Maps JS map and
@@ -18615,42 +18612,10 @@ reconcile_thread.start()
 
 
 
-class ResilientHTTPServer(HTTPServer):
-    """HTTPServer with a numeric fallback for invalid router hostnames."""
-
-    def server_bind(self):
-        # Preserve TCPServer's normal wildcard bind and socket behavior.
-        socketserver.TCPServer.server_bind(self)
-
-        host, port = self.server_address[:2]
-
-        try:
-            # Preserve HTTPServer's normal server-name behavior when the
-            # router hostname can be resolved and encoded successfully.
-            self.server_name = socket.getfqdn(host)
-        except UnicodeError as e:
-            # NCOS may expose an internal hostname that cannot be encoded as
-            # a valid DNS label. The numeric listener address is sufficient
-            # because the app is accessed through the router's LAN IP.
-            self.server_name = host or '0.0.0.0'
-            cp.log(
-                'Web server hostname lookup unavailable; using '
-                f'{self.server_name}: {e}'
-            )
-
-        self.server_port = port
-
-
-# Start web server
-try:
-    ResilientHTTPServer.allow_reuse_address = True
-    server = ResilientHTTPServer(('', PORT), SpeedtestHandler)
-    server_thread = Thread(target=server.serve_forever, daemon=True)
-    server_thread.start()
-    cp.log(f'Web server started on port {PORT}')
-except Exception as e:
-    cp.log(f'Failed to start web server: {e}')
-    sys.exit(1)
+# Start web server. Port: appdata speedtest_analyzer_web_port, else the
+# first free port from 8000 (saved there). On failure it stops the app
+# instead of exiting (restart = true would relaunch it in a loop).
+server = cp.start_web_server(SpeedtestHandler)
 
 # Main loop
 while True:

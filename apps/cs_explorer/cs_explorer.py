@@ -6,7 +6,8 @@ Visualizes JSON data from the CP library as a hierarchical folder/file structure
 
 import json
 import os
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import time
+from http.server import SimpleHTTPRequestHandler
 from http import HTTPStatus
 from urllib.parse import parse_qs, urlparse
 import cp
@@ -416,16 +417,11 @@ def search_data_recursively(data, current_path, search_term, max_depth=3, curren
 
 
 def start_server():
-    server_address = ('0.0.0.0', 9002)
-    httpd = HTTPServer(server_address, RouterDataHandler)
-    
-    cp.log(f'Starting CS Explorer on http://0.0.0.0:9002')
-    
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        cp.log('Stopping CS Explorer')
-        httpd.shutdown()
+    cp.log('Starting CS Explorer')
+    # Port: appdata cs_explorer_web_port, else first free from 9002 (saved).
+    cp.start_web_server(RouterDataHandler, start_port=9002)
+    while True:
+        time.sleep(60)
 
 
 if __name__ == '__main__':

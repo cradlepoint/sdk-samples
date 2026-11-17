@@ -22,8 +22,6 @@ import http.server
 import json
 import math
 import os
-import socket
-import socketserver
 import sys
 import threading
 import time
@@ -44,7 +42,6 @@ _STATIC_DIR = os.path.join(_SCRIPT_DIR, 'static')
 APP_NAME = 'rtk_compare'
 
 # --- defaults (overridable via appdata, never written back to appdata) ---
-DEFAULT_PORT = 8000
 DEFAULT_INTERVAL = 1.0
 DEFAULT_MAX_POINTS = 7200
 
@@ -1612,26 +1609,18 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
-    daemon_threads = True
-    allow_reuse_address = True
+def start_web_ui(sampler, device_info, app_version):
+    """Start the HTTP server in a daemon thread. Returns the server or None.
 
-
-def start_web_server(port, sampler, device_info, app_version):
-    """Start the HTTP server in a daemon thread. Returns the server or None."""
+    Port: appdata rtk_compare_web_port (or the older rtk_compare_port), else
+    the first free port from 8000, saved to rtk_compare_web_port. Recording
+    does not need the UI, so a failure keeps sampling (required=False).
+    """
     RequestHandler.sampler = sampler
     RequestHandler.device_info = device_info
     RequestHandler.app_version = app_version
-    try:
-        server = ThreadedHTTPServer(('', port), RequestHandler)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    except OSError as error:
-        cp.log('ERROR: could not bind port {}: {}'.format(port, error))
-        return None
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    cp.log('Web server started on port {}'.format(port))
-    return server
+    return cp.start_web_server(RequestHandler, legacy_field='rtk_compare_port',
+                               required=False)
 
 
 # ---------------------------------------------------------------------------
@@ -1660,12 +1649,11 @@ def _appdata_value(name, default, caster, minimum=None, maximum=None):
 
 
 def load_settings():
-    port = _appdata_value('rtk_compare_port', DEFAULT_PORT, int, 1, 65535)
     interval = _appdata_value('rtk_compare_interval', DEFAULT_INTERVAL,
                               float, MIN_INTERVAL, MAX_INTERVAL)
     max_points = _appdata_value('rtk_compare_max_points', DEFAULT_MAX_POINTS,
                                 int, 60, 100000)
-    return port, interval, max_points
+    return interval, max_points
 
 
 # ---------------------------------------------------------------------------
@@ -1677,10 +1665,9 @@ def main():
     cp.log('Starting {} v{}...'.format(app_name, app_version))
 
     try:
-        port, interval, max_points = load_settings()
+        interval, max_points = load_settings()
     except Exception as error:
         cp.log('Settings load failed ({}) - using defaults'.format(error))
-        port = DEFAULT_PORT
         interval = DEFAULT_INTERVAL
         max_points = DEFAULT_MAX_POINTS
 
@@ -1722,7 +1709,7 @@ def main():
         _park('sampler could not be initialised')
         return
 
-    start_web_server(port, sampler, device_info, app_version)
+    start_web_ui(sampler, device_info, app_version)
 
     next_run = time.time()
     while True:

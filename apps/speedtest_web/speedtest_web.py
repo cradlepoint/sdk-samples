@@ -3,35 +3,18 @@
 
 import cp
 import os
-import sys
 import json
 import time
-import socket
 import subprocess
 import threading
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler
 from datetime import datetime
 from threading import Thread
 
 # Constants
-DEFAULT_PORT = 8000
 HISTORY_FILE = 'tmp/speedtest_history.json'
 MAX_HISTORY = 100
 
-
-def get_web_port():
-    """Get the web server port from appdata 'speedtest_web_port', falling back
-    to DEFAULT_PORT if unset or invalid. Never writes a default to appdata."""
-    try:
-        val = cp.get_appdata('speedtest_web_port')
-        if val:
-            port = int(val)
-            if 1 <= port <= 65535:
-                return port
-            cp.log(f'Invalid speedtest_web_port value "{val}", using default {DEFAULT_PORT}')
-    except Exception as e:
-        cp.log(f'Error reading speedtest_web_port appdata: {e}')
-    return DEFAULT_PORT
 
 # Global state
 current_test = {
@@ -1712,17 +1695,10 @@ if schedule_config.get('enabled'):
 sched_thread = Thread(target=scheduler_thread, daemon=True)
 sched_thread.start()
 
-# Start web server
-try:
-    WEB_PORT = get_web_port()
-    HTTPServer.allow_reuse_address = True
-    server = HTTPServer(('', WEB_PORT), SpeedtestHandler)
-    server_thread = Thread(target=server.serve_forever, daemon=True)
-    server_thread.start()
-    cp.log(f'Web server started on port {WEB_PORT}')
-except Exception as e:
-    cp.log(f'Failed to start web server: {e}')
-    sys.exit(1)
+# Start web server. Port: appdata speedtest_web_web_port (or the older
+# speedtest_web_port), else the first free port from 8000, saved to
+# speedtest_web_web_port. On failure it stops the app instead of exiting.
+server = cp.start_web_server(SpeedtestHandler, legacy_field='speedtest_web_port')
 
 # Main loop
 while True:

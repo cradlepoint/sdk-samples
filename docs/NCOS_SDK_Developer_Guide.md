@@ -527,8 +527,11 @@ cp.download_packet_capture(filename, local_path=None, capture_params=None) -> Op
 ### 4.22 Web Server and File Server
 
 ```python
-cp.start_web_server(handler_class, start_port=8000, host="0.0.0.0") -> HTTPServer
-cp.bind_web_port(start_port=8000, host="0.0.0.0", name="web") -> Optional[socket]
+cp.start_web_server(handler_class, start_port=8000, host="0.0.0.0",
+                    legacy_field=None, required=True) -> HTTPServer
+cp.bind_web_port(start_port=8000, host="0.0.0.0", name="web",
+                 legacy_field=None) -> Optional[socket]
+cp.stop_app() -> bool
 cp.start_file_server(folder_path="files", port=None, host="0.0.0.0",
                      title="File Download") -> Optional[Dict]
 ```

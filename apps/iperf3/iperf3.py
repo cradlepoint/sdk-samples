@@ -5,14 +5,12 @@ import os
 import sys
 import json
 import time
-import socket
 import signal
 import threading
 import subprocess
 import http.server
 from datetime import datetime
 
-PORT = 8000
 HISTORY_FILE = 'tmp/iperf3_history.json'
 IPERF3_BINARIES = ('iperf3', 'iperf3-arm64v8', 'iperf3-aarch64')
 
@@ -646,12 +644,7 @@ class Iperf3Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
-def start_server():
-    """Start the HTTP server."""
-    server = http.server.HTTPServer(('', PORT), Iperf3Handler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    cp.log(f'Web server started on port {PORT}')
-    server.serve_forever()
+
 
 
 cp.log('Starting iPerf3 Web UI...')
@@ -666,10 +659,8 @@ else:
 # Ensure tmp directory exists for history
 os.makedirs('tmp', exist_ok=True)
 
-# Start web server in daemon thread
-server_thread = threading.Thread(target=start_server, daemon=True)
-server_thread.start()
-cp.log(f'iPerf3 Web UI available at http://0.0.0.0:{PORT}')
+# Start web server. Port: appdata iperf3_web_port, else first free from 8000.
+cp.start_web_server(Iperf3Handler)
 
 # Keep main thread alive
 while True:

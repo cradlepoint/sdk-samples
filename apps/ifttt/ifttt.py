@@ -1,6 +1,6 @@
 """IFTTT - If This Then That Rule Engine for NCOS Router.
 
-Web dashboard on port 8000 with drag-and-drop interface for creating
+Web dashboard (port from cp.start_web_server) with drag-and-drop interface for creating
 simple if/then rules that interact with the router config tree via cp.py.
 Each rule is stored as its own appdata entry and evaluated on its own interval.
 """
@@ -10,16 +10,14 @@ import datetime
 import json
 import math
 import os
-import socket
 import time
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import SimpleHTTPRequestHandler
 from threading import Thread
 from urllib.parse import urlparse, parse_qs
 
 APP_NAME = 'ifttt'
 RULE_PREFIX = 'ifttt_rule_'
 DEFAULT_INTERVAL = 10
-PORT = 8000
 APP_DIR = os.path.dirname(__file__) or '.'
 UPTIME_WAIT_SECONDS = 120
 
@@ -845,11 +843,8 @@ if __name__ == '__main__':
     cp.wait_for_uptime(UPTIME_WAIT_SECONDS)
     cp.log('System ready.')
 
-    server = HTTPServer(('0.0.0.0', PORT), IFTTTHandler)
-    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    cp.log('Web dashboard running on port %d' % PORT)
-
-    Thread(target=server.serve_forever, daemon=True).start()
+    # Port: appdata ifttt_web_port, else first free from 8000 (saved).
+    cp.start_web_server(IFTTTHandler)
 
     # Auto-start enabled rules on startup
     cp.log('Loading saved rules...')

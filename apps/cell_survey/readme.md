@@ -28,11 +28,14 @@ a simple web page served by the router — no apps to install on your computer.
 From a phone or computer connected to the router, open a web browser to:
 
 ```
-http://<your-router-IP>:8000
+http://<your-router-IP>:<port>
 ```
 
 For example `http://192.168.0.1:8000`. (Your router's IP is the same address
-you use to reach its admin page.)
+you use to reach its admin page.) The port is shown in the app log at startup
+(for example `Web server started on port 8000`) and saved in the
+`cell_survey_web_port` field. It is usually 8000, or the next free port if 8000
+is taken, and it stays the same after reboots. See **Appdata Fields** to change it.
 
 If the page doesn't load, see **Troubleshooting** at the bottom.
 
@@ -122,13 +125,25 @@ whether you ran it yourself or it ran on a schedule.
 - A tower the app can't match to a known carrier shows as "Unknown."
 - The header has **Help** and **Device Info** buttons and a light/dark toggle.
 
+## Appdata Fields
+
+Set these in NCM SDK Data (device or group), then restart the app.
+
+| Field | Required | Description |
+|---|---|---|
+| `cell_survey_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it and restart to pick a port automatically again. |
+| `cell_survey_port` | No | Deprecated. Older name for the web port, used only when `cell_survey_web_port` is not set. |
+
 ## Troubleshooting
 
-- **The page won't open.** Double-check the router's IP and that you used port
-  `8000` (`http://<your-router-IP>:8000`). Make sure your device is connected
-  to the router. If it still won't load, the router's firewall may be blocking
-  the port — ask whoever manages the router to allow LAN devices to reach it on
-  that port.
+- **The page won't open.** Double-check the router's IP and that you used the
+  port shown in the app log (`http://<your-router-IP>:<port>`). Make sure your
+  device is connected to the router. If it still won't load, the router's
+  firewall may be blocking the app's web port. Ask whoever manages the router to
+  allow LAN devices to reach it on that port.
+- **The app stops with a port error.** `cell_survey_web_port` is not a number
+  from 1 to 65535, or that port stayed busy. Fix or delete the field, then start
+  the app.
 - **"Run Survey" is greyed out.** The survey needs one of the supported modems
   (Cradlepoint's Telit 5G modules). Other modems can't run it, and the app will
   say so.
@@ -138,6 +153,6 @@ whether you ran it yourself or it ran on a schedule.
 ## Good to know
 
 The app only changes your network settings when *you* lock or restore a carrier
-(or when a schedule you set up does). It doesn't touch anything else on the
-router, and it doesn't send your data anywhere — everything runs on the router
+(or when a schedule you set up does). Apart from saving its web port, it
+doesn't touch anything else on the router, and it doesn't send your data anywhere — everything runs on the router
 itself.

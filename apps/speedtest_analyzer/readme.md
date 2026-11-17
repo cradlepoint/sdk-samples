@@ -107,7 +107,7 @@ After installation, allow a short period for NCOS to upload, extract, and start 
 
 ## 2. Access the web interface
 
-The application listens on TCP port `8000`.
+The application listens on a TCP port shown in the app log and saved in the `speedtest_analyzer_web_port` SDK appdata field (usually `8000`, or the next free port if `8000` is taken). See [Appdata Fields](#appdata-fields) to choose a specific port.
 
 If connecting through **NCM LAN Manager**, no local firewall zone-forwarding changes are required to access the app.
 
@@ -119,10 +119,10 @@ If connecting from a device on the router's **local LAN**, configure zone forwar
 Then browse to:
 
 ```text
-http://<router_ip>:8000
+http://<router_ip>:<port>
 ```
 
-Example:
+Example, when the app log shows port 8000:
 
 ```text
 http://192.168.0.1:8000
@@ -1157,6 +1157,16 @@ Factory Reset does **not** remove or modify the NCM Group configuration.
 
 If the router belongs to an NCM Group, the Group configuration becomes effective again after the local Device data is cleared.
 
+## Appdata Fields
+
+| Field | Required | Description |
+|---|---|---|
+| `speedtest_analyzer_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+
+The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to speedtest_analyzer_web_port)` followed by `Web server started on port 8001`. If `speedtest_analyzer_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+
+To change the port for one router or a group, set `speedtest_analyzer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
+
 ---
 
 # Basic Troubleshooting
@@ -1174,7 +1184,8 @@ If connecting directly from the local LAN:
 - Verify the client is behind the router.
 - Verify Primary LAN Zone to Router Zone forwarding is allowed.
 - Verify Router Zone to Primary LAN Zone forwarding is allowed.
-- Verify TCP port `8000` is reachable.
+- Verify the app's web port (shown in the app log) is reachable.
+- If the app stopped at startup, check the log for an invalid or busy `speedtest_analyzer_web_port`. Fix or delete the field, then start the app.
 
 ## iPerf3 cannot connect
 
@@ -1227,7 +1238,7 @@ For detailed troubleshooting and implementation behavior, see [TECHNICAL_GUIDE.m
 - Cradlepoint router capable of running the SDK application
 - NCOS 7.26.x recommended
 - ARM64/aarch64 platform for the bundled iPerf3 binary
-- LAN-to-Router firewall access for TCP port `8000`
+- LAN-to-Router firewall access for the app's web port
 - Reachable iPerf3 endpoint when using iPerf3
 - Internet access to the native Cradlepoint Netperf service when using Netperf
 - Compatible licensed Ookla binary for optional Ookla testing

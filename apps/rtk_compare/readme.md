@@ -41,11 +41,13 @@ of skipped repeats is shown on the Analytics page.
 
 ## Web UI
 
-Reachable at `http://{router_lan_ip}:8000`.
+Reachable at `http://{router_lan_ip}:<port>`. The port is shown in the app log
+and saved in the `rtk_compare_web_port` appdata field (usually 8000, or the
+next free port if 8000 is taken). See [Appdata fields](#appdata-fields).
 
 > LAN clients need a firewall rule forwarding Primary LAN Zone → Router Zone
-> for port 8000 (Security > Zone Firewall). Without it the page times out even
-> though the app is running.
+> for the app's web port (Security > Zone Firewall). Without it the page times
+> out even though the app is running.
 
 The header shows the app title with version, the router name
 (`config/system/system_id`) and the NCOS version (`status/fw_info`).
@@ -226,14 +228,27 @@ the app appends to these files at runtime.
 
 ## Appdata fields
 
-All optional. None are written back to appdata, so NCM group configs are never
-overridden.
+All optional. The only value the app writes to appdata is the discovered web
+port, saved to `rtk_compare_web_port` when that field is not set.
 
 | Field | Default | Description |
 |---|---|---|
-| `rtk_compare_port` | `8000` | Web UI TCP port |
+| `rtk_compare_web_port` | first free from `8000` | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `rtk_compare_port` | | Deprecated. Older name for the web port, used only when `rtk_compare_web_port` is not set. |
 | `rtk_compare_interval` | `1.0` | Sample interval in seconds (0.5–60) |
 | `rtk_compare_max_points` | `7200` | In-memory samples kept for the map and analytics (60–100000) |
+
+The startup log shows the port in use, for example
+`Bound port 8001 (discovered, saved to rtk_compare_web_port)` followed by
+`Web server started on port 8001`. If `rtk_compare_web_port` is set and that
+port is busy, the app retries for about 10 seconds and never moves to another
+port. If the value is not a number from 1 to 65535, or the port stays busy, the
+web UI does not start and the log says why. Recording keeps running. Fix or
+delete the field, then restart the app.
+
+To change the port for one router or a group, set `rtk_compare_web_port` in NCM
+SDK Data (device or group) and restart the app. Delete the field and restart to
+go back to automatic selection.
 
 ## API endpoints
 

@@ -16,7 +16,7 @@ monitoring live results, and downloading PCAP files.
 ## Features
 
 - Live packet display with decoded summaries
-- Web UI on TCP port 7001
+- Web UI on the port shown in the app log and saved in `tcpdumpster_web_port` (usually 7001)
 - Interface selection (WAN, LAN, Wi-Fi monitor, SDWAN)
 - Only displays active interfaces
 - Refresh for newly activated interfaces
@@ -28,19 +28,32 @@ monitoring live results, and downloading PCAP files.
 
 ## Usage
 
-Access the UI at `https://<router_ip>:7001` after deploying.
+Access the UI at `http://<router_ip>:<port>` after deploying. The port is shown
+in the app log and saved in `tcpdumpster_web_port` (usually 7001, or the next
+free port if 7001 is taken). The startup log shows it, for example
+`Bound port 7001 (discovered, saved to tcpdumpster_web_port)` then
+`Web server started on port 7001`.
 
 Ensure firewall zone forwarding is configured from Primary LAN Zone to
-Router Zone to allow LAN clients to reach port 7001.
+Router Zone to allow LAN clients to reach the app's web port.
+
+To change the port for one router or a group, set `tcpdumpster_web_port` in
+NCM SDK Data (device or group) and restart the app. Delete the field and
+restart to go back to automatic selection. A configured port that is busy is
+retried for about 10 seconds. If the port is not a number from 1 to 65535, or
+stays busy, the app stops itself and logs why. Fix or delete the field, then
+start the app.
 
 ## Requirements
 
 - NCOS 7.x or later
-- Zone forwarding enabled for port 7001 access from LAN
+- Zone forwarding enabled so LAN clients can reach the app's web port
 
 ## Appdata Fields
 
-None required.
+| Field | Required | Description |
+|-------|----------|-------------|
+| `tcpdumpster_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 7001 and saves it here. Delete it to pick a port automatically again. |
 
 ## Notes
 

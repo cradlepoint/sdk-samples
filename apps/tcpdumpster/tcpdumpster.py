@@ -718,16 +718,11 @@ def main():
     if not CAPTURE_PASS:
         cp.log('ERROR: Could not create capture user after 3 attempts')
 
-    # SO_REUSEADDR must be set before bind - override server_bind
-    class ReusableHTTPServer(http.server.HTTPServer):
-        allow_reuse_address = True
-
-    server = ReusableHTTPServer(('', PORT), TCPDumpsterHandler)
-
-    cp.log('Web server started on port ' + str(PORT))
-
     try:
-        server.serve_forever()
+        # Port: appdata tcpdumpster_web_port, else first free from 7001.
+        cp.start_web_server(TCPDumpsterHandler, start_port=PORT)
+        while True:
+            time.sleep(60)
     except Exception as e:
         cp.log('Server error: ' + str(e))
     finally:

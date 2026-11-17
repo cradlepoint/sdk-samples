@@ -8,13 +8,11 @@ import sys
 import json
 import time
 import threading
-import socket
 import signal
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 
-PORT = 8000
 CAPTURES_DIR = 'captures'
 META_DIR = 'captures/meta'
 
@@ -1017,17 +1015,6 @@ class CaptureHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
 
-def start_server():
-    """Start the HTTP server."""
-    global server
-    try:
-        server = HTTPServer(('', PORT), CaptureHandler)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.serve_forever()
-    except Exception as e:
-        cp.log('Error starting web server: ' + str(e))
-
-
 def backfill_packet_counts():
     """Count packets for any pcap files missing packet_count in meta."""
     try:
@@ -1055,12 +1042,9 @@ def backfill_packet_counts():
 
 def main():
     """Main entry point."""
-    # Start web server in a thread
-    server_thread = threading.Thread(target=start_server)
-    server_thread.daemon = True
-    server_thread.start()
-
-    cp.log('Packet_Capture_Web running on port ' + str(PORT))
+    global server
+    # Port: appdata Packet_Capture_Web_web_port, else first free from 8000.
+    server = cp.start_web_server(CaptureHandler)
 
     # Backfill packet counts for existing files
     try:

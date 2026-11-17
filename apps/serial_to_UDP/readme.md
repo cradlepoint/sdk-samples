@@ -6,7 +6,9 @@ remote hosts over UDP.
 <img width="1686" height="845" alt="image" src="https://github.com/user-attachments/assets/2077fcd2-a94b-4f66-a780-6cfabf96edc0" />
 <img width="1686" height="845" alt="image" src="https://github.com/user-attachments/assets/b66ded08-0a9a-4b07-97da-baa297d5f205" />
 
-A web UI on port **8000** configures both sides:
+A web UI at `http://<router_ip>:<port>` configures both sides. The port is shown in the app
+log and saved in the `serial_to_UDP_web_port` SDK Data field (usually 8000, or the next free
+port if 8000 is taken).
 
 - **UDP settings** (destinations and source address) are stored in SDK Data (appdata).
 - **Serial port settings** are read from and written back to the **router config** at
@@ -28,7 +30,8 @@ The source address defaults to the router's primary LAN address
 to use those defaults.
 
 Defaults are resolved in code and are never written to appdata, so a blank source cannot
-override values pushed from an NCM group config.
+override values pushed from an NCM group config. The only value the app writes to appdata on
+its own is the discovered web port (see below).
 
 ## Serial port settings
 
@@ -81,9 +84,23 @@ Field name: `serial_to_UDP`, value is a single JSON object.
 The older single-destination format (`udp_dest_ip` / `udp_dest_port`) is still read and
 treated as one destination, so existing installs keep working.
 
+The web UI port is a separate SDK Data field:
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `serial_to_UDP_web_port` | no | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+
+The startup log shows the port, e.g. `Bound port 8001 (discovered, saved to
+serial_to_UDP_web_port)` then `Web server started on port 8001`. To change it for one router
+or a group, set `serial_to_UDP_web_port` in NCM SDK Data (device or group) and restart the
+app. Delete the field and restart to go back to automatic selection. A configured port that
+is busy is retried for about 10 seconds. If it is not a number from 1 to 65535, or stays
+busy, the web UI does not start and the log says why, but serial to UDP forwarding keeps
+running.
+
 ## Security note
 
-The web UI and its JSON API on port 8000 have **no authentication**. Anyone who can reach
+The web UI and its JSON API on the app's web port have **no authentication**. Anyone who can reach
 that port can change the UDP destinations and write to the router's serial configuration.
 Only expose it on trusted networks, and keep the zone firewall rule scoped to the LAN
 zones that need it.
@@ -97,7 +114,7 @@ zones that need it.
 
 ## Behavior
 
-- Starts the web UI on port 8000, then reads UDP settings from SDK Data and serial
+- Starts the web UI on its web port, then reads UDP settings from SDK Data and serial
   settings from the router config
 - Opens the serial port and binds a UDP socket to the source address
 - Reads up to 1024 bytes at a time and fans each read out to all destinations

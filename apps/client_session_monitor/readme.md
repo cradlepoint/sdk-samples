@@ -19,11 +19,12 @@ Monitors client connections to specific domains by tracking firewall connection 
 - **monitored_domains** (string, default: "example.com") - Comma-separated list of domains/URLs to monitor
 - **session_timeout** (integer, default: 60) - Seconds of inactivity before session ends
 - **log_size_limit** (integer, default: 10485760) - Maximum CSV log file size in bytes (default 10MB)
+- **client_session_monitor_web_port** (integer, optional) - Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Set or delete it in NCM SDK Data and restart the app; deleting it picks a port automatically again. If the port is invalid or stays busy, the app stops and logs why
 
 ## Usage
 
 1. Install app on router
-2. Access dashboard at http://ROUTER_IP:8000
+2. Access dashboard at `http://<router_ip>:<port>`. The port is shown in the app log and saved in `client_session_monitor_web_port` (usually 8000, or the next free port if that is taken)
 3. Click gear icon to configure:
    - Add monitored domains (e.g., "netflix.com", "youtube.com", "cnn.com")
    - Set session timeout (seconds of inactivity before session ends)

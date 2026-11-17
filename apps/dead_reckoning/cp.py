@@ -4167,7 +4167,8 @@ def _try_bind(host: str, port: int) -> Optional[socket.socket]:
 
 
 def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
-                  name: str = 'web') -> Optional[socket.socket]:
+                  name: str = 'web',
+                  legacy_field: Optional[str] = None) -> Optional[socket.socket]:
     """Bind this app's web port and return the listening socket.
 
     The port lives in appdata field '<app_name>_<name>_port' (e.g.
@@ -4189,6 +4190,9 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
         start_port: First port tried when the field is not set.
         host: Bind address (default all interfaces).
         name: Port name, for apps with more than one listener.
+        legacy_field: Older appdata port field the app used before. When
+            the new field is not set, a value here is used as the
+            configured port, so existing NCM settings keep working.
 
     Returns:
         Optional[socket.socket]: Bound, listening socket. The port is
@@ -4196,6 +4200,10 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
     """
     field = f'{_app_name}_{name}_port'
     configured = get_appdata(field) if _is_ncos else None
+    if _is_ncos and legacy_field and (configured is None or not str(configured).strip()):
+        legacy = get_appdata(legacy_field)
+        if legacy is not None and str(legacy).strip():
+            configured, field = legacy, legacy_field
 
     if configured is not None and str(configured).strip():
         try:
@@ -4231,8 +4239,19 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
     return None
 
 
-def _stop_this_app() -> bool:
-    """Ask the SDK to stop this app (a stopped app is not restarted)."""
+def stop_app() -> bool:
+    """Ask the SDK to stop this app (a stopped app is not restarted).
+
+    Use instead of sys.exit() when the app cannot continue: with
+    restart = true NCOS relaunches an exited app every few seconds.
+
+    Returns:
+        bool: True if the stop request was sent. Off-router it does
+            nothing and returns False (it would stop the router's copy).
+    """
+    if not _is_ncos:
+        log('Local run: not stopping the app on the router.')
+        return False
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         config = configparser.ConfigParser()
@@ -4249,36 +4268,44 @@ def _stop_this_app() -> bool:
 
 
 def start_web_server(handler_class: Any, start_port: int = 8000,
-                     host: str = '0.0.0.0') -> Any:
+                     host: str = '0.0.0.0',
+                     legacy_field: Optional[str] = None,
+                     required: bool = True) -> Any:
     """Start a threaded http.server on this app's dynamic web port.
 
     Binds the port with bind_web_port() (see there for how the port is
     chosen), then serves handler_class in a daemon thread. The server
     never calls socket.getfqdn(), which crashes on many NCOS hostnames.
 
-    On failure on the router this does NOT return: exiting would make
-    NCOS restart the app in a loop (restart = true), so it stops the app
-    through the SDK and idles if the stop is not honoured. Fix or delete
-    the '<app_name>_web_port' appdata field and start the app again.
+    On failure on the router this does NOT return (unless required is
+    False): exiting would make NCOS restart the app in a loop
+    (restart = true), so it stops the app through the SDK and idles if
+    the stop is not honoured. Fix or delete the '<app_name>_web_port'
+    appdata field and start the app again.
 
     Args:
         handler_class: http.server.BaseHTTPRequestHandler subclass.
         start_port: First port tried when the port field is not set.
         host: Bind address (default all interfaces).
+        legacy_field: Older appdata port field (see bind_web_port).
+        required: False for apps whose main job does not need the UI
+            (e.g. an NTP server): return None on failure instead of
+            stopping the app.
 
     Returns:
         http.server.HTTPServer: The running server. The port is
-            server.server_port. None only on a failed local run.
+            server.server_port. None on a failed local run, or on any
+            failure when required is False.
     """
     import http.server
     import socketserver
 
-    sock = bind_web_port(start_port, host)
+    sock = bind_web_port(start_port, host, legacy_field=legacy_field)
     if sock is None:
-        if not _is_ncos:
+        if not _is_ncos or not required:
             return None
         log('Stopping app: no web port.')
-        if _stop_this_app():
+        if stop_app():
             time.sleep(30)  # the SDK terminates this process
         log('SDK stop not honoured; idling without the web server.')
         while True:
