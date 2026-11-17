@@ -16,6 +16,7 @@ Features:
 - NCM alerts
 - Event registration and callbacks
 - Appdata management
+- Web server on a dynamic, NCM-configurable port (start_web_server)
 - Device info helpers (GPS, WAN, LAN, WLAN, GPIO, etc.)
 - Diagnostic tools (ping, traceroute, CLI execution)
 - WAN profile management
@@ -4144,10 +4145,163 @@ def download_packet_capture(filename: str, local_path: Optional[str] = None,
 
 
 # =============================================================================
+# WEB SERVER (dynamic web port)
+# =============================================================================
+
+_WEB_PORT_RANGE = 64          # first-run discovery tries start_port..+63
+_WEB_PORT_RETRIES = 5         # attempts on a busy configured port
+_WEB_PORT_RETRY_DELAY = 2     # seconds between those attempts
+
+
+def _try_bind(host: str, port: int) -> Optional[socket.socket]:
+    """Bind and listen on host:port. Returns the socket, or None if busy."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((host, port))
+        sock.listen(5)
+        return sock
+    except OSError:
+        sock.close()
+        return None
+
+
+def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
+                  name: str = 'web') -> Optional[socket.socket]:
+    """Bind this app's web port and return the listening socket.
+
+    The port lives in appdata field '<app_name>_<name>_port' (e.g.
+    'my_app_web_port'), so NCM can set it per group or device:
+
+    - Field set: that port is authoritative. Bind exactly it, retrying
+      briefly in case a previous instance is still releasing it. Never
+      move to another port; an invalid value is an error.
+    - Field not set: bind the first free port from start_port and save
+      it to the field, so the app keeps the same port across reboots.
+
+    Off-router (local development) a free port is discovered on this
+    machine and appdata is neither read nor written.
+
+    Pass the socket to a server built with bind_and_activate=False, or use
+    start_web_server(), which does that for you.
+
+    Args:
+        start_port: First port tried when the field is not set.
+        host: Bind address (default all interfaces).
+        name: Port name, for apps with more than one listener.
+
+    Returns:
+        Optional[socket.socket]: Bound, listening socket. The port is
+            sock.getsockname()[1]. None on failure (reason is logged).
+    """
+    field = f'{_app_name}_{name}_port'
+    configured = get_appdata(field) if _is_ncos else None
+
+    if configured is not None and str(configured).strip():
+        try:
+            port = int(str(configured).strip())
+        except ValueError:
+            port = 0
+        if not 1 <= port <= 65535:
+            log(f'Invalid {field}={configured!r}: must be a port number '
+                f'1-65535. Web server not started.')
+            return None
+        for attempt in range(_WEB_PORT_RETRIES):
+            sock = _try_bind(host, port)
+            if sock:
+                log(f'Bound port {port} (configured in {field})')
+                return sock
+            if attempt < _WEB_PORT_RETRIES - 1:
+                time.sleep(_WEB_PORT_RETRY_DELAY)
+        log(f'Port {port} (configured in {field}) is in use. Not moving to '
+            f'another port. Web server not started.')
+        return None
+
+    for port in range(start_port, min(start_port + _WEB_PORT_RANGE, 65536)):
+        sock = _try_bind(host, port)
+        if sock:
+            if _is_ncos:
+                put_appdata(field, str(port))
+                log(f'Bound port {port} (discovered, saved to {field})')
+            else:
+                log(f'Bound port {port} (discovered, local run: not saved)')
+            return sock
+    log(f'No free port in {start_port}-{start_port + _WEB_PORT_RANGE - 1}. '
+        f'Web server not started.')
+    return None
+
+
+def _stop_this_app() -> bool:
+    """Ask the SDK to stop this app (a stopped app is not restarted)."""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config = configparser.ConfigParser()
+        config.read(os.path.join(script_dir, 'package.ini'))
+        uuid = config.get(_app_name, 'uuid', fallback='').strip()
+        if not uuid:
+            log('Cannot stop app: no uuid in package.ini')
+            return False
+        put('control/system/sdk/action', f'stop {uuid}')
+        return True
+    except Exception as e:
+        log(f'Error stopping app: {e}')
+        return False
+
+
+def start_web_server(handler_class: Any, start_port: int = 8000,
+                     host: str = '0.0.0.0') -> Any:
+    """Start a threaded http.server on this app's dynamic web port.
+
+    Binds the port with bind_web_port() (see there for how the port is
+    chosen), then serves handler_class in a daemon thread. The server
+    never calls socket.getfqdn(), which crashes on many NCOS hostnames.
+
+    On failure on the router this does NOT return: exiting would make
+    NCOS restart the app in a loop (restart = true), so it stops the app
+    through the SDK and idles if the stop is not honoured. Fix or delete
+    the '<app_name>_web_port' appdata field and start the app again.
+
+    Args:
+        handler_class: http.server.BaseHTTPRequestHandler subclass.
+        start_port: First port tried when the port field is not set.
+        host: Bind address (default all interfaces).
+
+    Returns:
+        http.server.HTTPServer: The running server. The port is
+            server.server_port. None only on a failed local run.
+    """
+    import http.server
+    import socketserver
+
+    sock = bind_web_port(start_port, host)
+    if sock is None:
+        if not _is_ncos:
+            return None
+        log('Stopping app: no web port.')
+        if _stop_this_app():
+            time.sleep(30)  # the SDK terminates this process
+        log('SDK stop not honoured; idling without the web server.')
+        while True:
+            time.sleep(3600)
+
+    class _WebServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        daemon_threads = True
+
+    server = _WebServer((host, 0), handler_class, bind_and_activate=False)
+    server.socket.close()  # unused placeholder socket from __init__
+    server.socket = sock
+    server.server_address = sock.getsockname()
+    server.server_name, server.server_port = server.server_address[:2]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    log(f'Web server started on port {server.server_port}')
+    return server
+
+
+# =============================================================================
 # FILE SERVER
 # =============================================================================
 
-def start_file_server(folder_path: str = "files", port: int = 8000,
+def start_file_server(folder_path: str = "files", port: Optional[int] = None,
                       host: str = "0.0.0.0",
                       title: str = "File Download") -> Optional[Dict[str, Any]]:
     """Start a web file server with custom UI for downloading files.
@@ -4158,7 +4312,8 @@ def start_file_server(folder_path: str = "files", port: int = 8000,
 
     Args:
         folder_path: Relative path to serve files from.
-        port: Port number (default 8000).
+        port: Port number. Default None picks a dynamic port with
+            bind_web_port(name='file') (appdata '<app_name>_file_port').
         host: Bind address (default all interfaces).
         title: Page title shown in the UI.
 
@@ -4336,12 +4491,23 @@ def start_file_server(folder_path: str = "files", port: int = 8000,
             def log_message(self, fmt, *args):
                 log(f"FileServer: {fmt % args}")
 
+        sock = None
+        if port is None:
+            sock = bind_web_port(host=host, name='file')
+            if sock is None:
+                return None
+            port = sock.getsockname()[1]
+
         def run():
             try:
-                with socketserver.TCPServer(
-                        (host, port), FileHandler) as httpd:
-                    httpd.socket.setsockopt(
-                        socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                if sock is not None:
+                    httpd = socketserver.TCPServer(
+                        (host, port), FileHandler, bind_and_activate=False)
+                    httpd.socket.close()
+                    httpd.socket = sock
+                else:
+                    httpd = socketserver.TCPServer((host, port), FileHandler)
+                with httpd:
                     httpd.serve_forever()
             except Exception as e:
                 log(f"File server error: {e}")
