@@ -21,11 +21,10 @@ See readme.md for the API details and measured switch timing.
 import json
 import os
 import signal
-import socket
 import sys
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
 import appconfig
@@ -33,20 +32,14 @@ import cp
 import dsds
 import monitor as monitor_mod
 
-DEFAULT_PORT = 8000
+# Web server port: appdata dsds_wan_verify_web_port, else the first free
+# port from 8000 (saved there) - see cp.start_web_server(). The older
+# dsds_wan_verify_port field is still honoured when the new one is unset.
+LEGACY_PORT_FIELD = 'dsds_wan_verify_port'
 
-# Optional appdata override for the web server port. A standalone appdata
-# field rather than part of the per-slot config JSON, because the port is
-# an app-wide deployment setting (it may collide with another SDK app or a
-# service on the router) and keeping it separate lets it be set from an
-# NCM group without touching the failover config. Field name:
-#   dsds_wan_verify_port = "8080"
-PORT_APPDATA_FIELD = 'dsds_wan_verify_port'
-
-# The resolved port the web server actually bound to, filled in at
-# startup by _resolve_port(). Used in log messages so they report the
-# real port, not the default.
-PORT = DEFAULT_PORT
+# The port the web server actually bound to, filled in at startup. Used in
+# log messages so they report the real port.
+PORT = None
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _STATIC_DIR = os.path.join(_SCRIPT_DIR, 'static')
@@ -299,58 +292,6 @@ class Handler(BaseHTTPRequestHandler):
             self._json({'error': str(e)}, 500)
 
 
-def _resolve_port():
-    """Port for the web server: the appdata override, or the default.
-
-    Reads the standalone appdata field dsds_wan_verify_port. An unset,
-    empty, non-numeric, or out-of-range value falls back to DEFAULT_PORT
-    rather than failing to start, so a bad override never leaves the app
-    with no web UI. Ports below 1024 are rejected because the app does
-    not run privileged; 8000 is the documented default.
-    """
-    try:
-        raw = cp.get_appdata(PORT_APPDATA_FIELD)
-    except Exception as e:
-        cp.log('Could not read %s appdata, using default port %d: %s'
-               % (PORT_APPDATA_FIELD, DEFAULT_PORT, e))
-        return DEFAULT_PORT
-    if raw is None or str(raw).strip() == '':
-        return DEFAULT_PORT
-    try:
-        port = int(str(raw).strip())
-    except (TypeError, ValueError):
-        cp.log('Ignoring non-numeric %s appdata value %r; using default '
-               'port %d' % (PORT_APPDATA_FIELD, raw, DEFAULT_PORT))
-        return DEFAULT_PORT
-    if not (1024 <= port <= 65535):
-        cp.log('Ignoring out-of-range %s appdata value %d (must be '
-               '1024-65535); using default port %d'
-               % (PORT_APPDATA_FIELD, port, DEFAULT_PORT))
-        return DEFAULT_PORT
-    if port != DEFAULT_PORT:
-        cp.log('Web server port overridden to %d via %s appdata'
-               % (port, PORT_APPDATA_FIELD))
-    return port
-
-
-def serve():
-    global SERVER
-    try:
-        # Threaded, because several endpoints legitimately block for a
-        # long time: a manual switch takes ~30s and a retrying HTTP test
-        # can take (retries + 1) x timeout. On a single-threaded server
-        # those would freeze the dashboard and its status polling.
-        SERVER = ThreadingHTTPServer(('', PORT), Handler)
-        SERVER.daemon_threads = True
-        SERVER.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        cp.log('Web server started on port %d' % PORT)
-        SERVER.serve_forever()
-    except OSError as e:
-        cp.log('Could not start web server on port %d: %s' % (PORT, e))
-    except Exception as e:
-        cp.log('Web server error: %s' % e)
-
-
 def _handle_signal(signum, frame):
     cp.log('Received signal %s, shutting down' % signum)
     _shutdown.set()
@@ -362,14 +303,8 @@ def _handle_signal(signum, frame):
 
 
 def main():
-    global MON, PORT
+    global MON, PORT, SERVER
     cp.log('Starting dsds_wan_verify v%s...' % _app_version())
-
-    # Resolve the web server port before the server thread starts, so the
-    # override takes effect and every later log line reports the real
-    # port. Changing it takes an app restart; it is a deployment setting,
-    # not a live control.
-    PORT = _resolve_port()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
@@ -381,9 +316,12 @@ def main():
     # retries exits promptly instead of holding up the restart.
     MON = monitor_mod.Monitor(stop_event=_shutdown)
 
-    thread = threading.Thread(target=serve, name='web')
-    thread.daemon = True
-    thread.start()
+    # Threaded server, because several endpoints legitimately block for a
+    # long time: a manual switch takes ~30s and a retrying HTTP test can
+    # take (retries + 1) x timeout. The port is a deployment setting read
+    # once at startup; changing it takes an app restart.
+    SERVER = cp.start_web_server(Handler, legacy_field=LEGACY_PORT_FIELD)
+    PORT = SERVER.server_port if SERVER else None
 
     slots = dsds.discover_slots()
     if slots:
@@ -395,7 +333,7 @@ def main():
                       ' (active)' if slot.get('active_sib') else ''))
     else:
         cp.log('No DSDS modem found yet. The app will keep looking; the web '
-               'UI is available on port %d.' % PORT)
+               'UI is available on port %s.' % PORT)
 
     # Only tests that can *fail* a slot count as arming it. A failback
     # minimum on its own just gates where the app may move to.
@@ -417,7 +355,7 @@ def main():
     else:
         cp.log('No tests are enabled yet, so no slot can fail and nothing '
                'will switch. Configure ping, signal, or HTTP tests per SIM '
-               'slot in the web UI on port %d.' % PORT)
+               'slot in the web UI on port %s.' % PORT)
 
     while not _shutdown.is_set():
         try:

@@ -1,7 +1,7 @@
 # dsds_wan_verify
 
 Connectivity verification and automatic failover for **Dual SIM Dual Standby (DSDS)** modems,
-with a web UI on port 8000.
+with a web UI on a port shown in the app log (usually 8000).
 
 <img width="1634" height="923" alt="image" src="https://github.com/user-attachments/assets/b6b7587e-dcee-44f8-b1b8-a88dca6e4854" />
 <img width="1634" height="923" alt="image" src="https://github.com/user-attachments/assets/7315c5be-e936-4f26-b402-de33c775fd72" />
@@ -20,9 +20,11 @@ other slot. Each slot can be checked three ways, and each check is switchable pe
 
 1. **Deploy the app.** It starts working immediately on its built-in defaults — ping `8.8.8.8`
    on both slots, with automatic failover on — so review them before leaving it unattended.
-2. **Open the web UI.** From a LAN client, go to `http://<router-lan-ip>:8000`. If the page
-   times out, see [LAN access](#lan-access). You can also reach it through Remote Connect LAN
-   Manager to `127.0.0.1` port 8000.
+2. **Open the web UI.** From a LAN client, go to `http://<router-lan-ip>:<port>`. The port is
+   shown in the app log and saved in `dsds_wan_verify_web_port` (usually 8000, or the next free
+   port if that is taken; see [Web server port](#web-server-port)). If the page times out, see
+   [LAN access](#lan-access). You can also reach it through Remote Connect LAN Manager to
+   `127.0.0.1` on the same port.
 3. **Set your tests.** On **Connectivity Tests**, pick a slot tab and edit the **Ping Test**
    targets or add an **HTTP Test** URL (use **Test Now** to check a URL before saving).
 4. **Set your signal thresholds.** On **Signal Thresholds**, adjust the minimum signal per slot.
@@ -47,7 +49,8 @@ Two things to know before it runs unattended:
 - **It will switch SIMs on its own** when the connected slot's tests fail. Each switch costs
   about 30 seconds of downtime.
 - Defaults live in code and are **never written to appdata**, so an NCM group config always
-  wins.
+  wins. The only value the app writes is the web port it picks on first start (see
+  [Web server port](#web-server-port)).
 
 ---
 
@@ -133,6 +136,14 @@ seconds (the slot summaries normally change almost immediately), the app treats 
 failed, logs it, and retries once the target is switchable again rather than waiting out the full
 switch timeout.
 
+**Failed switches say why.** When a switch does not complete, the Event Log entry gives the reason
+the target SIM did not come up: the modem's own error (for example `the modem reported "CPPM
+failed: no carrier"`), or, when the modem gives none, how far the SIM got (never handed the radio,
+handed the radio but never given an IP address) and the last state it was in. If the modem posts
+its error only after the switch is over, a follow-up entry adds it. If the modem gives up and goes
+back to the original SIM, the app notices and reports the failure then instead of waiting out the
+full timeout.
+
 ---
 
 ## Configuration
@@ -149,13 +160,33 @@ changes (NCM push, REST, manual edit, or deletion) within about 10 seconds witho
 
 ### Web server port
 
-The web UI listens on **port 8000** by default. To change it, set a separate appdata field
-**`dsds_wan_verify_port`** to the port number as a string, e.g. `8080`. This is a standalone field
-(not part of the `dsds_wan_verify` config JSON) so it can be pushed from an NCM group on its own.
-The value must be 1024–65535; anything unset, empty, non-numeric, or out of range falls back to
-8000 and is logged. **The port is read once at startup**, so changing it takes an app restart —
-unlike the per-slot config, it is not reloaded live. Remember to open the new port in the Zone
-Firewall forward (see [LAN access](#lan-access)).
+The web UI port is kept in a separate appdata field, **`dsds_wan_verify_web_port`** (not part of
+the `dsds_wan_verify` config JSON), so it can be pushed from an NCM group on its own.
+
+- **Set:** the app uses exactly that port, any number from 1 to 65535. If the port is busy it
+  retries for about 10 seconds and never moves to another port.
+- **Not set:** on first start the app takes the first free port from 8000 and saves it to
+  `dsds_wan_verify_web_port`, so the port stays the same after reboots.
+- **Invalid or busy:** if the value is not a number from 1 to 65535, or the port stays busy, the
+  app stops and logs why. Fix or delete the field, then start the app.
+
+The startup log shows the port, for example:
+
+```text
+Bound port 8001 (discovered, saved to dsds_wan_verify_web_port)
+Web server started on port 8001
+```
+
+To change the port for one router or a group, set `dsds_wan_verify_web_port` in NCM SDK Data
+(device or group) and restart the app. Delete the field and restart to go back to automatic
+selection. **The port is read once at startup**, so unlike the per-slot config it is not reloaded
+live. Make sure the Zone Firewall forward lets LAN clients reach the app's web port (see
+[LAN access](#lan-access)).
+
+| Field | Required | Description |
+|---|---|---|
+| `dsds_wan_verify_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `dsds_wan_verify_port` | No | Deprecated. Older name for the web port, used only when `dsds_wan_verify_web_port` is not set. It used to reject ports below 1024; the new field accepts 1-65535. |
 
 ### Per slot (`slots["<port>|<sim>"]`, e.g. `slots["int1|sim1"]`)
 
@@ -232,11 +263,11 @@ writes the whole config; the **Preferred SIM** selector applies immediately with
 
 ### LAN access
 
-If the app is running but LAN clients time out on port 8000, add a Zone Firewall forward from the
+If the app is running but LAN clients time out on the app's web port, add a Zone Firewall forward from the
 Primary LAN Zone to the Router Zone under **Security → Zone Firewall** (or at
 `config/firewall/zone_fwd`).
 
-The UI has no authentication — anyone who can reach port 8000 can change the config and force a
+The UI has no authentication — anyone who can reach the app's web port can change the config and force a
 switch. Keep the zone forward scoped to trusted networks.
 
 ### JSON API

@@ -122,6 +122,13 @@ SWITCH_RETRY_COOLDOWN = 15
 # probe just needs the interface routable.
 PING_ARM_DELAY = 5
 
+# After a failed switch where the modem gave no error text for the target,
+# keep watching that slot this long for one to appear. NCOS sometimes posts
+# the reason (e.g. "CPPM failed: no carrier") only after it has abandoned
+# the switch and restored the other slot, which is after the app has
+# already logged the failure.
+LATE_REASON_WINDOW = 180
+
 
 def _describe_failing(failing):
     """Render (metric, value_or_None, threshold) triples for a message.
@@ -216,6 +223,10 @@ class Monitor(object):
         # switch. Keeps a suspended target from being re-attempted every
         # poll while still retrying promptly once the cooldown passes.
         self._switch_retry_after = {}
+        # {'key': slot_key, 'until': deadline} while waiting for the modem
+        # to post an error reason for a switch target that failed without
+        # one. See LATE_REASON_WINDOW and _check_late_fail_reason().
+        self._await_fail_reason = None
 
     # -- helpers ---------------------------------------------------------
 
@@ -557,6 +568,28 @@ class Monitor(object):
                     # cleared), so the reason has outlived its window.
                     del self.failover_reason[key]
 
+    def _check_late_fail_reason(self, slots):
+        """Log the modem's reason for a failed switch if it shows up late.
+
+        Armed by do_switch() when a switch failed and the target had no
+        error text. Gives up quietly after LATE_REASON_WINDOW, or when the
+        slot connects (it evidently came up after all).
+        """
+        pending = self._await_fail_reason
+        if not pending:
+            return
+        slot = slots.get(pending['key'])
+        if slot is None or slot.get('connected') \
+                or time.time() > pending['until']:
+            self._await_fail_reason = None
+            return
+        err = slot.get('error_text')
+        if not err:
+            return
+        self._await_fail_reason = None
+        self.event('Reason the switch to %s failed, reported by the modem '
+                   'afterwards: %s' % (dsds.slot_label(slot), err), 'error')
+
     def _hold_status_text(self, active, held):
         """One consistent status line for an active failback holdoff.
 
@@ -660,6 +693,8 @@ class Monitor(object):
                                             int(retry_after - time.time()))
 
             self.switching = True
+            # A new attempt supersedes any wait for a previous one's reason.
+            self._await_fail_reason = None
             self.status_text = 'switching to %s' % dsds.slot_label(target)
             self.event('%s switching from %s to %s: %s'
                        % ('Manual' if manual else 'Automatic',
@@ -688,7 +723,7 @@ class Monitor(object):
                 self.armed_tests = {}
                 self.ping_results = {}
 
-            ok, elapsed, slots, fail_reason = dsds.wait_for_switch(
+            ok, elapsed, slots, fail_reason, trace = dsds.wait_for_switch(
                 current['key'], target_key)
             new_active = dsds.active_slot(slots)
             settle = appconfig.slot_config(
@@ -726,17 +761,46 @@ class Monitor(object):
                 return True, 'switched to %s in %.0fs' % (
                     dsds.slot_label(new_active), elapsed)
 
-            # The modem's own error text for the target names the real
-            # reason the switch failed (e.g. "CPPM failed: carrier
-            # reject"), so pull it from the just-discovered slots and use
-            # it in every message rather than a vague stock phrase.
-            err = (slots.get(target_key) or {}).get('error_text')
-            err_suffix = ': %s' % err if err else ''
+            # Say *why* the target did not come up, not just that it did
+            # not. The modem's own error text (e.g. "CPPM failed: no
+            # carrier") is the best answer, but NCOS often clears it or
+            # has not written it yet when the wait ends, so the trace
+            # keeps every error the target showed during the switch. With
+            # no error text at all, describe_switch_failure() falls back
+            # to how far the target got (radio handed over, IP assigned)
+            # and the last state it was seen in.
+            final_target = slots.get(target_key) or {}
+            errors = list(trace.get('errors') or [])
+            if final_target.get('error_text') and \
+                    final_target['error_text'] not in errors:
+                errors.append(final_target['error_text'])
+            err = '; '.join(errors) if errors else None
+            why = dsds.describe_switch_failure(trace, final_target)
+            why_suffix = ': %s' % why if why else ''
+            # The full step-by-step path goes to the system log only; the
+            # event keeps just the last step so it stays readable.
+            cp.log('Switch to %s (%s) state trace: %s'
+                   % (dsds.slot_label(target), fail_reason,
+                      ' -> '.join(trace.get('states') or []) or 'none'))
+            restored_to = ''
+            if trace.get('restored'):
+                restored_to = '; the modem went back to %s' \
+                    % dsds.slot_label(slots.get(current['key']) or current)
+            if not errors:
+                # The modem may still post its reason a little after the
+                # switch is over. Watch the target for a while and log it
+                # as a follow-up event when it appears.
+                with self.lock:
+                    self._await_fail_reason = {
+                        'key': target_key,
+                        'until': time.time() + LATE_REASON_WINDOW,
+                    }
 
             # Any failed switch arms the failback holdoff on the target.
             # Whatever the exact failure - the modem never acted ('did
             # not start'), the target went suspended ('target failed'),
-            # or it never connected in time ('timed out') - the target
+            # the modem put the original slot back ('reverted'), or it
+            # never connected in time ('timed out') - the target
             # could not be brought up, which is precisely what the holdoff
             # is for. Arming it here (rather than a short retry cooldown)
             # is what makes the app hold until failback instead of
@@ -745,7 +809,10 @@ class Monitor(object):
             # slot with a holdoff configured, which is the only slot a
             # proactive failback would ever retry; a failed *failover* to
             # a non-preferred slot falls through to the short cooldown.
-            self._hold_failback(target_key, cause='failed-switch', detail=err)
+            self._hold_failback(
+                target_key, cause='failed-switch',
+                detail='a switch to it failed: the modem reported "%s"'
+                       % '", then "'.join(errors) if errors else None)
             if not self._failback_hold_remaining(target_key):
                 # No holdoff applied (target is not the preferred slot, or
                 # the holdoff is configured to 0), so fall back to the
@@ -754,31 +821,40 @@ class Monitor(object):
                     self._switch_retry_after[target_key] = \
                         time.time() + SWITCH_RETRY_COOLDOWN
 
+            label = dsds.slot_label(target)
             if fail_reason == 'did not start':
+                # Nothing moved, so "how far it got" says nothing new -
+                # only the modem's own error text is worth adding.
                 self.event('Switch to %s did not start within %.0fs - the '
                            'modem did not act on the request%s'
-                           % (dsds.slot_label(target), elapsed, err_suffix),
+                           % (label, elapsed,
+                              ': the modem reported "%s"' % err if err else ''),
                            'warn')
-                self.status_text = 'switch to %s did not start' \
-                    % dsds.slot_label(target)
-                return False, 'switch did not start within %.0fs' % elapsed
+                self.status_text = 'switch to %s did not start' % label
+                return False, 'switch did not start within %.0fs%s' % (
+                    elapsed, ' (%s)' % err if err else '')
 
             if fail_reason == 'target failed':
-                self.event('Switch to %s failed after %.0fs%s'
-                           % (dsds.slot_label(target), elapsed,
-                              err_suffix or ': the slot went suspended '
-                              'instead of connecting'), 'error')
+                message = 'Switch to %s failed after %.0fs%s' % (
+                    label, elapsed, why_suffix)
+                self.event(message, 'error')
                 self.status_text = 'switch to %s failed%s' % (
-                    dsds.slot_label(target),
-                    ' (%s)' % err if err else ' (suspended)')
-                return False, 'target %s failed to connect' \
-                    % dsds.slot_label(target)
+                    label, ' (%s)' % err if err else ' (suspended)')
+                return False, message
 
-            self.event('Switch to %s did not complete within %.0fs%s'
-                       % (dsds.slot_label(target), elapsed, err_suffix),
-                       'error')
-            self.status_text = 'switch timed out'
-            return False, 'switch did not complete within %.0fs' % elapsed
+            if fail_reason == 'reverted':
+                message = 'Switch to %s failed after %.0fs%s%s' % (
+                    label, elapsed, why_suffix, restored_to)
+                self.event(message, 'error')
+                self.status_text = 'switch to %s failed%s' % (
+                    label, ' (%s)' % err if err else '')
+                return False, message
+
+            message = 'Switch to %s did not complete within %.0fs%s%s' % (
+                label, elapsed, why_suffix, restored_to)
+            self.event(message, 'error')
+            self.status_text = 'switch to %s timed out' % label
+            return False, message
         finally:
             self.switching = False
             self.switch_lock.release()
@@ -999,6 +1075,11 @@ class Monitor(object):
         # has reconnected or its holdoff has ended, so the red ping row
         # does not linger past the window it is explaining.
         self._clear_stale_failover_reason(live)
+
+        # Before any of the early returns below (switching, settling), so
+        # a reason the modem posts while it is still unwinding the failed
+        # switch is not missed.
+        self._check_late_fail_reason(slots)
 
         if self.failback_hold_slot:
             if self.failback_hold_slot not in live:
