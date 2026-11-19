@@ -237,21 +237,41 @@ def activate_esim_profile(uid, eid, iccid):
             'message': 'Could not start eSIM profile activation.'}
 
 
-def _at_channel_rank(summary, connected):
+def _is_active_sib(info, status, diag):
+    """True if this SIM slot currently owns the modem radio.
+
+    NCOS publishes the same flag in three places: status/isActiveSib and
+    info/isActiveSib (booleans) and diagnostics/IS_ACTIVE_SIB ('TRUE'/'FALSE').
+    Read whichever is present, status first.
+    """
+    for value in (status.get('isActiveSib'), info.get('isActiveSib')):
+        if isinstance(value, bool):
+            return value
+    return str(diag.get('IS_ACTIVE_SIB', '')).upper() == 'TRUE'
+
+
+def _at_channel_rank(summary, connected, active_sib=False):
     """Rank a SIM slot by how usable its AT channel is (higher is better).
 
-    The AT survey opens the slot's SubIface (e.g. rmnet501). A disabled slot
-    has no open AT channel, so its iface must never be chosen even when it is
-    the only slot iterated first. A connected slot is best; any other
-    non-disabled state (standby, connecting, Dual SIM switch) keeps a working
-    channel and is preferred over a disabled slot.
+    The AT survey opens the slot's SubIface (e.g. rmnet501), and only the slot
+    that owns the radio (the active sibling) has an open AT channel. So:
+      - A connected slot is best (it is always the active sibling).
+      - With nothing connected, the active sibling wins over the other slot.
+        E.g. SIM1 'disconnected' + eSIM 'standby' with isActiveSib true: the
+        survey must use the eSIM slot's iface, or atterm fails with "Could not
+        open AT channel on rmnet501".
+      - Any other non-disabled slot is a fallback.
+      - A disabled slot is never preferred.
 
     Returns:
-        int: 2 = connected, 1 = usable (non-disabled), 0 = disabled/unusable.
+        int: 3 = connected, 2 = active sibling, 1 = usable (non-disabled),
+            0 = disabled/unusable.
     """
     if str(summary or '').strip().lower() == 'disabled':
         return 0
     if connected:
+        return 3
+    if active_sib:
         return 2
     return 1
 
@@ -308,11 +328,13 @@ def list_modems():
         port = info.get('port') or key
         connected = status.get('connection_state') == 'connected'
         summary = status.get('summary', '')
-        # How usable this slot's AT channel is. A disabled slot's SubIface
-        # has no open AT channel, so it must never be picked as the port's
+        # How usable this slot's AT channel is. Only the slot that owns the
+        # radio (active sibling) has an open AT channel, so the inactive or
+        # disabled slot's SubIface must not be picked as the port's
         # representative iface (the survey would fail with "Could not open AT
         # channel"). Higher rank wins.
-        at_rank = _at_channel_rank(summary, connected)
+        at_rank = _at_channel_rank(summary, connected,
+                                   _is_active_sib(info, status, diag))
         raw_model = info.get('model') or 'Modem'
         entry = by_port.get(port)
         # Per-slot status pill data. NOSIM is a diagnostics string 'TRUE' /
@@ -344,8 +366,8 @@ def list_modems():
                 sim['label'] = 'SIM{}'.format(len(entry['sims']) + 1)
             entry['sims'].append(sim)
             # Pick the representative device for the port by AT-channel
-            # usability: a connected slot beats a standby one, and any
-            # non-disabled slot beats a disabled one. This both surfaces live
+            # usability: connected beats the active sibling, which beats any
+            # other non-disabled slot, which beats a disabled one. This both surfaces live
             # carrier/signal in the status tiles and keeps the survey off a
             # disabled slot's dead AT channel. This does not affect whether
             # the port is selectable - every port is.
