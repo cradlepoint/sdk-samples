@@ -23,6 +23,8 @@ lives in the topic files listed at the bottom.
 - **Never write defaults to appdata** — that overrides NCM group config. Default in code instead.
   (`cp.start_web_server` saving the port it actually bound is a recorded assignment, not a default.)
 - **Web apps never hardcode a port** — use `cp.start_web_server()` (see `web-standards.md`).
+- **Web apps never use a logo** — not in the page or the favicon. Use a simple inline SVG
+  favicon like the web app template's (see `web-standards.md`).
 - **Never commit `sdk_settings.ini`**, and never print the router password.
 
 ## Always deploy after changing an app

@@ -40,6 +40,8 @@
 - **`window.webAppTemplate.showToast(message, type, duration)` is available from the template**, but it needs a `<div class="toast-container" id="toast-container"></div>` in your HTML or it silently does nothing
 - **ALWAYS use `your_web_app.html` from `apps/templates/web_app_template` as the starting HTML** - copy it as `index.html` into your app, then modify the title, sidebar nav, and content sections. NEVER write HTML from scratch
 - **NEVER write custom CSS or include external stylesheets** - the template's `style.css` provides the complete design system (layout, colors, dark mode, components). Add app-specific styles in a `<style>` block or a separate file that supplements (not replaces) the template CSS
+- **NEVER put a logo in a web app** - no company or product logo, wordmark, or symbol (Ericsson, Cradlepoint, NetCloud, carrier, or any other) in the page, the header, or the favicon, whether as a file or an embedded `data:` image. Use the app title as text instead
+- **ALWAYS give a web app a simple favicon** - the template's `<link rel="icon">` is an inline SVG (white signal bars on a dark gray rounded square), so it needs no file and no server route; keep it, or swap in another simple shape-and-glyph SVG that suits the app. If an app has no favicon, create one this way rather than adding an image file
 - Proper error handling with try/catch
 - Serve assets locally (no external dependencies)
 - Implement signal handlers for graceful shutdown

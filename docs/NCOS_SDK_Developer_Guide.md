@@ -70,30 +70,47 @@ The NCOS SDK enables Python applications to run directly on Ericsson Cradlepoint
 
 ### Prerequisites
 
-- Python 3.8 or later on your development machine
+- Python 3 on your development machine (3.9 or newer recommended; `setup_env.py` warns on older versions)
 - Git
-- An Ericsson Cradlepoint router with Developer Mode enabled (via NetCloud Manager)
+- An Ericsson Cradlepoint router with Developer Mode enabled in NetCloud Manager (see [Enable Developer Mode](#enable-developer-mode))
+
+Step-by-step instructions for installing Python and Git on Windows and macOS, and for opening the repo in Kiro or another IDE, are in the [main README](../README.md#detailed-setup-instructions). No GitHub account is needed to clone the repo.
 
 ### Clone and Install
 
+**macOS / Linux:**
 ```bash
 git clone https://github.com/cradlepoint/sdk-samples.git
 cd sdk-samples
-```
-
-Then run the setup script. It creates a `.venv` virtual environment, installs all dependencies from `requirements.txt` (pyserial, requests, cryptography, paramiko), and — when run interactively — helps you fill in the router connection details in `sdk_settings.ini`.
-
-**macOS / Linux:**
-```bash
 python3 setup_env.py
 ```
 
 **Windows:**
 ```cmd
+git clone https://github.com/cradlepoint/sdk-samples.git
+cd sdk-samples
 python setup_env.py
 ```
 
-`setup_env.py` is the recommended way to set up and repair the environment. `make.py setup` is a thin wrapper that calls the same script, so either works:
+`setup_env.py` uses only the standard library, so it runs with your system Python before the virtual environment exists. It:
+
+1. Checks your Python version
+2. Creates the `.venv` virtual environment
+3. Installs the dependencies from `requirements.txt` (pyserial, requests, cryptography, paramiko)
+4. Creates `sdk_settings.ini` from `sdk_settings.ini.example` if it does not exist yet
+5. Asks for your dev router's IP, username, and password (reply `skip` to do it later)
+6. Tests the router connection and checks that Developer Mode is enabled
+7. Points your editor's Python interpreter at `.venv`
+
+Run it again any time to repair the environment. Useful options:
+
+```bash
+python3 setup_env.py --configure     # only change the router settings
+python3 setup_env.py --skip-router   # only build the venv, leave router settings alone
+python3 setup_env.py --help          # all options
+```
+
+Once `.venv` exists, `make.py setup` is a thin wrapper that calls the same script:
 
 ```bash
 .venv/bin/python make.py setup      # macOS / Linux
@@ -102,7 +119,7 @@ python setup_env.py
 
 ### Configure Router Connection
 
-Edit `sdk_settings.ini` in the repository root:
+`setup_env.py` writes your answers to `sdk_settings.ini` in the repository root. To change them later, rerun `setup_env.py --configure` or edit the file directly:
 
 ```ini
 [sdk]
@@ -119,13 +136,15 @@ dev_client_password=your_password
 | `dev_client_username` | Router admin username |
 | `dev_client_password` | Router admin password |
 
+`sdk_settings.ini` is git-ignored because it holds your router password, so it stays on your machine.
+
 ### Enable Developer Mode
 
-Developer Mode must be enabled in **NetCloud Manager** (not the router's local UI):
+Developer Mode is enabled in **NetCloud Manager**, not in the router's local admin UI (there is no such setting there). Deploys from `make.py` are rejected until it is on.
 
 1. Log in to NetCloud Manager
-2. Navigate to the device
-3. Enable SDK Developer Mode under device settings
+2. Go to **Tools ▸ Developer Mode Devices**
+3. Add your router
 
 ---
 
@@ -225,7 +244,7 @@ The `cp` module communicates with the router's config store via Unix socket (on-
 ```python
 cp.log(value: str)
 ```
-Log a message to syslog (router), stdout (container), or console (local). **Always use this instead of `print()`.**
+Log a message to syslog (router), stdout (container), or console (local). Use this instead of `print()`: on the router, `print()` output goes nowhere you can see it.
 
 ```python
 cp.alert(value: str) -> Optional[Dict]
@@ -608,7 +627,7 @@ for device_id, device_data in devices.items():
         cp.log(f"{device_id} uses rule: {rule.get('trigger_name')}")
 ```
 
-Notes confirmed in the docs:
+Notes:
 - Multiple devices can match the same rule (e.g. SIM1 and SIM2 both matching a generic modem rule).
 - A `disabled` rule prevents the device from activating even if the hardware is present.
 - To disable a specific device, look up its `config_id` from `status/wan/devices/{device_id}/info` and PUT `disabled: true` to that rule: `cp.put(f'config/wan/rules2/{config_id}/disabled', True)`.
@@ -630,7 +649,7 @@ So the pattern is: `config/wan/rules2` (what should exist / how to connect it) �
 
 #### LAN: a UUID Lookup, Not a Trigger Match
 
-`config/lan` and `status/lan` are related, but not the same way WAN is. There's no `trigger_string` matching here — `status/lan` is a fixed object (not an array), and the link is a direct UUID lookup. Verified against a live dev router (`GET /api/config/lan`, `GET /api/status/lan`):
+`config/lan` and `status/lan` are related, but not the same way WAN is. There's no `trigger_string` matching here — `status/lan` is a fixed object (not an array), and the link is a direct UUID lookup. The examples below come from a real router (`GET /api/config/lan`, `GET /api/status/lan`):
 
 `config/lan` is an **array** of LAN network configs. Each entry has an `_id_` (UUID) and a `devices[]` array of `{type, uid}` refs to the physical/wireless interfaces assigned to that network:
 
@@ -693,7 +712,7 @@ For full task-oriented examples, response shapes, and gotchas beyond what's summ
 
 #### DTD Schema Verification
 
-Before writing to any `config/` path, check its schema via the DTD endpoint — this shows exact field names, types, required/optional status, defaults, and min/max/allowed values:
+To see exactly what a `config/` path accepts, query its schema from the DTD endpoint. It shows field names, types, required/optional status, defaults, and min/max/allowed values, which is handy before writing to a path you haven't used before:
 
 ```bash
 curl -s -u admin:pass http://router/api/dtd/config/{path} | python3 -m json.tool
@@ -746,7 +765,7 @@ App names passed to `install`, `deploy`, `build`, `clean`, `start`, `stop`, `uni
 .venv/bin/python make.py create my_new_app
 ```
 
-This copies `apps/templates/app_template/` to `apps/my_new_app/`, renames the main file to `my_new_app.py`, and updates all internal references (`package.ini`, `readme.md`, `start.sh`). The app is created **directly in `apps/`** — the same place the repo keeps its apps and where CI looks — so do not move it afterward. Edit `my_new_app.py` and `readme.md`; leave the generated `package.ini`, `start.sh`, and `cp.py` as-is.
+This copies `apps/templates/app_template/` to `apps/my_new_app/`, renames the main file to `my_new_app.py`, and updates all internal references (`package.ini`, `readme.md`, `start.sh`). The app is created in `apps/`, which is where the repo keeps its apps and where CI looks, so it is ready to build and contribute as-is. Your code goes in `my_new_app.py`, and `readme.md` is where you describe the app for its users. The generated `package.ini` and `start.sh` usually need no changes. `cp.py` is a shared library that CI keeps in sync across every app, so local edits to it are overwritten.
 
 ### Deploying
 
@@ -784,7 +803,7 @@ To submit one of your apps to `cradlepoint/sdk-samples` as a pull request:
 .venv/bin/python make.py contribute my_app
 ```
 
-This is **interactive** — it runs a CI preflight, branches off upstream, stages only the app folder, prompts for a commit message and PR text, forks the repo on demand, pushes to your fork, and opens the pull request. It uses the GitHub CLI and offers to download it into `.gh/` (git-ignored) on first run. Your `origin` remote stays pointed at the upstream repo, so `git pull` keeps working; the fork is added as a second remote named `fork`. Do not run it unattended.
+You need a GitHub account (a free one is fine), but you do not need to fork the repo first. The command is interactive: it runs a CI preflight, branches off upstream, stages only the app folder, prompts for a commit message and PR text, forks the repo on demand, pushes to your fork, and opens the pull request. It uses the GitHub CLI, offers to download it into `.gh/` (git-ignored) on first run, and signs you in with `gh auth login`. Your `origin` remote stays pointed at the upstream repo, so `git pull` keeps working; the fork is added as a second remote named `fork`.
 
 ---
 
@@ -843,7 +862,7 @@ value = cp.get_appdata('my_setting')
 
 - **Relative paths only** — use `tmp/`, never `/tmp/`
 - **Create directories first** — `os.makedirs('tmp', exist_ok=True)`
-- **NEVER modify packaged files** — router deletes the app if any file from the original package is modified. Write to new files only
+- **Packaged files are read-only at runtime** — apps are signed, and the router deletes the app if any file from the original package changes. Write runtime data to new files
 - **No .pyc or .so files** — only pure Python (.py) is supported
 
 ### Available Standard Library Modules
@@ -892,19 +911,19 @@ while True:
     time.sleep(60)
 ```
 
-### Web Development Rules
+### Tips for Web Apps
 
-- **Never hardcode a port** — `cp.start_web_server()` uses appdata `<app_name>_web_port` when it is set (NCM group/device SDK Data), otherwise the first free port from 8000, which it saves to that field so the port survives reboots. A configured port is never moved; if it is invalid or stays busy, the app stops itself instead of restart-looping. Apps with their own server class use `cp.bind_web_port()` (see `cp_methods_reference.md`)
-- **Skip `socket.getfqdn()` in custom server classes** — the default `HTTPServer.server_bind()` crashes with `UnicodeError: ... 'idna' codec failed` on routers whose hostname is not IDNA-conformant. `cp.start_web_server()` already avoids it
-- **Run in a daemon thread** so the main thread handles app logic (`cp.start_web_server()` does this)
-- **Serve all assets locally** — no external CDNs
-- **Use Python's built-in `http.server`** — never use Flask, Bottle, etc.
-- **Vanilla JavaScript** — ES6+ is fine (arrow functions, async/await, template literals)
-- **Never pass parameters in onclick attributes** — use data attributes instead
+- **Let `cp.start_web_server()` pick the port.** It uses appdata `<app_name>_web_port` when it is set (NCM group/device SDK Data), otherwise the first free port from 8000, which it saves to that field so the port survives reboots. A configured port is never moved; if it is invalid or stays busy, the app stops itself instead of restart-looping. Several apps can then share a router without port clashes. Apps with their own server class can use `cp.bind_web_port()` (see `cp_methods_reference.md`)
+- **Custom server classes need to skip `socket.getfqdn()`.** The default `HTTPServer.server_bind()` crashes with `UnicodeError: ... 'idna' codec failed` on routers whose hostname is not IDNA-conformant. `cp.start_web_server()` already avoids it
+- **Keep the main thread alive.** `cp.start_web_server()` serves from a daemon thread and returns, so your main loop (or a `while True: time.sleep(60)`) has to keep running
+- **Serve assets from the app.** LAN clients may have no internet access, so CDN-hosted scripts and fonts may not load
+- **`http.server` is the simplest choice.** It ships with `cppython`, so there is nothing to bundle. Frameworks like Flask are not installed on the router and would need to be pure Python and Python 3.8 compatible to bundle
+- **Modern JavaScript works.** The page runs in the client's browser, so ES6+ (arrow functions, async/await, template literals) is fine
+- **Prefer data attributes over inline `onclick` arguments.** Quote escaping inside inline handlers is easy to get wrong
 
 ### Web App Template
 
-When creating web apps, copy the template at `apps/templates/web_app_template/`:
+`apps/templates/web_app_template/` is a ready-made starting point with a full design system (layout, dark mode, components):
 
 ```
 web_app_template/
@@ -922,7 +941,7 @@ web_app_template/
     └── libs/                # jQuery, Font Awesome
 ```
 
-Copy `your_web_app.html` as `index.html` and the `static/` folder into your app. Modify the title, sidebar nav, and content sections.
+To use it, copy `your_web_app.html` into your app as `index.html` along with the `static/` folder, then change the title, sidebar nav, and content sections.
 
 ### LAN Client Access
 
@@ -944,19 +963,19 @@ Install directly into your app folder:
 .venv\Scripts\pip install -t apps\my_app\ library_name
 ```
 
-### Rules
+### What Works on the Router
 
-- Only pure Python (`.py`) files — remove any `.pyc`, `.so`, `.pyd`
+- Only pure Python (`.py`) files load — remove any `.pyc`, `.so`, `.pyd`
 - Libraries must be compatible with Python 3.8
-- Keep dependencies minimal (app size limit: 60 MB)
-- Delete `egg-info` and `dist-info` directories after install
-- `requests` is pre-installed on the router — do NOT bundle it
-- `redis` is NOT available — make it conditional with try/except
+- Keep dependencies small (app size limit: 60 MB)
+- `egg-info` and `dist-info` directories are not needed at runtime and can be deleted after install
+- `requests` is pre-installed on the router. A bundled copy shadows it and usually fails on Python 3.8 because of a newer urllib3, so leave it out
+- `redis` is not available — wrap its import in `try/except ImportError` if your app can run without it
 
 ### Common Libraries That Work
 
 - `paho-mqtt` — MQTT client
-- `pynmeagps` — NMEA sentence parsing (always install fresh, never copy)
+- `pynmeagps` — NMEA sentence parsing. Pin `pynmeagps==1.0.42`: newer releases need Python 3.9+. Installing with pip gets a clean copy; copies inside other apps may be older or patched
 - `pyserial` — Serial port access
 
 ### CSV Workaround
@@ -993,7 +1012,7 @@ def my_callback(path: str, value: Any, args: tuple):
 - `value` — the new value at that path
 - `args` — a single tuple of any extra arguments passed during registration
 
-### Key Rules
+### Gotchas
 
 - **Use `'put'` (lowercase) for control tree paths** — `'set'` or `'PUT'` silently fails
 - **Do NOT cp.put() to seed the control tree before cp.register()** — causes socket desync
@@ -1041,14 +1060,13 @@ if not server_url:
 cp.put_appdata('last_run', '2025-01-15T10:30:00')
 ```
 
-### Critical Rules
+### Things to Know
 
-- **NEVER write default values to appdata** — this overrides NCM group-level configurations
-- **Always call with a field name** — `cp.get_appdata('field_name')`
-- `cp.get_appdata()` without args returns a LIST of all entries, not a dict
-- `cp.put_appdata(name, value)` takes TWO string arguments, not a dict
+- **Keep defaults in code, not in appdata.** A value your app writes to appdata at the device level overrides whatever is set for the NCM group, so writing defaults silently blocks group-wide configuration
+- `cp.get_appdata('field_name')` returns one value. Called with no arguments it returns a list of all entries, not a dict
+- `cp.put_appdata(name, value)` takes two string arguments, not a dict
 - Appdata is stored at `config/system/sdk/appdata`
-- Document all appdata fields in your `readme.md`
+- Listing your appdata fields in `readme.md` (which are required, and the defaults for the rest) tells users how to configure the app from NCM
 
 ### Pattern
 
@@ -1087,8 +1105,10 @@ gps = cp.get_gps_status()
 Use `pynmeagps` for NMEA sentence parsing:
 
 ```bash
-.venv/bin/pip install -t apps/my_app/ pynmeagps
+.venv/bin/pip install -t apps/my_app/ pynmeagps==1.0.42
 ```
+
+Version 1.0.42 is the last release that runs on the router's Python 3.8.
 
 ```python
 from pynmeagps import NMEAReader
@@ -1485,8 +1505,8 @@ cd apps
 ### Development Workflow
 
 1. Edit code locally
-2. Test logic with `python apps/my_app/my_app.py` (reads real data from router)
-3. Deploy to router for final testing: `.venv/bin/python make.py deploy my_app`
+2. Test logic from the `apps/` folder: `../.venv/bin/python my_app/my_app.py` (Windows: `..\.venv\Scripts\python my_app\my_app.py`). This reads and writes real data on the dev router
+3. Deploy to the router for final testing: `.venv/bin/python make.py deploy my_app` from the repo root
 
 ---
 
@@ -1536,12 +1556,12 @@ log clear                   # Clear all logs
 | `.so` or `.pyc` errors | Non-pure-Python files | Remove all `.so` and `.pyc` |
 | App won't start | Wrong interpreter in start.sh | Use `cppython`, not `python3` |
 | Stale logs | Old log buffer entries | Check timestamps — only trust entries after deploy |
-| Deploy fails | Wrong credentials | Check `sdk_settings.ini` |
+| Deploy fails | Wrong credentials or Developer Mode off | Run `setup_env.py --configure` to fix the router settings and recheck Developer Mode |
 | SCP "lost connection" | Normal behavior | Router drops SSH after receiving file — expected |
 
 ### Error Handling Pattern
 
-Always wrap API calls:
+Wrapping API calls keeps one failed read from crashing the app (and, with `restart = true`, restart-looping it):
 
 ```python
 try:
