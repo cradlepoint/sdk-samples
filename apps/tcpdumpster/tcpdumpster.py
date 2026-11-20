@@ -17,7 +17,6 @@ import urllib.parse
 from datetime import datetime
 
 
-PORT = 7001
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CAPTURE_USER = 'SDKTCPDUMP'
 CAPTURE_PASS = ''
@@ -719,8 +718,8 @@ def main():
         cp.log('ERROR: Could not create capture user after 3 attempts')
 
     try:
-        # Port: appdata tcpdumpster_web_port, else first free from 7001.
-        cp.start_web_server(TCPDumpsterHandler, start_port=PORT)
+        # Port: appdata tcpdumpster_web_port, else first free from 8000 (up to 8100).
+        cp.start_web_server(TCPDumpsterHandler)
         while True:
             time.sleep(60)
     except Exception as e:

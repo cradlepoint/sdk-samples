@@ -21,7 +21,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| **Motorola_web_port** | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| **Motorola_web_port** | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 | **Motorola_port** | No | Deprecated. Older name for the web port, used only when **Motorola_web_port** is not set. |
 
 Beacon settings (interval, UDP port, networks) are configured through the web UI and stored in appdata automatically.

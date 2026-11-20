@@ -18613,7 +18613,7 @@ reconcile_thread.start()
 
 
 # Start web server. Port: appdata speedtest_analyzer_web_port, else the
-# first free port from 8000 (saved there). On failure it stops the app
+# first free port from 8000 (up to 8100) (saved there). On failure it stops the app
 # instead of exiting (restart = true would relaunch it in a loop).
 server = cp.start_web_server(SpeedtestHandler)
 

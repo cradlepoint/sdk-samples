@@ -33,7 +33,7 @@ The Web App Template Style Guide provides a complete design system with:
 - **Help button** – Opens a modal displaying the app's readme.md content, rendered as formatted HTML
 - **Device info button** – Opens a modal showing router model, serial number, MAC address, firmware version, and SDK app version
 - **App version display** – Version number from package.ini shown below the app title
-- **Dynamic web port** – Finds a free port from 8000 on first run and remembers it, or uses the port you set in NCM SDK Data (see *Web Port* below)
+- **Dynamic web port** – Finds a free port from 8000-8100 on first run and remembers it, or uses the port you set in NCM SDK Data (see *Web Port* below)
 - **Copyable markup** – Structured HTML ready for rapid prototyping
 - **Consistent design language** – Shared typography, color tokens, and spacing across all components
 - **Production-ready patterns** – Snapshot of UI patterns suitable for internal portals, admin consoles, and monitoring dashboards
@@ -106,7 +106,7 @@ web_app_template/
 The app does not hardcode its port. At startup it reads the SDK Data field `web_app_template_web_port`:
 
 - **Set** – the app binds exactly that port. If the port is busy it retries for about 10 seconds, then stops itself. It never moves to a different port, so NCM LAN Manager connections and firewall rules pinned to that port stay valid. An invalid value (not a number from 1 to 65535) stops the app straight away.
-- **Not set** – on first run the app takes the first free port from 8000 to 8063 and saves it to `web_app_template_web_port`, so it keeps the same port after reboots.
+- **Not set** – on first run the app takes the first free port from 8000 up to 8100 and saves it to `web_app_template_web_port`, so it keeps the same port after reboots.
 
 To change the port for one router or a whole group, set the field in NCM SDK Data (Device or Group) and restart the app. To go back to automatic selection, delete the field and restart the app. After fixing a bad value, start the app again (it also retries on the next reboot).
 
@@ -116,7 +116,7 @@ LAN clients need a firewall forwarding rule from the Primary LAN Zone to the Rou
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `web_app_template_web_port` | No | Web UI port (1–65535). Authoritative when set. When not set, the app discovers a free port from 8000 and saves it here. Apps built from this template use `<app_name>_web_port`. |
+| `web_app_template_web_port` | No | Web UI port (1–65535). Authoritative when set. When not set, the app discovers a free port from 8000-8100 and saves it here. Apps built from this template use `<app_name>_web_port`. |
 
 ---
 

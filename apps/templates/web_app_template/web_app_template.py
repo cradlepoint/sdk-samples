@@ -6,7 +6,7 @@ with API endpoints for help content and device info.
 
 The port is chosen by cp.start_web_server(): the appdata field
 "<app_name>_web_port" is used when set (NCM group/device SDK Data);
-otherwise the first free port from 8000 is used and saved there.
+otherwise the first free port from 8000 (up to 8100) is used and saved there.
 """
 
 import http.server

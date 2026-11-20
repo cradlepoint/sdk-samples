@@ -487,7 +487,7 @@ if __name__ == '__main__':
     monitor_thread = threading.Thread(target=monitor_connections, daemon=True)
     monitor_thread.start()
     
-    # Port: appdata client_session_monitor_web_port, else first free from 8000.
+    # Port: appdata client_session_monitor_web_port, else first free from 8000 (up to 8100).
     cp.start_web_server(DashboardHandler)
     try:
         while True:

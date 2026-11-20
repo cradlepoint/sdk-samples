@@ -35,7 +35,7 @@ status/ntp_gps is published from the very first second, including while still wa
 
 Web UI
 ------
-A small web dashboard (port 8123, fixed) shows all of the status, and lets a user set the
+A small web dashboard (dynamic port, 8000-8100) shows all of the status, and lets a user set the
 router's clock either from their browser's current time or from a manually picked date/time,
 using control/system/clock/set_time. Handy for a router that has no time source at all yet.
 """
@@ -63,7 +63,6 @@ DEFAULT_PORT = 1123
 DEFAULT_HOLDOVER = 300        # seconds to keep serving after the last GPS sample
 STATUS_TREE_LATENCY = 0.8     # GPS second -> status/gps/nmea publish delay, added to each sample
 
-WEB_PORT = 8123               # first web UI port tried when NTP_server_web_port is unset
 
 TIME_SENTENCES = ('RMC', 'ZDA', 'GGA', 'GLL')
 MAX_DATE_SKEW = 5.0           # seconds a time-of-day sentence may differ from the RMC/ZDA time
@@ -604,11 +603,11 @@ def make_web_handler(state: AppState):
 def start_web_ui(state: AppState) -> None:
     """Start the web UI on the app's dynamic port.
 
-    Port: appdata NTP_server_web_port, else the first free port from 8123
+    Port: appdata NTP_server_web_port, else the first free port from 8000 (up to 8100)
     (saved there). The UI is optional here: if it cannot start, NTP keeps
     running (required=False) instead of the whole app stopping.
     """
-    httpd = cp.start_web_server(make_web_handler(state), start_port=WEB_PORT,
+    httpd = cp.start_web_server(make_web_handler(state),
                                 required=False)
     if httpd is None:
         cp.log('Web UI disabled; NTP service continues')

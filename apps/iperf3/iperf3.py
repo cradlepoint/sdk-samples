@@ -659,7 +659,7 @@ else:
 # Ensure tmp directory exists for history
 os.makedirs('tmp', exist_ok=True)
 
-# Start web server. Port: appdata iperf3_web_port, else first free from 8000.
+# Start web server. Port: appdata iperf3_web_port, else first free from 8000 (up to 8100).
 cp.start_web_server(Iperf3Handler)
 
 # Keep main thread alive

@@ -1696,7 +1696,7 @@ sched_thread = Thread(target=scheduler_thread, daemon=True)
 sched_thread.start()
 
 # Start web server. Port: appdata speedtest_web_web_port (or the older
-# speedtest_web_port), else the first free port from 8000, saved to
+# speedtest_web_port), else the first free port from 8000 (up to 8100), saved to
 # speedtest_web_web_port. On failure it stops the app instead of exiting.
 server = cp.start_web_server(SpeedtestHandler, legacy_field='speedtest_web_port')
 

@@ -555,7 +555,7 @@ cp.start_file_server(folder_path="files", port=None, host="0.0.0.0",
                      title="File Download") -> Optional[Dict]
 ```
 `start_web_server` serves a handler on the app's dynamic port (appdata `<app_name>_web_port`,
-else first free from 8000, saved back). `bind_web_port` returns just the bound socket for apps
+else first free from 8000 (up to 8100), saved back). `bind_web_port` returns just the bound socket for apps
 with their own server class. `start_file_server` serves a download UI; with `port=None` it uses
 a dynamic port from `<app_name>_file_port`.
 
@@ -913,7 +913,7 @@ while True:
 
 ### Tips for Web Apps
 
-- **Let `cp.start_web_server()` pick the port.** It uses appdata `<app_name>_web_port` when it is set (NCM group/device SDK Data), otherwise the first free port from 8000, which it saves to that field so the port survives reboots. A configured port is never moved; if it is invalid or stays busy, the app stops itself instead of restart-looping. Several apps can then share a router without port clashes. Apps with their own server class can use `cp.bind_web_port()` (see `cp_methods_reference.md`)
+- **Let `cp.start_web_server()` pick the port.** It uses appdata `<app_name>_web_port` when it is set (NCM group/device SDK Data), otherwise the first free port from 8000 (up to 8100), which it saves to that field so the port survives reboots. A configured port is never moved; if it is invalid or stays busy, the app stops itself instead of restart-looping. Several apps can then share a router without port clashes. Apps with their own server class can use `cp.bind_web_port()` (see `cp_methods_reference.md`)
 - **Custom server classes need to skip `socket.getfqdn()`.** The default `HTTPServer.server_bind()` crashes with `UnicodeError: ... 'idna' codec failed` on routers whose hostname is not IDNA-conformant. `cp.start_web_server()` already avoids it
 - **Keep the main thread alive.** `cp.start_web_server()` serves from a daemon thread and returns, so your main loop (or a `while True: time.sleep(60)`) has to keep running
 - **Serve assets from the app.** LAN clients may have no internet access, so CDN-hosted scripts and fonts may not load

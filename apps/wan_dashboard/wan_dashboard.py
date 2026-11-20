@@ -1319,7 +1319,7 @@ class WANDashboard:
                     self.end_headers()
         
         # Port: appdata wan_dashboard_web_port (or the older
-        # wan_dashboard_port), else the first free port from 8000, saved to
+        # wan_dashboard_port), else the first free port from 8000 (up to 8100), saved to
         # wan_dashboard_web_port.
         server = cp.start_web_server(DashboardHandler,
                                      legacy_field='wan_dashboard_port')

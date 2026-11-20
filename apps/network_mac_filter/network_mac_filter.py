@@ -1161,7 +1161,7 @@ def start_web_ui():
     """Start the web UI (run in a thread: a busy port retries for ~10s).
 
     Port: appdata network_mac_filter_web_port (or the older
-    custom_mac_filter_port), else the first free port from 8000, saved to
+    custom_mac_filter_port), else the first free port from 8000 (up to 8100), saved to
     network_mac_filter_web_port. MAC filtering does not need the UI, so a
     failure leaves the app running (required=False).
     """

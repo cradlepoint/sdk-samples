@@ -50,7 +50,7 @@ To change the web UI port for one router or a group, set `prtg_agent_web_port` i
 | `interval` | Push interval in seconds | `60` |
 | `protocol` | `http` or `https` | `http` |
 | `paths` | JSON array of NCOS API paths to collect | See defaults below |
-| `prtg_agent_web_port` | Optional. Web UI port on the router (1-65535), not the PRTG sensor port. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. | First free port from `8000` |
+| `prtg_agent_web_port` | Optional. Web UI port on the router (1-65535), not the PRTG sensor port. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. | First free port from `8000` |
 
 ## Default Collection Paths
 

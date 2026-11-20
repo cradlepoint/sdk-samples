@@ -1705,7 +1705,7 @@ calls `socket.getfqdn()` (which crashes on non-IDNA router hostnames).
 Port selection (shared with `bind_web_port`):
 - Appdata `<app_name>_web_port` set: bind exactly that port, retried for ~10 s if busy. Never
   moves to another port. An invalid value (not 1–65535) is an error.
-- Not set: first free port from `start_port` (up to 64 tried), saved to `<app_name>_web_port`.
+- Not set: first free port from `start_port` (8000-8100 by default), saved to `<app_name>_web_port`.
 - Off-router: a free local port is used; appdata is not read or written.
 
 | Parameter | Type | Default | Description |

@@ -156,7 +156,7 @@ MAC addresses accept any format (colons, dashes, no separators, mixed case).
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `network_mac_filter_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `network_mac_filter_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 | `custom_mac_filter_port` | No | Deprecated. Older name for the web port, used only when `network_mac_filter_web_port` is not set. |
 | `disable_ui` | No | If set to any value, the web interface is turned off. See [Headless Mode](#headless-mode-no-web-ui). |
 

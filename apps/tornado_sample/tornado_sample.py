@@ -19,8 +19,8 @@ if __name__ == "__main__":
         (r"/", MainHandler),
     ])
     # Port: appdata tornado_sample_web_port, else the first free port from
-    # 9001 (saved there). Tornado takes the pre-bound socket directly.
-    sock = cp.bind_web_port(start_port=9001)
+    # 8000 (saved there). Tornado takes the pre-bound socket directly.
+    sock = cp.bind_web_port()
     if sock is None:
         # Never exit: restart = true would relaunch the app in a loop.
         if cp.stop_app():

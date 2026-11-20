@@ -88,7 +88,7 @@ The web UI port is a separate SDK Data field:
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `serial_to_UDP_web_port` | no | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `serial_to_UDP_web_port` | no | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 The startup log shows the port, e.g. `Bound port 8001 (discovered, saved to
 serial_to_UDP_web_port)` then `Web server started on port 8001`. To change it for one router

@@ -549,7 +549,7 @@ if __name__ == '__main__':
     apply_limits_to_new_clients()
     cp.log('Applied saved/default limits to all clients')
 
-    # Port: appdata client_bandwidth_throttle_web_port, else first free from 8000.
+    # Port: appdata client_bandwidth_throttle_web_port, else first free from 8000 (up to 8100).
     cp.start_web_server(BandwidthHandler)
 
     # Limit clients that join after startup

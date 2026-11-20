@@ -293,7 +293,7 @@ if __name__ == '__main__':
     cp.log('Speedtest engine: ' + engine)
     get_config('installer_password')
     open_firewall()
-    # Port: appdata Installer_UI_web_port, else first free from 8000 (saved).
+    # Port: appdata Installer_UI_web_port, else first free from 8000 (up to 8100) (saved).
     cp.start_web_server(AppHandler)
     while True:
         time.sleep(60)

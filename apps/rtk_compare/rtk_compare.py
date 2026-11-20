@@ -1613,7 +1613,7 @@ def start_web_ui(sampler, device_info, app_version):
     """Start the HTTP server in a daemon thread. Returns the server or None.
 
     Port: appdata rtk_compare_web_port (or the older rtk_compare_port), else
-    the first free port from 8000, saved to rtk_compare_web_port. Recording
+    the first free port from 8000 (up to 8100), saved to rtk_compare_web_port. Recording
     does not need the UI, so a failure keeps sampling (required=False).
     """
     RequestHandler.sampler = sampler

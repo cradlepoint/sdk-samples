@@ -726,7 +726,7 @@ def main():
 
     # Static files are served relative to the app folder.
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    # Port: appdata prtg_agent_web_port, else first free from 8000 (saved).
+    # Port: appdata prtg_agent_web_port, else first free from 8000 (up to 8100) (saved).
     cp.start_web_server(PRTGAgentHandler)
 
     # Run data collection in the main thread

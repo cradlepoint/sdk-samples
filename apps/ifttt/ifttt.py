@@ -926,7 +926,7 @@ if __name__ == '__main__':
     cp.wait_for_uptime(UPTIME_WAIT_SECONDS)
     cp.log('System ready.')
 
-    # Port: appdata ifttt_web_port, else first free from 8000 (saved).
+    # Port: appdata ifttt_web_port, else first free from 8000 (up to 8100) (saved).
     cp.start_web_server(IFTTTHandler)
 
     # Auto-start enabled rules on startup

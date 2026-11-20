@@ -46,13 +46,13 @@ Once installed and running, access CS Explorer via:
 http://<router_ip>:<port>
 ```
 
-The port is shown in the app log at startup (for example `Web server started on port 9002`) and saved in the appdata field `cs_explorer_web_port`. It is usually 9002, or the next free port if 9002 is taken, and it stays the same after reboots. To change it, set `cs_explorer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
+The port is shown in the app log at startup (for example `Web server started on port 8000`) and saved in the appdata field `cs_explorer_web_port`. It is usually 8000, or the next free port if 8000 is taken, and it stays the same after reboots. To change it, set `cs_explorer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 
 ## Appdata Fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `cs_explorer_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 9002 and saves it here. Delete it to pick a port automatically again. |
+| `cs_explorer_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 ## 🎯 Usage
 

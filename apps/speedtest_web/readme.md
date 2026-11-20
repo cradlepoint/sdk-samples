@@ -113,7 +113,7 @@ you; set them in NCM SDK Data (device or group) to push the same settings to man
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `speedtest_web_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `speedtest_web_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 | `speedtest_web_port` | No | Deprecated. Older name for the web port, used only when `speedtest_web_web_port` is not set. |
 | `speedtest_schedule` | No | JSON: `{enabled, autostart, cron, engine, params}`. Defaults: `enabled` and `autostart` `false`, no `cron`, `engine` `netperf`. `autostart: true` turns the schedule on at every app start. Read at startup, so restart the app after changing it in NCM. |
 | `speedtest_outputs` | No | JSON array of where each successful result is written: `config/system/desc`, `config/system/asset_id`, `appdata:speedtest_results`, or a custom path such as `config/system/snmp/persisted_config`. Not set means results stay in the app's history only. |

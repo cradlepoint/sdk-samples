@@ -4148,7 +4148,7 @@ def download_packet_capture(filename: str, local_path: Optional[str] = None,
 # WEB SERVER (dynamic web port)
 # =============================================================================
 
-_WEB_PORT_RANGE = 64          # first-run discovery tries start_port..+63
+_WEB_PORT_MAX = 8100          # first-run discovery never goes above this port
 _WEB_PORT_RETRIES = 5         # attempts on a busy configured port
 _WEB_PORT_RETRY_DELAY = 2     # seconds between those attempts
 
@@ -4177,8 +4177,9 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
     - Field set: that port is authoritative. Bind exactly it, retrying
       briefly in case a previous instance is still releasing it. Never
       move to another port; an invalid value is an error.
-    - Field not set: bind the first free port from start_port and save
-      it to the field, so the app keeps the same port across reboots.
+    - Field not set: bind the first free port from start_port up to 8100
+      (8000-8100 by default) and save it to the field, so the app keeps
+      the same port across reboots.
 
     Off-router (local development) a free port is discovered on this
     machine and appdata is neither read nor written.
@@ -4225,7 +4226,7 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
             f'another port. Web server not started.')
         return None
 
-    for port in range(start_port, min(start_port + _WEB_PORT_RANGE, 65536)):
+    for port in range(start_port, _WEB_PORT_MAX + 1):
         sock = _try_bind(host, port)
         if sock:
             if _is_ncos:
@@ -4234,7 +4235,7 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
             else:
                 log(f'Bound port {port} (discovered, local run: not saved)')
             return sock
-    log(f'No free port in {start_port}-{start_port + _WEB_PORT_RANGE - 1}. '
+    log(f'No free port in {start_port}-{_WEB_PORT_MAX}. '
         f'Web server not started.')
     return None
 

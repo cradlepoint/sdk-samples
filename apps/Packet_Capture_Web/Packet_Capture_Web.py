@@ -1043,7 +1043,7 @@ def backfill_packet_counts():
 def main():
     """Main entry point."""
     global server
-    # Port: appdata Packet_Capture_Web_web_port, else first free from 8000.
+    # Port: appdata Packet_Capture_Web_web_port, else first free from 8000 (up to 8100).
     server = cp.start_web_server(CaptureHandler)
 
     # Backfill packet counts for existing files

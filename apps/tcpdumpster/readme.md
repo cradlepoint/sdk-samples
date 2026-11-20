@@ -16,7 +16,7 @@ monitoring live results, and downloading PCAP files.
 ## Features
 
 - Live packet display with decoded summaries
-- Web UI on the port shown in the app log and saved in `tcpdumpster_web_port` (usually 7001)
+- Web UI on the port shown in the app log and saved in `tcpdumpster_web_port` (usually 8000)
 - Interface selection (WAN, LAN, Wi-Fi monitor, SDWAN)
 - Only displays active interfaces
 - Refresh for newly activated interfaces
@@ -29,10 +29,10 @@ monitoring live results, and downloading PCAP files.
 ## Usage
 
 Access the UI at `http://<router_ip>:<port>` after deploying. The port is shown
-in the app log and saved in `tcpdumpster_web_port` (usually 7001, or the next
-free port if 7001 is taken). The startup log shows it, for example
-`Bound port 7001 (discovered, saved to tcpdumpster_web_port)` then
-`Web server started on port 7001`.
+in the app log and saved in `tcpdumpster_web_port` (usually 8000, or the next
+free port if 8000 is taken). The startup log shows it, for example
+`Bound port 8000 (discovered, saved to tcpdumpster_web_port)` then
+`Web server started on port 8000`.
 
 Ensure firewall zone forwarding is configured from Primary LAN Zone to
 Router Zone to allow LAN clients to reach the app's web port.
@@ -53,7 +53,7 @@ start the app.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `tcpdumpster_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 7001 and saves it here. Delete it to pick a port automatically again. |
+| `tcpdumpster_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 ## Notes
 

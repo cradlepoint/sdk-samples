@@ -54,7 +54,7 @@ def main():
                       help="the NAT address to use for passive connections")
     parser.add_option('-r', '--range', default=None, metavar="FROM-TO",
                       help="the range of TCP ports to use for passive "
-                           "connections (e.g. -r 8000-9000)")
+                           "connections (e.g. -r 8000-8100)")
     parser.add_option('-D', '--debug', action='store_true',
                       help="enable DEBUG logging evel")
     parser.add_option('-v', '--version', action='store_true',

@@ -418,8 +418,8 @@ def search_data_recursively(data, current_path, search_term, max_depth=3, curren
 
 def start_server():
     cp.log('Starting CS Explorer')
-    # Port: appdata cs_explorer_web_port, else first free from 9002 (saved).
-    cp.start_web_server(RouterDataHandler, start_port=9002)
+    # Port: appdata cs_explorer_web_port, else first free from 8000 (up to 8100) (saved).
+    cp.start_web_server(RouterDataHandler)
     while True:
         time.sleep(60)
 

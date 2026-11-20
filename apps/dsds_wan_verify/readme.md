@@ -165,7 +165,7 @@ the `dsds_wan_verify` config JSON), so it can be pushed from an NCM group on its
 
 - **Set:** the app uses exactly that port, any number from 1 to 65535. If the port is busy it
   retries for about 10 seconds and never moves to another port.
-- **Not set:** on first start the app takes the first free port from 8000 and saves it to
+- **Not set:** on first start the app takes the first free port from 8000 (up to 8100) and saves it to
   `dsds_wan_verify_web_port`, so the port stays the same after reboots.
 - **Invalid or busy:** if the value is not a number from 1 to 65535, or the port stays busy, the
   app stops and logs why. Fix or delete the field, then start the app.
@@ -185,7 +185,7 @@ live. Make sure the Zone Firewall forward lets LAN clients reach the app's web p
 
 | Field | Required | Description |
 |---|---|---|
-| `dsds_wan_verify_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `dsds_wan_verify_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 | `dsds_wan_verify_port` | No | Deprecated. Older name for the web port, used only when `dsds_wan_verify_web_port` is not set. It used to reject ports below 1024; the new field accepts 1-65535. |
 
 ### Per slot (`slots["<port>|<sim>"]`, e.g. `slots["int1|sim1"]`)

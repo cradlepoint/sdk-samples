@@ -90,7 +90,7 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `system_monitor_web_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `system_monitor_web_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to system_monitor_web_web_port)` followed by `Web server started on port 8001`. If `system_monitor_web_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 

@@ -94,7 +94,7 @@ Push the `pcap_defaults` appdata field via NCM group config to enable automated 
 | Field | Description |
 |-------|-------------|
 | `pcap_defaults` | JSON string with capture settings, auto_start flag, and interface config |
-| `Packet_Capture_Web_web_port` | Optional. Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again. |
+| `Packet_Capture_Web_web_port` | Optional. Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 ## Web Port
 

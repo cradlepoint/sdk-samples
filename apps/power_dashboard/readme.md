@@ -70,7 +70,7 @@ For unknown models, the application will attempt to use default paths and log wa
 
 **Core Configuration:**
 - `power_dashboard_interval`: Polling interval in seconds. Default: 300 (5 minutes)
-- `power_dashboard_web_port`: Web UI port (1-65535). Optional. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it to pick a port automatically again.
+- `power_dashboard_web_port`: Web UI port (1-65535). Optional. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again.
 - `power_dashboard_port`: Deprecated. Older name for the web port, used only when `power_dashboard_web_port` is not set.
 
 **Web Port Behavior:**
