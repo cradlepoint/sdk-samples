@@ -38,9 +38,9 @@ Out of the box, with nothing configured, the app is already a working failover s
 | Setting | Default |
 |---|---|
 | Ping | on, both slots, target `8.8.8.8` |
-| Signal threshold | on, both slots: `RSRP -100`, `RSRP_5G -120` |
+| Signal threshold | on, both slots: `RSRP -110`, `RSRP_5G -120` |
 | Automatic return (failback) | on, SIM 1 only |
-| Settle time after a switch | 10s |
+| Settle time after a switch | 20s |
 | Failback holdoff | 1 hour |
 | HTTP | off (no default URL) |
 
@@ -95,7 +95,7 @@ performs HTTP itself), so a slot still fails over on a failing HTTP test or low 
 dashboard the ping rows read "not run (router does not support IP Verify)". Enable an HTTP test on
 each slot if you rely on connectivity failover on such a model.
 
-**Settle time** (default 10s) tells the app to ignore a slot's test results for a short while
+**Settle time** (default 20s) tells the app to ignore a slot's test results for a short while
 right after switching to it. A freshly connected slot legitimately fails tests for a few seconds
 while it registers on the carrier, so this is the main guard against the modem flapping back and
 forth. Lower it only if you want faster reactions and accept the flapping risk.
@@ -193,7 +193,7 @@ live. Make sure the Zone Firewall forward lets LAN clients reach the app's web p
 | Field | Default | Description |
 |---|---|---|
 | `priority` | the SIM number | Which slot the app prefers. **Lower = higher priority** (1–99). The dashboard **Preferred SIM** control sets this. |
-| `settle_seconds` | `10` | Ignore this slot's test results for this long after switching to it (0–900). |
+| `settle_seconds` | `20` | Ignore this slot's test results for this long after switching to it (0–900). |
 | `failback_holdoff_seconds` | `3600` | After leaving this slot on a connectivity failure, wait this long before returning (0–86400, `0` = no wait). |
 | `test_combine` | `all` | `all` = ping and HTTP must both pass; `any` = either is enough. |
 | `ping_enabled` | `true` | Run a ping test on this slot. |
@@ -206,7 +206,7 @@ live. Make sure the Zone Firewall forward lets LAN clients reach the app's web p
 | `ping_pkt_size` | `36` | Payload bytes (minimum 36). |
 | `ping_pkt_timeout` | `10` | Per-packet reply timeout, stored in tenths of a second (1–255); the router counts a reply that arrives after this as a lost packet. The web UI edits this field in milliseconds and converts (so stored `10` shows as `1000` ms). |
 | `signal_enabled` | `true` | Use a signal threshold on this slot. |
-| `signal_thresholds` | `{"RSRP": -100, "RSRP_5G": -120}` | Metric → minimum value. |
+| `signal_thresholds` | `{"RSRP": -110, "RSRP_5G": -120}` | Metric → minimum value. |
 | `signal_fail_threshold` | `5` | Consecutive low readings before acting (1–100). |
 | `signal_failback_enabled` | `true` on SIM 1 | Return to this slot when its signal recovers. |
 | `http_enabled` | `false` | Run an HTTP test on this slot. |

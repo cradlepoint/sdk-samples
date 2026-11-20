@@ -8,12 +8,17 @@ See which cellular carriers are around your router and how strong each one is,
 then optionally lock your modem to the carrier you want. Everything happens in
 a simple web page served by the router — no apps to install on your computer.
 
+**No SIM needed.** The modem scans the airwaves directly, so a survey works with
+no SIM in the modem and no cellular connection. One modem sees every carrier in
+range, not just the one its SIM belongs to — handy for picking a carrier before
+you order SIMs for a site.
+
 ## What you can do
 
 - **See your modem at a glance** — carrier, network type (5G or LTE), band,
   APN, SIM, and signal strength, with an easy-to-read quality label.
 - **Run a survey** to find every nearby cell tower, grouped by carrier and
-  sorted strongest first.
+  sorted strongest first — with or without a SIM in the modem.
 - **Export the results** to a spreadsheet (CSV).
 - **Lock onto a carrier** so the modem uses only that network, and switch back
   to automatic whenever you want.
@@ -55,8 +60,9 @@ A menu on the left switches between:
 2. **Check the SIM slots.** Below the menu, a small tag shows each SIM slot's
    status — **NO SIM** if the slot is empty, otherwise whether it's connected.
 3. **Review the status tiles** for the current carrier and signal. You don't
-   need an active connection to run a survey — it scans the airwaves directly
-   and works even with no SIM installed.
+   need a SIM or an active connection to run a survey — it scans the airwaves
+   directly. With no SIM the tiles have little to show, but the survey still
+   finds every carrier in range.
 4. **Click Run Survey.** A "Scanning..." timer appears. Most scans finish in
    under a minute; 5G can take a couple of minutes.
 5. **Read the results.** Carriers are listed strongest first. Click a carrier
@@ -133,6 +139,25 @@ Set these in NCM SDK Data (device or group), then restart the app.
 |---|---|---|
 | `cell_survey_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 and saves it here. Delete it and restart to pick a port automatically again. |
 | `cell_survey_port` | No | Deprecated. Older name for the web port, used only when `cell_survey_web_port` is not set. |
+| `cell_survey_schedule` | No | The startup and scheduled survey settings, as JSON. **Save Schedule** on the Schedule page writes it for you; set it in NCM only to push the same schedule to many routers. Not set means no startup or scheduled surveys. |
+
+`cell_survey_schedule` keys (any key left out uses its default):
+
+| Key | Default | Values |
+|---|---|---|
+| `startup_enabled` | `false` | `true` runs one survey shortly after the app starts. |
+| `startup_action` | `none` | What to do after the startup survey: `none` (just save results), `lock` (lock the best carrier's PLMN), or `esim` (activate the best carrier's eSIM profile). |
+| `schedule_enabled` | `false` | `true` runs surveys on the `schedule_cron` timing. |
+| `schedule_cron` | none | Five-field cron expression (minute hour day month weekday) in the router's local time, for example `*/30 * * * *`. |
+| `schedule_action` | `none` | Same choices as `startup_action`, for scheduled surveys. |
+| `startup_port`, `schedule_port` | none | Modem port to survey (for example `int1`). Blank, or a port that is no longer present, uses the default modem. |
+
+Example:
+
+```json
+{"startup_enabled": true, "startup_action": "none",
+ "schedule_enabled": true, "schedule_cron": "0 6 * * *", "schedule_action": "lock"}
+```
 
 ## Troubleshooting
 

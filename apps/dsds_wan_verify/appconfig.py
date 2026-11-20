@@ -140,7 +140,7 @@ SLOT_DEFAULTS = {
     # and brings back the problem in the paragraph above.
     #
     # The values are conventional "cell edge" numbers rather than ones
-    # tuned for any deployment: RSRP -100 dBm is the usual poor/very-poor
+    # tuned for any deployment: RSRP -110 dBm is the usual poor/very-poor
     # boundary on LTE, and RSRP_5G -120 dBm is much lower because 5G NR
     # stays usable well past where LTE RSRP would be written off. Both
     # families are set because a slot reports only the ones its current
