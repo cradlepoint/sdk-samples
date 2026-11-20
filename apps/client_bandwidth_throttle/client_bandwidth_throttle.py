@@ -2,12 +2,19 @@ import cp
 import json
 import time
 import os
+import threading
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 DEFAULT_LIMIT_MBPS = 10  # Fallback default when no appdata value is set
 APPDATA_DEFAULT_LIMIT = 'default_limit_mbps'
 LIMITS_FILE = 'tmp/client_limits.json'
+NEW_CLIENT_CHECK_SECONDS = 10  # How often to look for clients that joined later
+
+# Serializes read-modify-write of config/qos between the web server threads
+# and the main loop's new-client check. Reentrant because the check calls
+# set_client_limit() while holding it.
+qos_lock = threading.RLock()
 
 # Store previous usage data for rate calculation
 previous_usage = {}
@@ -206,7 +213,60 @@ def get_clients_with_limits():
         cp.log(f'Error getting clients: {e}')
     return clients
 
+def get_ipv4_clients():
+    """Return LAN clients that have an IPv4 address."""
+    lan_data = cp.get('status/lan/clients') or []
+    return [c for c in lan_data
+            if c.get('mac') and c.get('ip_address')
+            and not c.get('ip_address', '').startswith('fe80::')]
+
+
+def apply_limits_to_new_clients():
+    """Give every client without a CBT queue and rule its saved or default limit.
+
+    Runs at startup (after cleanup every client is new) and then every
+    NEW_CLIENT_CHECK_SECONDS, so clients that join later are limited too. A
+    client whose IP changed (queue exists, no rule for the new IP) keeps its
+    current queue limit. Detection reads the live QoS config each pass, so a
+    write that did not apply is retried on the next pass.
+    """
+    with qos_lock:
+        try:
+            clients = get_ipv4_clients()
+            if not clients:
+                return
+            qos = cp.get('config/qos') or {}
+            queues = {q.get('name'): q for q in qos.get('queues', [])}
+            rule_targets = {(r.get('lipaddr'), r.get('queue')) for r in qos.get('rules', [])}
+            saved_limits = None
+            default_limit = None
+            for c in clients:
+                mac = c['mac']
+                ip = c['ip_address']
+                queue_name = f'CBT-{mac}'
+                if queue_name in queues and (ip, queue_name) in rule_targets:
+                    continue  # already limited
+                if saved_limits is None:
+                    saved_limits = load_saved_limits()
+                    default_limit = get_default_limit()
+                if mac in saved_limits:
+                    limit = saved_limits[mac]
+                elif queue_name in queues:
+                    limit = queues[queue_name].get('download_bw', default_limit * 1000) // 1000
+                else:
+                    limit = default_limit
+                cp.log(f'Limiting client {mac} ({ip}) to {limit} Mbps')
+                set_client_limit(mac, limit)
+        except Exception as e:
+            cp.log(f'Error applying limits to new clients: {e}')
+
+
 def set_client_limit(mac, limit_mbps):
+    with qos_lock:
+        return _set_client_limit(mac, limit_mbps)
+
+
+def _set_client_limit(mac, limit_mbps):
     try:
         # Find client IP from LAN clients
         lan_data = cp.get('status/lan/clients') or []
@@ -275,8 +335,10 @@ def set_client_limit(mac, limit_mbps):
         result = cp.put('config/qos', {'enabled': True, 'queues': queues, 'rules': rules})
         cp.log(f'QoS config result: {result}')
         
-        # Check if result indicates success (cp.put returns dict with success field)
-        if result and (result.get('success', True) or isinstance(result, dict)):
+        # On-router cp.put returns {'status': 'ok'|'error'|...}; local REST
+        # returns {'success': True|False}. Accept either success form.
+        if isinstance(result, dict) and (result.get('status') == 'ok'
+                                         or result.get('success') is True):
             cp.log('QoS updated successfully')
             # Save the limit to file
             save_limit(mac, limit_mbps)
@@ -483,21 +545,14 @@ if __name__ == '__main__':
     except Exception as e:
         cp.log(f'Error cleaning CBT config: {e}')
     
-    # Set default limits for all clients on startup
-    try:
-        saved_limits = load_saved_limits()
-        default_limit = get_default_limit()
-        clients_data = get_clients_with_limits()
-        for client in clients_data:
-            mac = client['mac']
-            # Use saved limit if exists, otherwise configured default
-            limit = saved_limits.get(mac, default_limit)
-            set_client_limit(mac, limit)
-        cp.log('Applied saved/default limits to all clients')
-    except Exception as e:
-        cp.log(f'Error setting limits: {e}')
-    
+    # Set saved/default limits for all clients on startup
+    apply_limits_to_new_clients()
+    cp.log('Applied saved/default limits to all clients')
+
     # Port: appdata client_bandwidth_throttle_web_port, else first free from 8000.
     cp.start_web_server(BandwidthHandler)
+
+    # Limit clients that join after startup
     while True:
-        time.sleep(60)
+        time.sleep(NEW_CLIENT_CHECK_SECONDS)
+        apply_limits_to_new_clients()

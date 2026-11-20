@@ -20,7 +20,6 @@ The startup log shows the port, for example `Bound port 8000 (discovered, saved 
 - **WiFi Configuration**: View current SSID and configure WiFi SSID and password
 - **Speedtest**: Run Ookla speedtests to measure download/upload speeds
 - **Signal Monitor**: View signal quality metrics (RSSI, SINR, RSRP, RSRQ)
-- **QR Code**: Generate QR codes for WiFi network credentials
 
 ## Appdata Fields
 

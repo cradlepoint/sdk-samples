@@ -8,6 +8,7 @@ Web-based QoS bandwidth limiting for individual LAN clients.
 - Real-time client detection and bandwidth monitoring
 - Per-client bandwidth limits (upload/download)
 - Configurable default rate limit for new clients, saved to SDK appdata
+- Clients that join after the app starts are limited automatically within about 10 seconds
 - Live usage statistics with 95th percentile rate calculation
 - Persistent limit settings across reboots
 - Web interface at `http://router_ip:<port>` (the port is shown in the app log and saved in `client_bandwidth_throttle_web_port`, usually 8000, or the next free port if that is taken)
@@ -26,10 +27,17 @@ The Settings panel sets the default rate limit (Mbps) applied to clients that
 do not have a specific limit configured. The value is stored in SDK appdata so
 it persists across reboots and redeploys.
 
+Every client gets a limit when the app starts, and the app checks for new
+clients every 10 seconds, so a device that joins later gets its saved limit
+(or the default) without anyone pressing Set. Changing the default applies to
+clients that join from then on; clients that already have a limit keep it until
+you change it with Set or restart the app.
+
 ## Default Settings
 
 - Default limit: 10 Mbps per client (overridable via the Settings panel)
 - Auto-refresh: 5 seconds
+- New client check: 10 seconds
 - Rate calculation: 95th percentile over 3 samples (15 seconds)
 
 ## Appdata Fields

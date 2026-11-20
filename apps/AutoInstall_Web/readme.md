@@ -27,7 +27,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 
 | Field | Purpose |
 |-------|---------|
-| **installer_password** | Password to start the install. If blank, the router serial number is used. Case-insensitive. |
+| **installer_password** | Password to start the install. If blank, the router serial number is used. The password is case-sensitive. |
 | **logo** | Base64-encoded image (or full `data:image/...;base64,...` URL) to display instead of the SIM card icon next to the panel title. |
 | **logo_dark** | Optional dark-mode logo. If set, used in night mode instead of `logo`. If not set, the regular logo is CSS-inverted in dark mode. |
 | **title** | Panel title. Default: `AutoInstall`. |

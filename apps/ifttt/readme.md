@@ -304,7 +304,9 @@ Each rule has a TRIGGER section that determines how conditions are evaluated:
 | Mode | Description |
 |------|-------------|
 | **Polling Interval** | Evaluates conditions at a configurable interval (seconds/minutes/hours, default 10 seconds). When sustain timers are active, polling increases to 1-second intervals automatically. |
-| **Callback** | Registers `cp.register('set', path, callback)` for each condition path. The rule evaluates only when a watched path changes. |
+| **Callback** | Registers `cp.register('put', path, callback)` for each IF / WHILE path. The rule evaluates when a watched path changes. WHEN, WHILE time, and WHERE conditions (and any duration sustain) can't raise change events, so a callback rule that uses them is also polled at its interval. A callback rule with only path conditions is not polled. |
+
+Turning a rule off, switching its trigger, or editing its paths takes effect within 5 seconds of saving: the old polling thread stops and the rule's watched paths are updated, so a rule never runs twice.
 
 > **Note:** Callbacks do not work on all paths. Status paths are generally supported, but some paths and nested objects may not trigger change events. Test your paths before relying on callback mode.
 

@@ -12,7 +12,7 @@ import math
 import os
 import time
 from http.server import SimpleHTTPRequestHandler
-from threading import Thread
+from threading import Event, Thread
 from urllib.parse import urlparse, parse_qs
 
 APP_NAME = 'ifttt'
@@ -709,70 +709,124 @@ class IFTTTHandler(SimpleHTTPRequestHandler):
 
 # --- Per-rule evaluation: interval threads and callback registrations ---
 
-# Track active polling threads: {rule_id: Thread}
+# Track active polling threads: {rule_id: (Thread, Event)}. Setting the Event
+# stops the thread at its next wake-up, including mid-sleep.
 _active_threads = {}
-# Track callback registrations: {rule_id: [eid, eid, ...]}
+# Callback rules and the paths each one watches: {rule_id: (path, ...)}
 _active_callbacks = {}
+# Rules to evaluate when a path changes: {path: {rule_id, ...}}
+_path_watchers = {}
+# Paths already registered with cp.register. cp.register does not return an
+# event id, so registrations are never undone; each path is registered once
+# and events for paths no rule watches any more are ignored.
+_registered_paths = set()
 # Track sustain state: {(rule_id, condition_index): {'start': timestamp, 'count': int}}
 _sustain_state = {}
 
+# Condition types that read the clock or GPS instead of a watched path. They
+# never raise change events, so a callback rule that uses them must also poll.
+_PATHLESS_COND_TYPES = ('when', 'while_time', 'where')
+
+
+def _is_path_condition(cond):
+    """True for IF / WHILE path conditions that can be watched with cp.register."""
+    return (cond.get('condType', 'if') not in _PATHLESS_COND_TYPES
+            and bool(cond.get('path', '')))
+
+
+def _callback_paths(rule):
+    """Sorted tuple of the paths a callback rule should watch."""
+    return tuple(sorted({c['path'] for c in rule.get('conditions', [])
+                         if _is_path_condition(c)}))
+
+
+def _needs_poll_thread(rule):
+    """Whether a rule needs a polling thread.
+
+    Interval rules always do. Callback rules only need one when a condition
+    cannot be watched (WHEN, WHILE time, WHERE, or an empty path) or uses a
+    duration sustain, which has to be re-checked after the timer runs out even
+    if the watched path does not change again.
+    """
+    if rule.get('trigger', 'interval') != 'callback':
+        return True
+    for cond in rule.get('conditions', []):
+        if not _is_path_condition(cond) or cond.get('sustain', 'none') == 'duration':
+            return True
+    return False
+
+
+def _clear_sustain_state(rule_id):
+    """Drop sustain timers and counters for a rule that is no longer running."""
+    for key in [k for k in list(_sustain_state) if k[0] == rule_id]:
+        _sustain_state.pop(key, None)
+
 
 def _on_path_change(path, value, args):
-    """Callback fired by cp.on when a watched path changes.
+    """Callback fired by cp.register when a watched path changes.
 
-    args is a tuple containing (rule_id,).
-    Re-loads the rule from appdata and evaluates it.
+    args is a tuple containing (registered_path,). Every enabled callback rule
+    currently watching that path is re-loaded from appdata and evaluated.
     """
-    rule_id = args[0] if args else None
-    if not rule_id:
+    watched = args[0] if args else path
+    for rule_id in list(_path_watchers.get(watched, ())):
+        try:
+            rule = load_rule(rule_id)
+            if rule:
+                cp.log('Callback triggered for rule %s on path %s' % (
+                    rule.get('name', rule_id), watched))
+                evaluate_single_rule(rule)
+        except Exception as e:
+            cp.log('Callback error for rule %s: %s' % (rule_id, e))
+
+
+def _ensure_registered(path):
+    """Register a change callback for a path, once per app run."""
+    if path in _registered_paths:
         return
+    _registered_paths.add(path)  # do not retry a failed path every sync pass
     try:
-        rule = load_rule(rule_id)
-        if rule:
-            cp.log('Callback triggered for rule %s on path %s' % (
-                rule.get('name', rule_id), path))
-            evaluate_single_rule(rule)
+        result = cp.register('put', path, _on_path_change, path)
+        if isinstance(result, dict) and result.get('status') == 'ok':
+            cp.log('Registered callback on %s' % path)
+        else:
+            cp.log('Callback registration failed on %s: %s' % (path, result))
     except Exception as e:
-        cp.log('Callback error for rule %s: %s' % (rule_id, e))
+        cp.log('Error registering callback on %s: %s' % (path, e))
 
 
-def register_callbacks(rule):
-    """Register cp.on callbacks for all condition paths in a rule."""
-    rule_id = rule['id']
-    eids = []
-    for cond in rule.get('conditions', []):
-        cond_path = cond.get('path', '')
-        if not cond_path:
-            continue
-        try:
-            result = cp.register('set', cond_path, _on_path_change, rule_id)
-            if result:
-                eids.append(result)
-                cp.log('Registered callback on %s for rule %s' % (cond_path, rule_id))
-        except Exception as e:
-            cp.log('Error registering callback on %s: %s' % (cond_path, e))
-    return eids
+def watch_paths(rule_id, paths):
+    """Point a callback rule at a new set of watched paths."""
+    unwatch_rule(rule_id)
+    for path in paths:
+        _ensure_registered(path)
+        _path_watchers.setdefault(path, set()).add(rule_id)
+    _active_callbacks[rule_id] = paths
+    cp.log('Rule %s watching %s' % (rule_id, ', '.join(paths)))
 
 
-def unregister_callbacks(rule_id):
-    """Unregister all cp.on callbacks for a rule."""
-    eids = _active_callbacks.pop(rule_id, [])
-    for eid in eids:
-        try:
-            cp.unregister(eid)
-        except Exception as e:
-            cp.log('Error unregistering eid %s: %s' % (eid, e))
-    if eids:
-        cp.log('Unregistered %d callbacks for rule %s' % (len(eids), rule_id))
+def unwatch_rule(rule_id):
+    """Stop evaluating a rule on path changes."""
+    paths = _active_callbacks.pop(rule_id, ())
+    for path in paths:
+        watchers = _path_watchers.get(path)
+        if watchers:
+            watchers.discard(rule_id)
+            if not watchers:
+                _path_watchers.pop(path, None)
+    if paths:
+        cp.log('Rule %s no longer watching %s' % (rule_id, ', '.join(paths)))
 
 
-def rule_thread(rule_id):
+def rule_thread(rule_id, stop_event):
     """Background thread that evaluates a single rule on its own interval.
 
     If any condition uses duration sustain, the thread checks every 1 second
     while sustain is being tracked, otherwise uses the configured interval.
+    Exits when stop_event is set (rule disabled, switched to callback-only, or
+    removed) or when the rule no longer exists.
     """
-    while True:
+    while not stop_event.is_set():
         try:
             rule = load_rule(rule_id)
             if not rule:
@@ -785,52 +839,81 @@ def rule_thread(rule_id):
             evaluate_single_rule(rule)
             # Check if any sustain timers are active for this rule
             has_active_sustain = any(
-                k[0] == rule_id for k in _sustain_state
+                k[0] == rule_id for k in list(_sustain_state)
             )
-            time.sleep(1 if has_active_sustain else interval_secs)
+            stop_event.wait(1 if has_active_sustain else interval_secs)
         except Exception as e:
             cp.log('Rule engine error for %s: %s' % (rule_id, e))
-            time.sleep(DEFAULT_INTERVAL)
+            stop_event.wait(DEFAULT_INTERVAL)
+
+
+def _start_thread(rule):
+    """Start a polling thread for a rule."""
+    rid = rule['id']
+    stop_event = Event()
+    t = Thread(target=rule_thread, args=(rid, stop_event), daemon=True)
+    t.start()
+    _active_threads[rid] = (t, stop_event)
+    if rule.get('trigger', 'interval') == 'callback':
+        cp.log('Started polling thread for callback rule %s '
+               '(time, GPS, or duration conditions)' % rid)
+    else:
+        cp.log('Started interval thread for rule %s' % rid)
+
+
+def _stop_thread(rule_id):
+    """Signal a rule's polling thread to exit and forget it."""
+    entry = _active_threads.pop(rule_id, None)
+    if entry:
+        entry[1].set()
+        cp.log('Removed thread for rule %s' % rule_id)
 
 
 def sync_rules():
-    """Sync interval threads and callback registrations to match saved rules."""
-    all_rules = load_all_rules()
-    current_ids = set()
-    for rule in all_rules:
+    """Sync polling threads and callback registrations to match saved rules.
+
+    Each pass compares what every enabled rule needs (a polling thread, and
+    for callback rules the set of watched paths) with what is running, so
+    disabling, re-enabling, switching trigger mode, or editing paths takes
+    effect within one pass and never leaves a stale or duplicate thread.
+    """
+    desired = {}
+    for rule in load_all_rules():
         rid = rule.get('id', '')
-        if not rid or not rule.get('enabled', True):
-            continue
-        current_ids.add(rid)
-        trigger = rule.get('trigger', 'interval')
+        if rid and rule.get('enabled', True):
+            desired[rid] = rule
 
-        if trigger == 'callback':
-            # Should be using callbacks, not a thread
-            if rid in _active_threads:
-                del _active_threads[rid]
-            if rid not in _active_callbacks:
-                eids = register_callbacks(rule)
-                _active_callbacks[rid] = eids
+    for rid, rule in desired.items():
+        # Callback watches: update when the watched paths change
+        if rule.get('trigger', 'interval') == 'callback':
+            paths = _callback_paths(rule)
         else:
-            # Should be using interval thread, not callbacks
-            if rid in _active_callbacks:
-                unregister_callbacks(rid)
-            if rid not in _active_threads:
-                t = Thread(target=rule_thread, args=(rid,), daemon=True)
-                t.start()
-                _active_threads[rid] = t
-                cp.log('Started interval thread for rule %s' % rid)
+            paths = ()
+        if _active_callbacks.get(rid, ()) != paths:
+            if paths:
+                watch_paths(rid, paths)
+            else:
+                unwatch_rule(rid)
 
-    running_thread_ids = set(_active_threads.keys())
-    running_cb_ids = set(_active_callbacks.keys())
+        # Polling thread: replace one that exited, stop one no longer needed
+        entry = _active_threads.get(rid)
+        if entry is not None and not entry[0].is_alive():
+            _active_threads.pop(rid, None)
+            entry = None
+        if _needs_poll_thread(rule):
+            if entry is None:
+                _start_thread(rule)
+        elif entry is not None:
+            _stop_thread(rid)
 
     # Clean up removed or disabled rules
-    for rid in running_thread_ids - current_ids:
-        del _active_threads[rid]
-        cp.log('Removed thread for rule %s' % rid)
+    for rid in [r for r in list(_active_threads) if r not in desired]:
+        _stop_thread(rid)
+        _clear_sustain_state(rid)
 
-    for rid in running_cb_ids - current_ids:
-        unregister_callbacks(rid)
+    for rid in [r for r in list(_active_callbacks) if r not in desired]:
+        unwatch_rule(rid)
+        _clear_sustain_state(rid)
 
 
 # --- Main ---
