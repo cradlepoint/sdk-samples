@@ -40,7 +40,7 @@ Router Zone to allow LAN clients to reach the app's web port.
 To change the port for one router or a group, set `tcpdumpster_web_port` in
 NCM SDK Data (device or group) and restart the app. Delete the field and
 restart to go back to automatic selection. A configured port that is busy is
-retried for about 10 seconds. If the port is not a number from 1 to 65535, or
+retried for about 10 seconds. If the port is not a number from 1024 to 65535, or
 stays busy, the app stops itself and logs why. Fix or delete the field, then
 start the app.
 
@@ -53,7 +53,7 @@ start the app.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `tcpdumpster_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `tcpdumpster_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 ## Notes
 

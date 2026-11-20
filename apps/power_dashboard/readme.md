@@ -70,12 +70,12 @@ For unknown models, the application will attempt to use default paths and log wa
 
 **Core Configuration:**
 - `power_dashboard_interval`: Polling interval in seconds. Default: 300 (5 minutes)
-- `power_dashboard_web_port`: Web UI port (1-65535). Optional. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again.
+- `power_dashboard_web_port`: Web UI port (1024-65535). Optional. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again.
 - `power_dashboard_port`: Deprecated. Older name for the web port, used only when `power_dashboard_web_port` is not set.
 
 **Web Port Behavior:**
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to power_dashboard_web_port)` followed by `Web server started on port 8001`. If `power_dashboard_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to power_dashboard_web_port)` followed by `Web server started on port 8001`. If `power_dashboard_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `power_dashboard_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

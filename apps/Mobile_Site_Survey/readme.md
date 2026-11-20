@@ -125,7 +125,7 @@ Primary LAN Zone to the Router Zone to reach the app's web port.
 To change the port for one router or a group, set `Mobile_Site_Survey_web_port`
 in NCM SDK Data (device or group) and restart the app. Delete the field and
 restart to go back to automatic selection. If the configured port is not a
-number from 1 to 65535, or stays busy for about 10 seconds, the app stops and
+number from 1024 to 65535, or stays busy for about 10 seconds, the app stops and
 logs why. Fix or delete the field, then start the app.
 
 **Survey targets need port 8000.** A surveyor router (`enable_surveyors`) starts
@@ -196,7 +196,7 @@ These are separate appdata fields, not part of the `Mobile_Site_Survey` JSON val
 
 | Field | Required | Description |
 |---|---|---|
-| `Mobile_Site_Survey_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. Set it to `8000` on routers used as survey targets |
+| `Mobile_Site_Survey_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. Set it to `8000` on routers used as survey targets |
 
 ## Results
 

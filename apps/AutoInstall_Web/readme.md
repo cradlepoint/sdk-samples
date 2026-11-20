@@ -40,7 +40,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | **group_by_sim** | If set (any value), enables **group mode**: only move router to NCM group (no WAN reprioritization). Groups are matched by **SIM slot**. |
 | **group_by_carrier** | If set (any value), enables **group mode**: only move router to NCM group (no WAN reprioritization). Groups are matched by carrier name. |
 | **diagnostics** | Comma-separated list of modem fields to log. Default: `DBM,SINR,RSRP,RSRQ,RFBAND,SRVC_TYPE,SRVC_TYPE_DETAILS`. |
-| **AutoInstall_Web_web_port** | Optional. Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. To change the port, set it in NCM SDK Data (device or group) and restart the app. Delete it and restart to pick a port automatically again. The field name must match exactly. |
+| **AutoInstall_Web_web_port** | Optional. Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. To change the port, set it in NCM SDK Data (device or group) and restart the app. Delete it and restart to pick a port automatically again. The field name must match exactly. |
 | **AutoInstall_Web_port** | Optional. Deprecated. Older name for the web port, used only when **AutoInstall_Web_web_port** is not set. |
 | **disable_alerts** | If set (any value), the app does not send the results alert. |
 | **custom1** | If set (any value), the app writes a results summary to the NCM device custom1 field. |
@@ -143,7 +143,7 @@ On error, the button shows **Auto-Install Failed! Restart** and the log file can
 | No matching group for SIM: X | Create an NCM group whose name contains both group_keyword and SIM1 or SIM2 (group_by_sim mode). |
 | No matching group for carrier: X | Create an NCM group whose name contains both group_keyword and the carrier name. |
 | Using serial number as password | Set **installer_password** in appdata to use a custom password. |
-| App stops at startup with a port error | **AutoInstall_Web_web_port** is not a number from 1 to 65535, or that port stayed busy. Fix or delete the field, then start the app. |
+| App stops at startup with a port error | **AutoInstall_Web_web_port** is not a number from 1024 to 65535, or that port stayed busy. Fix or delete the field, then start the app. |
 | Web page does not load | Use the port shown in the app log. LAN clients also need a Zone Firewall forward from the Primary LAN Zone to the Router Zone to reach the app's web port. |
 
 ## Logs

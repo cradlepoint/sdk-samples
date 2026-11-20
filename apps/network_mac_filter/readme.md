@@ -156,11 +156,11 @@ MAC addresses accept any format (colons, dashes, no separators, mixed case).
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `network_mac_filter_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `network_mac_filter_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 | `custom_mac_filter_port` | No | Deprecated. Older name for the web port, used only when `network_mac_filter_web_port` is not set. |
 | `disable_ui` | No | If set to any value, the web interface is turned off. See [Headless Mode](#headless-mode-no-web-ui). |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to network_mac_filter_web_port)` followed by `Web server started on port 8001`. If `network_mac_filter_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1 to 65535, or the port stays busy, the web UI does not start and the log says why. MAC filtering keeps running. Fix or delete the field, then restart the app.
+The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to network_mac_filter_web_port)` followed by `Web server started on port 8001`. If `network_mac_filter_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the web UI does not start and the log says why. MAC filtering keeps running. Fix or delete the field, then restart the app.
 
 To change the port for one router or a group, set `network_mac_filter_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

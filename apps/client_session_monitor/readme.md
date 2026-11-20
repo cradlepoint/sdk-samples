@@ -19,7 +19,7 @@ Monitors client connections to specific domains by tracking firewall connection 
 - **monitored_domains** (string, default: "example.com") - Comma-separated list of domains/URLs to monitor
 - **session_timeout** (integer, default: 60) - Seconds of inactivity before session ends
 - **log_size_limit** (integer, default: 10485760) - Maximum CSV log file size in bytes (default 10MB)
-- **client_session_monitor_web_port** (integer, optional) - Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Set or delete it in NCM SDK Data and restart the app; deleting it picks a port automatically again. If the port is invalid or stays busy, the app stops and logs why
+- **client_session_monitor_web_port** (integer, optional) - Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Set or delete it in NCM SDK Data and restart the app; deleting it picks a port automatically again. If the port is invalid or stays busy, the app stops and logs why
 
 ## Usage
 

@@ -52,7 +52,7 @@ The port is shown in the app log at startup (for example `Web server started on 
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `cs_explorer_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `cs_explorer_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 ## 🎯 Usage
 
@@ -129,7 +129,7 @@ cs_explorer/
 - Check system logs for startup errors
 
 **Application stops with a port error:**
-- `cs_explorer_web_port` is not a number from 1 to 65535, or that port stayed busy
+- `cs_explorer_web_port` is not a number from 1024 to 65535, or that port stayed busy
 - Fix or delete the field, then start the app
 
 **Cannot access web interface:**

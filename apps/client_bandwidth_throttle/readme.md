@@ -45,7 +45,7 @@ you change it with Set or restart the app.
 | Field | Required | Description |
 | --- | --- | --- |
 | `default_limit_mbps` | No | Default rate limit in Mbps for new clients. Valid range 1-1000. Defaults to 10 in code when unset. |
-| `client_bandwidth_throttle_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Set or delete it in NCM SDK Data and restart the app; deleting it picks a port automatically again. If the port is invalid or stays busy, the app stops and logs why. |
+| `client_bandwidth_throttle_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Set or delete it in NCM SDK Data and restart the app; deleting it picks a port automatically again. If the port is invalid or stays busy, the app stops and logs why. |
 
 ## Technical Details
 

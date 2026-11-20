@@ -137,7 +137,7 @@ Set these in NCM SDK Data (device or group), then restart the app.
 
 | Field | Required | Description |
 |---|---|---|
-| `cell_survey_web_port` | No | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it and restart to pick a port automatically again. |
+| `cell_survey_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it and restart to pick a port automatically again. |
 | `cell_survey_port` | No | Deprecated. Older name for the web port, used only when `cell_survey_web_port` is not set. |
 | `cell_survey_schedule` | No | The startup and scheduled survey settings, as JSON. **Save Schedule** on the Schedule page writes it for you; set it in NCM only to push the same schedule to many routers. Not set means no startup or scheduled surveys. |
 
@@ -167,7 +167,7 @@ Example:
   firewall may be blocking the app's web port. Ask whoever manages the router to
   allow LAN devices to reach it on that port.
 - **The app stops with a port error.** `cell_survey_web_port` is not a number
-  from 1 to 65535, or that port stayed busy. Fix or delete the field, then start
+  from 1024 to 65535, or that port stayed busy. Fix or delete the field, then start
   the app.
 - **"Run Survey" is greyed out.** The survey needs one of the supported modems
   (Cradlepoint's Telit 5G modules). Other modems can't run it, and the app will

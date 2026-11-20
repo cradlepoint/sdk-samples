@@ -88,13 +88,13 @@ The web UI port is a separate SDK Data field:
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `serial_to_UDP_web_port` | no | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `serial_to_UDP_web_port` | no | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 The startup log shows the port, e.g. `Bound port 8001 (discovered, saved to
 serial_to_UDP_web_port)` then `Web server started on port 8001`. To change it for one router
 or a group, set `serial_to_UDP_web_port` in NCM SDK Data (device or group) and restart the
 app. Delete the field and restart to go back to automatic selection. A configured port that
-is busy is retried for about 10 seconds. If it is not a number from 1 to 65535, or stays
+is busy is retried for about 10 seconds. If it is not a number from 1024 to 65535, or stays
 busy, the web UI does not start and the log says why, but serial to UDP forwarding keeps
 running.
 

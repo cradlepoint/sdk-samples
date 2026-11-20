@@ -90,7 +90,7 @@ All fields are optional. Defaults are applied in code.
 |---|---|---|---|
 | `ntp_gps_port` | No | `1123` | UDP port the NTP server listens on |
 | `ntp_gps_holdover` | No | `300` | Seconds to keep serving time after GPS samples stop |
-| `NTP_server_web_port` | No | first free port from `8000` | Web UI port (1-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `NTP_server_web_port` | No | first free port from `8000` | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
 
 The only value the app writes to appdata is the discovered web port, so it stays the same after
 reboots. To change the port for one router or a group, set `NTP_server_web_port` in NCM SDK Data

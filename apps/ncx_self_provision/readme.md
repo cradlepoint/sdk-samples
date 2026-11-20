@@ -625,7 +625,7 @@ name=<resource_name>;ip=<cidr_notation>[;tags=<tag1:tag2>][;protocols=<TCP:UDP>]
 | `ip` | **YES** | CIDR String | Valid IPv4 subnet in CIDR notation (e.g., `10.0.1.0/24`, `192.168.50.0/28`). Prefix must be 0-32. |
 | `tags` | No | Colon-separated strings | One or more tag labels (e.g., `datacenter:internal`). No special characters. |
 | `protocols` | No | Colon-separated list | Exactly one of: `TCP` \| `UDP` \| `TCP:UDP` \| `ICMP`. Case-sensitive. |
-| `port_ranges` | No | Colon-separated integers or ranges | Individual ports (e.g., `80:443`) or ranges (e.g., `8000-8080`). Valid range: 1-65535. Lower must be <= upper in ranges. Not allowed when protocols=ICMP. |
+| `port_ranges` | No | Colon-separated integers or ranges | Individual ports (e.g., `80:443`) or ranges (e.g., `8000-8080`). Valid range: 1024-65535. Lower must be <= upper in ranges. Not allowed when protocols=ICMP. |
 
 **FQDN Resource Format:**
 ```
@@ -638,7 +638,7 @@ name=<resource_name>;domain=<fully_qualified_domain>[;tags=<tag1:tag2>][;protoco
 | `domain` | **YES** | FQDN String | Valid fully qualified domain name using alphanumeric characters, hyphens, and dots (e.g., `app.site.local`, `api.branch.company.net`) |
 | `tags` | No | Colon-separated strings | One or more tag labels (e.g., `web:production`). No special characters. |
 | `protocols` | No | Colon-separated list | Exactly one of: `TCP` \| `UDP` \| `TCP:UDP` \| `ICMP`. Case-sensitive. |
-| `port_ranges` | No | Colon-separated integers or ranges | Individual ports (e.g., `443:8443`) or ranges (e.g., `8000-8080`). Valid range: 1-65535. Lower must be <= upper in ranges. Not allowed when protocols=ICMP. |
+| `port_ranges` | No | Colon-separated integers or ranges | Individual ports (e.g., `443:8443`) or ranges (e.g., `8000-8080`). Valid range: 1024-65535. Lower must be <= upper in ranges. Not allowed when protocols=ICMP. |
 
 **Examples:**
 

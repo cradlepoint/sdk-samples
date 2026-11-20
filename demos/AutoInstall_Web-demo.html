@@ -723,8 +723,8 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
           <tr><td><code>title</code></td><td><span class="req">No</span></td><td><code>AutoInstall</code></td><td>Text</td><td>Panel title.</td></tr>
           <tr><td><code>text</code></td><td><span class="req">No</span></td><td>Enter password to start auto-install process.</td><td>Text</td><td>Intro text above the signal meter.</td></tr>
           <tr><td><code>logo</code>, <code>logo_dark</code></td><td><span class="req">No</span></td><td>SIM card icon; <code>logo</code> inverted in dark mode</td><td>Base64 image</td><td>Image shown beside the panel title, with an optional dark-mode version.</td></tr>
-          <tr><td><code>AutoInstall_Web_web_port</code></td><td><span class="req">No</span></td><td>First free port from 8000, then saved</td><td>1 to 65535</td><td>Web UI port. Set it to pin the port; delete it and restart to pick one again.</td></tr>
-          <tr><td><code>AutoInstall_Web_port</code></td><td><span class="req">No</span></td><td>None</td><td>1 to 65535</td><td>Deprecated older name for the web port, used only when <code>AutoInstall_Web_web_port</code> is not set.</td></tr>
+          <tr><td><code>AutoInstall_Web_web_port</code></td><td><span class="req">No</span></td><td>First free port from 8000, then saved</td><td>1024 to 65535</td><td>Web UI port. Set it to pin the port; delete it and restart to pick one again.</td></tr>
+          <tr><td><code>AutoInstall_Web_port</code></td><td><span class="req">No</span></td><td>None</td><td>1024 to 65535</td><td>Deprecated older name for the web port, used only when <code>AutoInstall_Web_web_port</code> is not set.</td></tr>
         </tbody>
       </table>
     </div>

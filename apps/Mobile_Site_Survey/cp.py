@@ -4211,9 +4211,9 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
             port = int(str(configured).strip())
         except ValueError:
             port = 0
-        if not 1 <= port <= 65535:
+        if not 1024 <= port <= 65535:
             log(f'Invalid {field}={configured!r}: must be a port number '
-                f'1-65535. Web server not started.')
+                f'1024-65535. Web server not started.')
             return None
         for attempt in range(_WEB_PORT_RETRIES):
             sock = _try_bind(host, port)
