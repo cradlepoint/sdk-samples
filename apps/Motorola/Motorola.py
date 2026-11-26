@@ -68,11 +68,21 @@ def save_config(config):
         cp.get_logger().exception("Error saving config: %s", e)
 
 
+# Absolute app folder. On the router __file__ can be relative, which made
+# dirname() return '' and the server list the router's root filesystem.
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 class AppHandler(SimpleHTTPRequestHandler):
     """Handles all HTTP requests for the web UI."""
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=os.path.dirname(__file__), **kwargs)
+        super().__init__(*args, directory=APP_DIR, **kwargs)
+
+    def end_headers(self):
+        # Always revalidate so a stale cached style.css/script.js cannot break the UI
+        self.send_header('Cache-Control', 'no-cache, must-revalidate')
+        super().end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
