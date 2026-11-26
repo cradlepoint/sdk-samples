@@ -1,7 +1,7 @@
 # AutoInstall_Web
 AutoInstall – Detects SIMs, speedtests each, collects diagnostics, picks fastest. Default: reprioritizes WAN by download speed. With group_by_sim/carrier: moves router to matching NCM group. Optionally enforces min_speed, sends alerts, and updates NCM custom fields.
 
-![image](https://github.com/user-attachments/assets/a9353b53-d62c-434d-943c-98338d7c91b5)
+<img width="400" height="867" alt="image" src="https://github.com/user-attachments/assets/d5228cbc-c722-41dc-92da-28359d7d5345" />
 
 ## What It Does
 
