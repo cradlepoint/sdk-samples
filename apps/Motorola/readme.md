@@ -1,4 +1,5 @@
-# Motorola SmartConnect
+<img width="644" height="690" alt="image" src="https://github.com/user-attachments/assets/d86ca799-ffd7-4b6e-86ce-0935fa7dec3c" />
+
 Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP beacons on configured LANs. A web UI provides configuration.
 
 ## What It Does
@@ -12,8 +13,6 @@ Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP 
 Open **http://&lt;router-ip&gt;:&lt;port&gt;/** in a browser. The port is shown in the app log at startup. It is 8000 unless that port is taken, in which case the app uses the next free port and saves it in the **Motorola_web_port** appdata field. The log shows it, for example `Default port 8000 in use; bound 8001 (saved to Motorola_web_port)` then `Web server started on port 8001`.
 
 To use a specific port on one router or a group, set **Motorola_web_port** in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection. If the configured port is not a number from 1024 to 65535, or is still busy after about 10 seconds, the app stops itself and logs why. Fix or delete the field, then start the app.
-
-![image](https://github.com/user-attachments/assets/4e374d86-4119-4d21-b4f0-66a98e11c902)
 
 ## Appdata (Configuration)
 
