@@ -1,11 +1,8 @@
 # Installer_UI
 Installer_UI provides a simple web interface for installers to configure WiFi settings and run speedtests on the router.
 
-![image](https://github.com/user-attachments/assets/a0af6ae2-a9dd-46de-a294-10c8468cec8d)
-
-![image](https://github.com/user-attachments/assets/a91d5828-e81e-47a1-a16b-e8c1240240d1)
-
-![image](https://github.com/user-attachments/assets/2a74cdae-491c-42d6-9502-7436e3058d97)
+<img width="400" height="867" alt="image" src="https://github.com/user-attachments/assets/b06ef028-2851-44e9-84d1-d08238f89e23" />
+<img width="400" height="867" alt="image" src="https://github.com/user-attachments/assets/586d15cb-cf9a-4485-87d4-c18445ad89ab" />
 
 ## Access
 
