@@ -1,5 +1,4 @@
-# WAN Dashboard
-![image](https://github.com/user-attachments/assets/ca55cbc2-28fd-4851-be8d-5f63eef2d652)
+<img width="1264" height="664" alt="image" src="https://github.com/user-attachments/assets/b9411a1a-a7fa-4e13-8654-b2dbee24ef31" />
 
 ## Features
 
