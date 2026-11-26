@@ -4178,8 +4178,10 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
       briefly in case a previous instance is still releasing it. Never
       move to another port; an invalid value is an error.
     - Field not set: bind the first free port from start_port up to 8100
-      (8000-8100 by default) and save it to the field, so the app keeps
-      the same port across reboots.
+      (8000-8100 by default). Only if start_port was busy and a
+      different port had to be used is it saved to the field, so the
+      app keeps the same port across reboots. When start_port itself
+      binds, nothing is saved.
 
     Off-router (local development) a free port is discovered on this
     machine and appdata is neither read nor written.
@@ -4229,11 +4231,16 @@ def bind_web_port(start_port: int = 8000, host: str = '0.0.0.0',
     for port in range(start_port, _WEB_PORT_MAX + 1):
         sock = _try_bind(host, port)
         if sock:
-            if _is_ncos:
+            if port == start_port:
+                log(f'Bound default port {port}')
+            elif _is_ncos:
+                # Default was busy: save the fallback so it stays stable
                 put_appdata(field, str(port))
-                log(f'Bound port {port} (discovered, saved to {field})')
+                log(f'Default port {start_port} in use; bound {port} '
+                    f'(saved to {field})')
             else:
-                log(f'Bound port {port} (discovered, local run: not saved)')
+                log(f'Default port {start_port} in use; bound {port} '
+                    f'(local run: not saved)')
             return sock
     log(f'No free port in {start_port}-{_WEB_PORT_MAX}. '
         f'Web server not started.')
