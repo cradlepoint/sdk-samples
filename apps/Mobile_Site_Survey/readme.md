@@ -99,7 +99,7 @@ which is exactly the case the fall-through handles.
 
 ## Quick Start
 
-1. **Access Web Interface** - Navigate to `http://<router_ip>:<port>`, using the port shown in the app log and saved in `Mobile_Site_Survey_web_port` (usually 8000, or the next free port if that is taken)
+1. **Access Web Interface** - Navigate to `http://<router_ip>:<port>`, using the port shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `Mobile_Site_Survey_web_port`
 2. **Configure Settings** - Set distance/time intervals and testing options
 3. **Run Survey** - Click "Run Survey Now" for manual testing or enable automatic testing
 4. **View Results** - Real-time results display with professional formatting
@@ -108,13 +108,13 @@ which is exactly the case the fall-through handles.
 
 The web port is kept in the appdata field `Mobile_Site_Survey_web_port`. If the
 field is set, the app uses exactly that port. If it is not set, the app takes the
-first free port from **8000** (up to 8100) on first start and saves it there, so the port
+port **8000**, or the next free port (up to 8100) if 8000 is busy, and saves it there only in that case, so the port
 stays the same after reboots.
 
 The chosen port is always written to the router log at startup:
 
 ```text
-Bound port 8000 (discovered, saved to Mobile_Site_Survey_web_port)
+Bound default port 8000
 Web interface available on port 8000
 ```
 
@@ -196,7 +196,7 @@ These are separate appdata fields, not part of the `Mobile_Site_Survey` JSON val
 
 | Field | Required | Description |
 |---|---|---|
-| `Mobile_Site_Survey_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. Set it to `8000` on routers used as survey targets |
+| `Mobile_Site_Survey_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. Set it to `8000` on routers used as survey targets |
 
 ## Results
 

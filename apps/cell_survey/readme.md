@@ -38,9 +38,7 @@ http://<your-router-IP>:<port>
 
 For example `http://192.168.0.1:8000`. (Your router's IP is the same address
 you use to reach its admin page.) The port is shown in the app log at startup
-(for example `Web server started on port 8000`) and saved in the
-`cell_survey_web_port` field. It is usually 8000, or the next free port if 8000
-is taken, and it stays the same after reboots. See **Appdata Fields** to change it.
+(for example `Web server started on port 8000`) (usually 8000). If 8000 is taken, the app uses the next free port and saves it in the `cell_survey_web_port` field, so it stays the same after reboots. See **Appdata Fields** to change it.
 
 If the page doesn't load, see **Troubleshooting** at the bottom.
 
@@ -137,8 +135,7 @@ Set these in NCM SDK Data (device or group), then restart the app.
 
 | Field | Required | Description |
 |---|---|---|
-| `cell_survey_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it and restart to pick a port automatically again. |
-| `cell_survey_port` | No | Deprecated. Older name for the web port, used only when `cell_survey_web_port` is not set. |
+| `cell_survey_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it and restart to pick a port automatically again. |
 | `cell_survey_schedule` | No | The startup and scheduled survey settings, as JSON. **Save Schedule** on the Schedule page writes it for you; set it in NCM only to push the same schedule to many routers. Not set means no startup or scheduled surveys. |
 
 `cell_survey_schedule` keys (any key left out uses its default):

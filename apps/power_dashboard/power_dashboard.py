@@ -1822,11 +1822,9 @@ def start_web_server():
     
     
 
-    # Port: appdata power_dashboard_web_port (or the older
-    # power_dashboard_port), else the first free port from 8000 (up to 8100), saved to
-    # power_dashboard_web_port.
-    web_server = cp.start_web_server(PowerTrackerHandler,
-                                     legacy_field='power_dashboard_port')
+    # Port: appdata power_dashboard_web_port, else the first free port from
+    # 8000 (up to 8100), saved to power_dashboard_web_port.
+    web_server = cp.start_web_server(PowerTrackerHandler)
 
     # Keep the main thread alive; signal_handler shuts the server down.
     while not shutdown_requested:

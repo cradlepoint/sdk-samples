@@ -19,7 +19,7 @@ Enforces MAC address limits per network using Zone-Based Firewall deny rules. Au
 
 1. **Install app** via NetCloud Manager
 2. **Create Zone-Based Firewall filter policies** - Policy name must match LAN name exactly (e.g., "Primary LAN")
-3. **Access web UI** at `http://{router_ip}:<port>/`. The port is shown in the app log and saved in the `network_mac_filter_web_port` appdata field (usually 8000, or the next free port if 8000 is taken). LAN clients need a firewall zone forwarding rule from Primary LAN Zone to Router Zone to reach the app's web port
+3. **Access web UI** at `http://{router_ip}:<port>/`. The port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `network_mac_filter_web_port` appdata field. LAN clients need a firewall zone forwarding rule from Primary LAN Zone to Router Zone to reach the app's web port
 4. **Configure** via gear icon:
    - Set max unknown per network
    - Add allowed MAC prefixes (e.g., `00:11:22,AA:BB:CC`)
@@ -156,11 +156,10 @@ MAC addresses accept any format (colons, dashes, no separators, mixed case).
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `network_mac_filter_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
-| `custom_mac_filter_port` | No | Deprecated. Older name for the web port, used only when `network_mac_filter_web_port` is not set. |
+| `network_mac_filter_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 | `disable_ui` | No | If set to any value, the web interface is turned off. See [Headless Mode](#headless-mode-no-web-ui). |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to network_mac_filter_web_port)` followed by `Web server started on port 8001`. If `network_mac_filter_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the web UI does not start and the log says why. MAC filtering keeps running. Fix or delete the field, then restart the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to network_mac_filter_web_port)` followed by `Web server started on port 8001`. If `network_mac_filter_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the web UI does not start and the log says why. MAC filtering keeps running. Fix or delete the field, then restart the app.
 
 To change the port for one router or a group, set `network_mac_filter_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

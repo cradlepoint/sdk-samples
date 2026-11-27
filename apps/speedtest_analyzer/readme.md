@@ -107,7 +107,7 @@ After installation, allow a short period for NCOS to upload, extract, and start 
 
 ## 2. Access the web interface
 
-The application listens on a TCP port shown in the app log and saved in the `speedtest_analyzer_web_port` SDK appdata field (usually `8000`, or the next free port if `8000` is taken). See [Appdata Fields](#appdata-fields) to choose a specific port.
+The application listens on a TCP port shown in the app log (usually `8000`). If `8000` is taken, the app uses the next free port and saves it in the `speedtest_analyzer_web_port` SDK appdata field. See [Appdata Fields](#appdata-fields) to choose a specific port.
 
 If connecting through **NCM LAN Manager**, no local firewall zone-forwarding changes are required to access the app.
 
@@ -1161,9 +1161,9 @@ If the router belongs to an NCM Group, the Group configuration becomes effective
 
 | Field | Required | Description |
 |---|---|---|
-| `speedtest_analyzer_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `speedtest_analyzer_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to speedtest_analyzer_web_port)` followed by `Web server started on port 8001`. If `speedtest_analyzer_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to speedtest_analyzer_web_port)` followed by `Web server started on port 8001`. If `speedtest_analyzer_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `speedtest_analyzer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

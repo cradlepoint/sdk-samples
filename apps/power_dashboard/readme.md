@@ -34,7 +34,7 @@ A comprehensive real-time power usage monitoring application for Cradlepoint rou
 ## Access Methods
 
 ### Local Access
-- **Direct Browser**: Navigate to `http://<router_ip>:<port>` in your web browser. The port is shown in the app log and saved in the `power_dashboard_web_port` appdata field (usually 8000, or the next free port if 8000 is taken)
+- **Direct Browser**: Navigate to `http://<router_ip>:<port>` in your web browser. The port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `power_dashboard_web_port` appdata field
 - **PrimaryLAN Zone Forwarding**: Forward the PrimaryLAN zone to the Router zone to enable local network access to the app's web port
 
 ### Remote Access - NetCloud Manager
@@ -70,12 +70,11 @@ For unknown models, the application will attempt to use default paths and log wa
 
 **Core Configuration:**
 - `power_dashboard_interval`: Polling interval in seconds. Default: 300 (5 minutes)
-- `power_dashboard_web_port`: Web UI port (1024-65535). Optional. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again.
-- `power_dashboard_port`: Deprecated. Older name for the web port, used only when `power_dashboard_web_port` is not set.
+- `power_dashboard_web_port`: Web UI port (1024-65535). Optional. If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again.
 
 **Web Port Behavior:**
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to power_dashboard_web_port)` followed by `Web server started on port 8001`. If `power_dashboard_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to power_dashboard_web_port)` followed by `Web server started on port 8001`. If `power_dashboard_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `power_dashboard_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

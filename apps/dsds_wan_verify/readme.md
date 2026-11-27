@@ -21,8 +21,7 @@ other slot. Each slot can be checked three ways, and each check is switchable pe
 1. **Deploy the app.** It starts working immediately on its built-in defaults — ping `8.8.8.8`
    on both slots, with automatic failover on — so review them before leaving it unattended.
 2. **Open the web UI.** From a LAN client, go to `http://<router-lan-ip>:<port>`. The port is
-   shown in the app log and saved in `dsds_wan_verify_web_port` (usually 8000, or the next free
-   port if that is taken; see [Web server port](#web-server-port)). If the page times out, see
+   shown in the app log (usually 8000; if 8000 is taken the next free port is used and saved in `dsds_wan_verify_web_port`; see [Web server port](#web-server-port)). If the page times out, see
    [LAN access](#lan-access). You can also reach it through Remote Connect LAN Manager to
    `127.0.0.1` on the same port.
 3. **Set your tests.** On **Connectivity Tests**, pick a slot tab and edit the **Ping Test**
@@ -165,7 +164,7 @@ the `dsds_wan_verify` config JSON), so it can be pushed from an NCM group on its
 
 - **Set:** the app uses exactly that port, any number from 1024 to 65535. If the port is busy it
   retries for about 10 seconds and never moves to another port.
-- **Not set:** on first start the app takes the first free port from 8000 (up to 8100) and saves it to
+- **Not set:** the app uses port 8000, or the next free port (up to 8100) if 8000 is busy, and saves it only in that case to
   `dsds_wan_verify_web_port`, so the port stays the same after reboots.
 - **Invalid or busy:** if the value is not a number from 1024 to 65535, or the port stays busy, the
   app stops and logs why. Fix or delete the field, then start the app.
@@ -173,7 +172,7 @@ the `dsds_wan_verify` config JSON), so it can be pushed from an NCM group on its
 The startup log shows the port, for example:
 
 ```text
-Bound port 8001 (discovered, saved to dsds_wan_verify_web_port)
+Default port 8000 in use; bound 8001 (saved to dsds_wan_verify_web_port)
 Web server started on port 8001
 ```
 
@@ -185,8 +184,7 @@ live. Make sure the Zone Firewall forward lets LAN clients reach the app's web p
 
 | Field | Required | Description |
 |---|---|---|
-| `dsds_wan_verify_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
-| `dsds_wan_verify_port` | No | Deprecated. Older name for the web port, used only when `dsds_wan_verify_web_port` is not set. It used to reject ports below 1024; the new field accepts 1024-65535. |
+| `dsds_wan_verify_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
 ### Per slot (`slots["<port>|<sim>"]`, e.g. `slots["int1|sim1"]`)
 

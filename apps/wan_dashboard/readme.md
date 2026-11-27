@@ -17,7 +17,7 @@
 ## Configuration
 
 - **Update Interval**: Set `wan_dashboard_interval` in appdata (default: 3 seconds)
-- **Port**: Set `wan_dashboard_web_port` in appdata to choose the web port. If not set, the app uses the first free port from 8000 (up to 8100) and saves it there. The port in use is shown in the app log
+- **Port**: Set `wan_dashboard_web_port` in appdata to choose the web port. If not set, the app uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it there only in that case. The port in use is shown in the app log
 
 ## Access
 
@@ -29,9 +29,8 @@
 | Field | Required | Description |
 |-------|----------|-------------|
 | `wan_dashboard_interval` | No | Dashboard update interval in seconds. Default: 3 |
-| `wan_dashboard_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
-| `wan_dashboard_port` | No | Deprecated. Older name for the web port, used only when `wan_dashboard_web_port` is not set. |
+| `wan_dashboard_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to wan_dashboard_web_port)` followed by `Web server started on port 8001`. If `wan_dashboard_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to wan_dashboard_web_port)` followed by `Web server started on port 8001`. If `wan_dashboard_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `wan_dashboard_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.

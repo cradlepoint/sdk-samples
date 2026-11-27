@@ -407,8 +407,8 @@ if __name__ == "__main__":
     broadcaster = Broadcaster()
     Thread(target=broadcaster.loop, daemon=True).start()
 
-    # Port: appdata Motorola_web_port (or the older Motorola_port), else the
+    # Port: appdata Motorola_web_port, else the
     # first free port from 8000 (up to 8100), saved to Motorola_web_port.
-    cp.start_web_server(AppHandler, legacy_field='Motorola_port')
+    cp.start_web_server(AppHandler)
     while True:
         time.sleep(60)

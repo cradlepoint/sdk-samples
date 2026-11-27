@@ -12,8 +12,7 @@ NTP to learn the real time. This app is that time source when the only thing ava
 
 - Stratum-1 NTP server sourced from GPS, answering on **UDP port 1123**.
 - Web dashboard at **http://router_ip:&lt;port&gt;** showing full sync status and the router's
-  current clock. The port is shown in the app log and saved in `NTP_server_web_port` (usually
-  8000, or the next free port if 8000 is taken). A **Local / UTC switch** at the top (defaults
+  current clock. The port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `NTP_server_web_port`. A **Local / UTC switch** at the top (defaults
   to Local) sets the timezone for every timestamp on the page, so you never have to reconcile
   mixed zones. "Local" is the router's own
   configured timezone.
@@ -31,8 +30,7 @@ NTP to learn the real time. This app is that time source when the only thing ava
    (Administration > System > Time, or `config/system/ntp`). The router's clock is then
    disciplined to GPS.
 4. Open **http://router_ip:&lt;port&gt;** to watch status and, if needed, set the clock manually.
-   The startup log shows the port, e.g. `Bound port 8000 (discovered, saved to
-   NTP_server_web_port)` then `Web server started on port 8000`.
+   The startup log shows the port, e.g. `Bound default port 8000` then `Web server started on port 8000`.
 
 ### Setting the clock from the web UI
 
@@ -90,7 +88,7 @@ All fields are optional. Defaults are applied in code.
 |---|---|---|---|
 | `ntp_gps_port` | No | `1123` | UDP port the NTP server listens on |
 | `ntp_gps_holdover` | No | `300` | Seconds to keep serving time after GPS samples stop |
-| `NTP_server_web_port` | No | first free port from `8000` | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `NTP_server_web_port` | No | `8000`, or the next free port | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
 The only value the app writes to appdata is the discovered web port, so it stays the same after
 reboots. To change the port for one router or a group, set `NTP_server_web_port` in NCM SDK Data

@@ -91,6 +91,7 @@ entry there before acting on anything in this list.
 **SDK mechanics**
 - `cp.register` callbacks receive `(path, value, args)` — do not use `*args`
 - `cp.register()` on control paths must use `'put'` (lowercase)
+- Most `status/` paths never fire `cp.register` callbacks (GPIO, ethernet link, all `status/wan/*`, `lan/clients`) — poll them; only `control/**`, `status/ecm/state`, `status/wlan/*`, `status/gps/fix` fire (table in `docs/ncos-api/register-callback-support.md`)
 - Do not `cp.put()` to seed the control tree before `cp.register()` — causes socket desync
 - Control tree keys persist across redeploys — keep path names stable
 - REST returns masked `$0$` password hashes; only the on-router socket returns real `$3$`
@@ -107,6 +108,6 @@ entry there before acting on anything in this list.
 Already documented in full — grep these rather than re-deriving:
 `config/serial.md` · `config/ipverify.md` · `config/wan-rules2.md` · `config/source-routing.md`
 · `status/rtk.md` · `status/gps/` · `status/wan/devices/dsds.md` · `control/tcpdump.md`
-· `control/container.md` · `client-usage-qos.md`
+· `control/container.md` · `client-usage-qos.md` · `register-callback-support.md`
 
 Netperf/speed testing: activate `speedtest-standards`. GPS/NMEA/RTK: activate `gps-standards`.

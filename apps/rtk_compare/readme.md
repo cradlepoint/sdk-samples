@@ -42,8 +42,7 @@ of skipped repeats is shown on the Analytics page.
 ## Web UI
 
 Reachable at `http://{router_lan_ip}:<port>`. The port is shown in the app log
-and saved in the `rtk_compare_web_port` appdata field (usually 8000, or the
-next free port if 8000 is taken). See [Appdata fields](#appdata-fields).
+(usually 8000). If 8000 is taken, the app uses the next free port and saves it in the `rtk_compare_web_port` appdata field. See [Appdata fields](#appdata-fields).
 
 > LAN clients need a firewall rule forwarding Primary LAN Zone → Router Zone
 > for the app's web port (Security > Zone Firewall). Without it the page times
@@ -229,17 +228,16 @@ the app appends to these files at runtime.
 ## Appdata fields
 
 All optional. The only value the app writes to appdata is the discovered web
-port, saved to `rtk_compare_web_port` when that field is not set.
+port, saved to `rtk_compare_web_port` only when 8000 is busy and that field is not set.
 
 | Field | Default | Description |
 |---|---|---|
-| `rtk_compare_web_port` | first free from `8000` | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
-| `rtk_compare_port` | | Deprecated. Older name for the web port, used only when `rtk_compare_web_port` is not set. |
+| `rtk_compare_web_port` | `8000`, or the next free port | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 | `rtk_compare_interval` | `1.0` | Sample interval in seconds (0.5–60) |
 | `rtk_compare_max_points` | `7200` | In-memory samples kept for the map and analytics (60–100000) |
 
 The startup log shows the port in use, for example
-`Bound port 8001 (discovered, saved to rtk_compare_web_port)` followed by
+`Default port 8000 in use; bound 8001 (saved to rtk_compare_web_port)` followed by
 `Web server started on port 8001`. If `rtk_compare_web_port` is set and that
 port is busy, the app retries for about 10 seconds and never moves to another
 port. If the value is not a number from 1024 to 65535, or the port stays busy, the

@@ -252,24 +252,6 @@ def get_config(name):
     return password
 
 
-def open_firewall():
-    """Open firewall forwarding from Primary LAN to Router Zone."""
-    app_fwd = {
-        'dst_zone_id': '00000001-695c-3d87-95cb-d0ee2029d0b5',
-        'enabled': True,
-        'filter_policy_id': '00000000-77db-3b20-980e-2de482869073',
-        'src_zone_id': '00000003-695c-3d87-95cb-d0ee2029d0b5'
-    }
-    forwardings = cp.get('config/security/zfw/forwardings')
-    for forwarding in forwardings:
-        if (forwarding['src_zone_id'] == app_fwd['src_zone_id']
-                and forwarding['dst_zone_id'] == app_fwd['dst_zone_id']):
-            return
-    cp.post('config/security/zfw/forwardings', app_fwd)
-    cp.log('Forwarded Primary LAN Zone to Router Zone'
-           ' with Default Allow All policy')
-
-
 def get_signal_quality():
     """Get cellular signal quality metrics."""
     try:
@@ -292,7 +274,6 @@ if __name__ == '__main__':
     engine = 'Ookla' if has_ookla() else 'Netperf (built-in)'
     cp.log('Speedtest engine: ' + engine)
     get_config('installer_password')
-    open_firewall()
     # Port: appdata Installer_UI_web_port, else first free from 8000 (up to 8100) (saved).
     cp.start_web_server(AppHandler)
     while True:

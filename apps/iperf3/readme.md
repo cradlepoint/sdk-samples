@@ -9,7 +9,7 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 
 ## How It Works
 
-1. On startup, the app launches a web server. The port is shown in the app log and saved in the `iperf3_web_port` appdata field (usually 8000, or the next free port if 8000 is taken)
+1. On startup, the app launches a web server. The port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `iperf3_web_port` appdata field
 2. Browse to `http://<router_ip>:<port>` to access the UI
 3. Select Client or Server mode and configure options
 4. Click "Run Test" (client) or "Start Server" (server) to begin
@@ -70,9 +70,9 @@ A web-based interface for running iPerf3 bandwidth tests from a Cradlepoint rout
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `iperf3_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `iperf3_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to iperf3_web_port)` followed by `Web server started on port 8001`. If `iperf3_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to iperf3_web_port)` followed by `Web server started on port 8001`. If `iperf3_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `iperf3_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

@@ -73,8 +73,7 @@ because an RR test measures transactions rather than bytes.
 ## Web Interface
 
 Access at `http://<router_ip>:<port>` from a device on the LAN. The port is shown in
-the app log and saved in the `speedtest_web_web_port` appdata field (usually 8000, or
-the next free port if 8000 is taken). See [Appdata Fields](#appdata-fields).
+the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in the `speedtest_web_web_port` appdata field. See [Appdata Fields](#appdata-fields).
 
 **Note**: LAN access to the app's web port requires a firewall zone forwarding rule from
 the Primary LAN Zone to the Router Zone.
@@ -113,15 +112,14 @@ you; set them in NCM SDK Data (device or group) to push the same settings to man
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `speedtest_web_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
-| `speedtest_web_port` | No | Deprecated. Older name for the web port, used only when `speedtest_web_web_port` is not set. |
+| `speedtest_web_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 | `speedtest_schedule` | No | JSON: `{enabled, autostart, cron, engine, params}`. Defaults: `enabled` and `autostart` `false`, no `cron`, `engine` `netperf`. `autostart: true` turns the schedule on at every app start. Read at startup, so restart the app after changing it in NCM. |
 | `speedtest_outputs` | No | JSON array of where each successful result is written: `config/system/desc`, `config/system/asset_id`, `appdata:speedtest_results`, or a custom path such as `config/system/snmp/persisted_config`. Not set means results stay in the app's history only. |
 | `netperf_servers` | No | JSON array of `{server, label}` objects. Not set means the router's default netperf server. |
 | `iperf3_servers` | No | JSON array of `{server, port, city, country}` objects. `port` is a single port (`"5201"`) or a range (`"5201-5210"`). |
 | `speedtest_results` | No | Written by the app, not read. Holds the latest result line when the SDK Data output is enabled (see [Output Format](#output-format)). |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to speedtest_web_web_port)` followed by `Web server started on port 8001`. If `speedtest_web_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to speedtest_web_web_port)` followed by `Web server started on port 8001`. If `speedtest_web_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `speedtest_web_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

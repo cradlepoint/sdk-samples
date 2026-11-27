@@ -101,8 +101,8 @@ These are the summary versions. Each has fuller detail in the file named.
 Use Python's built-in `http.server` — never Flask, Bottle, or any third-party framework. Copy
 `your_web_app.html` and the `static/` folder from `apps/templates/web_app_template` rather than
 writing HTML or CSS from scratch. Start the server with `cp.start_web_server(Handler)`, never
-a hardcoded port: it uses appdata `<app_name>_web_port` when set, otherwise the first free port
-from 8000 up to 8100 (saved back to that field), and serves in a daemon thread. LAN clients reaching a router port requires firewall zone forwarding. Never put a logo
+a hardcoded port: it uses appdata `<app_name>_web_port` when set, otherwise port 8000, or
+the next free port up to 8100 if 8000 is busy (saved back to that field only in that case), and serves in a daemon thread. LAN clients reaching a router port requires firewall zone forwarding. Never put a logo
 (company, product, or any other) in a web app or its favicon; keep the template's simple inline
 SVG favicon, or create a similar one if the app has none. Full rules and
 the template's known traps are in `web-standards.md`.

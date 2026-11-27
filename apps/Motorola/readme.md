@@ -6,7 +6,7 @@ Integrates with Motorola SmartConnect by broadcasting WAN and VPN status as UDP 
 
 - At the configured interval, sends a UDP packet with a JSON payload to the broadcast address of each enabled LAN
 - Payload includes WAN connection status, VPN state, GPS fix (when available), and modem info
-- Web UI for configuration, on the port shown in the app log and saved in **Motorola_web_port**
+- Web UI for configuration, on the port shown in the app log (usually 8000)
 
 ## Accessing the App
 
@@ -21,7 +21,6 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | Field | Required | Purpose |
 |-------|----------|---------|
 | **Motorola_web_port** | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses 8000, or the first free port up to 8100 if 8000 is busy (only then is the port saved here). Delete it to pick a port automatically again. |
-| **Motorola_port** | No | Deprecated. Older name for the web port, used only when **Motorola_web_port** is not set. |
 
 Beacon settings (interval, UDP port, networks) are configured through the web UI and stored in appdata automatically.
 

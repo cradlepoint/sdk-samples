@@ -33,7 +33,7 @@
 
 The IFTTT Rule Engine is an NCOS SDK application that provides a drag-and-drop web dashboard for creating automated "if this then that" rules on Ericsson/Cradlepoint routers. Rules interact with the router's config and status tree via `cp.py` to monitor conditions and execute actions automatically.
 
-The application runs a web server on a port shown in the app log and saved in the `ifttt_web_port` appdata field (usually 8000, or the next free port if 8000 is taken). It supports five condition types (IF, WHILE path, WHILE time, WHEN, WHERE), three action types (Set Config, Send Alert, Log Message), per-rule polling intervals or callback triggers, and sustained condition tracking with duration and interval modes.
+The application runs a web server on a port shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `ifttt_web_port` appdata field. It supports five condition types (IF, WHILE path, WHILE time, WHEN, WHERE), three action types (Set Config, Send Alert, Log Message), per-rule polling intervals or callback triggers, and sustained condition tracking with duration and interval modes.
 
 ## Features
 
@@ -158,7 +158,7 @@ python make.py build ifttt
 
 2. Upload to NCM or directly to the router via the SDK Apps interface
 
-3. The app waits for system uptime (120s), then auto-starts and serves the web dashboard on its web port. The port is shown in the app log and saved in the `ifttt_web_port` appdata field (usually 8000, or the next free port if 8000 is taken). See [Appdata Fields](#appdata-fields).
+3. The app waits for system uptime (120s), then auto-starts and serves the web dashboard on its web port. The port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `ifttt_web_port` appdata field. See [Appdata Fields](#appdata-fields).
 
 ### Accessing the Web Interface
 
@@ -441,10 +441,10 @@ Each rule is stored as an individual appdata entry with the key prefix `ifttt_ru
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `ifttt_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `ifttt_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 | `ifttt_rule_<id>` | No | One entry per saved rule, written by the web dashboard. See [Data Storage](#data-storage). |
 
-The startup log shows the port in use, for example `Bound port 8001 (discovered, saved to ifttt_web_port)` followed by `Web server started on port 8001`. If `ifttt_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
+The startup log shows the port in use, for example `Default port 8000 in use; bound 8001 (saved to ifttt_web_port)` followed by `Web server started on port 8001`. If `ifttt_web_port` is set and that port is busy, the app retries for about 10 seconds and never moves to another port. If the value is not a number from 1024 to 65535, or the port stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
 To change the port for one router or a group, set `ifttt_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 

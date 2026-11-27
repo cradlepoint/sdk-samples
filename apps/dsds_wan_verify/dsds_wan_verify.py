@@ -33,9 +33,7 @@ import dsds
 import monitor as monitor_mod
 
 # Web server port: appdata dsds_wan_verify_web_port, else the first free
-# port from 8000 (saved there) - see cp.start_web_server(). The older
-# dsds_wan_verify_port field is still honoured when the new one is unset.
-LEGACY_PORT_FIELD = 'dsds_wan_verify_port'
+# port from 8000 (saved there) - see cp.start_web_server().
 
 # The port the web server actually bound to, filled in at startup. Used in
 # log messages so they report the real port.
@@ -320,7 +318,7 @@ def main():
     # long time: a manual switch takes ~30s and a retrying HTTP test can
     # take (retries + 1) x timeout. The port is a deployment setting read
     # once at startup; changing it takes an app restart.
-    SERVER = cp.start_web_server(Handler, legacy_field=LEGACY_PORT_FIELD)
+    SERVER = cp.start_web_server(Handler)
     PORT = SERVER.server_port if SERVER else None
 
     slots = dsds.discover_slots()

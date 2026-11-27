@@ -46,13 +46,13 @@ Once installed and running, access CS Explorer via:
 http://<router_ip>:<port>
 ```
 
-The port is shown in the app log at startup (for example `Web server started on port 8000`) and saved in the appdata field `cs_explorer_web_port`. It is usually 8000, or the next free port if 8000 is taken, and it stays the same after reboots. To change it, set `cs_explorer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
+The port is shown in the app log at startup (for example `Web server started on port 8000`) (usually 8000). If 8000 is taken, the app uses the next free port and saves it in the appdata field `cs_explorer_web_port`, so it stays the same after reboots. To change it, set `cs_explorer_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection.
 
 ## Appdata Fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `cs_explorer_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `cs_explorer_web_port` | No | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
 ## 🎯 Usage
 
@@ -133,7 +133,7 @@ cs_explorer/
 - Fix or delete the field, then start the app
 
 **Cannot access web interface:**
-- Ensure you're accessing `http://<router_ip>:<port>` with the port shown in the app log (also saved in `cs_explorer_web_port`)
+- Ensure you're accessing `http://<router_ip>:<port>` with the port shown in the app log (saved in `cs_explorer_web_port` only if 8000 was taken)
 - Check that the app's web port is not blocked by firewall (LAN clients need a Zone Firewall forward from the Primary LAN Zone to the Router Zone)
 - Verify the application is running via NCOS application status
 

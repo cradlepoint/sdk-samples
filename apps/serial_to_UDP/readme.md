@@ -7,8 +7,7 @@ remote hosts over UDP.
 <img width="1686" height="845" alt="image" src="https://github.com/user-attachments/assets/b66ded08-0a9a-4b07-97da-baa297d5f205" />
 
 A web UI at `http://<router_ip>:<port>` configures both sides. The port is shown in the app
-log and saved in the `serial_to_UDP_web_port` SDK Data field (usually 8000, or the next free
-port if 8000 is taken).
+log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in the `serial_to_UDP_web_port` SDK Data field.
 
 - **UDP settings** (destinations and source address) are stored in SDK Data (appdata).
 - **Serial port settings** are read from and written back to the **router config** at
@@ -88,10 +87,9 @@ The web UI port is a separate SDK Data field:
 
 | Field | Required | Description |
 | --- | --- | --- |
-| `serial_to_UDP_web_port` | no | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `serial_to_UDP_web_port` | no | Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
-The startup log shows the port, e.g. `Bound port 8001 (discovered, saved to
-serial_to_UDP_web_port)` then `Web server started on port 8001`. To change it for one router
+The startup log shows the port, e.g. `Default port 8000 in use; bound 8001 (saved to serial_to_UDP_web_port)` then `Web server started on port 8001`. To change it for one router
 or a group, set `serial_to_UDP_web_port` in NCM SDK Data (device or group) and restart the
 app. Delete the field and restart to go back to automatic selection. A configured port that
 is busy is retried for about 10 seconds. If it is not a number from 1024 to 65535, or stays

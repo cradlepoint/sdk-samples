@@ -31,7 +31,7 @@ Collects system monitoring data and modem signal diagnostics from a Cradlepoint 
 
 ## Web UI
 
-Access at `http://<router-ip>:<port>`. The web UI port is shown in the app log and saved in the `prtg_agent_web_port` appdata field (usually 8000, or the next free port if 8000 is taken). The startup log shows it, for example `Bound port 8001 (discovered, saved to prtg_agent_web_port)` then `Web server started on port 8001`. This is not the same as the `port` field, which is the PRTG sensor port the agent pushes to.
+Access at `http://<router-ip>:<port>`. The web UI port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `prtg_agent_web_port` appdata field. The startup log shows it, for example `Default port 8000 in use; bound 8001 (saved to prtg_agent_web_port)` then `Web server started on port 8001`. This is not the same as the `port` field, which is the PRTG sensor port the agent pushes to.
 
 To change the web UI port for one router or a group, set `prtg_agent_web_port` in NCM SDK Data (device or group) and restart the app. Delete the field and restart to go back to automatic selection. A configured port that is busy is retried for about 10 seconds. If the port is not a number from 1024 to 65535, or stays busy, the app stops itself and logs why. Fix or delete the field, then start the app.
 
@@ -50,7 +50,7 @@ To change the web UI port for one router or a group, set `prtg_agent_web_port` i
 | `interval` | Push interval in seconds | `60` |
 | `protocol` | `http` or `https` | `http` |
 | `paths` | JSON array of NCOS API paths to collect | See defaults below |
-| `prtg_agent_web_port` | Optional. Web UI port on the router (1024-65535), not the PRTG sensor port. If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. | First free port from `8000` |
+| `prtg_agent_web_port` | Optional. Web UI port on the router (1024-65535), not the PRTG sensor port. If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. | First free port from `8000` |
 
 ## Default Collection Paths
 

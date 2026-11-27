@@ -343,9 +343,9 @@ def main():
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    # Port: appdata cell_survey_web_port (or the older cell_survey_port),
-    # else the first free port from 8000 (up to 8100), saved to cell_survey_web_port.
-    cp.start_web_server(AppRequestHandler, legacy_field='cell_survey_port')
+    # Port: appdata cell_survey_web_port, else the first free port from 8000
+    # (up to 8100), saved to cell_survey_web_port.
+    cp.start_web_server(AppRequestHandler)
     while True:
         time.sleep(60)
 

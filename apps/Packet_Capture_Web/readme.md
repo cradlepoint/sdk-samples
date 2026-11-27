@@ -94,13 +94,12 @@ Push the `pcap_defaults` appdata field via NCM group config to enable automated 
 | Field | Description |
 |-------|-------------|
 | `pcap_defaults` | JSON string with capture settings, auto_start flag, and interface config |
-| `Packet_Capture_Web_web_port` | Optional. Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. Delete it to pick a port automatically again. |
+| `Packet_Capture_Web_web_port` | Optional. Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. Delete it to pick a port automatically again. |
 
 ## Web Port
 
-The web UI port is shown in the app log and saved in `Packet_Capture_Web_web_port` (usually
-8000, or the next free port if 8000 is taken). The startup log shows it, for example
-`Bound port 8001 (discovered, saved to Packet_Capture_Web_web_port)` then
+The web UI port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `Packet_Capture_Web_web_port`. The startup log shows it, for example
+`Default port 8000 in use; bound 8001 (saved to Packet_Capture_Web_web_port)` then
 `Web server started on port 8001`.
 
 To change the port for one router or a group, set `Packet_Capture_Web_web_port` in NCM SDK Data

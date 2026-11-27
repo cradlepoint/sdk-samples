@@ -1,14 +1,13 @@
 import cp
 import json
 import time
-import os
 import threading
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 DEFAULT_LIMIT_MBPS = 10  # Fallback default when no appdata value is set
 APPDATA_DEFAULT_LIMIT = 'default_limit_mbps'
-LIMITS_FILE = 'tmp/client_limits.json'
+APPDATA_CLIENT_LIMITS = 'client_limits'  # JSON {mac: limit_mbps} of per-client overrides
 NEW_CLIENT_CHECK_SECONDS = 10  # How often to look for clients that joined later
 
 # Serializes read-modify-write of config/qos between the web server threads
@@ -46,30 +45,62 @@ def set_default_limit(limit_mbps):
             return False
         cp.put_appdata(APPDATA_DEFAULT_LIMIT, str(limit))
         cp.log(f'Default limit set to {limit} Mbps')
-        return True
     except Exception as e:
         cp.log(f'Error saving default limit: {e}')
         return False
+    apply_default_to_default_clients()
+    return True
+
+
+def apply_default_to_default_clients():
+    """Re-limit every existing client that is on the default to the new default.
+
+    A client is "on the default" when it has no saved override (save_limit()
+    drops entries equal to the default). Clients with an explicit limit are
+    left alone.
+    """
+    with qos_lock:
+        try:
+            default_limit = get_default_limit()
+            saved_limits = load_saved_limits()
+            qos = cp.get('config/qos') or {}
+            queues = {q.get('name'): q for q in qos.get('queues', [])}
+            for c in get_ipv4_clients():
+                mac = c['mac']
+                queue = queues.get(f'CBT-{mac}')
+                if mac in saved_limits or queue is None:
+                    continue  # explicit limit, or not limited yet (handled by new-client check)
+                if (queue.get('download_bw') or 0) // 1000 == default_limit:
+                    continue  # already at the new default
+                cp.log(f'Applying new default {default_limit} Mbps to client {mac}')
+                set_client_limit(mac, default_limit)
+        except Exception as e:
+            cp.log(f'Error applying default limit to clients: {e}')
 
 def load_saved_limits():
+    """Return {mac: limit_mbps} of per-client overrides from appdata."""
     try:
-        if os.path.exists(LIMITS_FILE):
-            with open(LIMITS_FILE, 'r') as f:
-                return json.load(f)
+        value = cp.get_appdata(APPDATA_CLIENT_LIMITS)
+        if value is not None and str(value).strip() != '':
+            limits = json.loads(value)
+            if isinstance(limits, dict):
+                return limits
     except Exception as e:
         cp.log(f'Error loading limits: {e}')
     return {}
 
 def save_limit(mac, limit_mbps):
+    """Store a per-client override in appdata (only changes on a user action)."""
     try:
-        os.makedirs('tmp', exist_ok=True)
         limits = load_saved_limits()
         if limit_mbps == get_default_limit():
             limits.pop(mac, None)  # Remove default limits
         else:
             limits[mac] = limit_mbps
-        with open(LIMITS_FILE, 'w') as f:
-            json.dump(limits, f)
+        if limits:
+            cp.put_appdata(APPDATA_CLIENT_LIMITS, json.dumps(limits, sort_keys=True))
+        else:
+            cp.delete_appdata(APPDATA_CLIENT_LIMITS)
     except Exception as e:
         cp.log(f'Error saving limit: {e}')
 
@@ -143,6 +174,7 @@ def get_clients_with_limits():
         
         qos = cp.get('config/qos') or {}
         queues = {q['name']: q for q in qos.get('queues', [])}
+        saved_limits = load_saved_limits()
         
         for c in ipv4_clients:
             mac = c.get('mac', '')
@@ -151,7 +183,6 @@ def get_clients_with_limits():
             queue = queues.get(queue_name, {})
             
             # Check saved limits first, then queue config, then default
-            saved_limits = load_saved_limits()
             if mac in saved_limits:
                 limit = saved_limits[mac]
             else:
@@ -390,7 +421,7 @@ button:hover{background:#0056b3}
 <input type="number" id="default-limit" min="1" max="1000">
 <button id="save-default">Save Default</button>
 </div>
-<div class="hint">New clients without a specific limit use this value. Saved to SDK appdata, so it persists across reboots and redeploys.</div>
+<div class="hint">New and existing clients without a specific limit use this value; changing it updates them immediately. Saved to SDK appdata, so it persists across reboots and redeploys.</div>
 </div>
 <table id="clients">
 <thead><tr><th>Hostname</th><th>IP</th><th>MAC</th><th>Usage</th><th>Rate</th><th>Current Limit</th><th>New Limit</th></tr></thead>
@@ -553,6 +584,12 @@ if __name__ == '__main__':
     cp.start_web_server(BandwidthHandler)
 
     # Limit clients that join after startup
+    last_default = get_default_limit()
     while True:
         time.sleep(NEW_CLIENT_CHECK_SECONDS)
+        # Default changed outside the web UI (e.g. NCM appdata): re-apply it
+        current_default = get_default_limit()
+        if current_default != last_default:
+            last_default = current_default
+            apply_default_to_default_clients()
         apply_limits_to_new_clients()

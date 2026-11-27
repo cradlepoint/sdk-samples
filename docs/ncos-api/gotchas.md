@@ -71,6 +71,8 @@ Search it: `grep -n "keyword" docs/ncos-api/gotchas.md`
 
 - **`cp.register` callback receives 3 args: `(path, value, args)`** where `args` is a single tuple — do NOT use `*args` unpacking in the callback signature.
 
+- **Most `status/` paths never fire `cp.register` callbacks — poll them** — verified live: `status/gpio/*`, `status/ethernet/<n>/*` (link up/down), `status/wan/*` (incl. `primary_device`, `connection_state`, per-device `summary`, `info/service_type`, `diagnostics/*`), `status/lan/clients` and `status/system/uptime` changed while their callbacks stayed at 0. Paths that do fire: `control/**`, `status/ecm/state`, `status/wlan/state`, `status/wlan/radio`, `status/gps/fix` (~1/s), whole-array `status/ethernet` (config changes only, value may be stale), and any `status/` path an app writes itself. Only action `'put'` is accepted (`'set'` returns error; `post`/`delete` register but were never seen firing). Writes propagate up and down the path tree for paths that do emit. Callbacks come in 2-3 duplicates per change. Full table: `register-callback-support.md`.
+
 - **`cp.register()` for control tree paths MUST use `'put'` (lowercase)** — `cp.register('put', 'control/...', callback)`. Using `'set'` or `'PUT'` (uppercase) silently fails to trigger callbacks.
 
 - **Do NOT `cp.put()` to seed the control tree before `cp.register()`** — the dict PUT response causes socket desync, making subsequent register calls fail silently. Register first, then seed (or don't seed at all).

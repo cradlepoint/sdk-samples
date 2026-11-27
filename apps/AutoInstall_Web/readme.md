@@ -16,7 +16,7 @@ AutoInstall – Detects SIMs, speedtests each, collects diagnostics, picks faste
 
 ## Accessing the App
 
-- Open **http://&lt;router-ip&gt;:&lt;port&gt;/** in a browser. The port is shown in the app log at startup (for example `Access the web interface at http://<router-ip>:8000/`) and saved in **AutoInstall_Web_web_port**. It is usually 8000, or the next free port if 8000 is taken, and it stays the same after reboots.
+- Open **http://&lt;router-ip&gt;:&lt;port&gt;/** in a browser. The port is shown in the app log at startup (for example `Access the web interface at http://<router-ip>:8000/`). It is usually 8000; if 8000 is taken, the app uses the next free port and saves it in **AutoInstall_Web_web_port**, and it stays the same after reboots.
 - Enter the installer password to start (see Appdata below), or set **autostart** to begin automatically without user input
 - The page shows progress, a short log, and a **Download Logs** button (available when the run finishes or fails)
 - Mobile-friendly layout with dark mode toggle
@@ -40,8 +40,7 @@ Set these in the router UI under **System > SDK Data** (or in NCM under the devi
 | **group_by_sim** | If set (any value), enables **group mode**: only move router to NCM group (no WAN reprioritization). Groups are matched by **SIM slot**. |
 | **group_by_carrier** | If set (any value), enables **group mode**: only move router to NCM group (no WAN reprioritization). Groups are matched by carrier name. |
 | **diagnostics** | Comma-separated list of modem fields to log. Default: `DBM,SINR,RSRP,RSRQ,RFBAND,SRVC_TYPE,SRVC_TYPE_DETAILS`. |
-| **AutoInstall_Web_web_port** | Optional. Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses the first free port from 8000 (up to 8100) and saves it here. To change the port, set it in NCM SDK Data (device or group) and restart the app. Delete it and restart to pick a port automatically again. The field name must match exactly. |
-| **AutoInstall_Web_port** | Optional. Deprecated. Older name for the web port, used only when **AutoInstall_Web_web_port** is not set. |
+| **AutoInstall_Web_web_port** | Optional. Web UI port (1024-65535). If set, the app uses exactly this port. If not set, it uses port 8000, or the next free port up to 8100 if 8000 is busy, and saves it here only in that case. To change the port, set it in NCM SDK Data (device or group) and restart the app. Delete it and restart to pick a port automatically again. The field name must match exactly. |
 | **disable_alerts** | If set (any value), the app does not send the results alert. |
 | **custom1** | If set (any value), the app writes a results summary to the NCM device custom1 field. |
 | **custom2** | If set (any value), the app writes a results summary to the NCM device custom2 field. |

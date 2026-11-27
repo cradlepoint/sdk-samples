@@ -2637,10 +2637,9 @@ if __name__ == '__main__':
         ],
         default_handler_class=DefaultHandler,
     )
-    # Port: appdata AutoInstall_Web_web_port (or the older
-    # AutoInstall_Web_port), else the first free port from 8000 (up to 8100), saved to
-    # AutoInstall_Web_web_port. Tornado takes the pre-bound socket directly.
-    sock = cp.bind_web_port(legacy_field='AutoInstall_Web_port')
+    # Port: appdata AutoInstall_Web_web_port, else the first free port from
+    # 8000 (up to 8100), saved to AutoInstall_Web_web_port. Tornado takes the pre-bound socket directly.
+    sock = cp.bind_web_port()
     if sock is None:
         # Never exit: restart = true would relaunch the app in a loop.
         if cp.stop_app():

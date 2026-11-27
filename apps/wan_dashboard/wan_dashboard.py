@@ -1318,11 +1318,9 @@ class WANDashboard:
                     self.send_response(404)
                     self.end_headers()
         
-        # Port: appdata wan_dashboard_web_port (or the older
-        # wan_dashboard_port), else the first free port from 8000 (up to 8100), saved to
-        # wan_dashboard_web_port.
-        server = cp.start_web_server(DashboardHandler,
-                                     legacy_field='wan_dashboard_port')
+        # Port: appdata wan_dashboard_web_port, else the first free port from
+        # 8000 (up to 8100), saved to wan_dashboard_web_port.
+        server = cp.start_web_server(DashboardHandler)
         if server:
             dashboard.port = server.server_port
         # Keep the main thread alive; the server runs in its own thread.

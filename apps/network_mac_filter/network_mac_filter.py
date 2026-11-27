@@ -1168,8 +1168,7 @@ def start_web_ui():
     global web_server
     try:
         os.makedirs('tmp', exist_ok=True)
-        web_server = cp.start_web_server(
-            WebHandler, legacy_field='custom_mac_filter_port', required=False)
+        web_server = cp.start_web_server(WebHandler, required=False)
         if web_server is None:
             cp.log("Web UI not started; MAC filtering continues")
     except Exception as e:
