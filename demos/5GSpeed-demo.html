@@ -229,8 +229,8 @@ body{
 .log .ok{color:#0fc373;}.log .err{color:#ff3232;}.log .warn{color:#ff8c0a;}.log .inf{color:#85ccff;}
 
 /* Rules grid */
-.rules{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;}
-@media(max-width:620px){.rules{grid-template-columns:1fr;}}
+.rules{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+@media(max-width:860px){.rules{grid-template-columns:1fr;}}
 .rule{background:var(--card-surface);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:1.1rem;box-shadow:var(--shadow-md);}
 .rule h4{display:flex;align-items:center;gap:.5rem;font-size:.95rem;margin-bottom:.4rem;}
 .rule h4 i{color:var(--primary-color);}
@@ -425,6 +425,9 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
 .flash{animation:attn 1.2s ease-in-out 3;}
 .set td.vals code{display:inline-block;margin:0 .2rem .2rem 0;}
 @media (prefers-reduced-motion:reduce){.link.go,.link.back,.eng.run .sdot,.chip.run::before{animation:none}}
+.readout.one{grid-template-columns:1fr;}
+.lower.one{grid-template-columns:1fr;}
+details.more>summary{cursor:pointer;font-weight:600;font-size:.85rem;display:flex;align-items:center;gap:.4rem;color:var(--text-primary);}
 </style>
 </head>
 <body data-theme="light">
@@ -503,7 +506,9 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
         </div>
 
         <hr class="divider">
-        <div class="section-label"><i class="fa-solid fa-sliders"></i> SDK Data and app folder</div>
+        <details class="more" id="moreSet">
+        <summary><i class="fa-solid fa-sliders"></i> Settings and faults</summary>
+        <div class="section-label" style="margin-top:.7rem">SDK Data and app folder</div>
         <label class="check"><input type="checkbox" id="ooklaChk"> Licensed Ookla binary in the app folder</label>
         <div class="field" style="margin-top:.5rem;">
           <span class="lbl" id="engLbl"><code>speedtest</code></span>
@@ -523,10 +528,11 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
         </div>
 
         <hr class="divider">
-        <div class="section-label"><i class="fa-solid fa-triangle-exclamation"></i> Illustrative faults</div>
+        <div class="section-label">Illustrative faults</div>
         <label class="fault"><input type="checkbox" id="busyChk"> First iPerf3 port is busy</label>
         <label class="fault" style="margin-top:.35rem;"><input type="checkbox" id="failChk"> Every engine returns no result</label>
         <div class="hint">Show the code's port retry and fallback paths.</div>
+        </details>
       </div>
 
       <!-- Visualisation -->
@@ -593,7 +599,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
           </div>
         </div>
 
-        <div class="readout">
+        <div class="readout one">
           <div class="card field-card" id="fieldCard">
             <div class="section-label" style="margin-bottom:0"><i class="fa-solid fa-database"></i> Results field
               <span class="chip" id="fieldChip">holds a result</span></div>
@@ -601,24 +607,15 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <div class="field-val" id="fieldVal" aria-live="polite"></div>
             <div class="field-note" id="fieldNote"></div>
           </div>
-          <div class="tiles">
-            <div class="tile"><div class="k"><i class="fa-solid fa-arrow-down"></i> Download</div><div class="v" id="tDl">—</div></div>
-            <div class="tile"><div class="k"><i class="fa-solid fa-arrow-up"></i> Upload</div><div class="v" id="tUl">—</div></div>
-            <div class="tile"><div class="k"><i class="fa-solid fa-gears"></i> Engine</div><div class="v small" id="tEng">—</div></div>
-            <div class="tile"><div class="k"><i class="fa-solid fa-stopwatch"></i> Test time (modeled)</div><div class="v" id="tTime">—</div></div>
-          </div>
         </div>
-        <p class="hint" style="margin-top:.5rem;">Speeds are the readme's sample results. Netperf and iPerf3 run 10 seconds per direction in the code; the Ookla run time and the compressed animation are illustrative.</p>
+        <p class="hint" style="margin-top:.5rem;">Speeds are the readme's sample results, and the animation is compressed. Netperf and iPerf3 run 10 seconds per direction in the code.</p>
 
-        <div class="lower">
+        <div class="lower one">
           <div class="card" id="apiCard">
-            <div class="card-title"><i class="fa-solid fa-cloud"></i> NetCloud Manager API <small>requests from your script</small></div>
+            <div class="card-title"><i class="fa-solid fa-terminal"></i> Activity <small>API requests and router log</small></div>
             <div class="api-box" id="apiBox"></div>
             <div class="api-note" id="apiNote"></div>
-          </div>
-          <div class="card">
-            <div class="card-title"><i class="fa-solid fa-terminal"></i> Router log <small>5GSpeed cp.log lines</small></div>
-            <div class="log" id="log" aria-live="polite" style="margin-top:0"></div>
+            <div class="log" id="log" aria-live="polite" style="margin-top:.6rem"></div>
           </div>
         </div>
       </div>
@@ -643,18 +640,11 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
          Otherwise the router's built-in <b>netperf</b> runs. The engine settings are read at every test.</p>
     </div>
     <div class="rule">
-      <h4><i class="fa-solid fa-reload"></i> Falls back and retries ports</h4>
-      <p>If Ookla fails, the configured engine runs; if iPerf3 fails, netperf runs. iPerf3 tests upload,
-         then download, 10 seconds each with a 60-second timeout. Each direction starts at the first port in
-         <code>iperf3_server</code> and moves up one port when a port is busy or fails. Netperf runs
-         10 seconds down, then 10 seconds up.</p>
-    </div>
-    <div class="rule">
-      <h4><i class="fa-solid fa-check"></i> Always writes back</h4>
-      <p>The field gets one line, for example
-         <code>DL:96.82Mbps UL:46.74Mbps Engine:netperf Time:…</code>; Ookla adds ping, server, and ISP.
-         If every engine returns nothing, it gets <code>Speedtest failed</code>, and an unexpected error
-         writes <code>Speedtest error: …</code>. If netperf runs but measures nothing, the line shows 0.00 Mbps.</p>
+      <h4><i class="fa-solid fa-check"></i> Falls back, then always writes back</h4>
+      <p>If Ookla fails, the configured engine runs; if iPerf3 fails, netperf runs. iPerf3 moves up one
+         port when a port is busy. The field gets one line, for example
+         <code>DL:96.82Mbps UL:46.74Mbps Engine:netperf Time:…</code>. If every engine returns nothing,
+         it gets <code>Speedtest failed</code>, never blank.</p>
     </div>
   </div>
 
@@ -695,10 +685,8 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     </div>
     <ul class="setup-notes">
       <li>Set fields in NetCloud Manager under the device or group's <b>SDK Data</b> (on the router: System &gt; SDK Data). <code>speedtest</code> and <code>iperf3_server</code> are read at each test; <code>5GSpeed</code> is read at startup, so restart the app after changing it.</li>
-      <li>To read results, create NetCloud API v2 keys on the Tools page, NetCloud API tab, and GET <code>https://www.cradlepointecm.com/api/v2/routers/{router_id}/</code> with them in the headers. The <code>router_id</code> is in NetCloud Manager, or run <code>get status/ecm/client_id</code> at the console.</li>
-      <li>To start a test, PUT the same URL with <code>Content-Type: application/json</code> and the field set blank, for example <code>{"asset_id": ""}</code>. The readme suggests checking back after about a minute.</li>
-      <li>Ookla is bring your own binary: add your licensed <code>ookla</code> binary to the app folder. iPerf3 uses the bundled binary but needs a server you provide.</li>
-      <li>Built for NCOS 7.26 or later (from <code>package.ini</code>).</li>
+      <li>To read results, create NetCloud API v2 keys on the Tools page, NetCloud API tab, and GET <code>https://www.cradlepointecm.com/api/v2/routers/{router_id}/</code>. To start a test, PUT the same URL with <code>{"asset_id": ""}</code>, then check back after about a minute.</li>
+      <li>Ookla is bring your own binary: add your licensed <code>ookla</code> binary to the app folder. iPerf3 uses the bundled binary but needs a server you provide. Built for NCOS 7.26 or later.</li>
     </ul>
   </section>
 
@@ -721,7 +709,7 @@ themeBtn.addEventListener('click',()=>{
 const RESULTS_PATH='config/system/asset_id';                 // default_results_path
 const IPERF_BIN='./iperf3-arm64v8';                          // bundled, found by _find_binary()
 const SAMPLE={                                               // readme "Sample Results"
-  ookla:{dl:'52.54', ul:'16.55', ping:'9.7', server:'Telstra', isp:'Vocus'},
+  ookla:{dl:'52.54', ul:'16.55', ping:'9.7', server:'Carrier A', isp:'Carrier B'},
   iperf3:{dl:'85.23', ul:'42.11'},
   netperf:{dl:'96.82', ul:'46.74'}
 };
@@ -789,12 +777,8 @@ function setField(v,state,note){
   $('fieldNote').textContent=note||'';
   if(state==='ok'||state==='fail'){ el.classList.add('updated'); setTimeout(()=>el.classList.remove('updated'),1600); }
 }
-function tiles(dl,ul,engName){
-  $('tDl').innerHTML=dl==null?'—':dl==='…'?'…':`${dl} <small>Mbps</small>`;
-  $('tUl').innerHTML=ul==null?'—':ul==='…'?'…':`${ul} <small>Mbps</small>`;
-  $('tEng').textContent=engName||'—';
-}
-function renderTime(){ $('tTime').innerHTML=modelSecs?`${Math.round(modelSecs)} <small>s</small>`:'—'; }
+function tiles(){ return; }
+function renderTime(){}
 function status(html){ $('headerStatus').innerHTML=html||''; }
 
 const TRIG_HINT={
@@ -1068,6 +1052,7 @@ $('getBtn').addEventListener('click',()=>{ stopTour(); getRouter(); });
 
 /* ---------- reset ---------- */
 function resetAll(){
+  $('moreSet').open=false;
   runToken++; getToken++; setBusy(false); getBusy=false; $('getBtn').disabled=false;
   runCount=0; modelSecs=0; simTime=START_TIME;
   trigger='api'; renderTrigger();
@@ -1117,6 +1102,7 @@ function stopTour(){
   playBtn.innerHTML='<i class="fa-solid fa-play"></i> Play walkthrough';
 }
 function startTour(){
+  $('moreSet').open=true;
   stopTour(); resetAll();
   const tok=tourToken;
   $('simPanel').scrollIntoView({behavior:'smooth',block:'start'});   // the only scroll in the tour

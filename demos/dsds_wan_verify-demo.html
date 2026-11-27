@@ -349,11 +349,11 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <!-- carrier towers -->
             <g id="tower1">
               <svg x="67" y="59" width="22" height="22" viewBox="0 0 32 32" fill="var(--text-primary)" aria-hidden="true"><path d="M6 2v4h9v-4h2v4h9v-4h2v6h-10.154l10.154 22h-24l10.154-22h-10.154v-6h2zM20.095 17.644l-4.095-8.871-3.003 6.506 7.097 2.366zM21.179 19.994l-9.098 3.033 12.541 4.426-3.443-7.459zM20.162 28l-11.21-3.957-1.826 3.957h13.036zM10.087 21.583l7.75-2.583-5.684-1.895-2.067 4.478z"/></svg>
-              <text x="78" y="94" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="sans-serif" font-weight="700">Verizon</text>
+              <text x="78" y="94" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="sans-serif" font-weight="700">Carrier A</text>
             </g>
             <g id="tower2">
               <svg x="211" y="59" width="22" height="22" viewBox="0 0 32 32" fill="var(--text-primary)" aria-hidden="true"><path d="M6 2v4h9v-4h2v4h9v-4h2v6h-10.154l10.154 22h-24l10.154-22h-10.154v-6h2zM20.095 17.644l-4.095-8.871-3.003 6.506 7.097 2.366zM21.179 19.994l-9.098 3.033 12.541 4.426-3.443-7.459zM20.162 28l-11.21-3.957-1.826 3.957h13.036zM10.087 21.583l7.75-2.583-5.684-1.895-2.067 4.478z"/></svg>
-              <text x="222" y="94" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="sans-serif" font-weight="700">T-Mobile</text>
+              <text x="222" y="94" text-anchor="middle" font-size="9" fill="var(--text-secondary)" font-family="sans-serif" font-weight="700">Carrier B</text>
             </g>
             <!-- tower-to-net links -->
             <line x1="78" y1="62" x2="120" y2="38" stroke="var(--border-color)" stroke-width="1.5" stroke-dasharray="3 3"/>
@@ -387,7 +387,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
       <div class="statuspanel">
         <div class="slot-card active" id="card1">
           <div class="slot-top">
-            <span class="slot-name" id="n1">Verizon</span>
+            <span class="slot-name" id="n1">Carrier A</span>
             <span class="slot-sub">int1 / sim1</span>
             <span class="slot-spacer"></span>
             <span class="state-pill sp-pref">Preferred</span>
@@ -398,7 +398,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
         </div>
         <div class="slot-card" id="card2">
           <div class="slot-top">
-            <span class="slot-name" id="n2">T-Mobile</span>
+            <span class="slot-name" id="n2">Carrier B</span>
             <span class="slot-sub">int1 / sim2</span>
             <span class="slot-spacer"></span>
             <span class="state-pill sp-standby" id="st2">Standby</span>
@@ -493,12 +493,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <td><span class="req">No</span></td>
             <td>First free port from 8000, then saved</td>
             <td>Web UI port (1024 to 65535). Set it to pin the port; delete it to pick one automatically again. Read once at startup.</td>
-          </tr>
-          <tr>
-            <td><code>dsds_wan_verify_port</code></td>
-            <td><span class="req">No</span></td>
-            <td>None</td>
-            <td>Deprecated older name for the web port, used only when <code>dsds_wan_verify_web_port</code> is not set.</td>
           </tr>
         </tbody>
       </table>
@@ -610,7 +604,7 @@ function setCaption(text,live){ caption.innerHTML=text; captionBar.classList.tog
 // a blind switch. Signal is a live measurement on both slots, so (unlike a
 // connectivity failover) no failback holdoff is needed.
 //
-// rsrp1/rsrp2: live RSRP (dBm) per SIM. SIM1=Verizon(preferred), SIM2=T-Mobile.
+// rsrp1/rsrp2: live RSRP (dBm) per SIM. SIM1=Carrier A(preferred), SIM2=Carrier B.
 // Threshold on SIM1 is RSRP -110 (the appconfig.py default). active: which SIM carries
 // traffic.
 const THRESH1=-110;        // SIM1 signal floor (RSRP dBm), from the app defaults
@@ -757,17 +751,17 @@ function runScenario(){
   busy=true; breakBtn.disabled=true;
 
   // 1) SIM1 signal fades from -88 toward -118
-  log('Verizon (int1 / sim1) signal dropping: RSRP -88 dBm','warn');
+  log('Carrier A (int1 / sim1) signal dropping: RSRP -88 dBm','warn');
   rampSignal(1,-88,-118,4800);
 
   // reading counter: 5 consecutive sub-threshold readings before acting
   [[3600,1,-111],[4200,2,-114],[4800,3,-117],[5400,4,-118]].forEach(([ms,n,v])=>
     at(ms,()=>{ state.lowCount=n; log(`Signal below -110 for ${n} reading${n>1?'s':''} (RSRP ${v})`,'warn'); }));
-  at(6000,()=>{ state.lowCount=5; log('Signal below -110 for 5 readings: Verizon signal threshold failed','err'); });
+  at(6000,()=>{ state.lowCount=5; log('Signal below -110 for 5 readings: Carrier A signal threshold failed','err'); });
 
   // 2) decide + switch (signal failover: no holdoff is armed)
   at(6600,()=>{
-    log('Automatic switching from Verizon to T-Mobile: signal below threshold','warn');
+    log('Automatic switching from Carrier A to Carrier B: signal below threshold','warn');
     state.switching=true; render();
     setClock('down','00:00');
   });
@@ -780,24 +774,24 @@ function runScenario(){
     clearInterval(iv);
     state.switching=false; state.active=2; state.settling=true; render();
     setClock('down','00:27');
-    log('Switch completed in 27s: now on T-Mobile (int1 / sim2)','ok');
+    log('Switch completed in 27s: now on Carrier B (int1 / sim2)','ok');
   });
   at(12600,()=>{
     state.settling=false; render();
     setClock('up','online');
-    log('T-Mobile settled and passing: traffic restored','ok');
+    log('Carrier B settled and passing: traffic restored','ok');
     log('No failback holdoff: signal is a live reading on both SIMs','ok');
   });
 
-  // 4) KEY MOMENT: DSDS keeps reporting Verizon's signal from STANDBY,
+  // 4) KEY MOMENT: DSDS keeps reporting Carrier A's signal from STANDBY,
   //    and we watch it climb back over the threshold.
-  at(20400,()=>log('Watching Verizon from standby: its signal is still visible','warn'));
+  at(20400,()=>log('Watching Carrier A from standby: its signal is still visible','warn'));
   at(20800,()=>rampSignal(1,-118,-92,4000));
-  at(23400,()=>log('Verizon signal recovered above -110 (RSRP -101, from standby)','ok'));
+  at(23400,()=>log('Carrier A signal recovered above -110 (RSRP -101, from standby)','ok'));
 
   // 5) fail back to the preferred SIM
   at(30600,()=>{
-    log('Failing back to Verizon: preferred SIM signal recovered','warn');
+    log('Failing back to Carrier A: preferred SIM signal recovered','warn');
     state.switching=true; render();
     setClock('down','00:00');
   });
@@ -808,12 +802,12 @@ function runScenario(){
     clearInterval(iv2);
     state.switching=false; state.active=1; state.settling=true; state.lowCount=0; render();
     setClock('down','00:26');
-    log('Switch completed in 26s: back on Verizon (int1 / sim1)','ok');
+    log('Switch completed in 26s: back on Carrier A (int1 / sim1)','ok');
   });
   at(36600,()=>{
     state.settling=false; render();
     setClock('up','online');
-    log('Verizon settled and passing: back on your preferred SIM','ok');
+    log('Carrier A settled and passing: back on your preferred SIM','ok');
     busy=false; breakBtn.disabled=false; breakBtn.innerHTML=BTN_IDLE;
   });
 }
@@ -850,11 +844,11 @@ function startTour(){
   // beats are timed to land just after each later step begins.
   // The lead is SPEED; dual-SIM signal visibility is the supporting act.
   const STEPS=[
-    ()=>setCaption('Traffic is on <b>Verizon (SIM 1)</b>, your preferred SIM. The app isn\u2019t trusting the modem\u2019s \u201Cconnected\u201D light. It checks this SIM <b>every 2 seconds</b>, so a problem gets caught the moment it starts.', true),
-    ()=>{ setCaption('Now <b>Verizon\u2019s signal drops</b> below its -110 floor. The app waits for <b>5 low readings in a row</b> to be sure it\u2019s real, not one blip. No one had to notice, and no one had to log in.', true);
+    ()=>setCaption('Traffic is on <b>Carrier A (SIM 1)</b>, your preferred SIM. The app isn\u2019t trusting the modem\u2019s \u201Cconnected\u201D light. It checks this SIM <b>every 2 seconds</b>, so a problem gets caught the moment it starts.', true),
+    ()=>{ setCaption('Now <b>Carrier A\u2019s signal drops</b> below its -110 floor. The app waits for <b>5 low readings in a row</b> to be sure it\u2019s real, not one blip. No one had to notice, and no one had to log in.', true);
           logT0=performance.now(); runScenario(); },
-    ()=>setCaption('Confirmed, and the app <b>fails over to T-Mobile (SIM 2) in about 30 seconds</b>. That\u2019s the whole point: traffic is back in under a minute, hands-off, instead of hours waiting on a truck roll.', true),
-    ()=>setCaption('A nice bonus of a dual-SIM modem: with traffic on T-Mobile, the app <b>still sees Verizon\u2019s signal from standby</b>, and watches it <b>climb back above -110</b>. So it knows the preferred SIM is healthy again.', true),
+    ()=>setCaption('Confirmed, and the app <b>fails over to Carrier B (SIM 2) in about 30 seconds</b>. That\u2019s the whole point: traffic is back in under a minute, hands-off, instead of hours waiting on a truck roll.', true),
+    ()=>setCaption('A nice bonus of a dual-SIM modem: with traffic on Carrier B, the app <b>still sees Carrier A\u2019s signal from standby</b>, and watches it <b>climb back above -110</b>. So it knows the preferred SIM is healthy again.', true),
     ()=>setCaption('So it <b>fails back to your preferred SIM</b> on its own, again in about 30 seconds, once the signal proves the move is safe. Fast off, fast back, no guessing.', true),
   ];
   STEPS.forEach((fn,i)=>tAt(i*STEP_MS,()=>{ if(tourRunning) fn(); }));

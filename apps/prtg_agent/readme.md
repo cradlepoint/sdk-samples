@@ -24,7 +24,7 @@ Collects system monitoring data and modem signal diagnostics from a Cradlepoint 
 3. Navigate to **PRTG Server** and enter:
    - Protocol (http or https)
    - Server address (IP or hostname of your PRTG probe)
-   - Port (the PRTG sensor port, default 5050)
+   - Port (the PRTG sensor port; if left empty, 5050 for http or 5051 for https)
    - Identification Token
    - Push interval in seconds
 4. Save settings
@@ -45,7 +45,7 @@ To change the web UI port for one router or a group, set `prtg_agent_web_port` i
 | Field | Description | Default |
 |-------|-------------|---------|
 | `server` | PRTG probe IP or hostname | *(empty — required)* |
-| `port` | PRTG sensor port | `5050` |
+| `port` | PRTG sensor port | Empty, which means `5050` for `http` and `5051` for `https` |
 | `token` | Sensor identification token | *(empty — required)* |
 | `interval` | Push interval in seconds | `60` |
 | `protocol` | `http` or `https` | `http` |

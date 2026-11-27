@@ -389,8 +389,8 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     </div>
     <div class="fact">
       <div class="fi" style="background:var(--chart-3)"><i class="fa-solid fa-network-wired"></i></div>
-      <h3>Any WAN, three engines<span class="tag">bonus</span></h3>
-      <p>Test the cellular backup without failing over. Built-in netperf, bundled iPerf3, or your own Ookla binary.</p>
+      <h3>Any SIM, three engines<span class="tag">bonus</span></h3>
+      <p>Test the backup SIM without failing over. Built-in netperf, bundled iPerf3, or your own Ookla binary.</p>
     </div>
   </div>
 
@@ -462,6 +462,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
           <option value="15" selected>Every 15 minutes</option>
           <option value="30">Every 30 minutes</option>
           <option value="60">Every hour</option>
+          <option value="1440">Daily (midnight UTC)</option>
         </select>
         <div class="sched-status" id="schedStatus">Schedule off. Enabling it saves the current engine and test settings.</div>
 
@@ -472,7 +473,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
         <label class="check"><input type="checkbox" class="outChk" value="sdk"> SDK Data (speedtest_results)</label>
 
         <hr class="divider">
-        <label class="fault"><input type="checkbox" id="faultChk"> <i class="fa-solid fa-triangle-exclamation"></i> Stall the cellular link</label>
+        <label class="fault"><input type="checkbox" id="faultChk"> <i class="fa-solid fa-triangle-exclamation"></i> Stall the SIM2 link</label>
         <div class="hint">It stays "connected" but nothing gets through.</div>
       </div>
 
@@ -496,15 +497,15 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <foreignObject x="210" y="86" width="90" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="text-align:center" class="icon-fo"><i class="fa-solid fa-hard-drive"></i></div></foreignObject>
             <text class="node-title" x="255" y="125" text-anchor="middle">Router</text>
             <text class="node-sub" x="255" y="140" text-anchor="middle" id="engineTxt">netperf</text>
-            <!-- Ethernet WAN -->
+            <!-- SIM1 WAN -->
             <rect class="node-box" id="nEth" x="380" y="30" width="112" height="64" rx="10"/>
-            <text class="node-title" x="436" y="52" text-anchor="middle">Ethernet</text>
+            <text class="node-title" x="436" y="52" text-anchor="middle">Carrier A SIM1</text>
             <text class="node-sub" x="436" y="67" text-anchor="middle">Priority 1 · primary</text>
             <circle class="state-ok" cx="400" cy="82" r="4"/>
             <text class="node-tiny" x="409" y="85">connected</text>
-            <!-- Cellular WAN -->
+            <!-- SIM2 WAN -->
             <rect class="node-box" id="nCell" x="380" y="138" width="112" height="64" rx="10"/>
-            <text class="node-title" x="436" y="160" text-anchor="middle">T-Mobile 5G</text>
+            <text class="node-title" x="436" y="160" text-anchor="middle">Carrier B SIM2</text>
             <text class="node-sub" x="436" y="175" text-anchor="middle">Priority 2 · backup</text>
             <circle class="state-ok" id="cellDot" cx="400" cy="190" r="4"/>
             <text class="node-tiny" x="409" y="193" id="cellState">connected</text>
@@ -568,7 +569,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
       <h4><i class="fa-solid fa-cloud-arrow-up"></i> Writes only good results</h4>
       <p>After each successful test, one line goes to every output you enable: Asset ID, Description,
          SDK Data, or a custom path. For example
-         <code>DL:96.82Mbps UL:46.74Mbps Lat:12.5ms Jit:2.1ms Iface:T-Mobile Engine:netperf 2026-06-13T11:30:00Z</code>.
+         <code>DL:96.82Mbps UL:46.74Mbps Lat:12.5ms Jit:2.1ms Iface:Carrier B Engine:netperf 2026-06-13T11:30:00Z</code>.
          A test that returns zero for both download and upload is logged as <b>failed</b> and is not
          written, so NetCloud Manager keeps the last good line and its timestamp.</p>
     </div>
@@ -635,12 +636,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <td><span class="req">No</span></td>
             <td>First free port from 8000, then saved</td>
             <td>Web UI port (1024 to 65535). Set it to pin the port; delete it and restart to pick one automatically again.</td>
-          </tr>
-          <tr>
-            <td><code>speedtest_web_port</code></td>
-            <td><span class="req">No</span></td>
-            <td>None</td>
-            <td>Deprecated older name for the web port, used only when <code>speedtest_web_web_port</code> is not set.</td>
           </tr>
           <tr>
             <td><code>speedtest_schedule</code></td>
@@ -743,9 +738,9 @@ themeBtn.addEventListener('click',()=>{
 // get_wan_interfaces(): connected WANs only, sorted by priority. Modem names are CARRID + SIM.
 // Option text matches the app: name (iface - ip).
 const WANS=[
-  {key:'eth', name:'10/100/1000 Ethernet Switch', iface:'wan', ip:'203.0.113.24', carrier:'',
-   dl:312.4, ul:21.8, lat:9.6, jit:1.2},
-  {key:'cell', name:'T-Mobile SIM1', iface:'rm_0a1b2c3d.1', ip:'100.64.18.7', carrier:'T-Mobile',
+  {key:'sim1', name:'Carrier A SIM1', iface:'rm_0a1b2c3d.1', ip:'100.72.40.19', carrier:'Carrier A',
+   dl:182.4, ul:38.6, lat:14.2, jit:2.6},
+  {key:'sim2', name:'Carrier B SIM2', iface:'rm_0a1b2c3d.2', ip:'100.64.18.7', carrier:'Carrier B',
    dl:96.82, ul:46.74, lat:12.5, jit:2.1},
 ];
 // Deterministic run-to-run variation so the history graph looks like a real link.
@@ -806,14 +801,14 @@ function log(msg,cls){
 }
 
 /* ---------- topology animation ---------- */
-const LINKS={eth:['lnkE1','lnkE2'], cell:['lnkC1','lnkC2']};
+const LINKS={sim1:['lnkE1','lnkE2'], sim2:['lnkC1','lnkC2']};
 function setFlow(key,mode){            // mode: '', 'down', 'up', 'rr'
   Object.keys(LINKS).forEach(k=>LINKS[k].forEach(id=>{
     const el=$(id); el.classList.remove('down','up','rr','stalled');
-    if(k===key && mode){ el.classList.add(mode); if(k==='cell' && faultChk.checked) el.classList.add('stalled'); }
+    if(k===key && mode){ el.classList.add(mode); if(k==='sim2' && faultChk.checked) el.classList.add('stalled'); }
   }));
-  $('nEth').classList.toggle('active',key==='eth' && !!mode);
-  $('nCell').classList.toggle('active',key==='cell' && !!mode);
+  $('nEth').classList.toggle('active',key==='sim1' && !!mode);
+  $('nCell').classList.toggle('active',key==='sim2' && !!mode);
 }
 function renderFault(){
   const on=faultChk.checked;
@@ -825,7 +820,7 @@ function renderFault(){
 }
 faultChk.addEventListener('change',()=>{
   renderFault();
-  log(faultChk.checked?'Cellular link stalled (still reports connected)':'Cellular link passing traffic again', faultChk.checked?'warn':'ok');
+  log(faultChk.checked?'SIM2 link stalled (still reports connected)':'SIM2 link passing traffic again', faultChk.checked?'warn':'ok');
 });
 
 /* ---------- readout ---------- */
@@ -870,7 +865,7 @@ async function runTest(params,scheduled){
   if(testRunning) return;
   const tok=++runToken; testRunning=true; runBtn.disabled=true;
   const w=WANS.find(x=>x.key===params.wan), e=params.engine;
-  const stalled=(w.key==='cell' && faultChk.checked);
+  const stalled=(w.key==='sim2' && faultChk.checked);
   const v=VAR[varIdx++%VAR.length];
   const dl=stalled?0:w.dl*v, ul=stalled?0:w.ul*(2-v);
   const supports=(e==='netperf'||e==='iperf3');
@@ -1048,12 +1043,12 @@ function computeNextFire(){
   const step=parseInt(presetSel.value,10);
   let m=Math.floor(simTime/60000)+1;
   for(let i=0;i<1500;i++,m++){
-    const min=new Date(m*60000).getUTCMinutes();
-    if(step===60?min===0:min%step===0){ nextFire=m*60000; return; }
+    const d=new Date(m*60000), min=d.getUTCMinutes();
+    if(step===1440?(min===0&&d.getUTCHours()===0):step===60?min===0:min%step===0){ nextFire=m*60000; return; }
   }
 }
 function presetText(){ return presetSel.options[presetSel.selectedIndex].text; }
-function cronText(){ const s=presetSel.value; return s==='60'?'0 * * * *':`*/${s} * * * *`; }
+function cronText(){ const s=presetSel.value; return s==='1440'?'0 0 * * *':s==='60'?'0 * * * *':`*/${s} * * * *`; }
 function setSchedule(on){
   schedEnabled=on; schedChk.checked=on;
   if(on){
@@ -1098,7 +1093,7 @@ setInterval(()=>{
   if(!testRunning){
     if(schedEnabled && nextFire){
       const s=Math.max(0,Math.round((nextFire-simTime)/1000));
-      headerStatus.innerHTML=`<i class="fa-solid fa-clock" style="color:var(--text-secondary)"></i> Next test in ${Math.floor(s/60)}m ${s%60}s`;
+      headerStatus.innerHTML=`<i class="fa-solid fa-clock" style="color:var(--text-secondary)"></i> Next test in ${s>=3600?Math.floor(s/3600)+'h ':''}${Math.floor((s%3600)/60)}m ${s%60}s`;
     }else if(!lastResult){
       headerStatus.innerHTML='';
     }
@@ -1117,7 +1112,7 @@ function resetAll(){
   runToken++; testRunning=false; runBtn.disabled=false;
   history=[]; lastResult=null; varIdx=0; iperfFirstRun=true; ffTarget=null;
   simTime=START_TIME;
-  setEngine('netperf'); ifaceSel.value='eth'; durSel.value='10'; sizeIn.value='0'; durSel.disabled=false;
+  setEngine('netperf'); ifaceSel.value='sim1'; durSel.value='10'; sizeIn.value='0'; durSel.disabled=false;
   latChk.checked=false; presetSel.value='15'; setSchedule(false);
   faultChk.checked=false; renderFault();
   document.querySelectorAll('.outChk').forEach(c=>c.checked=(c.value==='asset')); renderOutputToggles();
@@ -1139,18 +1134,18 @@ function flash(id){ const el=$(id); el.classList.remove('flash','attn'); void el
 const STEPS=[
   {c:'Picture a router at a remote site, and someone says the internet is slow. A laptop speed test would also measure the <b>Wi-Fi and the laptop</b>, only on the primary link, and someone has to be standing there to run it.',
    a:()=>{ lanHighlight(true); }},
-  {c:'Speedtest Web runs the test <b>on the router itself</b>. Here it\u2019s the router\u2019s built-in <b>netperf</b>: download, then upload, then a latency and jitter check on the primary Ethernet WAN. No extra server or software.',
+  {c:'Speedtest Web runs the test <b>on the router itself</b>. Here it\u2019s the router\u2019s built-in <b>netperf</b>: download, then upload, then a latency and jitter check on the primary WAN, SIM1. No extra server or software.',
    a:(tok)=>{ lanHighlight(false); latChk.checked=true; runWhenIdle(tok); }},
-  {c:'Now something a laptop can\u2019t do: pick the <b>T-Mobile 5G backup</b> and test it directly. The test is bound to that interface, so the backup gets measured <b>without failing over</b>.',
-   a:(tok)=>{ ifaceSel.value='cell'; runWhenIdle(tok); }},
+  {c:'Now something a laptop can\u2019t do: pick the <b>SIM2 backup</b> and test it directly. The test is bound to that SIM\u2019s interface, so the backup gets measured <b>without failing over</b>.',
+   a:(tok)=>{ ifaceSel.value='sim2'; runWhenIdle(tok); }},
   {c:'Here\u2019s the payoff. Each good result is written as <b>one line to Asset ID</b>: speeds, latency, carrier, engine, and time. It shows up in <b>NetCloud Manager</b> right next to the device.',
    a:()=>{ flash('ncmCard'); }},
-  {c:'Nobody wants to press Run every day, so turn on a schedule: <b>every 15 minutes</b>. When the minute matches, the router starts a test by itself. (We\u2019re fast-forwarding the clock.)',
-   a:(tok)=>{ presetSel.value='15'; setSchedule(true); fastForwardToNext(tok); }},
+  {c:'Nobody wants to press Run every day, so turn on a schedule: <b>once a day</b>. When the time matches, the router starts a test by itself. (We\u2019re fast-forwarding the clock.)',
+   a:(tok)=>{ presetSel.value='1440'; setSchedule(true); fastForwardToNext(tok); }},
   {c:'Every run adds a bar to the history and refreshes the line in NetCloud Manager. History keeps the <b>last 100 tests</b>, and the schedule picks back up after a reboot.',
    a:(tok)=>{ fastForwardToNext(tok); }},
-  {c:'Now the cellular link stalls: still <b>connected</b>, but nothing gets through. The test comes back zero, so it\u2019s logged as <b>failed</b>. NetCloud Manager keeps the last good line, and its timestamp shows how old it is.',
-   a:(tok)=>{ faultChk.checked=true; renderFault(); log('Cellular link stalled (still reports connected)','warn'); fastForwardToNext(tok); }},
+  {c:'Now the SIM2 link stalls: still <b>connected</b>, but nothing gets through. The test comes back zero, so it\u2019s logged as <b>failed</b>. NetCloud Manager keeps the last good line, and its timestamp shows how old it is.',
+   a:(tok)=>{ faultChk.checked=true; renderFault(); log('SIM2 link stalled (still reports connected)','warn'); fastForwardToNext(tok); }},
   {c:'Everything lands in <b>History and reports</b>: averages, a bar graph per test, and a full test log. One click exports it as a <b>CSV</b> or HTML report.',
    a:()=>{ faultChk.checked=false; renderFault(); flash('histCard'); flash('csvBtn'); }},
   {c:'That\u2019s Speedtest Web: the router measures its own links, on a schedule, and reports to NetCloud Manager. The schedule, outputs, and servers live in <b>SDK Data</b>, so they can be set once on a NetCloud Manager group.',

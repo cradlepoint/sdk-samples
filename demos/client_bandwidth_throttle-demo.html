@@ -370,7 +370,7 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
     <div class="fact">
       <div class="fi" style="background:var(--chart-2)"><i class="fa-solid fa-settings"></i></div>
       <h3>10 Mbps for everyone by default</h3>
-      <p>Every LAN client gets the default limit when the app starts, and new clients get it within about 10 seconds of joining. Change it from 1 to 1000 Mbps in Settings; it is saved to SDK appdata.</p>
+      <p>Every LAN client gets the default limit when the app starts, and new clients get it within about 10 seconds of joining. Change the default from 1 to 1000 Mbps in Settings, even while the app is running, and every client still on the default follows it right away.</p>
     </div>
     <div class="fact">
       <div class="fi" style="background:var(--chart-3)"><i class="fa-solid fa-graph"></i></div>
@@ -431,7 +431,7 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
           <div class="metric"><div class="mk"><i class="fa-solid fa-time"></i> Simulated clock</div><div class="mv" id="clk">00:00</div></div>
           <div class="metric"><div class="mk"><i class="fa-solid fa-graph"></i> WAN in use</div>
             <div class="wanrow"><span class="mv" id="wanMv">0.0 / 50 Mbps</span><span class="meter"><span id="wanMeter"></span></span></div></div>
-          <div class="metric"><div class="mk"><i class="fa-solid fa-layers"></i> CBT queues</div><div class="mv" id="qMv">0</div></div>
+          <div class="metric"><div class="mk"><i class="fa-solid fa-layers"></i> Limits</div><div class="mv" id="qMv">0</div></div>
         </div>
       </div>
 
@@ -443,7 +443,7 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
         <div class="stored">
           <div class="lh"><i class="fa-solid fa-save"></i> What the app has stored</div>
           <dl>
-            <dt><code>tmp/client_limits.json</code></dt><dd id="stFile">none yet</dd>
+            <dt><code>client_limits</code></dt><dd id="stFile">none yet</dd>
             <dt><code>default_limit_mbps</code></dt><dd id="stDef">unset (code default 10)</dd>
             <dt><code>client_bandwidth_throttle_web_port</code></dt><dd id="stPort">unset</dd>
           </dl>
@@ -481,7 +481,7 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
 
   <!-- HOW IT WORKS -->
   <h2 class="section-title section-gap">How it works</h2>
-  <p class="section-sub">Everything runs on the router: a small web page, the router's own QoS engine, and two files' worth of state.</p>
+  <p class="section-sub">Everything runs on the router: a small web page, the router's own QoS engine, and a little state in SDK appdata.</p>
   <div class="rules">
     <div class="rule">
       <h4><i class="fa-solid fa-dial"></i> One queue and one rule per client</h4>
@@ -491,10 +491,11 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
     </div>
     <div class="rule">
       <h4><i class="fa-solid fa-settings"></i> Everyone starts at the default</h4>
-      <p>At startup the app clears old CBT- entries, then gives each LAN client its saved limit or the
+      <p>At startup the app clears its old limits, then gives each LAN client its saved limit or the
         default (<b>10 Mbps</b> unless you change it). It checks for new clients <b>every 10 seconds</b>
-        and limits them the same way. Changing the default leaves running queues as they are; it
-        applies to clients that join from then on.</p>
+        and limits them the same way. Change the default while the app is running and the new value
+        is applied to <b>every existing client that is on the default</b>. Clients with their own limit
+        are left alone.</p>
     </div>
     <div class="rule">
       <h4><i class="fa-solid fa-graph"></i> A rate that keeps short bursts visible</h4>
@@ -504,9 +505,9 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
     </div>
     <div class="rule">
       <h4><i class="fa-solid fa-save"></i> Limits that survive a restart</h4>
-      <p>The default lives in SDK appdata (<code>default_limit_mbps</code>). A per-client limit that differs
-        from the default is saved to <code>tmp/client_limits.json</code>. Only queues and rules named CBT-
-        are touched; the rest of your QoS setup is left alone.</p>
+      <p>The default lives in SDK appdata (<code>default_limit_mbps</code>). Any limit that differs from the
+        default is saved to appdata too (<code>client_limits</code>), so it survives a restart. Only the
+        app's own queues and rules are touched; the rest of your QoS setup is left alone.</p>
     </div>
   </div>
 
@@ -525,7 +526,7 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
   <!-- SDK DATA SETTINGS -->
   <section class="section-gap" aria-labelledby="settingsTitle">
     <h2 class="section-title" id="settingsTitle">SDK Data settings</h2>
-    <p class="section-sub">Nothing is required. The app's Settings panel writes the default limit for you, and it picks its own web port the first time it runs.</p>
+    <p class="section-sub">Nothing is required. The app writes the default limit and each client's own limit for you, and it picks its own web port the first time it runs.</p>
     <div class="set-wrap">
       <table class="set">
         <thead>
@@ -538,6 +539,13 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
             <td>10 (in code)</td>
             <td>1 to 1000 Mbps</td>
             <td>The limit given to clients that have no limit of their own. The Settings panel saves it here.</td>
+          </tr>
+          <tr>
+            <td><code>client_limits</code></td>
+            <td><span class="req">No</span></td>
+            <td>None (everyone follows the default)</td>
+            <td>JSON of MAC address to Mbps</td>
+            <td>Limits that differ from the default. The app writes it when you press Set, so they survive a restart. You can also pre-set or edit it here; delete it to clear them all.</td>
           </tr>
           <tr>
             <td><code>client_bandwidth_throttle_web_port</code></td>
@@ -554,7 +562,7 @@ input.num.typed{box-shadow:0 0 0 3px var(--primary-tint);}
       <li>Open the web UI at <code>http://router_ip:&lt;port&gt;</code>. The port is in the app log at startup, usually 8000.</li>
       <li>If LAN clients time out, add a zone firewall forward from the Primary LAN Zone to the Router Zone. The page has no login, so anyone who can reach it can change limits; keep that forward to trusted networks.</li>
       <li>One number sets both upload and download. Limits match IPv4 clients by address.</li>
-      <li>On start, the app turns QoS on and rebuilds its own CBT- queues and rules. Other QoS queues and rules are kept.</li>
+      <li>On start, the app turns QoS on and rebuilds its own limits. Other QoS queues and rules are kept.</li>
     </ul>
   </section>
 
@@ -643,7 +651,7 @@ function fresh(){
   return {
     t:0, running:false, web:false, download:false,
     qos:{enabled:false, queues:{}, rules:{}},   // queues: name -> {bw: kbps}; rules: ip -> {name, queue}
-    saved:{},                                   // tmp/client_limits.json
+    saved:{},                                   // client_limits (appdata)
     appdata:null,                               // default_limit_mbps (unset)
     port:null,                                  // client_bandwidth_throttle_web_port (unset)
     cl:CLIENTS.map(c=>({down:c.down0, upB:c.up0, cur:c.want, curUp:c.up, alloc:0, wantNow:c.want, lim:null})),
@@ -761,7 +769,7 @@ function render(){
   $('wanFlow').style.animationDuration=Math.max(0.3,3/Math.sqrt(total+0.01)).toFixed(2)+'s';
   const nq=Object.keys(state.qos.queues).length;
   $('qMv').textContent=nq;
-  $('qosTxt').textContent=state.qos.enabled?`QoS on · ${nq} CBT queue${nq===1?'':'s'}`:'QoS off';
+  $('qosTxt').textContent=state.qos.enabled?`QoS on · ${nq} limit${nq===1?'':'s'}`:'QoS off';
   $('clk').textContent=clockText(state.t);
 }
 function renderStored(){
@@ -824,7 +832,7 @@ function apiClients(show){
   if(show) renderTable();
 }
 
-/* save_limit(): a limit equal to the current default is removed from the file */
+/* save_limit(): a limit equal to the current default is removed from appdata */
 function saveLimit(mac,v){ if(v===getDefault()) delete state.saved[mac]; else state.saved[mac]=v; renderStored(); }
 
 /* set_client_limit(): build queue + rule, then one config/qos write */
@@ -881,6 +889,20 @@ function saveDefault(val){
   if(!Number.isInteger(v)||v<1||v>1000){ appStatus('Failed to save default limit (must be 1-1000)',false); return false; }
   state.appdata=v; applog(`Default limit set to ${v} Mbps`,'ok');
   defInput.value=v; appStatus(`Default limit saved (${v} Mbps)`,true);
+  /* apply_default_to_default_clients(): re-limit clients that have no saved limit of their own */
+  const todo=CLIENTS.map((c,i)=>i).filter(i=>{
+    const q=state.qos.queues['CBT-'+CLIENTS[i].mac];
+    return q && !(CLIENTS[i].mac in state.saved) && q.bw/1000!==v;
+  });
+  if(todo.length){
+    busy=true;
+    todo.forEach((i,k)=>{
+      const t0=k*800;
+      at(t0,()=>applog(`Applying new default ${v} Mbps to client ${CLIENTS[i].mac}`));
+      setClientLimitSteps(i,v,t0+100);
+    });
+    at(todo.length*800+400,()=>{ apiClients(true); busy=false; renderAll(); });
+  }
   apiClients(true); renderAll();
   return true;
 }
@@ -958,16 +980,16 @@ function startTour(){
     ()=>setCaption('Here\u2019s a small branch LAN: four devices sharing one <b>50 Mbps</b> link through a Cradlepoint router. The devices and link speed are illustrative; what the app does is real.',true),
     ()=>{ setCaption('Someone on <b>media-pc</b> starts a big download. With no limits it takes most of the link, and <b>lobby-tablet\u2019s 15 Mbps stream</b> gets squeezed to about 6.',true);
           whenIdle(tok,()=>{ if(!state.download) toggleDownload(); }); },
-    ()=>{ setCaption('Now the app starts. It clears any old CBT- QoS entries, then gives <b>every client a 10 Mbps queue</b> and a rule for its IP, and then its web page comes up.',true);
+    ()=>{ setCaption('Now the app starts. It clears any old limits, then gives <b>every client a 10 Mbps queue</b> and a rule for its IP, and then its web page comes up.',true);
           whenIdle(tok,()=>{ nudge(startBtn); startApp(); }); },
     ()=>setCaption('Each device is now capped at <b>10 Mbps</b>. media-pc is held there, and the tablet climbs back to its 10. The Rate column catches up over the next few 5-second refreshes.',true),
     ()=>{ setCaption('The tablet needs more for its stream. Type <b>20</b> in its New limit box and press <b>Set</b>. The app updates that one queue, and the change <b>applies right away</b>.',true);
           whenIdle(tok,()=>typeAndPress(tok,$('lim-1'),$('set-1'),20,()=>setLimit(1,20))); },
-    ()=>{ setCaption('It works the other way too. Set <b>media-pc to 5 Mbps</b>. A limit that differs from the default is saved to <code>tmp/client_limits.json</code>, so it survives a restart.',true);
+    ()=>{ setCaption('It works the other way too. Set <b>media-pc to 5 Mbps</b>. A limit that differs from the default is saved to appdata, so it survives a restart.',true);
           whenIdle(tok,()=>typeAndPress(tok,$('lim-0'),$('set-0'),5,()=>setLimit(0,5))); },
-    ()=>{ setCaption('A nice extra is the Settings panel. Save <b>20 Mbps</b> as the default and it goes into SDK appdata. Queues that are already running keep their value for now.',true);
+    ()=>{ setCaption('Now change the default while the app is running. Save <b>20 Mbps</b> in Settings and the app applies it to <b>every client still on the default</b> right away.',true);
           whenIdle(tok,()=>typeAndPress(tok,defInput,defBtn,20,()=>saveDefault(20))); },
-    ()=>{ setCaption('Restart the app and it rebuilds every queue. media-pc and the tablet keep their own limits, and <b>laptop-01 and pos-terminal move to the new 20 Mbps default</b>.',true);
+    ()=>{ setCaption('Restart the app and nothing is lost. <b>media-pc keeps its 5 Mbps</b> and the tablet its 20, because limits that differ from the default are saved in appdata.',true);
           whenIdle(tok,()=>{ nudge(startBtn); startApp(); }); },
   ];
   STEPS.forEach((fn,i)=>tAt(i*STEP_MS,()=>{ if(tourRunning&&tok===tourToken) fn(); }));

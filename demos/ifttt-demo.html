@@ -80,7 +80,7 @@ body{
 .section-label{font-size:.72rem;font-weight:700;color:var(--text-light);margin-bottom:.9rem;}
 
 /* Walkthrough caption */
-.caption-bar{display:flex;align-items:center;gap:.75rem;min-height:56px;
+.caption-bar{position:sticky;top:0;z-index:20;box-shadow:var(--shadow-md);display:flex;align-items:center;gap:.75rem;min-height:56px;
   background:rgba(17,116,230,.1);
   border:1px solid var(--border-color);border-radius:var(--radius-lg);
   padding:.75rem 1rem;margin-bottom:1.25rem;transition:var(--transition);}
@@ -104,7 +104,7 @@ body{
 .btn-play:not(:disabled):hover{transform:translateY(-1px);box-shadow:var(--shadow-lg);}
 
 /* Simulator stage */
-.stage{display:grid;grid-template-columns:1.15fr 1fr;gap:1.25rem;align-items:start;}
+.stage{scroll-margin-top:90px;display:grid;grid-template-columns:1.15fr 1fr;gap:1.25rem;align-items:start;}
 @media(max-width:820px){.stage{grid-template-columns:1fr;}}
 .diagram{background:var(--light-bg);border:1px solid var(--border-color);border-radius:var(--radius-lg);
   padding:1rem;position:relative;overflow:hidden;}
@@ -192,7 +192,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
 .btn:focus-visible,.theme-toggle:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px;}
 .theme-toggle{color:var(--text-primary);}
 .theme-toggle:hover{color:var(--text-primary);background:var(--primary-tint);}
-.caption-bar{background:var(--primary-tint);}
+.caption-bar{background:linear-gradient(var(--primary-tint),var(--primary-tint)),var(--card-surface);}
 .fact .fi{color:#fff;}
 
 .clockbar .clk.down,.clockbar .clk.up{padding:0 .4rem;border-radius:var(--radius-sm);}
@@ -318,7 +318,7 @@ input[type=range]{accent-color:var(--primary-color);width:120px;}
 .le .lt{width:62px;}
 
 /* the app's rules page, recreated with design-system tokens */
-.appui{margin-top:1.25rem;border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden;background:var(--card-surface);box-shadow:var(--shadow-md);}
+.appui{margin:0 0 1.25rem;scroll-margin-top:90px;border:1px solid var(--border-color);border-radius:var(--radius-lg);overflow:hidden;background:var(--card-surface);box-shadow:var(--shadow-md);}
 .appui-body{padding:.9rem 1rem 1rem;display:flex;flex-direction:column;gap:.8rem;}
 .unsaved{display:none;align-items:center;gap:.5rem;font-size:.84rem;padding:.45rem .8rem;border-radius:var(--radius-md);
   background:var(--light-bg);border-left:4px solid var(--warning-color);}
@@ -448,7 +448,13 @@ input[type=range]{accent-color:var(--primary-color);width:120px;}
     </div>
     <p class="illus">Illustrative: the router's values, clock, and GPS route are simulated, and the walkthrough polls every 2 seconds so you don't wait (the app's default is 10). Rule fields, evaluation, timing, and log lines follow ifttt.py.</p>
 
-    <div class="stage">
+    <!-- the app's rules page, with its real fields -->
+    <div class="appui" id="appui">
+      <div class="shot-chrome" aria-hidden="true"><span class="d"></span><span class="d"></span><span class="d"></span><span class="url">router_ip:&lt;port&gt; · IFTTT Rule Engine · Rules</span></div>
+      <div class="appui-body" id="builder"></div>
+    </div>
+
+    <div class="stage" id="stage">
       <div>
         <div class="diagram">
           <svg viewBox="0 0 600 300" id="svg" role="img" aria-label="Diagram: four router values feed the rule engine, which shows each condition's last result and the logic gate, and fires the Set config, Send alert, and Log message actions.">
@@ -485,12 +491,6 @@ input[type=range]{accent-color:var(--primary-color);width:120px;}
           <div class="none" id="stNone">Nothing saved yet. Press Save rule(s) in the rules page.</div>
         </div>
       </div>
-    </div>
-
-    <!-- the app's rules page, with its real fields -->
-    <div class="appui" id="appui">
-      <div class="shot-chrome" aria-hidden="true"><span class="d"></span><span class="d"></span><span class="d"></span><span class="url">router_ip:&lt;port&gt; · IFTTT Rule Engine · Rules</span></div>
-      <div class="appui-body" id="builder"></div>
     </div>
   </div>
 
@@ -1350,6 +1350,7 @@ function whenReady(cond,fn){
   const go=()=>{ if(!tourRunning||tok!==tourToken) return; if(tourBusy||!cond()){ tourTimers.push(setTimeout(go,150)); return; } fn(); };
   go();
 }
+function goTo(id){ const e=$(id); if(e) e.scrollIntoView({behavior:'smooth',block:'start'}); }
 function nudge(el){ if(!el) return; el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge'); setTimeout(()=>el.classList.remove('nudge'),3400); }
 function fld(f){ return builder.querySelector('[data-f="'+f+'"]'); }
 function flash(f){ const e=fld(f); if(e){ e.classList.add('typed'); setTimeout(()=>e.classList.remove('typed'),1300); } }
@@ -1371,7 +1372,7 @@ function startTour(){
   // Fixed 10 s per narrated step. Every action a step starts finishes within about 8.5 s.
   // Headline first: you build the automation, you don't code it.
   const STEPS=[
-    ()=>setCaption('Say this Ericsson Cradlepoint router should speak up when its WAN link drops. Without this app, that means writing, packaging, and deploying a script.',true),
+    ()=>{ goTo('appui'); setCaption('Say this Ericsson Cradlepoint router should speak up when its WAN link drops. Without this app, that means writing, packaging, and deploying a script.',true); },
     ()=>{ setCaption('With the IFTTT Rule Engine you build it instead: <b>IF status/wan/connection_state != connected</b>, then <b>send an alert</b> and <b>log a message</b>. This one polls every 2 seconds.',true);
       tourBusy++;
       tAt(300,()=>edit(()=>{ draft.name='WAN down alert'; },'name'));

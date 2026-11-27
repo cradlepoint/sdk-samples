@@ -390,7 +390,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
         <div class="modem-tile" id="modemTile">
           <div class="row"><span>Modem</span><span>Internal 5G eSIM (FN990)</span></div>
           <div class="row"><span>State</span><span id="mState" style="color:var(--success-color)">Connected</span></div>
-          <div class="row"><span>Carrier</span><span id="mCarrier">Verizon</span></div>
+          <div class="row"><span>Carrier</span><span id="mCarrier">Carrier A</span></div>
           <div class="row"><span>Network</span><span id="mType">5G SA</span></div>
           <div class="row"><span>Signal</span><span id="mSignal">-97 dBm · Fair</span></div>
           <div class="row"><span>eSIM</span><span id="mEsim">eUICC · 2 profiles</span></div>
@@ -447,12 +447,12 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     <div class="shots-grid">
       <button class="shot-tile" type="button" data-shot="status">
         <span class="shot-chrome" aria-hidden="true"><span class="d"></span><span class="d"></span><span class="d"></span><span class="url">router_ip:port · Run survey</span></span>
-        <img alt="Run survey page: live modem status tiles above the results, 26 cells across 4 carriers, with T-Mobile expanded">
+        <img alt="Run survey page: live modem status tiles above the results, 26 cells across 4 carriers, with Carrier B expanded">
         <span class="shot-cap"><span>Live modem status, then the survey: 26 cells across 4 carriers, strongest first, with <b>Export CSV</b>.</span><i class="fa-solid fa-expand" aria-hidden="true"></i></span>
       </button>
       <button class="shot-tile" type="button" data-shot="towers">
         <span class="shot-chrome" aria-hidden="true"><span class="d"></span><span class="d"></span><span class="d"></span><span class="url">router_ip:port · Run survey</span></span>
-        <img alt="AT&amp;T and Verizon expanded to their individual 5G and LTE cells, each carrier with its own lock button">
+        <img alt="Carrier C and Carrier A expanded to their individual 5G and LTE cells, each carrier with its own lock button">
         <span class="shot-cap"><span>Each carrier expands to its individual towers, with a lock button per carrier.</span><i class="fa-solid fa-expand" aria-hidden="true"></i></span>
       </button>
       <button class="shot-tile" type="button" data-shot="weakest">
@@ -478,12 +478,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <td><span class="req">No</span></td>
             <td>First free port from 8000, then saved</td>
             <td>Web UI port (1024 to 65535). Set it to pin the port; delete it and restart to pick one automatically again.</td>
-          </tr>
-          <tr>
-            <td><code>cell_survey_port</code></td>
-            <td><span class="req">No</span></td>
-            <td>None</td>
-            <td>Deprecated older name for the web port, used only when <code>cell_survey_web_port</code> is not set.</td>
           </tr>
           <tr>
             <td><code>cell_survey_schedule</code></td>
@@ -573,24 +567,24 @@ function quality(rsrp){
 // strongest first — group_by_carrier sorts by best_signal descending.
 // esim: an operational eUICC profile for this carrier is installed on the modem
 // (modems.find_profile_for_carrier matches by name). The modem starts camped on
-// its currently-active profile (Verizon), which carries the 'eSIM active' badge.
+// its currently-active profile (Carrier A), which carries the 'eSIM active' badge.
 // cellList: illustrative per-cell rows, used for Export CSV (same columns as
 // survey.groups_to_csv). rsrp on the carrier is its best cell.
 const CARRIERS=[
-  {name:'T-Mobile',  country:'United States', flag:'\u{1F1FA}\u{1F1F8}', plmn:'310260', rsrp:-78, esim:true,
+  {name:'Carrier B',  country:'United States', flag:'\u{1F1FA}\u{1F1F8}', plmn:'001011', rsrp:-78, esim:true,
    cellList:[['5G','n71','',125530,-78,-10,841,7573458947,2764288],['LTE','B12',5,5035,-82,-6,430,49979415,10859],
              ['5G','n41','',501390,-90,-10,304,7616205103,2764288],['LTE','B66',5,66786,-95,-3,76,22795779,10859]]},
-  {name:'AT&T',      country:'United States', flag:'\u{1F1FA}\u{1F1F8}', plmn:'310410', rsrp:-88, esim:true,
+  {name:'Carrier C',      country:'United States', flag:'\u{1F1FA}\u{1F1F8}', plmn:'001012', rsrp:-88, esim:true,
    cellList:[['5G','n5','',174770,-88,-10,968,20779381835,3164176],['LTE','B14',5,5330,-91,-7,342,110685657,38656],
              ['LTE','B2',5,1100,-99,-5,444,110685450,38656]]},
-  {name:'Verizon',   country:'United States', flag:'\u{1F1FA}\u{1F1F8}', plmn:'311480', rsrp:-97, esim:true,
+  {name:'Carrier A',   country:'United States', flag:'\u{1F1FA}\u{1F1F8}', plmn:'001013', rsrp:-97, esim:true,
    cellList:[['LTE','B66',5,66511,-97,-12,272,2820384,2817],['5G','n77','',647328,-103,-10,562,1917206570,721153]]},
-  {name:'US Cellular',country:'United States',flag:'\u{1F1FA}\u{1F1F8}',plmn:'311580', rsrp:-104, esim:false,
+  {name:'Carrier D',country:'United States',flag:'\u{1F1FA}\u{1F1F8}',plmn:'001014', rsrp:-104, esim:false,
    cellList:[['LTE','B12',5,5110,-104,-14,182,3001129,56894]]},
 ];
 CARRIERS.forEach(c=>{ c.cells=c.cellList.length; });
 // The profile that's active when the demo opens (physical/eSIM serving carrier).
-const INITIAL_ACTIVE='Verizon';
+const INITIAL_ACTIVE='Carrier A';
 
 /* ---------- SVG towers ---------- */
 const towerG=document.getElementById('towers');
@@ -839,7 +833,7 @@ function startTour(){
   document.querySelector('.panel').scrollIntoView({behavior:'smooth',block:'start'});
 
   // Step 1 — the problem (10s)
-  setCaption('Here\u2019s the setup: a router with an <b>eSIM modem</b>, camped on its <b>Verizon</b> profile at only <b>-97 dBm</b>, just \u201CFair.\u201D Is that really the best carrier here? You can\u2019t tell by looking.', true);
+  setCaption('Here\u2019s the setup: a router with an <b>eSIM modem</b>, camped on its <b>Carrier A</b> profile at only <b>-97 dBm</b>, just \u201CFair.\u201D Is that really the best carrier here? You can\u2019t tell by looking.', true);
 
   // Step 2 — run the survey (10s) — scan takes ~2.6s, caption holds the rest
   at(STEP_MS,()=>{
@@ -849,12 +843,12 @@ function startTour(){
 
   // Step 3 — results ranked (10s)
   at(STEP_MS*2,()=>{
-    setCaption('And there it is: four carriers, <b>sorted strongest first</b>. <b>T-Mobile at -78 dBm</b> is \u201CExcellent\u201D here, and the modem already has an <b>eSIM profile</b> installed for it.', true);
+    setCaption('And there it is: four carriers, <b>sorted strongest first</b>. <b>Carrier B at -78 dBm</b> is \u201CExcellent\u201D here, and the modem already has an <b>eSIM profile</b> installed for it.', true);
   });
 
   // Step 4 — activate the best eSIM (10s)
   at(STEP_MS*3,()=>{
-    setCaption('One click on <b>Activate eSIM profile</b> for the strongest carrier, and the modem switches to T-Mobile and re-registers. No swapping SIMs, no site visit.', true);
+    setCaption('One click on <b>Activate eSIM profile</b> for the strongest carrier, and the modem switches to Carrier B and re-registers. No swapping SIMs, no site visit.', true);
     at(900,()=>{ if(tourRunning && surveyed) activateEsim(0); });
   });
 

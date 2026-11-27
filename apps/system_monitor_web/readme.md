@@ -21,7 +21,7 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 
 ### 🎨 **Professional Web Interface**
 - **Responsive Design**: Works on desktop and mobile devices
-- **Real-time Updates**: Auto-refreshes every 10 seconds
+- **Auto-refresh**: The page fetches new data every 60 seconds, the same rate the app takes measurements. **Refresh Data** fetches it right away
 - **Loading Indicators**: Shows data collection progress
 - **Export Functionality**: Download data as JSON
 
@@ -34,6 +34,7 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 ## Access Methods
 
 ### Local Access
+- **Internet needed in the browser**: The charts use Chart.js, which the page loads from `cdn.jsdelivr.net`. The browser you view the page in needs internet access, or the charts do not draw
 - **Direct Browser**: Navigate to `http://<router_ip>:<port>` in your web browser. The port is shown in the app log (usually 8000). If 8000 is taken, the app uses the next free port and saves it in `system_monitor_web_web_port` appdata field
 - **PrimaryLAN Zone Forwarding**: Forward the PrimaryLAN zone to the Router zone to enable local network access to the app's web port
 
@@ -58,7 +59,8 @@ A comprehensive real-time system monitoring application for Cradlepoint routers 
 ### ⚙️ **Alert Configuration**
 - **Memory Threshold**: Default 80% (customizable 1-100%)
 - **CPU Threshold**: Default 70% (customizable 1-100%)
-- **Real-time Updates**: Threshold changes apply immediately
+- **Applied immediately**: Changing a threshold on the page takes effect right away
+- **Not saved**: Thresholds are held in memory only. When the app restarts (including after a router reboot) they go back to the defaults, 80% and 70%
 
 ### 📊 **Charts**
 - **Memory Usage Chart**: Blue-themed line chart showing memory usage over time

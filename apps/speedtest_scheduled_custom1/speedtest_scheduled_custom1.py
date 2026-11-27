@@ -7,7 +7,7 @@ Speedtest engines (in priority order):
 2. Netperf - built-in router netperf service (default fallback)
 
 Appdata fields:
-  schedule   - cron expression (default: "0 8,12,17 * * *")
+  schedule   - cron expression (default: "0 12 * * *"); weekday is standard cron, 0 or 7 = Sunday, 1 = Monday
   ncm_keys   - JSON string with NCM API keys:
                {"X-CP-API-ID":"...","X-CP-API-KEY":"...","X-ECM-API-ID":"...","X-ECM-API-KEY":"..."}
 """
@@ -39,14 +39,17 @@ def cron_matches(expr, now):
         if len(parts) != 5:
             return False
         minute, hour, dom, month, dow = parts
+        # Standard cron weekday: 0 = Sunday, 1 = Monday ... 6 = Saturday (7 also means Sunday).
+        # Python's weekday() is 0 = Monday ... 6 = Sunday, so shift it by one.
+        cron_dow = (now.weekday() + 1) % 7
         checks = [
-            (minute, now.minute),
-            (hour, now.hour),
-            (dom, now.day),
-            (month, now.month),
-            (dow, now.weekday()),  # 0=Monday; cron 0=Sunday - close enough for simple use
+            (minute, now.minute, False),
+            (hour, now.hour, False),
+            (dom, now.day, False),
+            (month, now.month, False),
+            (dow, cron_dow, True),
         ]
-        for field, value in checks:
+        for field, value, is_weekday in checks:
             if field == '*':
                 continue
             values = set()
@@ -60,6 +63,8 @@ def cron_matches(expr, now):
                     values.update(range(start, 60, int(step)))
                 else:
                     values.add(int(part))
+            if is_weekday and 7 in values:
+                values.add(0)  # 7 is an alias for Sunday
             if value not in values:
                 return False
         return True

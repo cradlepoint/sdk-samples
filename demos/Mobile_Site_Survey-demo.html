@@ -387,12 +387,15 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
   <div class="panel" id="simPanel">
     <div class="panel-head">
       <h2><i class="fa-solid fa-car"></i> Drive test</h2>
-      <button class="btn btn-play" id="playBtn" type="button"><i class="fa-solid fa-play"></i> Play walkthrough</button>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="resetBtn" type="button"><i class="fa-solid fa-reset"></i> Reset</button>
+        <button class="btn btn-play" id="playBtn" type="button"><i class="fa-solid fa-play"></i> Play walkthrough</button>
+      </div>
     </div>
 
     <div class="caption-bar" id="captionBar">
       <span class="dot"></span>
-      <span id="caption" aria-live="polite">Press <b>Play walkthrough</b> for a guided tour, or press <b>Drive</b> and change the settings yourself.</span>
+      <span id="caption" aria-live="polite">Press <b>Play walkthrough</b> for a guided tour, or change the settings and press <b>Run survey now</b>.</span>
       <span class="step-count" id="stepCount"></span>
     </div>
     <div class="tour-progress"><span id="tourBar"></span></div>
@@ -426,6 +429,12 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
 
           <h4>Test options</h4>
           <div class="trig"><label><input type="checkbox" id="fLoss"> Monitor packet loss</label></div>
+          <div class="trig" id="trigSend"><label><input type="checkbox" id="fSend"> Upload results to 5g-ready.io (free)</label></div>
+          <div class="field" id="tokenGroup" hidden>
+            <label for="fToken">5g-ready.io token</label>
+            <input type="text" id="fToken" placeholder="Paste your token" autocomplete="off">
+            <div class="hint">Every router using the same token adds to one shared dataset, so a whole fleet aggregates in one place.</div>
+          </div>
 
           <h4>Speedtest server</h4>
           <div class="field">
@@ -456,15 +465,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
           </div>
         </div>
 
-        <div class="card">
-          <h3><i class="fa-solid fa-car"></i> Simulation <small>not part of the app</small></h3>
-          <div class="btn-row">
-            <button class="btn btn-primary" id="driveBtn" type="button"><i class="fa-solid fa-car"></i> Drive</button>
-            <button class="btn btn-ghost" id="resetBtn" type="button"><i class="fa-solid fa-reset"></i> Reset</button>
-          </div>
-          <div class="sim-note" id="simNote">Parked at the start of the route.</div>
-          <p class="illus">Carriers, speeds, and signal values are illustrative. Time is compressed.</p>
-        </div>
       </div>
 
       <div>
@@ -505,6 +505,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <span>From last test point: <b id="distNow">no test yet</b></span>
             <span>Distance tests: <b id="distRule">every 50 m</b></span>
             <span>Driven: <b id="driven">0 m</b></span>
+            <span class="illus" style="margin:0">Carriers, speeds, and signal values are illustrative. Time is compressed.</span>
           </div>
         </div>
         <div class="mrows">
@@ -558,7 +559,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     <div class="rule">
       <h4><i class="fa-solid fa-table"></i> What each result records</h4>
       <p>UTC time, position, accuracy, carrier, download, upload, latency, jitter, packet loss, bytes, engine,
-         server, and signal diagnostics, as one CSV per SIM in <code>results/</code>. Latency is measured on a
+         server, and signal diagnostics, as one CSV per SIM in <code>results/</code>, and can upload each result to free <b>5g-ready.io</b> with a token, where routers sharing a token aggregate fleet-wide. Latency is measured on a
          <b>quiet link</b>. Packet loss comes from 10-ping runs to 8.8.8.8 on each modem between surveys.</p>
     </div>
     <div class="rule">
@@ -705,7 +706,7 @@ const VERSION='3.4.2';        // package.ini
 const START_EPOCH=Date.UTC(2026,8,25,17,5,0)/1000;  // illustrative start time (UTC, like the app)
 const BASE={lat:43.673132, lon:-116.292004};         // illustrative, from the readme screenshot
 // settings.py defaults for the fields this simulator exposes
-const DEFAULTS={enabled:true,min_distance:50,enable_timer:false,min_time:0,packet_loss:true,
+const DEFAULTS={enabled:true,min_distance:50,enable_timer:false,min_time:0,packet_loss:true,send_to_server:false,server_token:'',
                 speedtest_engine:'netperf',iperf3_server:'',iperf3_ports:'5201-5210'};
 const PING_COUNT=10, PING_INTERVAL=0.5;      // ping(): num 10, interval 0.5 s, to 8.8.8.8
 const LATENCY_PING_COUNT=4;                  // pre-transfer pings for iPerf3 latency
@@ -724,7 +725,7 @@ const road=$('road'), ROUTE_LEN=road.getTotalLength(), ORIGIN=road.getPointAtLen
 const carG=$('car'), ringG=$('ringG'), ring=$('ring'), ringLbl=$('ringLbl'), pinsG=$('pins');
 const resultsEl=$('results'), logEl=$('log');
 const runBtn=$('runBtn'), dlBtn=$('dlBtn'), clearBtn=$('clearBtn'), saveBtn=$('saveBtn'),
-      driveBtn=$('driveBtn'), resetBtn=$('resetBtn'), playBtn=$('playBtn');
+      resetBtn=$('resetBtn'), playBtn=$('playBtn');
 const captionBar=$('captionBar'), caption=$('caption');
 
 /* ---------- formatting, matching the app's output ---------- */
@@ -833,6 +834,8 @@ function ensureLoop(){ if(!S.loopOn){ S.loopOn=true; loop(runToken); } }
 async function loop(tok){
   try{
     while(true){
+      // Parked with nothing queued: idle until the vehicle moves or a test is requested.
+      if(!S.driving && !S.manual && !cfg.enable_timer){ S.loopOn=false; return; }
       await runPings(tok);
       checkTimer();
       const gpsLock=true;
@@ -930,6 +933,13 @@ async function runTests(i,pt,engine,problem,tok){
   const row=[fmtIso(ts),pyF(pt.lat),pyF(pt.lon),pyF(pt.acc),m.carrier,pyF(down),pyF(up),pyV(lat),pyF(jit),loss,bs,br,'',eng,server]
             .concat(diag(i,pt.s,down).map(pyV));
   const text=row.join(',')+'\n';
+  let sent=null;
+  if(cfg.send_to_server){
+    log('HTTP POST https://5g-ready.io/injector (Authorization: Bearer token)');
+    await simSleep(1,tok);
+    sent=!!cfg.server_token;
+    log(sent?'5g-ready.io accepted the result (HTTP 200).':'5g-ready.io rejected the result: no token set.',sent?'ok':'warn');
+  }
   log(`Results: ${text.trim()}`);
   const title=` ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
               ` ┣┅➤  ${fmtTitle(ts)}   ⌖${pt.lat.toFixed(6)}, ${pt.lon.toFixed(6)} \n`;
@@ -937,7 +947,7 @@ async function runTests(i,pt,engine,problem,tok){
   const entry=title+` ┣┅┅┅  ☏${m.carrier} ${m.plmn}  ⇄ ${loss}% loss (${tx-rx} of ${tx})\n`+
               ` ┣┅┅┅  ↓${pyF(down)}Mbps  ↑${pyF(up)}Mbps  ⏱${pyV(lat)}ms  ∿${pyF(jit)}ms\n`+
               ` ┣┅┅┅  ⛁ ${engDisp}\n`+
-              ` ┗┅┅┅  ✓ Done`;
+              ` ┗┅┅┅  ${sent===null?'✓ Done':(sent?'⇪ 5g-ready:✓️':'⇪ 5g-ready:❌')}`;
   S.results=`${entry}\n\n`+S.results.slice(0,32000); renderResults();
   S.testCount++; S.lastTest=fmtTitle(S.simNow); renderStats();
   // write_csv: one file per SIM, named by ICCID
@@ -983,14 +993,14 @@ function updateMap(){
 }
 
 /* ---------- animation tick: clock and vehicle ---------- */
-let lastFrame=null;
+let lastFrame=null, carSpeed=CAR_PX_PER_S;
 function frame(t){
   if(lastFrame===null) lastFrame=t;
   const dt=Math.min(.1,(t-lastFrame)/1000); lastFrame=t;
   S.simNow+=dt*SIM_RATE;
   if(S.driving){
-    S.s=Math.min(ROUTE_LEN,S.s+dt*CAR_PX_PER_S);
-    if(S.s>=ROUTE_LEN){ setDriving(false); $('simNote').textContent='End of the route. Press Reset to drive it again.'; }
+    S.s=Math.min(ROUTE_LEN,S.s+dt*carSpeed);
+    if(S.s>=ROUTE_LEN){ setDriving(false); }
   }
   updateMap();
   requestAnimationFrame(frame);
@@ -1001,8 +1011,6 @@ function setDriving(on){
   if(on && S.s>=ROUTE_LEN) return;
   S.driving=on;
   if(on) ensureLoop();
-  driveBtn.innerHTML=on?'<i class="fa-solid fa-pause"></i> Park':'<i class="fa-solid fa-car"></i> Drive';
-  if(S.s<ROUTE_LEN) $('simNote').textContent=on?'Driving the route.':(S.s>0?'Parked.':'Parked at the start of the route.');
 }
 // TestHandler: "Manual Test Executed.", a 1 s pause, then timestamp and manual flag.
 async function runNow(){
@@ -1041,7 +1049,7 @@ function toInt(v){ const n=parseInt(v,10); return isNaN(n)?0:n; }
 function fillForm(c){
   $('fEnabled').checked=c.enabled; $('fDist').value=c.min_distance;
   $('fTimer').checked=c.enable_timer; $('fTime').value=c.min_time;
-  $('fLoss').checked=c.packet_loss; $('fEngine').value=c.speedtest_engine;
+  $('fLoss').checked=c.packet_loss; $('fSend').checked=c.send_to_server; $('fToken').value=c.server_token; $('tokenGroup').hidden=!c.send_to_server; $('fEngine').value=c.speedtest_engine;
   $('fServer').value=c.iperf3_server; $('fPorts').value=c.iperf3_ports;
   $('iperfGroup').hidden=c.speedtest_engine!=='iperf3';
   updateUnsaved();
@@ -1049,6 +1057,7 @@ function fillForm(c){
 function readForm(){
   return {enabled:$('fEnabled').checked, min_distance:toInt($('fDist').value),
     enable_timer:$('fTimer').checked, min_time:toInt($('fTime').value), packet_loss:$('fLoss').checked,
+    send_to_server:$('fSend').checked, server_token:$('fToken').value.trim(),
     speedtest_engine:$('fEngine').value, iperf3_server:$('fServer').value.trim(),
     iperf3_ports:$('fPorts').value.trim()||DEFAULTS.iperf3_ports};
 }
@@ -1065,10 +1074,11 @@ function saveConfig(){
   log(`Saved new config: ${pyRepr(cfg)}`);
   logEngine(); updateUnsaved(); drawRing(); updateMap();
 }
-['fEnabled','fDist','fTimer','fTime','fLoss','fEngine','fServer'].forEach(id=>{
+['fEnabled','fDist','fTimer','fTime','fLoss','fSend','fToken','fEngine','fServer'].forEach(id=>{
   $(id).addEventListener('input',()=>{ stopTour(); updateUnsaved(); });
   $(id).addEventListener('change',()=>{ stopTour(); updateUnsaved(); });
 });
+$('fSend').addEventListener('change',()=>{ $('tokenGroup').hidden=!$('fSend').checked; });
 $('fEngine').addEventListener('change',()=>{ $('iperfGroup').hidden=$('fEngine').value!=='iperf3'; });
 
 /* ---------- reset ---------- */
@@ -1090,7 +1100,6 @@ runBtn.addEventListener('click',()=>{ stopTour(); runNow(); });
 dlBtn.addEventListener('click',()=>{ stopTour(); openFiles(); });
 clearBtn.addEventListener('click',()=>{ stopTour(); clearResults(); });
 saveBtn.addEventListener('click',()=>{ stopTour(); saveConfig(); });
-driveBtn.addEventListener('click',()=>{ stopTour(); setDriving(!S.driving); });
 resetBtn.addEventListener('click',()=>{ stopTour(); resetAll(); });
 $('filesClose').addEventListener('click',()=>{ $('files').hidden=true; dlBtn.focus(); });
 
@@ -1103,50 +1112,41 @@ async function whenIdle(tok){
   while(S.surveying){ await sleep(100); if(tok!==tourToken) return false; }
   return tok===tourToken;
 }
-// Drive, then park as soon as a new survey starts after 2 s (or at 4 s). Parking at a
-// survey's start point means no further distance test fires, so the step settles within ~8 s.
-async function tourDrive(tok){
-  if(!await whenIdle(tok)) return;
-  const t0=performance.now();
-  setDriving(true);
-  while(true){
-    await sleep(50);
-    if(tok!==tourToken) return;
-    const el=performance.now()-t0;
-    if(el>=4000 || (el>=2000 && S.surveying && S.surveyStartedAt>t0+2000)) break;
-  }
-  setDriving(false);
-}
+// The vehicle keeps moving through the walkthrough; this only starts it once.
+async function tourDrive(tok){ if(tok===tourToken && !S.driving) setDriving(true); }
 const STEPS=[
   {c:'Here\u2019s the job: find out how each carrier really performs along a route. By hand, that means stopping, running a speed test on a laptop, and writing down where you were. Every time.',
-   a:()=>{ flash(driveBtn); }},
-  {c:'Press <b>Drive</b>. With a GPS lock, Mobile Site Survey runs a survey right away, then again whenever the vehicle is <b>at least 50 meters</b> from the last test point. The dashed ring marks that distance.',
+   a:()=>{ flash($('mapSvg')); }},
+  {c:'The vehicle starts down the route. With a GPS lock, Mobile Site Survey runs a survey right away, then again whenever the vehicle is <b>at least 50 meters</b> from the last test point. The dashed ring marks that distance.',
    a:tok=>{ tourDrive(tok); }},
   {c:'Each survey tests <b>every connected modem</b> at the same spot, here Carrier A and Carrier B. The default <b>netperf</b> engine is built into NCOS, so there\u2019s no server or license, and it takes the modems one at a time.',
    a:tok=>{ tourDrive(tok); }},
   {c:'Every result is stamped with the <b>time and GPS position</b>: download, upload, idle latency, jitter, and <b>packet loss</b> from pings sent between surveys. Each modem also gets a row in its own CSV on the router.',
    a:tok=>{ flash($('resultsCard')); tourDrive(tok); }},
   {c:'Want more points? Set the distance to <b>25 meters</b> and save. The points get closer, but not 25 meters apart: a survey and its pings take time, so the distance is a <b>minimum</b>, not a fixed spacing.',
-   a:async tok=>{ if(!await whenIdle(tok)) return; $('fDist').value=25; saveConfig(); flash($('trigDist')); tourDrive(tok); }},
+   a:async tok=>{ $('fDist').value=25; saveConfig(); flash($('trigDist')); tourDrive(tok); }},
   {c:'Now switch the engine to <b>iPerf3</b>, pick a server, and save. Both modems test <b>at the same time</b>, each on its own port from <b>5201-5210</b>, instead of waiting their turn.',
-   a:async tok=>{ if(!await whenIdle(tok)) return; $('fEngine').value='iperf3'; $('iperfGroup').hidden=false;
+   a:async tok=>{ $('fEngine').value='iperf3'; $('iperfGroup').hidden=false;
      $('fServer').value='speedtest.sea11.us.leaseweb.net'; saveConfig(); flash(saveBtn); tourDrive(tok); }},
+  {c:'Turn on <b>Upload results to 5g-ready.io</b>, a free service, and paste your token. Each result is sent as it\u2019s measured, and every router using the <b>same token</b> adds to one shared map, so the whole <b>fleet</b> aggregates in one place.',
+   a:async tok=>{ $('fSend').checked=true; $('tokenGroup').hidden=false; $('fToken').value='demo-fleet-token'; saveConfig(); flash($('trigSend')); tourDrive(tok); }},
   {c:'Parked at a site? Press <b>Run survey now</b> for a one-off test, no movement needed. <b>Time-based tests</b> do the same on a schedule.',
-   a:async tok=>{ if(!await whenIdle(tok)) return; flash(runBtn); runNow(); flash($('trigTime')); }},
+   a:async tok=>{ setDriving(false); flash(runBtn); runNow(); flash($('trigTime')); }},
   {c:'When you\u2019re done, <b>Download results</b> lists one CSV per SIM, with every row\u2019s position, speeds, carrier, and signal. <b>Clear results</b> empties the panel, and the CSV files stay.',
-   a:async tok=>{ if(!await whenIdle(tok)) return; flash(dlBtn); openFiles(); flash(clearBtn); }}
+   a:async tok=>{ flash(dlBtn); openFiles(); flash(clearBtn); }}
 ];
 function stopTour(){
   tourToken++; tourOn=false;
   tourTimers.forEach(clearTimeout); tourTimers=[];
   if(tourRaf) cancelAnimationFrame(tourRaf); tourRaf=null;
-  captionBar.classList.remove('live');
+  captionBar.classList.remove('live'); carSpeed=CAR_PX_PER_S;
   playBtn.innerHTML='<i class="fa-solid fa-play"></i> Play walkthrough';
   $('tourBar').style.width='0'; $('stepCount').textContent='';
 }
 function startTour(){
   stopTour(); resetAll();
   const tok=tourToken; tourOn=true;
+  carSpeed=ROUTE_LEN/66;   // pace the drive so the route lasts the whole tour
   playBtn.innerHTML='<i class="fa-solid fa-stop"></i> Stop walkthrough';
   $('simPanel').scrollIntoView({behavior:'smooth',block:'start'});   // the only scroll in the tour
   STEPS.forEach((s,i)=>{
@@ -1159,7 +1159,7 @@ function startTour(){
   tourTimers.push(setTimeout(()=>{
     if(tok!==tourToken) return;
     stopTour(); setDriving(false);
-    setCaption('That\u2019s Mobile Site Survey. Press <b>Drive</b> to run the route yourself, or change the settings and save.',false);
+    setCaption('That\u2019s Mobile Site Survey. Press <b>Play walkthrough</b> to watch it again, or change the settings and press <b>Run survey now</b>.',false);
   },STEPS.length*STEP_MS));
   const t0=performance.now(), total=STEPS.length*STEP_MS;
   (function tick(){

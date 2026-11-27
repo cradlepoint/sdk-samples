@@ -587,8 +587,8 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <!-- towers -->
             <svg x="59" y="62" width="22" height="22" viewBox="0 0 32 32" fill="var(--text-primary)" aria-hidden="true"><path d="M6 2v4h9v-4h2v4h9v-4h2v6h-10.154l10.154 22h-24l10.154-22h-10.154v-6h2zM20.095 17.644l-4.095-8.871-3.003 6.506 7.097 2.366zM21.179 19.994l-9.098 3.033 12.541 4.426-3.443-7.459zM20.162 28l-11.21-3.957-1.826 3.957h13.036zM10.087 21.583l7.75-2.583-5.684-1.895-2.067 4.478z"/></svg>
             <svg x="279" y="62" width="22" height="22" viewBox="0 0 32 32" fill="var(--text-primary)" aria-hidden="true"><path d="M6 2v4h9v-4h2v4h9v-4h2v6h-10.154l10.154 22h-24l10.154-22h-10.154v-6h2zM20.095 17.644l-4.095-8.871-3.003 6.506 7.097 2.366zM21.179 19.994l-9.098 3.033 12.541 4.426-3.443-7.459zM20.162 28l-11.21-3.957-1.826 3.957h13.036zM10.087 21.583l7.75-2.583-5.684-1.895-2.067 4.478z"/></svg>
-            <text x="54" y="78" text-anchor="end" class="svg-t">T-Mobile</text>
-            <text x="306" y="78" text-anchor="start" class="svg-t">Verizon</text>
+            <text x="54" y="78" text-anchor="end" class="svg-t">Carrier B</text>
+            <text x="306" y="78" text-anchor="start" class="svg-t">Carrier A</text>
             <!-- speed badges -->
             <g class="badge" id="badge1"><rect x="6" y="100" width="70" height="22" rx="4"/><text x="41" y="115" text-anchor="middle" id="badge1t">0.0 Mbps</text></g>
             <g class="badge" id="badge2"><rect x="284" y="100" width="70" height="22" rx="4"/><text x="319" y="115" text-anchor="middle" id="badge2t">0.0 Mbps</text></g>
@@ -680,7 +680,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
       <h4><i class="fa-solid fa-sitemap"></i> Optional: group mode and a speed floor</h4>
       <p>With <code>group_by_carrier</code> or <code>group_by_sim</code>, WAN config is left alone and the router moves to
          the NetCloud Manager group whose name has <code>group_keyword</code> (default <code>prod</code>) plus the carrier or
-         slot, like <code>prod_Verizon</code> or <code>prod_SIM1</code>. That needs API keys. <code>min_speed</code> stops the
+         slot, like <code>prod_Carrier_A</code> or <code>prod_SIM1</code>. That needs API keys. <code>min_speed</code> stops the
          run with an error if no SIM reaches it.</p>
     </div>
   </div>
@@ -691,7 +691,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     <div class="shots-grid single">
       <button class="shot-tile" type="button" data-shot="complete">
         <span class="shot-chrome" aria-hidden="true"><span class="d"></span><span class="d"></span><span class="d"></span><span class="url">router_ip:port · AutoInstall</span></span>
-        <img alt="AutoInstall panel after a finished run: signal meter for Internal SIM1 T-Mobile 4G, the password field, Connect, Switch SIMs, and Start AutoInstall buttons, and a status panel reading WAN reprioritized by download speed with T-Mobile at 175.1 Mbps and Verizon at 90.2 Mbps">
+        <img alt="AutoInstall panel after a finished run: signal meter for Internal SIM1 Carrier B 4G, the password field, Connect, Switch SIMs, and Start AutoInstall buttons, and a status panel reading WAN reprioritized by download speed with Carrier B at 175.1 Mbps and Carrier A at 90.2 Mbps">
         <span class="shot-cap"><span><b>Finished run</b>: WAN reprioritized by download speed, each SIM's carrier and result, the live signal meter, and Download Logs.</span><i class="fa-solid fa-expand" aria-hidden="true"></i></span>
       </button>
     </div>
@@ -724,7 +724,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
           <tr><td><code>text</code></td><td><span class="req">No</span></td><td>Enter password to start auto-install process.</td><td>Text</td><td>Intro text above the signal meter.</td></tr>
           <tr><td><code>logo</code>, <code>logo_dark</code></td><td><span class="req">No</span></td><td>SIM card icon; <code>logo</code> inverted in dark mode</td><td>Base64 image</td><td>Image shown beside the panel title, with an optional dark-mode version.</td></tr>
           <tr><td><code>AutoInstall_Web_web_port</code></td><td><span class="req">No</span></td><td>First free port from 8000, then saved</td><td>1024 to 65535</td><td>Web UI port. Set it to pin the port; delete it and restart to pick one again.</td></tr>
-          <tr><td><code>AutoInstall_Web_port</code></td><td><span class="req">No</span></td><td>None</td><td>1024 to 65535</td><td>Deprecated older name for the web port, used only when <code>AutoInstall_Web_web_port</code> is not set.</td></tr>
         </tbody>
       </table>
     </div>
@@ -802,10 +801,10 @@ const SYSTEM_ID='E3000-ae3';          // from the readme screenshot
 const VERSION='1.1.1';                // package.ini
 // Download speeds and SIM1 signal are from the readme screenshot; upload and SIM2 signal are illustrative.
 const SIMS=[
-  {n:1, slot:'SIM1', port:'Internal', carrier:'T-Mobile', dl:175.1, ul:31.4, rsrp:-87, rsrq:-9},
-  {n:2, slot:'SIM2', port:'Internal', carrier:'Verizon',  dl:90.2,  ul:18.7, rsrp:-98, rsrq:-12},
+  {n:1, slot:'SIM1', port:'Internal', carrier:'Carrier B', dl:175.1, ul:31.4, rsrp:-87, rsrq:-9},
+  {n:2, slot:'SIM2', port:'Internal', carrier:'Carrier A',  dl:90.2,  ul:18.7, rsrp:-98, rsrq:-12},
 ];
-const GROUPS=['Staging','prod_T-Mobile','prod_Verizon','prod_SIM1','prod_SIM2'];   // illustrative NCM groups
+const GROUPS=['Staging','prod_Carrier_B','prod_Carrier_A','prod_SIM1','prod_SIM2'];   // illustrative NCM groups
 const sim=n=>SIMS.find(s=>s.n===n);
 const ps=s=>s.port+' '+s.slot;
 // rsrp_rsrq_to_score(): RSRP -140..-44 and RSRQ -19.5..-3 mapped to 0-100, averaged.
@@ -822,7 +821,7 @@ let S, busy=false, running=false, simTok=0, cancelReq=false, runT0=0, clockIv=nu
 let mode='wan', minSpeed=null;
 function fresh(){
   return {active:0, switching:0, target:0, testing:0,
-          pri:{1:1.1, 2:1.0},          // illustrative starting WAN priorities: Verizon (SIM2) preferred
+          pri:{1:1.1, 2:1.0},          // illustrative starting WAN priorities: Carrier A (SIM2) preferred
           tested:{}, group:'Staging', status:null, msg:'', pct:0,
           runLog:[], logName:null, priFlashUntil:0};
 }
@@ -939,7 +938,7 @@ async function doConnect(){
     elog('Connect: setting the first SIM to always on');
     await wait(2200,tok);
     S.active=1; S.target=0; busy=false;
-    elog('First SIM set to always on: Internal SIM1 T-Mobile 4G connected','ok');
+    elog('First SIM set to always on: Internal SIM1 Carrier B 4G connected','ok');
     render();
   }catch(e){ if(e!=='abort') console.error(e); }
 }
@@ -1149,17 +1148,17 @@ async function typePw(tok){
 }
 // Each step's simulated action finishes within about 8.5 s, so steps never collide.
 const STEPS=[
-  {c:'Here\u2019s a fresh install: two SIMs, and WAN priority happens to favor <b>Verizon</b>. Nobody has checked which carrier is actually faster here. The installer types the password and presses <b>Connect</b> to bring the first SIM up.',
+  {c:'Here\u2019s a fresh install: two SIMs, and WAN priority happens to favor <b>Carrier A</b>. Nobody has checked which carrier is actually faster here. The installer types the password and presses <b>Connect</b> to bring the first SIM up.',
    a:async tok=>{ if(!await whenIdle(tok)) return; if(!await typePw(tok)) return; doConnect(); }},
   {c:'Now <b>Start AutoInstall</b>. The router speed tests the SIM that\u2019s connected, then <b>switches to the next SIM and tests it the same way</b>, with up to 3 tries per SIM.',
    a:async tok=>{ if(!await whenIdle(tok)) return; runInstall(); }},
-  {c:'Here\u2019s the payoff. T-Mobile came in at <b>175.1 Mbps</b> and Verizon at <b>90.2</b>. The app gives T-Mobile the <b>lowest WAN priority number</b>, so the fastest SIM is now primary and Verizon is the backup.',
+  {c:'Here\u2019s the payoff. Carrier B came in at <b>175.1 Mbps</b> and Carrier A at <b>90.2</b>. The app gives Carrier B the <b>lowest WAN priority number</b>, so the fastest SIM is now primary and Carrier A is the backup.',
    a:()=>flash('priCard')},
   {c:'It also leaves a record: a one-line <b>results</b> summary in SDK Data, an alert in NetCloud Manager, and a log file behind <b>Download Logs</b>. With autostart, that results line keeps it from running again on every reboot.',
    a:()=>{ flash('ncmCard'); nudge('dlBtn'); }},
   {c:'Want a floor? Set <b>min_speed</b>. At 200 Mbps no SIM qualifies, so the app <b>stops with an error</b> instead of finishing a weak install, and the button reads <b>Auto-Install Failed! Restart</b>.',
    a:async tok=>{ if(!await whenIdle(tok)) return; setMin(200); flash('sdkCard'); await sleep(400); if(tok!==tourToken) return; runInstall(); }},
-  {c:'Group mode is the other option. With <b>group_by_carrier</b> set, the app leaves WAN priority alone and <b>moves the router to the NetCloud Manager group</b> named for the fastest carrier, here <b>prod_T-Mobile</b>.',
+  {c:'Group mode is the other option. With <b>group_by_carrier</b> set, the app leaves WAN priority alone and <b>moves the router to the NetCloud Manager group</b> named for the fastest carrier, here <b>prod_Carrier_B</b>.',
    a:async tok=>{ if(!await whenIdle(tok)) return; setMin(null); setMode('carrier'); flash('sdkCard'); await sleep(400); if(tok!==tourToken) return; runInstall(); }},
   {c:'Between runs the installer still has the manual tools. <b>Switch SIMs</b> cycles to the next SIM, and the signal meter shows its RSRP, RSRQ, and score once it connects.',
    a:async tok=>{ if(!await whenIdle(tok)) return; doSwitch(); }},

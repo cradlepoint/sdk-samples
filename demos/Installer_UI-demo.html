@@ -351,7 +351,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
 .d-tower{fill:none;stroke:var(--text-primary);stroke-width:2;}
 .d-wave{fill:none;stroke:var(--chart-3);stroke-width:2;opacity:0;transition:opacity .3s;}
 .d-wave.on{opacity:1;}
-.d-fw{fill:var(--light-bg);stroke:var(--chart-2);stroke-width:1.5;}
 @media (prefers-reduced-motion:reduce){.d-lan,.d-wan.flow-down,.d-wan.flow-up{animation:none;}}
 
 .tile-rows{margin-top:.75rem;background:var(--card-surface);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:.6rem .9rem;font-size:.84rem;}
@@ -498,10 +497,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
             <text class="d-small" x="55" y="170" text-anchor="middle">Installer</text>
             <text class="d-small" x="55" y="184" text-anchor="middle">phone or laptop</text>
             <text class="d-small" x="130" y="118" text-anchor="middle">WiFi or LAN</text>
-            <!-- firewall forward -->
-            <rect class="d-fw" x="98" y="138" width="64" height="38" rx="4"/>
-            <text class="d-small" x="130" y="153" text-anchor="middle">LAN to</text>
-            <text class="d-small" x="130" y="167" text-anchor="middle">router zone</text>
             <!-- router -->
             <rect class="d-router" id="routerBox" x="168" y="40" width="144" height="176" rx="8"/>
             <text class="d-label" x="240" y="62" text-anchor="middle">Cradlepoint router</text>
@@ -615,9 +610,8 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     </div>
     <div class="rule">
       <h4><i class="fa-solid fa-routing"></i> Reachable from the LAN</h4>
-      <p>At startup it adds a zone forward from the Primary LAN Zone to the Router Zone with the Default Allow All
-        policy, unless one exists. The page uses the first free port from 8000, saved to
-        <code>Installer_UI_web_port</code>, or the port you pin there.</p>
+      <p>The page uses port 8000. If that is busy, it takes the next free port and saves it to
+        <code>Installer_UI_web_port</code>. You can also pin a port there.</p>
     </div>
   </div>
 
@@ -637,7 +631,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
       </button>
       <button class="shot-tile" type="button" data-shot="speed">
         <span class="shot-chrome" aria-hidden="true"><span class="d"></span><span class="d"></span><span class="d"></span><span class="url">router_ip:port</span></span>
-        <img alt="Speedtest result dialog over the installer page: carrier Verizon Wireless, server Macarne LLC, download 108.50 Mbps, upload 24.44 Mbps, ping 116 ms">
+        <img alt="Speedtest result dialog over the installer page: carrier Carrier A, server Macarne LLC, download 108.50 Mbps, upload 24.44 Mbps, ping 116 ms">
         <span class="shot-cap"><span>An Ookla speedtest result: carrier, server, download, upload, and ping.</span><i class="fa-solid fa-expand" aria-hidden="true"></i></span>
       </button>
     </div>
@@ -662,7 +656,7 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
           <tr>
             <td><code>Installer_UI_web_port</code></td>
             <td><span class="req">No</span></td>
-            <td>First free port from 8000, then saved</td>
+            <td>Port 8000, or the next free port (saved)</td>
             <td>Web UI port, 1024 to 65535. Set it to pin the port; delete it and restart to pick one automatically again. An invalid or busy port makes the app stop itself and log why.</td>
           </tr>
         </tbody>
@@ -671,7 +665,6 @@ h2.section-title{font-size:1.4rem;margin-bottom:1.1rem;text-align:center;}
     <ul class="setup-notes">
       <li>Set fields in Ericsson NetCloud Manager under the device or group's <b>SDK Data</b>, or on the router under <b>System &gt; SDK Data</b>. A new installer password applies on the next save or speedtest; a port change needs an app restart.</li>
       <li>Open the page at <code>http://router_ip:&lt;port&gt;</code> from the router's WiFi or a LAN port. The port is in the app log at startup, for example <code>Web server started on port 8000</code>.</li>
-      <li>The app adds the Primary LAN Zone to Router Zone firewall forward itself, so LAN clients can reach the page.</li>
       <li>For Ookla results, bundle an <code>ookla</code>, <code>speedtest</code>, or <code>speedtest-cli</code> binary in the app folder. Without one, the built-in Netperf test runs.</li>
       <li>Signal monitor needs a modem as the primary WAN; otherwise each value shows N/A.</li>
     </ul>
@@ -737,7 +730,7 @@ const MODAL_MS=2000;                    // index.html: save and error dialogs cl
 const SPEED_MS=6000;                    // demo only: compressed speedtest (real Netperf is 10 s down + 10 s up)
 const STEP_MS=10000;                    // walkthrough: fixed 10 s per narrated step
 // Example figures from the readme's Ookla result screenshot.
-const RESULT={dl:'108.50', ul:'24.44', ping:'116', isp:'Verizon Wireless', server:'Macarne LLC'};
+const RESULT={dl:'108.50', ul:'24.44', ping:'116', isp:'Carrier A', server:'Macarne LLC'};
 
 const $=id=>document.getElementById(id);
 const el={
@@ -816,8 +809,7 @@ function startup(){
   const lines=[
     ['Starting... edit Installer Password under System > SDK Data.'],
     ['Speedtest engine: '+(st.engine==='ookla'?'Ookla':'Netperf (built-in)')],
-    ['Forwarded Primary LAN Zone to Router Zone with Default Allow All policy'],
-    ['Bound port 8000 (discovered, saved to Installer_UI_web_port)'],
+    ['Bound default port 8000'],
     ['Web server started on port 8000','ok']
   ];
   lines.forEach((l,i)=>later(250*i,()=>log(l[0],l[1])));
@@ -963,7 +955,7 @@ function stopTour(){
 function at(ms,tok,fn){ tourTimers.push(setTimeout(()=>{ if(alive(tok)) fn(); },ms)); }
 
 const STEPS=[
-  {caption:'Here\u2019s a new site. The Cradlepoint router starts Installer_UI, which opens a firewall forward from the LAN to the router and serves its page on <b>port 8000</b>. The installer joins the WiFi or a LAN port and browses to it.',
+  {caption:'Here\u2019s a new site. The Cradlepoint router starts Installer_UI, which serves its page on <b>port 8000</b>. The installer joins the WiFi or a LAN port and browses to it.',
    run:async()=>{}},
   {caption:'The installer types the site\u2019s new WiFi name and password, plus a <b>wrong installer password</b>. Save is refused with <b>Incorrect Password!</b>, and nothing on the router changes.',
    run:async tok=>{
